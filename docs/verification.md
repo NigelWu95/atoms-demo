@@ -367,6 +367,34 @@ Java 保持 17.0.5。只正常重启本项目 8080/8081 服务，V009 已在正�
 
 T25–T28 的本地能力已完成。下一步为 T29 独立白名单网关和受控隧道接入；公开 HTTPS/独立域名 Cookie/外网验证尚未完成，不允许把 5173/8080 整站转发公网。T21 重启演练、T22 完整限制、T24 第二轮真实修改/T31 多类型模型质量继续保留待办。设计及回退边界见 [ADR-010](decisions/010-publication-and-live-state.md)。
 
+## 单服务器发布包 · 本地 HTTPS 验收
+
+2026-10-08。用户改为云服务器原生运行整套平台及 PostgreSQL，应用继续 `/a/<slug>` 路径发布；ADR-011 取代前述 ngrok 部署方向。本轮只准备并验证可上传的发布包，没有 SSH、没有实际公网部署，也没有调用 DeepSeek 或修改 `.env.local`。
+
+| 检查 | 结果 |
+|---|---|
+| `node scripts/release.mjs` | 完整构建通过，输出约 25 MB tar.gz、归档 SHA-256、逐文件 SHA256SUMS 和源码 revision/dirty 元信息 |
+| 后端 `clean verify` | 19 单元 + 42 PostgreSQL 集成测试通过，无失败/跳过；包含新增 2 项 server profile / Secure Cookie / 本机 TLS 代理测试 |
+| 前端 typecheck / lint / format:check / test:unit / build | 通过，19 文件 100 项单元测试；JS gzip 95.51 kB、CSS gzip 4.40 kB |
+| `node --test scripts/release.test.mjs` | 2 项通过：白名单和哈希/重复打包不覆盖；源码映射、符号链接和缺失产物拒绝 |
+| `npm audit --audit-level=high` | 当前锁文件 0 已知漏洞；没有新增或升级前后端依赖 |
+| `node scripts/smoke-release.mjs .../atoms-demo-<release-id>` | 生产 JAR + 静态资源经回环 HTTPS 代理，3 项真实 Chrome 测试通过，24.9 秒 |
+| 本地 `test:e2e:runtime` 回归 | 15 项全部通过，1.7 分钟；没有跳过或修改既有断言 |
+
+实际验收使用发布包内 `server/start.sh` 启动 8082，显式独立配置连接 `atoms_demo_test` / `atoms_test`，模型 Key 为空、预算 0、Worker 关闭。已有 8081 夹具入口只用于向测试库装载固定待办，测试代码没有打入生产 JAR。Docker Desktop 仅运行一次性 Nginx TLS 测试代理，公网服务器不需要 Docker。使用官方镜像镜像源 `public.ecr.aws/docker/library/nginx`，固定 digest `sha256:0985e772fb9f729e6fa0980da05fca5d9c468e870eed43071545afa9d2e27d94`，只绑定 `127.0.0.1:18443`。测试证书不进入发布包；结束后停止拥有的代理/Java 子进程并删除临时凭据和测试私钥，未删除用户数据。
+
+浏览器证据：HTTPS 首页创建访客和项目，深链接刷新恢复；已有固定产物通过预览检查后发布，链接是配置的 HTTPS origin 加 `/a/<slug>`；访客新增任务刷新仍在，另一访客看不到；显式下线后无法新访问。正常首页与公开页没有 console warning/error 或 pageerror。运行 document 只有一个 sandbox CSP 且 XFO 为 SAMEORIGIN，未被 Nginx 静态页策略覆盖；未知公开 API 返回 JSON 404、缺失 assets/测试页/点文件返回 404、超过 512 KiB 的请求返回 413；伪造 X-Forwarded-Proto 被代理覆盖，仍返回 HTTPS HSTS 和安全 Cookie。已查看桌面及 390px 截图，位于 `frontend/test-results-release/release-packaged-preview-p-074de-tate-work-through-nginx-TLS-chromium/`，不公开上传测试会话或 trace。
+
+测试驱动/审查记录：ServerProfileIT 先因缺少 Secure 标记失败，新增 server 配置后通过；前端新增服务器 origin 文案测试先因旧“工作台仅本地”文案失败，改为准确描述私有数据边界后通过。首次归档拒绝未列入白名单的 favicon.svg，新增最小复现再明确允许该既有静态资源，没有放宽为复制整个目录。按 code-review-and-quality 暂时允许 `.map`，拒绝测试正确失败；恢复后 2 项全通过。Maven clean 插件下载和 npm audit 初次受沙箱网络限制，按审批重跑后成功；Docker Hub 返回 EOF 后从官方镜像 ECR 源拉取，没有退出/更改 Docker 登录。
+
+本地运行时回归的首轮 4 通过 / 11 失败，失败快照为浏览器 ERR_CONNECTION_REFUSED，未到达 5174 工作台；后续沙箱内 webServer 启动检查也失败。对同一已启动端口，沙箱内 curl 连接失败、获批的沙箱外 curl 返回 200。显式让回环请求绕过系统代理，并在沙箱外重跑后 15 项全部通过，没有改业务代码、延长断言超时或忽略失败。
+
+五轴复核：复用全部既有业务 API 和发布数据模型，无新增迁移/账号流程/应用容器；配置与发布物分离，启动脚本不执行配置为 shell；JAR 和白名单静态文件不含夹具、密码、个人会话、数据库备份或 node_modules。后端只监听回环，仅信任本机代理；Nginx 不添加 API CSP/XFO、不缓存/缓冲 SSE，更新采用单实例停机切换，不同时运行两个 Worker。编译期包检查不会替代目标主机的安全审核。
+
+边界：本地 HTTPS 使用测试证书，不代表真实证书/DNS/外网已通过。原生 Linux 安装、systemd 启停、数据库首次初始化/备份恢复、实际反代下的 SSE 重连和进程重启持久化仍等 SSH 后验收；身份限流与存储总配额也没有因打包而完成。新服务器默认新库且预算 0，不自动迁移本机业务数据或恢复模型额度。T29 总任务继续未完成。部署流程由 incremental-implementation / shipping-and-launch 约束为可验证发布包、独立凭据、回退说明和明确的远程验收门槛。
+
+实现提交：`aac1823` 服务器配置、`52258d0` 部署中立文案、`02bb49e` 发布包/模板、`3c1c604` 生产包浏览器验证。未推送或合并。打包命令和远程操作说明见 [服务器部署说明](../deploy/server/README.md)。
+
 ## 官方实现依据
 
 - [Vue 表单及中文输入法](https://vuejs.org/guide/essentials/forms.html)

@@ -41,7 +41,7 @@ Spring MVC 官方支持 `SseEmitter`；Go 的 `net/http` 提供流式 flush，`c
 | 会话 | Spring Security + Spring Session JDBC | Cookie 会话与持久化 |
 | 模型 | 自定义 ModelGateway + HTTP 客户端 | 先接通一个实际可用模型 |
 | 数据库 | PostgreSQL | JSONB、项目和任务状态 |
-| 入口部署 | 本地创作平台 + 独立公开网关 + ngrok 类 HTTPS 隧道 | 只公开已发布应用，见 ADR-008 |
+| 入口部署 | 单云服务器：Nginx + JAR + 原生 PostgreSQL | 整套平台同源，应用按路径发布，见 ADR-011 |
 
 访问时 Spring 3.5 文档列出 Java 17 为最低要求，并提示最新稳定系列为 4.1；这里偏向 3.5 是对熟悉度与既有依赖的选择，不表示它是最新系列或承诺长期支持。开工时锁定可下载、通过测试的补丁版本和镜像标签。[Spring 系统要求](https://docs.spring.io/spring-boot/3.5/system-requirements.html)
 
@@ -271,7 +271,7 @@ P0 所有版本保持 stateSchemaVersion=1，只允许兼容性新增字段并�
 
 ## 8. API、身份与额度边界
 
-- 创作端与公开端分入口，各自保持前端/API 同源。公开端只转发白名单路径，不代理创作 API；HTTPS 会话 Cookie 为 HttpOnly、Secure、SameSite，不向生成代码暴露会话值。本地 HTTP 开发与公网 Cookie 配置须分开验证。
+- 创作端与应用外壳部署在同一站点，前端/API 同源；私有资源按所有者鉴权，发布应用只读已发布版本。HTTPS 会话 Cookie 为 HttpOnly、Secure、SameSite，不向生成代码暴露会话值。本地 HTTP 开发与公网 Cookie 配置须分开验证。
 - 写接口校验 CSRF token；启动会话前从允许公开访问的 CSRF 获取接口领取。
 - Spring Security 负责会话、密码验证和安全上下文；所有项目查询仍检查 ownerId。
 - 模型密钥仅在服务端环境；供应商 URL 由部署配置指定，不接受访客提交任意地址。
@@ -282,23 +282,23 @@ P0 所有版本保持 stateSchemaVersion=1，只允许兼容性新增字段并�
 
 ## 9. 部署结构与运行条件
 
-2026-10-07 用户明确：创作平台不开放公网，仅已发布的用户应用需要公网链接。以下替代原全站云部署目标，详见 [ADR-008](../decisions/008-local-studio-public-apps.md)；公开网关和隧道尚未实现。
+2026-10-08 用户改为：整套平台与 PostgreSQL 原生运行在一台云服务器，保留与本地相同的路径访问方式。详见 [ADR-011](../decisions/011-single-server-release.md)；取代 ADR-008 的 ngrok 计划。当前只准备发布包，尚未连接实际云服务器。
 
 ```text
-本地创作者 → 127.0.0.1:5173 → backend:8080 → LLM API / PostgreSQL
-公网访问者 → ngrok HTTPS → 127.0.0.1:8090（计划独立网关）
-                            ├─ /a/:slug + 公开外壳资源
-                            ├─ 公开应用 API + 必需的访客/CSRF 接口 → backend
-                            └─ 其他路由/方法 → 拒绝（无创作 SPA fallback）
+浏览器 → Nginx HTTPS
+          ├─ /、/projects/:id、/a/:slug → Vue 静态资源
+          └─ /api/* → 127.0.0.1:8080 Spring Boot 单实例
+                           ├─ 127.0.0.1:5432 PostgreSQL
+                           └─ DeepSeek（显式预算授权）
 ```
 
 独立发布应用首版走 `/a/:slug`，不为每个项目启动服务进程。公开外壳只下载 publication 指定的快照，缓存必须随版本键变化；发布元信息短缓存或不缓存，避免更新后仍取旧指针。
 
-数据库不暴露到公网；容器重建保留数据卷。日志包含 runId、阶段、耗时、错误类型和供应商用量，不默认记录完整提示、源码、密钥和业务数据。
+数据库和后端内部端口不暴露到公网；程序在 `/opt/atoms-demo/releases/`，外部配置在 `/etc/atoms-demo/`，数据库文件与二者分离。更新发布包不覆盖凭据、不重建数据库。日志不默认记录完整提示、源码、密钥和业务数据。
 
-无需 Redis、Kubernetes、向量数据库、独立消息中间件。不直接转发 5173/8080/5432 或测试端口；端口不同不等于安全隔离，还要验证路径/方法白名单、服务端鉴权、转发头、Cookie 和 CSP。生成与 SSE 留在本地，公网使用应用不触发模型请求。
+无需 Docker、Redis、Kubernetes、向量数据库或独立消息中间件。服务器只运行 Java 17、PostgreSQL 17、Nginx 与 systemd，不用 Vite dev/preview 托管生产。代理保持 API 错误与受限 document 的响应头，SSE 禁止缓冲；生成仍需明确预算，公开应用使用本身不触发模型调用。
 
-实际接入时需要本地配置隧道凭据与可用 HTTPS 域名，再做外部网络验收；不在聊天中提供 token。本机休眠、关机、断网会使链接不可访问，免费隧道可能有提示页及额度限制。没有将本地隧道描述为持续托管服务。
+实际接入时确认 SSH 登录方式、Linux 发行版、已有服务、域名/证书、访问范围和防火墙，再安装部署并做外网验收。私钥、密码与模型 Key 不发到聊天。单服务器仍是共同故障域，不承诺高可用；备份恢复、重启持久化、限流与总配额不能以“能启动”代替验收。
 
 ## 10. 项目目录建议
 
