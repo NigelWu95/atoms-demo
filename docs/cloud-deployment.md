@@ -4,9 +4,9 @@
 
 ## 访问和当前边界
 
-- 工作台：<https://118.195.239.8:8443>；发布链接 origin 同此地址，应用沿用 `/a/<slug>`。
-- 当前使用单独在服务器生成的 30 天自签名证书，不是公信证书。浏览器会警告，须核对证书后信任；未关闭 Secure Cookie 或改用公网 HTTP。
-- 证书有效期至 **2026-11-07 02:15:58（Asia/Shanghai）**，没有自动续期。SHA-256 指纹：`C5:4F:98:43:36:47:87:F5:AA:3F:01:C6:6B:5C:CD:69:4F:9E:AA:85:09:BE:B2:C7:D9:7F:A1:FF:97:34:4D:34`。
+- 工作台：<http://118.195.239.8:8443>；发布链接 origin 同此地址，应用沿用 `/a/<slug>`。用户明确要求直接 HTTP，已关闭此端口的 TLS，不自动跳 HTTPS。
+- 这是显式的临时 Demo 例外，HTTP 流量未加密。独立 Cookie `ATOMS_HTTP_SESSION` 保留 HttpOnly / SameSite=Lax，但不含 Secure；旧 HTTPS 访客数据保留，不自动映射到新 HTTP 访客。
+- 原 HTTPS 自签证书仅为回退保留，有效期至 **2026-11-07 02:15:58（Asia/Shanghai）**，没有自动续期。SHA-256 指纹：`C5:4F:98:43:36:47:87:F5:AA:3F:01:C6:6B:5C:CD:69:4F:9E:AA:85:09:BE:B2:C7:D9:7F:A1:FF:97:34:4D:34`。
 - 使用全新数据库，没有上传本地项目、会话或 `.env.local`。云端 Key 为空、累计调用上限为 0，因此 **尚不能生成应用**；密钥同步和新的调用预算须另行授权。云端模型请求记账为 0，本地 11 次记录未改动。
 - 全站采用既有访客模式，项目按所有者隔离。身份频率限制、总存储配额、长期数据清理仍待完成；不适合无人监管地长期开放。侧栏个别“本地”字样仍是既有展示文案，不代表请求发往开发机。
 
@@ -18,22 +18,22 @@
 
 | 项目 | 位置 / 状态 |
 |---|---|
-| 发布版本 | `atoms-demo-XmTJCF`，源码 `d2602bf5c257658e824be49340c5a2e987830a7d`，打包时 dirty=false |
-| 程序 | `/opt/atoms-demo/releases/atoms-demo-XmTJCF`；`/opt/atoms-demo/current` 为其符号链接 |
+| 发布版本 | `atoms-demo-Dpprat`，源码 `e1702d04e4e0e21a46c798d1e394fba30c723100`，打包时 dirty=false |
+| 程序 | `/opt/atoms-demo/releases/atoms-demo-Dpprat`；`/opt/atoms-demo/current` 为其符号链接；旧 `atoms-demo-XmTJCF` 保留 |
 | 外部配置 | `/etc/atoms-demo/application.properties`，root:atoms / 0640，目录 0750 |
-| TLS | `/etc/atoms-demo/tls/server.crt`、`server.key`；私钥 root / 0600，目录 0700 |
+| TLS（未启用） | `/etc/atoms-demo/tls/server.crt`、`server.key` 为回退保留；私钥 root / 0600，目录 0700 |
 | 后端服务 | `atoms-demo.service`，非 root 的 `atoms` 账号，单实例 |
-| 主机特有配置 | `/etc/systemd/system/atoms-demo.service.d/runtime.conf`，Java 路径、PG17 启动顺序、内存和正常退出码 |
-| Nginx 站点 | `/etc/nginx/conf.d/atoms-demo.conf`，监听 `8443 ssl`；路由/安全头在 `/etc/nginx/atoms-demo/` |
+| 主机特有配置 | `/etc/systemd/system/atoms-demo.service.d/runtime.conf`，Java 路径、PG17 启动顺序、内存和正常退出码；`http-demo.conf` 配置独立 HTTP Cookie |
+| Nginx 站点 | `/etc/nginx/conf.d/atoms-demo.conf`，监听明文 `8443`；路由/安全头在 `/etc/nginx/atoms-demo/`，HTTP 不发 HSTS |
 | 数据库 | `atoms_demo` / schema `atoms` / 受限角色 `atoms_app`；数据目录 `/var/lib/pgsql/17/data` |
 | 数据库服务 | `postgresql-17.service`；本机 peer、回环 TCP SCRAM-SHA-256，数据页校验已开启 |
-| 公网监听 | SSH 22、HTTPS 8443；8080 和 5432 仅回环监听 |
+| 公网监听 | SSH 22、HTTP 8443；8080 和 5432 仅回环监听 |
 
 三个服务均 active/enabled；没有修改 SSH、系统防火墙或云安全组。安装时新增的 Nginx 默认欢迎页配置保留为 `default.conf.atoms-disabled`，不会额外监听 80。程序目录中所有文件仍通过发布包 SHA256SUMS 校验；服务器特有配置在包外，不回写已发布归档。
 
 第一次重启时，JVM 已优雅关闭，但 systemd 将退出码 143 记作失败。按 [Spring Boot systemd 示例](https://docs.spring.io/spring-boot/how-to/deployment/installing.html) 在 drop-in 加入 `SuccessExitStatus=143`；原配置保留为 `runtime.conf.before-exitfix`。再次实际启停验证 `ExecMainStatus=143`、`Result=success`，启动后 health=UP、NRestarts=0。仓库服务模板和回归测试已同步修正，历史发布包不改写。
 
-## 已验收
+## 首次 HTTPS 部署验收（历史）
 
 - SSH 严格校验已有主机密钥；上传前后归档校验、解包后 13 个文件哈希一致。
 - Flyway V000–V009 共 10 次迁移成功，重复启动不重新初始化。
@@ -45,9 +45,22 @@
 
 浏览器只对从 SSH 证书计算得到的 SPKI 放行；这证明应用在信任该证书后的表现，不等于普通浏览器已公信。验收脚本和截图在开发机临时目录 `/private/tmp/atoms-cloud-deploy.A3b2w7/`，不上传会话或 trace。
 
+## HTTP 切换验收（当前）
+
+- 原 400 正文为 `The plain HTTP request was sent to HTTPS port`，与 Nginx `listen 8443 ssl` 一致。现公网首页 200、`/api/health` 为 UP，三个服务 active，后端 NRestarts=0。
+- 本地打包测试 3 项、前端 106 项、后端单测 20 项和真实 PostgreSQL 集成测试 43 项通过；类型/格式/lint/构建通过；实际 Chrome runtime 回归 15 项通过，包含预览、保存、发布与下线。新增测试先失败后修复；反转 HTTP 同源判断时 4 项测试失败，恢复后 13 项发布解码测试通过。
+- 完整构建的候选包与提交后的正式包 13 个载荷哈希完全一致；服务器再次校验归档与解包文件。未引入依赖或数据库迁移，也未使用模型。
+- 独立 Chrome 无证书放行、无安全上下文覆盖参数：实测 `isSecureContext=false`、`crypto.randomUUID` 不存在，仍可建立 HTTP 访客、创建“HTTP 部署验收：不调用模型”项目、刷新恢复；第二访客读取私有项目被拒绝。
+- 模拟浏览器保留旧 Secure `ATOMS_SESSION` 时，新的 HTTP Cookie 仍正常工作；检查 HttpOnly / SameSite=Lax / 非 Secure，缺 CSRF 的写请求为 403。管理页 CSP/nosniff 保留、无 HSTS；点文件、缺失资源、测试入口及未知公开 API 保持 404；正常页面控制台无 warning/error/pageerror。已检查桌面和 390px 截图。
+- 初次切换的即时 HTTP 探测触发自动回退，数据库未恢复或删除。日志显示 Nginx ExecReload 仅发 HUP，随后新旧 worker 交替；改为有界就绪探测后实测第一笔 400、第二笔 200，成功切换。见 [Nginx 重载机制](https://nginx.org/en/docs/control.html)。这不是放宽 200 验收要求。
+
+本轮验收脚本和截图保留在 `/private/tmp/atoms-http-deploy.F425WE/`，远端切换脚本位于 `/var/tmp/atoms-http-deploy.X6eNYZ/`。本轮未重新验收 HTTP 会话跨后端重启，也未将本地 runtime 通过冒称为云端真实生成/发布闭环。
+
 ## 备份及运维
 
 已执行 `pg_dump -Fc`，备份为 `/var/backups/atoms-demo/atoms-demo-initial-20261008.dump`，root / 0600，目录 0700。恢复到独立临时库验证了 10 次迁移、1 个项目、调用预算记账 0；临时恢复库已删除，正式库未覆盖，备份保留。该备份在同机且未加密，不是异地灾备；自动定时、加密异地备份及保留策略仍待落实。未迁移或备份开发机业务数据。
+
+HTTP 切换前再次备份到 `/var/backups/atoms-demo/http-switch.hzH19S/`（目录 0700）：`database.dump` 为 0600，`pg_restore --list` 通过，但未对此次新备份再做恢复演练；另含原外部配置、HTTPS 站点、静态安全头。第一次自动回退的备份 `http-switch.GKMCaI/` 同样保留。数据库没有被重建或覆盖。
 
 常用命令（通过 SSH 在服务器执行）：
 
@@ -61,6 +74,6 @@ systemctl restart atoms-demo
 
 配置修改后重启后端，Nginx 配置改动须先 `nginx -t` 再 reload。不要输出完整配置、密码或 Cookie。启用 DeepSeek 前，确认密钥转移授权、累计调用预算和工作台开放范围；不删除预算记账。后端仍只允许单实例。
 
-更新/回退遵循 [部署说明](../deploy/server/README.md)：备份 → 停后端 → 切换已校验版本 → 启动检查。当前是首个部署版本，没有更早的云端版本可回退；失败时停止应用入口并保留数据库/配置，重新部署已验证版本。不得将恢复数据库当成无损代码回退。
+更新/回退遵循 [部署说明](../deploy/server/README.md)：备份 → 停后端 → 切换已校验版本 → 启动检查。回退至旧 `atoms-demo-XmTJCF` 时，必须同时恢复上述备份内的外部配置、HTTPS 站点和静态安全头，将 `http-demo.conf` 移出 systemd drop-in 目录后 daemon-reload，再启动后端、检查代理配置并重载。等待协议入口就绪，不以发出 reload 信号视为完成；旧证书必须仍有效。不恢复数据库、不删除新 HTTP 期间产生的数据，不将恢复数据库当成无损代码回退。
 
 尚未验收：云端真实模型生成、代理后的生成 SSE/重连、云端实际生成版本发布与 LIVE 数据闭环、活动任务崩溃恢复、整机重启。它们不因站点已可访问而算完成，T29 总项继续保留未完成。
