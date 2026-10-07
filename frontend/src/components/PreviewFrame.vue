@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { onMounted, onBeforeUnmount, ref } from 'vue'
 import type { Version } from '../api/artifacts'
-import { createRuntimeBridge, type BridgeStatus } from '../runtime/bridge'
+import type { BridgeStatus } from '../runtime/bridge'
+import { mountFrame } from '../runtime/mountFrame'
 import { createPreviewContext, type PreviewMode } from '../runtime/previewContext'
 import { validateScript } from '../runtime/validateScript'
 import type { Observation } from '../api/previewReports'
@@ -44,14 +45,10 @@ function reload() {
     return
   }
   observation.value.checks = ['SCRIPT_PARSE']
-  const channelId = crypto.randomUUID()
-  const frame = document.createElement('iframe')
-  frame.title = '应用交互预览'
-  frame.setAttribute('sandbox', 'allow-scripts')
-  frame.referrerPolicy = 'no-referrer'
-  const bridge = createRuntimeBridge(
-    frame,
-    channelId,
+  if (!container.value) return
+  cleanup = mountFrame(
+    container.value,
+    `/api/projects/${encodeURIComponent(props.version.projectId)}/versions/${encodeURIComponent(props.version.id)}/document?previewMode=${props.mode}`,
     createPreviewContext(
       props.version.projectId,
       props.version.id,
@@ -60,23 +57,6 @@ function reload() {
     ),
     report,
   )
-  let loaded = false
-  frame.addEventListener('load', () => {
-    if (revision !== current) return
-    if (loaded) {
-      bridge.dispose()
-      report('error', '预览发生导航，旧连接已关闭。请手动重新加载。')
-      return
-    }
-    loaded = true
-    bridge.start()
-  })
-  frame.src = `/api/projects/${encodeURIComponent(props.version.projectId)}/versions/${encodeURIComponent(props.version.id)}/document?previewMode=${props.mode}#atoms-channel=${channelId}`
-  container.value?.replaceChildren(frame)
-  cleanup = () => {
-    bridge.dispose()
-    frame.remove()
-  }
 }
 onMounted(reload)
 onBeforeUnmount(() => {
