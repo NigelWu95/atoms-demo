@@ -104,3 +104,20 @@ it('labels a local URL honestly and preserves a selectable link when clipboard p
     wrapper.unmount()
   }
 })
+it('uses the configured server origin without claiming the studio is local-only', async () => {
+  vi.mocked(getPublication).mockResolvedValue({
+    ...published,
+    publicUrl: 'https://atoms.example.com' + published.publicPath,
+  })
+  const wrapper = await open()
+  try {
+    expect(wrapper.get<HTMLInputElement>('#publication-url').element.value).toBe(
+      'https://atoms.example.com' + published.publicPath,
+    )
+    expect(wrapper.get('label[for="publication-url"]').text()).toBe('应用访问链接')
+    expect(wrapper.text()).not.toContain('创作工作台保持本地访问')
+    expect(wrapper.text()).toContain('私有对话和预览数据不会公开')
+  } finally {
+    wrapper.unmount()
+  }
+})

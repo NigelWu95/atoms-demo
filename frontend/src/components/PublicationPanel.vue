@@ -74,7 +74,7 @@ async function offline() {
           publication?.status === 'PUBLISHED' ? '已发布' : publication?.slug ? '已下线' : '未发布'
         }}</span>
       </div>
-      <p>只公开选定版本的应用。后续编辑不会自动更新已发布版本，创作工作台保持本地访问。</p>
+      <p>只公开选定版本的应用。后续编辑不会自动更新已发布版本，私有对话和预览数据不会公开。</p>
       <p v-if="publication">
         当前版本 {{ versionNo ? `V${versionNo}` : '尚无版本' }} ·
         {{ publication.versionNo ? `上次发布 V${publication.versionNo}` : '尚未发布' }}
