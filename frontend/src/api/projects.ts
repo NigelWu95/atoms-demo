@@ -5,6 +5,7 @@ export type Project = {
   name: string
   ownerId: string
   projectRevision: number
+  currentVersionId?: string | null
   createdAt: string
   updatedAt: string
 }
@@ -29,6 +30,12 @@ function decodeProject(value: unknown): Project {
     name: value.name,
     ownerId: value.ownerId,
     projectRevision: value.projectRevision,
+    currentVersionId:
+      value.currentVersionId === undefined || value.currentVersionId === null
+        ? null
+        : typeof value.currentVersionId === 'string'
+          ? value.currentVersionId
+          : protocolFailure(),
     createdAt: value.createdAt,
     updatedAt: value.updatedAt,
   }

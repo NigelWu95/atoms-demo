@@ -7,6 +7,7 @@ import { useSessionStore } from '../stores/session'
 import { getProject, type Project } from '../api/projects'
 import { errorMessage } from '../api/client'
 import ProjectHeading from '../components/ProjectHeading.vue'
+import ArtifactPanel from '../components/ArtifactPanel.vue'
 
 const draft = useDraftStore()
 const session = useSessionStore()
@@ -48,8 +49,6 @@ watch(
   { immediate: true },
 )
 const panel = ref<'conversation' | 'preview'>('conversation')
-const view = ref<'preview' | 'code'>('preview')
-const device = ref<'desktop' | 'mobile'>('desktop')
 </script>
 
 <template>
@@ -121,49 +120,7 @@ const device = ref<'desktop' | 'mobile'>('desktop')
           hint="生成能力尚未接入"
         />
       </section>
-      <section class="preview-panel" aria-labelledby="preview-title">
-        <div class="preview-toolbar">
-          <div role="group" aria-label="产物视图">
-            <button type="button" :aria-pressed="view === 'preview'" @click="view = 'preview'">
-              预览</button
-            ><button type="button" :aria-pressed="view === 'code'" @click="view = 'code'">
-              代码
-            </button>
-          </div>
-          <div role="group" aria-label="预览尺寸">
-            <button type="button" :aria-pressed="device === 'desktop'" @click="device = 'desktop'">
-              桌面</button
-            ><button type="button" :aria-pressed="device === 'mobile'" @click="device = 'mobile'">
-              手机
-            </button>
-          </div>
-        </div>
-        <div class="preview-stage">
-          <div class="preview-canvas" :class="{ 'mobile-canvas': device === 'mobile' }">
-            <div class="browser-decoration" aria-hidden="true"><i /><i /><i /></div>
-            <div class="preview-empty">
-              <span class="preview-icon" aria-hidden="true">{{
-                view === 'preview' ? '◫' : '⌘'
-              }}</span>
-              <h2 id="preview-title">
-                {{ view === 'preview' ? '还没有生成应用' : '还没有可查看的源码' }}
-              </h2>
-              <p>
-                {{
-                  view === 'preview'
-                    ? '生成完成后，你可以在这里直接使用应用。'
-                    : '真实生成的 HTML、CSS 和 JavaScript 将显示在这里。'
-                }}
-              </p>
-              <span class="outline-badge">等待生成能力接入</span>
-            </div>
-          </div>
-        </div>
-        <footer class="preview-status">
-          <span><span class="neutral-dot" aria-hidden="true" />暂无产物</span
-          ><span>未执行预览检查</span>
-        </footer>
-      </section>
+      <ArtifactPanel :project="project" />
     </div>
   </div>
 </template>
