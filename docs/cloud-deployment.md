@@ -18,8 +18,8 @@
 
 | 项目 | 位置 / 状态 |
 |---|---|
-| 发布版本 | `atoms-demo-Dpprat`，源码 `e1702d04e4e0e21a46c798d1e394fba30c723100`，打包时 dirty=false |
-| 程序 | `/opt/atoms-demo/releases/atoms-demo-Dpprat`；`/opt/atoms-demo/current` 为其符号链接；旧 `atoms-demo-XmTJCF` 保留 |
+| 发布版本 | `atoms-demo-X4tLzj`，源码 `5817a068fe2ddc465e0971a04f3c38768cfd8e8d`，打包时 dirty=false |
+| 程序 | `/opt/atoms-demo/releases/atoms-demo-X4tLzj`；`/opt/atoms-demo/current` 为其符号链接；旧 `atoms-demo-Dpprat`（HTTP）和 `atoms-demo-XmTJCF`（HTTPS）保留 |
 | 外部配置 | `/etc/atoms-demo/application.properties`，root:atoms / 0640，目录 0750 |
 | TLS（未启用） | `/etc/atoms-demo/tls/server.crt`、`server.key` 为回退保留；私钥 root / 0600，目录 0700 |
 | 后端服务 | `atoms-demo.service`，非 root 的 `atoms` 账号，单实例 |
@@ -70,6 +70,22 @@
 
 本次配置备份位于 `/var/backups/atoms-demo/model-budget.52ShPQ/application.properties`（文件 root / 0600，目录 0700），包含密钥，禁止公开或输出。备份额度为 0，可用于回退此次变更；若后续修改过其他配置，停用生成应只将额度改回 0 并重启，保留当前其他配置和调用记账。上限用尽不自动扩容，增加额度需要再次确认。
 
+## 长度限制修复（2026-10-08）
+
+用户报告 2048 生成失败。任务 `de708451-c4fc-4535-b8be-432d34f797b7` 的规划成功，BUILDING 约 58 秒后因 length 返回 MODEL_INCOMPLETE，没有保存版本。旧实现丢弃该响应 usage，因此不能追溯其精确 token 或推理消耗；不能将错误误认成超时或 100 次额度耗尽。
+
+用户确认后将云端 `DEEPSEEK_MAX_TOKENS=32768`、`DEEPSEEK_TIMEOUT_SECONDS=180`；总上限仍为 100，不更改已有记账。模型密钥、HTTP、数据库及其他配置经不输出内容的比较确认未变。新版本将非 stop completion 的安全结束原因、输出上限及用量写入关联日志，并把已知失败调用用量落库；未取得响应的调用仍保留 UNKNOWN，不自动重试、不保存截断代码。详见 [ADR-006](decisions/006-deepseek-generation.md)。
+
+升级前无活动任务。备份 `/var/backups/atoms-demo/model-length.sYQnSh/` 含 `application.properties` 和 `database.dump`，目录 0700、文件 0600，包含凭据，不公开；dump 的目录检查通过，未另做恢复演练。回退可停后端、切回 HTTP 旧版本 `atoms-demo-Dpprat`、恢复该配置为 root:atoms / 0640，再启动和检查 HTTP 健康，不改 Nginx、不恢复数据库或重置调用额度。升级后 health=UP、首页 200、三个服务 active；切换时已用仍为 2 次。
+
+验证：回归先复现缺少诊断和失败调用 UNKNOWN；修复后通过。反转失败记账条件会使两项测试失败，恢复后正式构建通过：打包 3 项、前端 106 项、后端单测 22 项、真实 PostgreSQL 集成 44 项，以及类型、lint、格式和构建；npm audit 为 0 已知漏洞。完整候选包与提交后发布包 13 个载荷哈希相同，服务器再次逐项验证。没有依赖升级、数据库迁移或前端行为变更；未将之前的 15 项 runtime 验收说成本轮重跑。
+
+本机操作脚本/浏览器证据位于 `/private/tmp/atoms-length-fix.tgI9AZ/`；云端无凭据脚本位于 `/var/tmp/atoms-length-fix.fbABnp/`。归档解包时 GNU tar 忽略 macOS provenance 扩展属性，载荷校验全部通过；此警告不涉及程序文件缺失。
+
+真实云端验收仅提交一轮原需求“帮我做一个 2048 小游戏”，使用独立临时 Chrome 访客，不复用/提取用户会话。项目 `486a94fd-30d0-4abb-8fa5-99cdb06f1200`、任务 `b391ceef-219e-4f6b-bb51-3e49fd21107f` 成功，V1 为 `55241c45-80d3-4450-a434-c3e78be32c65`。规划用量 395 / 660 / 1055、构建 1500 / 18001 / 19501（输入 / completion / 合计）；构建约 58 秒。此次 18001 completion tokens 高于旧上限，但不据此倒推原失败调用的未知计数。
+
+生成过程中刷新页面后继续完成，前后两次 SSE 均为 200，浏览器自动装载预览。实际方向键操作发生合并、分数增至 4，棋盘与最高分通过 PREVIEW 状态 API 保存（revision=3）；刷新后棋盘数组、分数、最高分不变，页面显示正确，控制台 warning/error/pageerror 均为空。只做 CREATE，一共 2 次请求，没有 Repair 或第二轮重试；云端累计 4 / 100，剩余 96。原失败任务未修改，测试项目保留为独立访客私有项目，没有公开发布或变更用户项目所有者。截图为 `2048-preview.png`。
+
 ## 备份及运维
 
 已执行 `pg_dump -Fc`，备份为 `/var/backups/atoms-demo/atoms-demo-initial-20261008.dump`，root / 0600，目录 0700。恢复到独立临时库验证了 10 次迁移、1 个项目、调用预算记账 0；临时恢复库已删除，正式库未覆盖，备份保留。该备份在同机且未加密，不是异地灾备；自动定时、加密异地备份及保留策略仍待落实。未迁移或备份开发机业务数据。
@@ -90,4 +106,4 @@ systemctl restart atoms-demo
 
 更新/回退遵循 [部署说明](../deploy/server/README.md)：备份 → 停后端 → 切换已校验版本 → 启动检查。回退至旧 `atoms-demo-XmTJCF` 时，必须同时恢复上述备份内的外部配置、HTTPS 站点和静态安全头，将 `http-demo.conf` 移出 systemd drop-in 目录后 daemon-reload，再启动后端、检查代理配置并重载。等待协议入口就绪，不以发出 reload 信号视为完成；旧证书必须仍有效。不恢复数据库、不删除新 HTTP 期间产生的数据，不将恢复数据库当成无损代码回退。
 
-尚未验收：云端真实模型生成、代理后的生成 SSE/重连、云端实际生成版本发布与 LIVE 数据闭环、活动任务崩溃恢复、整机重启。它们不因站点已可访问而算完成，T29 总项继续保留未完成。
+尚未验收：云端实际生成版本发布与 LIVE 数据闭环、活动任务崩溃恢复、整机重启，以及不刷新页面的 SSE 断网游标恢复。云端真实 CREATE、生成中刷新后 SSE 重连、预览交互保存与刷新恢复已通过；不把一款 2048 的成功等同于任意需求稳定性保证，T29 总项继续保留未完成。
