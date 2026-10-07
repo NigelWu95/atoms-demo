@@ -36,6 +36,12 @@ public final class ApiBrowser {
         return http.send(HttpRequest.newBuilder(URI.create(base + path)).timeout(Duration.ofSeconds(15)).GET().build(),
                 HttpResponse.BodyHandlers.ofString());
     }
+    public HttpResponse<java.io.InputStream> events(String path, String lastEventId) throws Exception {
+        var request = HttpRequest.newBuilder(URI.create(base + path)).timeout(Duration.ofSeconds(15))
+                .header("Accept", "text/event-stream").GET();
+        if (lastEventId != null) request.header("Last-Event-ID", lastEventId);
+        return http.send(request.build(), HttpResponse.BodyHandlers.ofInputStream());
+    }
     public void refreshCsrf() throws Exception { csrf = get("/api/csrf").body().path("token").asText(); }
     public Reply initialize() throws Exception {
         refreshCsrf();

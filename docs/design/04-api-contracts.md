@@ -59,14 +59,14 @@
 | POST `/api/projects/{id}/runs` | CreateRun，幂等键 | 202 `{runId, status}`；eventsUrl 待 SSE 实现 |
 | GET `/api/projects/{id}/runs` | cursor、limit | Run 列表，新到旧 |
 | GET `/api/runs/{runId}` | runId | Run：状态、阶段、结果版本、错误、lastEventSeq |
-| GET `/api/runs/{runId}/events` | after，或 Last-Event-ID | SSE，尚未实现 |
+| GET `/api/runs/{runId}/events` | after，或 Last-Event-ID | 持久事件 SSE；读取终态全部事件后关闭，已补齐返回 204 |
 | PUT `/api/runs/{runId}/cancellation` | `{}` | 200 Run，取消直接持久化终态 |
 
 Project 最小字段：`id, name, ownerId, currentVersionId?, projectRevision, activeRunId?, publication?, updatedAt`。其中 projectRevision 表示源码当前指针的修订号，重命名不改变它。
 
 本地身份与项目实现约束（2026-10-07）：
 
-- 本表除 SSE 外均已实现。Project 另返回 createdAt，始终返回 currentVersionId、activeRunId（没有当前版本/活动任务时为 null），发布字段未实现。历史已保存的幂等创建响应保持原样重放，可缺少后来新增的字段。
+- 本表均已实现。Project 另返回 createdAt，始终返回 currentVersionId、activeRunId（没有当前版本/活动任务时为 null），发布字段未实现。历史已保存的幂等创建响应保持原样重放，可缺少后来新增的字段。
 - name 去除首尾空白后为 1–80 个 UTF-16 单元，不允许控制字符；仅接受 name 字段。列表按 createdAt/id 倒序，cursor 为不透明游标，limit 为 1–100。
 - Idempotency-Key 允许 1–128 个 ASCII 字母、数字、点、下划线、冒号或短横线；缺失/无效返回 422 INVALID_INPUT。名称规范化后同键重试返回第一次 201 的原始 JSON，包括首次名称与时间，不受后续重命名影响。
 - 会话首次创建变更 session ID 和 CSRF，前端在 POST /api/session 后再取一次 GET /api/csrf。Cookie 为 HttpOnly、SameSite=Lax、7 天有效；只有本地 HTTP/test 配置允许 Secure=false。
@@ -96,7 +96,7 @@ intent 为 CREATE、MODIFY，P1 可增加 REPAIR。CREATE 使用 null 基线和 
 - 消息与任务均按数据库递增序号倒序分页，默认 20、最大 100，cursor 为不透明正整数字符串；非法 cursor 返回 400。GET run、分页、取消都验证当前访客是所有者，跨身份返回 404。
 - GET generation 只返回是否配置、Worker 开关、剩余累计请求数及固定模型名；不验证 Key 真实有效性、不返回 Key。配置与预算生效需重启后端。默认预算 0；每轮开始至少需要 2 次余量，每次出网前再次原子预留，排队期间余量可能变化，耗尽时明确失败。
 - 当前固定官方 DeepSeek 端点和 deepseek-flash，不接受用户自定义 URL。thinking enabled/high、stream=false，JSON 对象模式。平台请求上限见 README；服务端记录实际可得 usage，未知值为 null，不将其伪造为 0。未知请求预留不退回。
-- 前端活动任务采用 1.5 秒短轮询，持久事件已写入但没有 SSE 订阅端点；终态任务之后再读取消息和项目版本。任务执行不依赖网页连接。消息通过 Vue 文本转义，不把模型输出作为平台页面 HTML 渲染；产物另经校验和受限运行文档展示。
+- 活动任务订阅持久事件 SSE；前端从任务快照的 lastEventSeq 继续接收，补齐终态后再读取消息和项目版本。任务执行不依赖网页连接。消息通过 Vue 文本转义，不把模型输出作为平台页面 HTML 渲染；产物另经校验和受限运行文档展示。
 
 ### 2.2 版本、预览和发布
 
@@ -245,6 +245,12 @@ StateDocument：
 产物内容是待运行的不可信代码；输出符合 JSON Schema 不等于代码安全或业务正确。
 
 ## 4. SSE 事件协议
+
+本轮实现契约（T20）：`GET /api/runs/{runId}/events?after=0` 使用现有访客会话，先校验归属再校验游标；`Last-Event-ID` 非空时优先于 `after`，两者均为规范的非负十进制安全整数，不得超过当前 lastEventSeq。错误在建立流前返回既有 JSON 错误结构；无权 404、游标无效 400。事件按 seq 升序发送，历史与尾随统一读取数据库已提交记录，不触发模型请求。终态 payload 含 lastEventSeq，终态已全部读取时返回 204，禁止浏览器无意义重连。
+
+每帧 data 为现有事件数据加 `runId, seq, createdAt`；终态额外含 `lastEventSeq`。当前实际事件是 run.queued、stage.started、plan.ready、artifact.created、run.completed；下表的其他类型仍是预留，不伪造模型 token 进度。每批最多 100 条、尾随间隔 500ms、心跳 15 秒、不缓存/请求代理禁用缓冲；单连接最多 60 秒后正常轮换，浏览器携带已读游标重连。独立的 4 线程 SSE 调度池最多接纳 32 个连接，满时 429；连接/任务生命周期互不影响。
+
+前端从 Run 快照的 lastEventSeq 开始订阅，按 seq 去重并拒绝跳号、跨任务或畸形事件；阶段实时更新，规划完成刷新持久对话，收到完整终态后再读取任务/版本/消息并关闭流。连续三次连接失败暂停自动重连，保留旧预览并提供“刷新生成状态”；项目切换和卸载清理旧连接。当前不清理历史事件；如发现数据库回放缺口，明确报错，不能冒充完整回放。
 
 ```text
 id: 12

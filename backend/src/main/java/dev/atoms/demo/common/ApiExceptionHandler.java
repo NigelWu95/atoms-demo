@@ -15,16 +15,18 @@ public class ApiExceptionHandler {
     private static final Logger log = LoggerFactory.getLogger(ApiExceptionHandler.class);
     @ExceptionHandler(ApiException.class)
     ResponseEntity<ApiError> business(ApiException error, HttpServletRequest request) {
-        return ResponseEntity.status(error.status()).body(ApiError.of(request, error.code(), error.getMessage(), false));
+        return ResponseEntity.status(error.status()).contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                .body(ApiError.of(request, error.code(), error.getMessage(), false));
     }
     @ExceptionHandler({HttpMessageNotReadableException.class, MethodArgumentTypeMismatchException.class})
     ResponseEntity<ApiError> invalidRequest(Exception error, HttpServletRequest request) {
-        return ResponseEntity.badRequest().body(ApiError.of(request, "INVALID_JSON", "请求格式不正确。", false));
+        return ResponseEntity.badRequest().contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                .body(ApiError.of(request, "INVALID_JSON", "请求格式不正确。", false));
     }
     @ExceptionHandler(DataAccessException.class)
     ResponseEntity<ApiError> unavailable(DataAccessException error, HttpServletRequest request) {
         var body = ApiError.of(request, "SERVICE_UNAVAILABLE", "服务暂不可用，请稍后重试。", true);
         log.warn("Database operation unavailable requestId={}", body.requestId());
-        return ResponseEntity.status(503).body(body);
+        return ResponseEntity.status(503).contentType(org.springframework.http.MediaType.APPLICATION_JSON).body(body);
     }
 }

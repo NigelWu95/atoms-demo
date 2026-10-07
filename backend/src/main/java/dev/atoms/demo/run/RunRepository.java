@@ -1,6 +1,7 @@
 package dev.atoms.demo.run;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import dev.atoms.demo.common.ApiException;
 import dev.atoms.demo.project.ProjectService;
 import java.time.Instant;
@@ -15,6 +16,7 @@ import org.springframework.stereotype.Repository;
 public class RunRepository {
     public record Message(UUID id, UUID projectId, UUID runId, String role, String content, Instant createdAt) {}
     public record Page<T>(List<T> items, String nextCursor) {}
+    public record Event(long seq, String type, ObjectNode data) {}
     private record Positioned<T>(long ordinal, T value) {}
     static final RowMapper<Run> ROW = (rs, n) -> new Run(rs.getObject("id", UUID.class), rs.getObject("project_id", UUID.class),
             rs.getObject("owner_id", UUID.class), rs.getString("prompt"), rs.getString("intent"), rs.getObject("base_version_id", UUID.class),
@@ -31,6 +33,24 @@ public class RunRepository {
         if (rows.isEmpty()) throw missing();
         return rows.get(0);
     }
+    // The caller first reads an owned Run. Bound this batch to that committed snapshot.
+    List<Event> events(Run run, long after) {
+        var events = jdbc.query("SELECT seq, type, data_json, created_at FROM run_events WHERE run_id = ? AND seq > ? AND seq <= ? ORDER BY seq LIMIT 100",
+                (rs, n) -> {
+                    try {
+                        ObjectNode data = (ObjectNode) json.readTree(rs.getString("data_json"));
+                        long seq = rs.getLong("seq"); String type = rs.getString("type");
+                        data.put("runId", run.id().toString()).put("seq", seq).put("createdAt", rs.getTimestamp("created_at").toInstant().toString());
+                        if ("run.completed".equals(type)) data.put("lastEventSeq", seq);
+                        return new Event(seq, type, data);
+                    } catch (java.io.IOException invalid) { throw new IllegalStateException("Invalid stored event"); }
+                }, run.id(), after, run.lastEventSeq());
+        long expected = after;
+        for (var event : events) if (event.seq() != ++expected) throw historyMissing();
+        if (events.isEmpty() && after < run.lastEventSeq()) throw historyMissing();
+        return events;
+    }
+    private ApiException historyMissing() { return new ApiException(409, "EVENT_HISTORY_UNAVAILABLE", "任务事件不完整，请刷新任务快照。"); }
     Run lock(UUID owner, String id) {
         Run read = get(owner, id);
         projects.lock(owner, read.projectId().toString());
