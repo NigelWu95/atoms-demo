@@ -1,6 +1,6 @@
 # Atoms Demo · 可执行任务清单
 
-状态：T01–T03、T05–T16、C01、C03–C07 已通过本地验收；DeepSeek 网关、后台工作流、取消/恢复与普通工作台已部分完成 T17–T24，未满足整项验收的仍不勾选。T00 的真实模型与公网资源验证仍未完成，T04 按本地优先决定暂后置。`[ ]` 表示尚未完成，不代表没有对应代码。总体顺序、路径缩写和验证命令见 [开发计划](plan.md)。
+状态：T01–T03、T05–T17、T19、C01、C03–C08 已通过相应本地验收；已完成真实模型首次生成及待办保存/刷新验证。T18 的提示词调整复验、T20–T24 的完整验收仍未完成，特别是真实修改尚未成功。T00 的公网资源验证仍缺失，T04 按本地优先决定暂后置。`[ ]` 表示尚未完成，不代表没有对应代码。总体顺序、路径缩写和验证命令见 [开发计划](plan.md)。
 
 说明：范围 S 为约 1–2 个主要文件，M 为约 3–5 个；自动脚手架文件按计划约定整体审阅。每项必须同时满足自己的验收条件和统一完成标准。所有代码路径都是拟建工程中的相对路径。
 
@@ -254,8 +254,8 @@ T10–T15 使用固定手工计数器/待办检验源码落库、执行隔离、
 
 ### T17 · 接入一个真实模型供应商
 
-- [ ] 完成 T17（P0，M）
-- 进度：DeepSeekGateway、LimitedBody、协议/超时/取消/脱敏测试已实现；采用固定官方端点与 deepseek-flash，用户自定义后置。仍缺一次有预算的真实调用，不计完整完成。
+- [x] 完成 T17（P0，M）
+- 进度：协议与安全测试通过，实际调用 DeepSeek 返回 final content 和 usage；累计 5 次请求记录可查。按用户选择固定官方端点与 deepseek-flash，服务端配置凭据和额度，用户自定义端点/模型后置。
 - 说明：在 ModelGateway 后隐藏具体协议，先验证最小真实接入，再复用到工作流。
 - 依赖：T01、T00 的真实模型资源。
 - 实际主要文件：`B/model/ModelGateway.java`、`B/model/DeepSeekGateway.java`、`B/model/LimitedBody.java`、`.env.local.example`、`BT/model/DeepSeekGatewayTest.java`。
@@ -268,7 +268,7 @@ T10–T15 使用固定手工计数器/待办检验源码落库、执行隔离、
 ### T18 · 实现规划、生成、校验及有限修复
 
 - [ ] 完成 T18（P0，M）
-- 进度：Planner → Builder → 结构校验 → 最多一次 Repair 已接通，无模板兜底；协议替身覆盖正常/失败/空输出等分支。真实生成质量尚未验证。
+- 进度：真实 Planner → Builder → 一次 Repair 已生成可交互 V1，无模板兜底。两次规划契约失败暴露输出稳定性问题，新增脱敏诊断与确切六字段提示示例；调整后仍待真实复验，不将这项视为完全验收。
 - 说明：实现有界工作流，角色阶段对应真实模型或程序动作。
 - 依赖：T17、T10。
 - 主要文件：`B/model/GenerationWorkflow.java`、`B/artifact/ArtifactValidator.java`、`R/prompts/planner.md`、`R/prompts/builder.md`、`BT/model/GenerationWorkflowTest.java`。
@@ -280,8 +280,8 @@ T10–T15 使用固定手工计数器/待办检验源码落库、执行隔离、
 
 ### T19 · 接入后台执行与原子版本提交
 
-- [ ] 完成 T19（P0，M）
-- 进度：GenerationScheduler/GenerationWorker/RunExecutionService 已实现，数据库任务领取、版本原子保存和修改保留数据通过真实 PostgreSQL 测试；仍待真实模型 V-M。
+- [x] 完成 T19（P0，M）
+- 进度：数据库任务领取、版本原子保存和修改保留数据通过 PostgreSQL 测试；真实模型任务完成 V1 提交与浏览器预览。修改失败未推进版本指针。
 - 说明：Worker 从数据库领取任务，执行工作流，将产物与终态原子落库。
 - 依赖：T16、T18。
 - 实际主要文件：`B/run/GenerationWorker.java`、`B/run/GenerationScheduler.java`、`B/run/RunExecutionService.java`、`B/artifact/ArtifactService.java`、`BT/run/GenerationExecutionIT.java`。
@@ -293,7 +293,7 @@ T10–T15 使用固定手工计数器/待办检验源码落库、执行隔离、
 
 ### C08 · 首次真实生成检查点
 
-- [ ] 新需求通过真实 Planner/Builder 产生新源码并可读取预览；记录真实调用与结果，不把替身测试计为模型实测。
+- [x] 新需求通过真实 Planner/Builder/一次 Repair 产生 V1，真实浏览器新增、完成、刷新恢复待办；请求数与 usage 已记录，不把替身测试计为模型实测。
 
 ### T20 · 实现可回放 SSE
 
@@ -342,7 +342,7 @@ T10–T15 使用固定手工计数器/待办检验源码落库、执行隔离、
 ### T23 · 接通聊天式生成工作台
 
 - [ ] 完成 T23（P0，M）
-- 进度：普通 5173 对话区已接通生成、历史消息、取消、错误输入恢复、同键重试与完成后新版本预览；当前 1.5 秒短轮询恢复任务，不宣称 SSE 已完成。浏览器生成响应使用显式替身，真实网页模型闭环待验收。
+- 进度：普通 5173 已真实提交模型需求并自动预览生成产物，持久化交互通过；当前 1.5 秒短轮询，不宣称 SSE 已完成。取消/同键重试等错误场景仍由明确替身覆盖，完整 SSE 断线恢复验收待做。
 - 说明：把已有生成内核接到首页/工作台，用户无需使用 API 工具。
 - 依赖：T15、T20、T21、T22。
 - 实际主要文件：`F/api/runs.ts`、`F/composables/useGeneration.ts`、`F/components/ConversationPanel.vue`、`F/pages/WorkbenchPage.vue`、`e2e/generation.spec.ts`；未知意图缓存位于 `F/stores/generation.ts`。
@@ -355,7 +355,7 @@ T10–T15 使用固定手工计数器/待办检验源码落库、执行隔离、
 ### T24 · 完成基于当前版本的继续修改
 
 - [ ] 完成 T24（P0，M）
-- 进度：前端按当前版本提交 MODIFY，后端新建完整版本、保留应用状态；单元/集成测试通过。两轮真实模型修改及业务兼容性验收待做。
+- 进度：当前版本基线和保留数据的单元/集成测试通过；真实 MODIFY 在规划字段数量校验处失败，V1 与已保存数据不变。尚未完成任何成功的真实修改；额度不足，停止调用等待授权。
 - 说明：把修改做成新的完整快照，而非原地覆盖文件或丢弃已有业务数据。
 - 依赖：T23、T18。
 - 主要文件：`B/run/RunAdmissionService.java`、`B/model/GenerationWorkflow.java`、`F/stores/run.ts`、`BT/run/ModifyRunIT.java`、`e2e/modify.spec.ts`。
