@@ -99,6 +99,42 @@ class DeepSeekGatewayTest {
                 .isInstanceOf(ModelException.class).hasMessageContaining("配置");
         assertThat(calls.get()).isZero();
     }
+    @Test void incompleteCompletionRetainsOnlySafeDiagnosticsWithoutRetrying() {
+        body = body.replace("\"stop\"", "\"length\"").replace("\"total_tokens\":50",
+                "\"total_tokens\":50,\"completion_tokens_details\":{\"reasoning_tokens\":27}");
+        var configured = new DeepSeekGateway(json, endpoint, "test-only-key", "deepseek-flash", Duration.ofSeconds(180), 32768);
+        assertThatThrownBy(() -> configured.complete("JSON", "private prompt", () -> false))
+                .isInstanceOfSatisfying(ModelException.class, error -> {
+                    assertThat(error.code()).isEqualTo("MODEL_INCOMPLETE");
+                    assertThat(error.completion()).isNotNull();
+                    assertThat(error.completion().finishReason()).isEqualTo("length");
+                    assertThat(error.completion().usage()).isEqualTo(new ModelGateway.Usage(20L, 30L, 50L));
+                    assertThat(error.completion().reasoningTokens()).isEqualTo(27);
+                    assertThat(error.completion().outputTokenLimit()).isEqualTo(32768);
+                    assertThat(error.completion().toString()).doesNotContain("private", "完成", "test-only-key");
+                });
+        assertThat(received.get()).contains("\"max_tokens\":32768");
+        assertThat(calls.get()).isEqualTo(1);
+    }
+    @Test void incompleteDiagnosticsNormalizeUnknownReasonsAndRejectInvalidCounters() {
+        body = body.replace("\"stop\"", "\"private-provider-detail\"").replace("\"prompt_tokens\":20", "\"prompt_tokens\":-1")
+                .replace("\"completion_tokens\":30", "\"completion_tokens\":1.5")
+                .replace("\"total_tokens\":50", "\"total_tokens\":9223372036854775808,\"completion_tokens_details\":{\"reasoning_tokens\":\"private\"}");
+        assertThatThrownBy(() -> gateway().complete("JSON", "test", () -> false))
+                .isInstanceOfSatisfying(ModelException.class, error -> {
+                    assertThat(error.completion()).isNotNull();
+                    assertThat(error.completion().finishReason()).isEqualTo("other");
+                    assertThat(error.completion().usage()).isEqualTo(new ModelGateway.Usage(null, null, null));
+                    assertThat(error.completion().reasoningTokens()).isNull();
+                });
+        body = "{\"choices\":[{\"finish_reason\":\"length\"}]}";
+        assertThatThrownBy(() -> gateway().complete("JSON", "test", () -> false))
+                .isInstanceOfSatisfying(ModelException.class, error -> {
+                    assertThat(error.completion().usage()).isEqualTo(new ModelGateway.Usage(null, null, null));
+                    assertThat(error.completion().reasoningTokens()).isNull();
+                });
+        assertThat(calls.get()).isEqualTo(2);
+    }
     @Test void enforcesDeadlineAndCancelsAnInflightRequest() {
         delayMillis = 600;
         var fast = new DeepSeekGateway(json, endpoint, "test-only-key", "deepseek-flash", Duration.ofMillis(150), 8192);

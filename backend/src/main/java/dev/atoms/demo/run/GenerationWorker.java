@@ -33,14 +33,25 @@ public class GenerationWorker {
     private ModelGateway.Answer call(Run run, String stage, String system, String user) {
         var call = execution.reserve(run, stage);
         long start = System.nanoTime(); String outcome = "UNKNOWN";
+        ModelException.CompletionDetails completion = null;
         try {
             var answer = model.complete(system, user, () -> { execution.check(run); return Thread.currentThread().isInterrupted(); });
             execution.recordUsage(call, answer.usage()); outcome = "SUCCEEDED"; return answer;
-        } catch (ModelException error) { outcome = error.code(); throw error; }
+        } catch (ModelException error) {
+            outcome = error.code(); completion = error.completion();
+            if (completion != null) execution.recordFailedUsage(call, completion.usage());
+            throw error;
+        }
         finally {
-            log.info("{}", json.createObjectNode().put("event", "model_call").put("entryPoint", "generation_worker")
+            var event = json.createObjectNode().put("event", "model_call").put("entryPoint", "generation_worker")
                     .put("runId", run.id().toString()).put("callId", call.toString()).put("stage", stage)
-                    .put("durationMs", (System.nanoTime() - start) / 1_000_000).put("outcome", outcome));
+                    .put("durationMs", (System.nanoTime() - start) / 1_000_000).put("outcome", outcome);
+            if (completion != null) {
+                event.put("finishReason", completion.finishReason()).put("outputTokenLimit", completion.outputTokenLimit())
+                        .put("promptTokens", completion.usage().promptTokens()).put("completionTokens", completion.usage().completionTokens())
+                        .put("totalTokens", completion.usage().totalTokens()).put("reasoningTokens", completion.reasoningTokens());
+            }
+            log.info("{}", event);
         }
     }
 }
