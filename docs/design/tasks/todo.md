@@ -1,6 +1,6 @@
 # Atoms Demo · 可执行任务清单
 
-状态：T01–T03、T05–T11、C01、C03–C05 已通过本地验收；其余待实施。T00 的模型与公网资源验证仍未完成，T04 按本地优先决定暂后置。`[ ]` 表示尚未完成，不代表已经创建了对应文件。总体顺序、路径缩写和验证命令见 [开发计划](plan.md)。
+状态：T01–T03、T05–T15、C01、C03–C06 已通过本地验收；其余待实施。T00 的模型与公网资源验证仍未完成，T04 按本地优先决定暂后置。`[ ]` 表示尚未完成，不代表已经创建了对应文件。总体顺序、路径缩写和验证命令见 [开发计划](plan.md)。
 
 说明：范围 S 为约 1–2 个主要文件，M 为约 3–5 个；自动脚手架文件按计划约定整体审阅。每项必须同时满足自己的验收条件和统一完成标准。所有代码路径都是拟建工程中的相对路径。
 
@@ -8,7 +8,7 @@
 
 当前实施记录：[验收证据](../../verification.md)。T01 增加 V000 基线迁移；浏览器测试位于 frontend/e2e，避免独立前端包之外的依赖解析。T09 已接通 /projects/:id；/workbench 保留未保存草稿入口。项目元信息持久化，需求草稿仍只保留在页面会话中，消息保存留到 T16/T23。
 
-T10–T11 使用固定手工计数器检验代码落库和执行隔离；测试入口为独立 test-run 的 `/test-lab`，仅连接 atoms_demo_test，浏览器用例位于 frontend/e2e-runtime。该计数器刷新归零，不代表 T12–T15 的 SDK/业务数据保存/工作台源码已完成；不是 AI 生成。用户决定保留访客方案，OAuth 暂不实现。
+T10–T15 使用固定手工计数器/待办检验源码落库、执行隔离、SDK 与应用状态保存；测试入口为独立 test-run 的 `/test-lab`，仅连接 atoms_demo_test，测试工作台为 5174，浏览器用例位于 frontend/e2e-runtime。计数器仍刷新归零；待办已可刷新恢复，并验证源码视图、私有独立预览、历史只读、断网重试和双标签冲突。这不是 AI 生成。用户决定保留访客方案，OAuth 暂不实现。
 
 ## M0 · 开工准备
 
@@ -184,7 +184,7 @@ T10–T11 使用固定手工计数器检验代码落库和执行隔离；测试�
 
 ### T12 · 实现最小消息桥与 SDK
 
-- [ ] 完成 T12（P0，M）
+- [x] 完成 T12（P0，M）
 - 说明：让生成脚本只通过 Atoms.ready 和固定 storage API 请求宿主能力。
 - 依赖：T11、T06。
 - 主要文件：`F/runtime/bridge.ts`、`F/runtime/protocol.ts`、`R/runtime/bootstrap.js`、`F/runtime/bridge.spec.ts`、`e2e/runtime-channel.spec.ts`。
@@ -196,7 +196,7 @@ T10–T11 使用固定手工计数器检验代码落库和执行隔离；测试�
 
 ### T13 · 实现预览状态存储
 
-- [ ] 完成 T13（P0，M）
+- [x] 完成 T13（P0，M）
 - 说明：保存生成应用的真实 JSON 业务状态，与代码版本分开。
 - 依赖：T10、T07。
 - 主要文件：`R/db/migration/V005__app_states.sql`、`B/appdata/StateDocument.java`、`B/appdata/AppStateService.java`、`B/appdata/PreviewStateController.java`、`BT/appdata/PreviewStateIT.java`。
@@ -208,7 +208,7 @@ T10–T11 使用固定手工计数器检验代码落库和执行隔离；测试�
 
 ### T14 · 接通交互预览和保存反馈
 
-- [ ] 完成 T14（P0，M）
+- [x] 完成 T14（P0，M）
 - 说明：组合运行文档、消息桥和状态 API，让明确标注的测试待办真正可操作。
 - 依赖：T12、T13。
 - 主要文件：`F/components/PreviewFrame.vue`、`F/runtime/previewContext.ts`、`F/api/preview.ts`、`F/runtime/bridge.ts`、`e2e/preview-state.spec.ts`。
@@ -220,11 +220,11 @@ T10–T11 使用固定手工计数器检验代码落库和执行隔离；测试�
 
 ### C06 · 预览与数据检查点
 
-- [ ] 手工产物可操作和持久化；两个写入竞争不丢数据；桥接隔离测试通过。此时尚不能宣称“AI 生成”完成。
+- [x] 手工产物可操作和持久化；两个写入竞争不丢数据；桥接隔离测试通过。此时尚不能宣称“AI 生成”完成。
 
 ### T15 · 接入源码视图与独立预览页
 
-- [ ] 完成 T15（P0，M）
+- [x] 完成 T15（P0，M）
 - 说明：工作台展示真实版本的源码和预览，独立打开仍使用可信外壳。
 - 依赖：T14、T09。
 - 主要文件：`F/api/artifacts.ts`、`F/pages/WorkbenchPage.vue`、`F/components/SourceViewer.vue`、`F/pages/StandalonePreviewPage.vue`、`F/router.ts`。

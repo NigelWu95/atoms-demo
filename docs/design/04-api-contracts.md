@@ -104,15 +104,15 @@ intent 为 CREATE、MODIFY，P1 可增加 REPAIR。CREATE 使用 null 基线和 
 
 运行 HTML 不经过普通 SPA fallback。响应包含正确 MIME、no-store，以及 HTTP `Content-Security-Policy` 的 sandbox 与资源限制。直接打开 document URL 仍受沙箱约束；独立正常体验应打开可信 `/preview/...` 或 `/a/...` 外壳。
 
-本地 T10–T11 实现约束（2026-10-07）：
+本地 T10–T15 实现约束（2026-10-07）：
 
 - 已实现本表前三个 GET；其余仍是后续设计。版本写入只开放内部事务服务，没有生产 POST 源码接口。
 - 版本摘要字段为 `id, projectId, versionNo, contentHash, basedOnId, createdAt`；详情在相同字段之外返回 `artifact`。UUID 为小写标准格式；版本列表按 versionNo 倒序，cursor 是上一页最后版本号的十进制字符串（客户端仍按不透明游标传回）；limit=1–100，默认 20。
 - 内部保存同时验证项目 revision 和基线版本，冲突为 409 BASE_VERSION_CONFLICT；成功后 projectRevision+1。重复内容 hash 允许产生新版本，源码不可修改或删除。
-- document 的 previewMode 默认 CURRENT，非 CURRENT/HISTORY 返回 422 INVALID_PREVIEW_MODE；旧版本 CURRENT 返回 409 STALE_APP_VERSION。HISTORY 此阶段仅执行历史源码，不接入任何业务状态，后续只允许使用 initialState。
-- HTML 使用解析白名单：基本布局/文本、表格、交互控件、受限 SVG；不含 URL 属性、form、事件属性或嵌套框架。源码文件合计 120 KiB UTF-8；初始数据对象 256 KiB JSON UTF-8；不支持内容返回 422 INVALID_ARTIFACT。完整经典脚本语法检查/SDK 启动检查尚未实现。
+- document 的 previewMode 默认 CURRENT，非 CURRENT/HISTORY 返回 422 INVALID_PREVIEW_MODE；旧版本 CURRENT 返回 409 STALE_APP_VERSION。HISTORY 的 SDK get 只返回该版本 initialState/revision=0，save 返回 READ_ONLY_PREVIEW，不调用持久状态接口。
+- HTML 使用解析白名单：基本布局/文本、表格、交互控件、受限 SVG；不含 URL 属性、form、事件属性或嵌套框架。源码文件合计 120 KiB UTF-8；初始数据对象 256 KiB JSON UTF-8；不支持内容返回 422 INVALID_ARTIFACT。宿主已根据 SDK ready/error 提供真实启动反馈；完整静态经典脚本语法检查与服务端预览报告仍未实现。
 - 运行文档才有 inline-only 脚本/CSS 和 HTTP sandbox；管理 API 仍禁止嵌入。具体取舍见 [ADR-004](../decisions/004-immutable-artifacts-runtime.md)。
-- 固定测试装载 POST `/api/test-fixtures` 仅在 test-run 专用入口存在，接收 `{fixture: "counter"|"closing-tags"|"security"|"history"}`，必须具有访客会话、CSRF 和 Idempotency-Key；返回 `{project, version, firstVersionId, testOnly: true}`。只连接 atoms_demo_test/atoms_test，测试类和页面不进入正式 JAR。
+- 固定测试装载 POST `/api/test-fixtures` 仅在 test-run 专用入口存在，接收 `{fixture: "counter"|"closing-tags"|"security"|"history"|"todo"|"todo-history"}`，必须具有访客会话、CSRF 和 Idempotency-Key；返回 `{project, version, firstVersionId, testOnly: true}`。只连接 atoms_demo_test/atoms_test，测试类和页面不进入正式 JAR。待办通过 5174 的测试工作台使用消息桥，5173 仍连接正常开发库。
 
 CURRENT 模式要求 versionId 等于项目当前版本；历史版本只允许 HISTORY 模式。后端状态接口也校验这个条件，不能通过伪造 previewMode 绕过历史只读限制。恢复版本和发布时均拒绝同项目仍有活动 run 的操作。
 
@@ -290,8 +290,8 @@ Atoms.ready 等待宿主桥接完成后调用回调，并捕获回调异常。SD
 ```json
 {
   "protocol": "atoms-runtime-v1",
-  "channelId": "ephemeral-channel-id",
-  "requestId": "rpc_1",
+  "channelId": "7f9c39c2-b9ec-4f1e-9981-a1259bec0eb2",
+  "requestId": "72c8fca0-1207-4575-b235-b2d1209b5294",
   "type": "STATE_SAVE",
   "payload": {
     "expectedRevision": 3,
@@ -302,7 +302,9 @@ Atoms.ready 等待宿主桥接完成后调用回调，并捕获回调异常。SD
 
 允许的 type 为 STATE_GET、STATE_SAVE、RUNTIME_ERROR、RUNTIME_READY。响应包含 requestId、ok 和 result 或统一错误；每个请求有超时，切换版本时拒绝所有未完成请求并关闭通道。
 
-宿主把每次 STATE_SAVE 的 requestId 映射为一次固定幂等键，HTTP 重试继续复用。桥消息不能触发生成、恢复、发布或读取平台项目。
+本地 T12–T15 已实现：每次创建 iframe 前生成 UUID channelId 并放入 URL fragment。此模式下运行文档在 INIT → HELLO → CONNECT 完成前不注入应用 CSS/JS。bootstrap 检查 parent/source 与 URL origin；宿主检查 iframe.contentWindow、channel 和消息结构，一次性转移 MessagePort，不以 opaque/null origin 授权。后续导航或销毁关闭旧通道。启动期限 10 秒，SDK RPC 期限 15 秒，最多 16 个并发数据请求；RUNTIME_READY/ERROR 不被请求队列上限丢弃。
+
+channelId 和 requestId 均要求标准 UUID。宿主把每次 STATE_SAVE 映射为 `channelId:requestId` 固定幂等键（73 字符），HTTP 重试继续复用。SDK 保存不可变 JSON 快照；网络中断、超时或异常成功响应均保留原意图，只允许相同内容重试。STATE_GET 不会撤销可能已提交的保存；确定的业务拒绝才允许更正输入。队列满而尚未发送时不建立未知意图。结构有效但状态无效返回 INVALID_INPUT，伪造 source/channel 或未知 type 忽略。桥消息不能触发生成、恢复、发布或读取平台项目。实现取舍见 [ADR-005](../decisions/005-preview-state-bridge.md)。
 
 历史预览 mode=HISTORY 时，SDK get 返回该版本 initialState，save 返回 READ_ONLY_PREVIEW；不访问当前项目持久状态。加载只读模式由宿主与服务器确定，不接收模型指令覆盖。
 
