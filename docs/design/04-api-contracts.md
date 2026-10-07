@@ -66,7 +66,7 @@ Project 最小字段：`id, name, ownerId, currentVersionId?, projectRevision, a
 
 本地身份与项目实现约束（2026-10-07）：
 
-- 本表均已实现。Project 另返回 createdAt，始终返回 currentVersionId、activeRunId（没有当前版本/活动任务时为 null），发布字段未实现。历史已保存的幂等创建响应保持原样重放，可缺少后来新增的字段。
+- 本表均已实现。Project 另返回 createdAt，始终返回 currentVersionId、activeRunId（没有当前版本/活动任务时为 null）；发布状态通过独立 publication 接口读取。历史已保存的幂等创建响应保持原样重放，可缺少后来新增的字段。
 - name 去除首尾空白后为 1–80 个 UTF-16 单元，不允许控制字符；仅接受 name 字段。列表按 createdAt/id 倒序，cursor 为不透明游标，limit 为 1–100。
 - Idempotency-Key 允许 1–128 个 ASCII 字母、数字、点、下划线、冒号或短横线；缺失/无效返回 422 INVALID_INPUT。名称规范化后同键重试返回第一次 201 的原始 JSON，包括首次名称与时间，不受后续重命名影响。
 - 会话首次创建变更 session ID 和 CSRF，前端在 POST /api/session 后再取一次 GET /api/csrf。Cookie 为 HttpOnly、SameSite=Lax、7 天有效；只有本地 HTTP/test 配置允许 Secure=false。
@@ -108,9 +108,9 @@ intent 为 CREATE、MODIFY，P1 可增加 REPAIR。CREATE 使用 null 基线和 
 | POST `/api/projects/{id}/versions/{versionId}/preview-reports` | PreviewReport，幂等键 | 201 `{reportId, status}` |
 | GET `/api/projects/{id}/versions/{versionId}/preview-reports/latest` | 所有者权限 | 最近保存的检查报告；未检查为 UNKNOWN |
 | POST `/api/projects/{id}/restorations` | `{sourceVersionId, expectedProjectRevision}` | P1，201 新版本 |
-| GET `/api/projects/{id}/publication` | 项目权限 | `{slug, versionId, status, revision}` 或未发布状态 |
+| GET `/api/projects/{id}/publication` | 项目权限 | Publication，首次未发布时 revision=0 |
 | PUT `/api/projects/{id}/publication` | PublishRequest，幂等键 | 200 Publication + publicUrl |
-| DELETE `/api/projects/{id}/publication` | 项目权限 | 204，下线；重复请求仍成功 |
+| DELETE `/api/projects/{id}/publication?expectedPublicationRevision=...` | 项目权限、CSRF、幂等键 | 204，下线；原意图重试不影响后续重新发布 |
 | GET `/api/public/apps/{slug}` | slug | 仅公开版本元信息和初始配置 |
 | GET `/api/public/apps/{slug}/document` | versionId | 当前已发布版本的受限运行 HTML |
 
@@ -118,7 +118,7 @@ intent 为 CREATE、MODIFY，P1 可增加 REPAIR。CREATE 使用 null 基线和 
 
 本地 T10–T15 / T25 实现约束（2026-10-07）：
 
-- 已实现本表前三个 GET 及预览报告 POST/最新 GET；恢复和发布仍是后续设计。版本写入只开放内部事务服务，没有生产 POST 源码接口。
+- 已实现本表版本 GET、预览报告 POST/最新 GET、发布 GET/PUT/DELETE 及公开元信息/运行文档；恢复版本仍是后续设计。版本写入只开放内部事务服务，没有生产 POST 源码接口。公开入口目前仅本地可用，公网网关尚未接通。
 - 版本摘要字段为 `id, projectId, versionNo, contentHash, basedOnId, createdAt`；详情在相同字段之外返回 `artifact`。UUID 为小写标准格式；版本列表按 versionNo 倒序，cursor 是上一页最后版本号的十进制字符串（客户端仍按不透明游标传回）；limit=1–100，默认 20。
 - 内部保存同时验证项目 revision 和基线版本，冲突为 409 BASE_VERSION_CONFLICT；成功后 projectRevision+1。重复内容 hash 允许产生新版本，源码不可修改或删除。
 - document 的 previewMode 默认 CURRENT，非 CURRENT/HISTORY 返回 422 INVALID_PREVIEW_MODE；旧版本 CURRENT 返回 409 STALE_APP_VERSION。HISTORY 的 SDK get 只返回该版本 initialState/revision=0，save 返回 READ_ONLY_PREVIEW，不调用持久状态接口。
@@ -157,6 +157,12 @@ PublishRequest：
 
 首版只发布当前版本。若有活动运行、版本变更或未完成预览检查，返回可解释的 409；用户回到预览完成检查再发布。事务固定 versionId，不在发布过程中重新查询“最新”而偷偷切换目标。下线只改状态，不删除版本和数据。
 
+T26–T28 本轮实施契约：Publication 为 `{slug, versionId, versionNo, status, revision, publicPath, publicUrl}`。从未发布时 status=UNPUBLISHED、revision=0，其余字段 null；首次发布后稳定 slug 是服务端生成的 32 位小写十六进制串，下线保留最后的版本和 slug。status 仅 PUBLISHED/UNPUBLISHED，publicPath 为 `/a/{slug}`；publicUrl 仅从受信任的服务端 PUBLIC_APP_ORIGIN 配置产生，未配置则为 null，不根据 Host/转发头拼接，界面只能提供明确标注的本地链接。尚未接通公网网关前不声称外网可用。
+
+发布只接受 PublishRequest 三字段，修订号为非负安全整数；同项目行锁内验证 projectRevision、publication revision、无活动 run、目标为当前版本且该版本最新报告 PASSED。失败保留旧发布；成功仅 publication revision+1，不改变 projectRevision。下线同样携带 publication revision 和稳定幂等键：新意图要求修订号匹配，已下线为无操作；原成功意图重放即使已经重新发布也不能再下线。这是对原简写 DELETE 契约的并发保护补充，不删除任何数据。
+
+公开 GET 元信息只返回 `{slug, versionId, versionNo, title, summary, stateSchemaVersion, initialState}`，不含 projectId/ownerId/私有需求/历史源码/预览数据。GET 元信息与 document 匿名可访问，但仅限 PUBLISHED；公开 state 仍需原有访客会话与写入 CSRF。不存在或下线统一 404 APP_NOT_PUBLISHED；已更新的旧 document/state 新请求为 409 STALE_APP_VERSION。读取与状态写入和发布/下线使用同一项目锁，先取锁再重读发布指针；LIVE 保存的原成功意图仅在应用仍已发布时可重放，不再次写数据。
+
 ### 2.3 生成应用数据
 
 | 方法与路径 | 范围 | 输出 |
@@ -191,7 +197,7 @@ StateDocument：
 
 后端从身份确定 actorId、从路径确定项目与环境；请求不接收 ownerId 或任意数据库路径。保存成功返回 revision=4。同一保存意图因网络未知结果重试时复用幂等键；未使用幂等键的旧 revision 重试可能得到 409，必须重新读取，不能盲目覆盖。
 
-本地 T13 实现：已实现 PREVIEW 的 GET/PUT；LIVE 尚未实现。仅接受上述四个保存字段，value 必须是序列化后不超过 256 KiB UTF-8 的 JSON 对象，schema 固定为整数 1，expectedRevision 为非负安全整数且小于 9007199254740991。所有者检查与代码指针变更共用项目行锁；不存在状态时只读返回 initialState/revision=0，首次写入用唯一约束，后续写入用修订号条件更新。新意图的旧代码返回 409 STALE_APP_VERSION，状态竞争返回 409 STATE_CONFLICT。已经提交的同键同体意图在重新鉴权后重放原结果（即使代码指针或状态修订号已推进），不再执行保存；同键异体返回 422。代码升级不会重置已有应用状态。
+本地 T13/T27 实现：PREVIEW 和 LIVE 的 GET/PUT 均已实现。仅接受上述四个保存字段，value 必须是序列化后不超过 256 KiB UTF-8 的 JSON 对象，schema 固定为整数 1，expectedRevision 为非负安全整数且小于 9007199254740991。所有者检查/发布检查与代码指针变更共用项目行锁；不存在状态时只读返回 initialState/revision=0，首次写入用唯一约束，后续写入用修订号条件更新。新意图的旧代码返回 409 STALE_APP_VERSION，状态竞争返回 409 STATE_CONFLICT。已经提交的同键同体意图在重新鉴权后重放原结果（即使代码指针或状态修订号已推进），不再执行保存；LIVE 重放还要求应用仍已发布，下线返回 404。同键异体返回 422。代码升级不会重置已有应用状态。
 
 ### 2.4 P1 账号
 

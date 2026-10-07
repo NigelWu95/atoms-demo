@@ -372,8 +372,8 @@ T10–T15 使用固定手工计数器/待办检验源码落库、执行隔离、
 
 ### T25 · 完成预览检查与错误反馈
 
-- [ ] 完成 T25（P0，M）
-- 已完成本地报告切片：报告 POST/最新 GET、ES2022 经典 JavaScript 静态解析、SDK 启动/运行错误观察、显式报告保存及刷新恢复。真实浏览器验证语法阻断、SDK 初始化失败、error/unhandledrejection；报告可同键重试，不修改源码或 run 状态。原第 3 项的发布门禁尚待 T26 实施，所以保留本项未全量勾选，不将检查通过当作安全认证。
+- [x] 完成 T25（P0，M）
+- 报告切片与发布门禁均完成：报告 POST/最新 GET、ES2022 经典 JavaScript 静态解析、SDK 启动/运行错误观察、显式保存/刷新恢复及 T26 最新 PASSED 门禁。真实浏览器验证语法阻断、SDK 初始化失败、error/unhandledrejection；报告可同键重试，不修改源码或 run 状态，不将检查通过当作安全认证。
 - 说明：把生成成功和页面检查拆开，错误必须能定位到具体版本。
 - 依赖：T14、T23。
 - 主要文件：`F/runtime/validateScript.ts`、`F/components/PreviewFrame.vue`、`R/db/migration/V008__preview_reports.sql`、`B/preview/PreviewReportController.java`、`BT/preview/PreviewReportIT.java`。
@@ -387,10 +387,11 @@ T10–T15 使用固定手工计数器/待办检验源码落库、执行隔离、
 
 ### T26 · 实现固定版本发布
 
-- [ ] 完成 T26（P0，M）
+- [x] 完成 T26（P0，M）
+- 已验证固定指针、最新报告门禁、版本/修订号/活动任务、发布竞争与匿名资源边界；旧发布/下线重放不会改变新指针。V009 在正常和测试库增量应用。公开链接仍仅本地，T29 未启动；无新增 DeepSeek 调用。
 - 说明：为公开访问建立独立发布指针，不能将“当前编辑版本”直接当作线上版本。
 - 依赖：T25、T07。
-- 主要文件：`R/db/migration/V009__publications.sql`、`B/publication/Publication.java`、`B/publication/PublicationService.java`、`B/publication/PublicationController.java`、`BT/publication/PublicationIT.java`。
+- 主要文件：`R/db/migration/V009__publications.sql`、`B/publication/PublicationService.java`、`B/publication/PublicAppService.java`、`B/publication/PublicationController.java`、`BT/publication/PublicationIT.java`。
 - 验收：
   1. 发布当前、已检查版本，检查 project/publication revision 和无活动 run，事务固定指定 versionId。
   2. 稳定 slug 可读取公开元信息和当前发布运行文档；文档版本过期明确返回 STALE_APP_VERSION。
@@ -399,7 +400,8 @@ T10–T15 使用固定手工计数器/待办检验源码落库、执行隔离、
 
 ### T27 · 实现公开访问者状态隔离
 
-- [ ] 完成 T27（P0，M）
+- [x] 完成 T27（P0，M）
+- 真实数据库与浏览器验证 LIVE/PREVIEW、双访客与跨项目隔离，更新保留状态，旧版本新请求及下线后重放拒绝；不接受客户端 actor/environment。
 - 说明：复用同一数据服务，增加 LIVE 命名空间和公开版本校验。
 - 依赖：T26、T13。
 - 主要文件：`B/appdata/PublicStateController.java`、`B/appdata/AppStateService.java`、`B/publication/PublicationService.java`、`BT/appdata/PublicStateIT.java`。
@@ -411,14 +413,15 @@ T10–T15 使用固定手工计数器/待办检验源码落库、执行隔离、
 
 ### C11 · 发布服务检查点
 
-- [ ] 当前版本、公开版本、预览状态和访客状态四者边界经测试；无匿名私有资源泄漏。
+- [x] 当前版本、公开版本、预览状态和访客状态四者边界经测试；无匿名私有资源泄漏。
 
 ### T28 · 完成发布交互与公开外壳
 
-- [ ] 完成 T28（P0，M）
+- [x] 完成 T28（P0，M）
+- 普通工作台发布/确认下线/复制链接、当前与已发布版本区分、未知结果原意图重试及独立公开外壳已实现。真实 Chrome 验证访客保存/刷新/隔离、下线/重新发布同链接、窄屏/axe；V1→V2 指针转换由真实数据库测试、更新按钮和版本标签由组件测试覆盖。本轮未付费再生成 V2，不冒称公网或第二轮真实修改验收。
 - 说明：让用户发布、复制链接、更新、下线，访问者通过可信外壳使用同一运行机制。
 - 依赖：T27、T23。
-- 主要文件：`F/api/publication.ts`、`F/pages/WorkbenchPage.vue`、`F/pages/PublicAppPage.vue`、`F/router.ts`、`e2e/publication.spec.ts`。
+- 主要文件：`F/api/publication.ts`、`F/components/PublicationPanel.vue`、`F/pages/PublicAppPage.vue`、`F/runtime/mountFrame.ts`、`frontend/e2e-runtime/publication.spec.ts`。
 - 验收：
   1. 展示“当前 V2 / 线上 V1”，发布失败保留旧线上版本；复制实际 URL，可显式更新和下线。
   2. /a/:slug 不展示编辑控件或私有聊天，复用 PreviewFrame/SDK，版本过期重新取元信息。
