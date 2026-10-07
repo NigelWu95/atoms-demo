@@ -1,0 +1,12 @@
+# Nginx terminates TLS; the backend remains reachable only on this machine.
+# https://docs.spring.io/spring-boot/3.5/how-to/webserver.html#howto.webserver.use-behind-a-proxy-server
+server:
+  address: 127.0.0.1
+  forward-headers-strategy: native
+  tomcat:
+    remoteip:
+      internal-proxies: '127\.0\.0\.1|::1|0:0:0:0:0:0:0:1'
+  servlet:
+    session:
+      cookie:
+        secure: true
