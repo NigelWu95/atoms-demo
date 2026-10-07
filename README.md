@@ -1,6 +1,6 @@
 # Atoms Demo Studio
 
-Java 17 + Spring Boot + Vue 的本地开发工程。后端骨架与真实 PostgreSQL 连接已通过验收，前端首页/工作台正在实现。当前不是完整生成平台；项目持久化、真实模型生成、预览运行和发布尚未实现。功能设计和执行计划位于 [设计目录](../atoms-demo-design/README.md)。
+Java 17 + Spring Boot + Vue 的本地开发工程。T01–T03 已通过本地验收：后端骨架、真实 PostgreSQL 连接、响应式首页和工作台基础交互。当前不是完整生成平台；项目持久化、真实模型生成、预览运行和发布尚未实现。功能设计和执行计划位于 [设计目录](docs/design/README.md)，唯一进度清单位于 [tasks/todo.md](docs/design/tasks/todo.md)。
 
 本阶段仅本地开发，不配置云服务器或公开域名。挑战最终仍需在线链接，后续交付阶段再安排。
 
@@ -8,7 +8,7 @@ Java 17 + Spring Boot + Vue 的本地开发工程。后端骨架与真实 Postgr
 
 - Java：用户指定 `17.0.5-oracle`；Maven Wrapper 固定 3.9.11，Spring Boot 固定 3.5.16。
 - 前端：Node 24.20.0、npm 11.19.0；从项目根目录执行 `nvm use` 选择已有版本，不修改全局默认。
-- 数据库：先按下文启动 Docker PostgreSQL。应用和测试凭据存放在项目根 `.env.local`（权限 600，禁止提交），键名为 `APP_DB_PASSWORD`、`TEST_DB_PASSWORD`，分别使用独立的 64 位随机十六进制密码。
+- 数据库：先按下文启动 Docker PostgreSQL。应用和测试凭据存放在项目根 `.env.local`（权限 600，禁止提交），键名为 `APP_DB_PASSWORD`、`TEST_DB_PASSWORD`，分别使用独立的 64 位随机十六进制密码。新环境可参照 `.env.local.example` 创建，不能直接使用占位值，更不能覆盖已有凭据。
 - 首次配置应用账号：在根目录执行 `node scripts/provision-db.mjs`；需要本地 Docker 权限。它仅创建缺失的账号、测试库和 schema，不重置已有密码，也不删除数据。
 
 在两个终端分别运行：
@@ -40,6 +40,18 @@ cd backend
 该命令实际运行单元测试与集成测试（Surefire/Failsafe），需要本地数据库可达；集成测试只连接 `atoms_demo_test`，不使用业务数据库或 H2。
 
 前端目录提供 `npm run typecheck`、`npm run test:unit`、`npm run lint`、`npm run format:check`、`npm run build` 和 `npm run test:e2e`。验收证据见 [verification.md](docs/verification.md)，环境决策见 [ADR-002](docs/decisions/002-local-java17-baseline.md)。
+
+浏览器测试位于 `frontend/e2e`，当前配置使用本机已安装的 Google Chrome，并创建独立临时测试会话。运行前启动后端；Playwright 可复用本地前端或自动启动它。不连接个人浏览器资料，不依赖登录账号。没有 Chrome 的机器需准备对应浏览器并调整测试 channel，不能把未运行的浏览器测试当作通过。
+
+## 当前可体验的交互
+
+- 首页的三个示例只填充需求；非空输入可通过按钮或 Enter 进入 `/workbench` 草稿工作台，Shift+Enter 换行，中文组合输入期间不提交。
+- 草稿在当前页面会话的路由切换中保留；刷新会清空，目前还不是数据库保存的项目。
+- 工作台支持预览/代码空态、桌面/手机宽度和窄屏对话/预览切换；生成和发布按钮明确禁用。
+- 侧栏服务状态来自真实 `/api/health`；失败时可重试。未知路由有返回入口。
+- Vite 开发页面有 CSP/基础安全响应头；仅开发 HMR 放行本地 WebSocket 与内联样式。`npm run preview` 使用更严格 CSP，但它只是本地构建预览，不是正式部署方案。
+
+下一步是 T05–T09 的访客会话、项目创建/列表/重命名及数据库持久化。T04 的部署骨架和公网验证保留待办；模型 API 与用户自定义模型设置均未实现。
 
 ## 当前 API
 

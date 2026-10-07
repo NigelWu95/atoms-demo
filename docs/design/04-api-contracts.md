@@ -1,0 +1,297 @@
+# 04 · 接口与协议
+
+本文件是实施契约草案，不表示接口已部署。字段使用 camelCase，状态枚举使用 UPPER_SNAKE_CASE，ID 为不可推断的字符串，时间为 UTC ISO-8601。
+
+## 1. 通用约定
+
+- JSON 请求/响应，HTTP 状态码表达结果；不使用 HTTP 200 包装所有错误。
+- 列表返回 `{ "items": [], "nextCursor": null }`；默认 limit=20，最大 100。
+- Cookie 会话；所有状态变更请求使用 CSRF token。
+- 创建项目、提交运行、恢复版本、提交预览报告使用 `Idempotency-Key`。状态保存和发布更新也带该键，避免未知结果后重复执行。
+- 客户端在一次用户意图开始时生成键，网络重试复用；新的修改意图使用新键。
+- 数据库唯一约束为 `(actorId, method, resource, key)`，同时保存规范化请求摘要。相同键不同内容返回 422；相同请求返回原结果。
+- 长任务的重复提交返回同一 202/runId，查询运行状态判断是否完成。幂等记录保留至少整个评审使用期，不在短时间内过期重放。
+- 项目级、版本级和运行级接口都检查项目归属，不能仅凭不可猜 ID 授权。
+
+### 错误体
+
+```json
+{
+  "error": {
+    "code": "BASE_VERSION_CONFLICT",
+    "message": "项目已更新，请刷新后再提交。",
+    "retryable": false,
+    "details": { "currentVersionId": "ver_2", "projectRevision": 2 }
+  },
+  "requestId": "req_abc"
+}
+```
+
+| 状态码 | 典型 code |
+|---|---|
+| 400 | INVALID_JSON、INVALID_CURSOR |
+| 401 | SESSION_REQUIRED |
+| 403 | CSRF_REJECTED |
+| 404 | PROJECT_NOT_FOUND、VERSION_NOT_FOUND、APP_NOT_PUBLISHED |
+| 409 | RUN_ALREADY_ACTIVE、BASE_VERSION_CONFLICT、STATE_CONFLICT、STALE_APP_VERSION |
+| 413 | PAYLOAD_TOO_LARGE |
+| 422 | INVALID_ARTIFACT、INVALID_INPUT、IDEMPOTENCY_PAYLOAD_MISMATCH |
+| 429 | GENERATION_LIMIT_REACHED |
+| 503 | MODEL_UNAVAILABLE、SERVICE_UNAVAILABLE |
+
+对于他人私有项目，返回 404，避免额外泄露其存在。不要将供应商密钥、内部堆栈或原始认证响应放入错误体。
+
+## 2. REST 端点目录
+
+### 2.1 身份、项目、生成
+
+| 方法与路径 | 输入 | 输出/结果 |
+|---|---|---|
+| GET `/api/csrf` | 无 | `{token, headerName}`，初始化 CSRF 所需会话 |
+| POST `/api/session` | `{}`，CSRF | `{userId, isGuest, displayName}`；已有身份则恢复 |
+| GET `/api/me` | 会话 | 当前身份 |
+| POST `/api/projects` | `{name}`，幂等键 | 201 Project |
+| GET `/api/projects` | cursor、limit | Project 摘要列表，仅自己的 |
+| GET `/api/projects/{id}` | 项目 ID | Project |
+| PATCH `/api/projects/{id}` | `{name}` | 重命名后的 Project；纯赋值幂等 |
+| GET `/api/projects/{id}/messages` | cursor、limit | Message 列表 |
+| POST `/api/projects/{id}/runs` | CreateRun，幂等键 | 202 `{runId, status, eventsUrl}` |
+| GET `/api/runs/{runId}` | runId | Run：状态、阶段、结果版本、错误、lastEventSeq |
+| GET `/api/runs/{runId}/events` | after，或 Last-Event-ID | SSE |
+| PUT `/api/runs/{runId}/cancellation` | `{}` | 200 `{runId, status, cancelRequested}` |
+
+Project 最小字段：`id, name, ownerId, currentVersionId?, projectRevision, activeRunId?, publication?, updatedAt`。其中 projectRevision 表示源码当前指针的修订号，重命名不改变它。
+
+Message：`id, projectId, runId?, role, content, createdAt`。role 为 USER、PLANNER、BUILDER、SYSTEM；角色名称与是否独立模型不混为一谈。
+
+CreateRun：
+
+```json
+{
+  "prompt": "增加优先级筛选，保留现有待办功能。",
+  "baseVersionId": "ver_1",
+  "expectedProjectRevision": 1,
+  "intent": "MODIFY"
+}
+```
+
+intent 为 CREATE、MODIFY，P1 可增加 REPAIR。CREATE 使用 null 基线和 revision=0；MODIFY 要求基线为当前版本。REPAIR 还带对应 previewReportId，服务器验证报告属于项目和基线。
+
+取消非终态 run 设置标记；重复取消已取消任务返回当前状态。已经成功或失败的任务不能变为取消，返回 409 RUN_TERMINAL。结果处理与取消使用同一项目/run 锁，避免相互覆盖。
+
+### 2.2 版本、预览和发布
+
+| 方法与路径 | 输入 | 输出/结果 |
+|---|---|---|
+| GET `/api/projects/{id}/versions` | cursor、limit | 版本元信息列表 |
+| GET `/api/projects/{id}/versions/{versionId}` | 路径 | Version + Artifact |
+| GET `/api/projects/{id}/versions/{versionId}/document` | previewMode=CURRENT/HISTORY | 带强制响应级沙箱的 HTML，需项目权限 |
+| POST `/api/projects/{id}/versions/{versionId}/preview-reports` | PreviewReport，幂等键 | 201 `{reportId, status}` |
+| POST `/api/projects/{id}/restorations` | `{sourceVersionId, expectedProjectRevision}` | P1，201 新版本 |
+| GET `/api/projects/{id}/publication` | 项目权限 | `{slug, versionId, status, revision}` 或未发布状态 |
+| PUT `/api/projects/{id}/publication` | PublishRequest，幂等键 | 200 Publication + publicUrl |
+| DELETE `/api/projects/{id}/publication` | 项目权限 | 204，下线；重复请求仍成功 |
+| GET `/api/public/apps/{slug}` | slug | 仅公开版本元信息和初始配置 |
+| GET `/api/public/apps/{slug}/document` | versionId | 当前已发布版本的受限运行 HTML |
+
+运行 HTML 不经过普通 SPA fallback。响应包含正确 MIME、no-store，以及 HTTP `Content-Security-Policy` 的 sandbox 与资源限制。直接打开 document URL 仍受沙箱约束；独立正常体验应打开可信 `/preview/...` 或 `/a/...` 外壳。
+
+CURRENT 模式要求 versionId 等于项目当前版本；历史版本只允许 HISTORY 模式。后端状态接口也校验这个条件，不能通过伪造 previewMode 绕过历史只读限制。恢复版本和发布时均拒绝同项目仍有活动 run 的操作。
+
+公开 document 请求携带版本是为保持元信息与代码一致；若发布指针已变，返回 STALE_APP_VERSION，宿主重新加载元信息。历史公开版本不通过此接口任意访问。
+
+PreviewReport：
+
+```json
+{
+  "status": "PASSED",
+  "checks": ["SCRIPT_PARSE", "SDK_STARTUP"],
+  "errors": [],
+  "viewport": { "width": 1440, "height": 900 }
+}
+```
+
+报告属于浏览器反馈，可被用户伪造，只用于体验反馈与问题定位，不作为授权或恶意代码安全证明。限制错误数组长度和每条文本长度；用户行为不经过模型自动授权。
+
+PublishRequest：
+
+```json
+{
+  "versionId": "ver_2",
+  "expectedProjectRevision": 2,
+  "expectedPublicationRevision": 0
+}
+```
+
+首版只发布当前版本。若有活动运行、版本变更或未完成预览检查，返回可解释的 409；用户回到预览完成检查再发布。事务固定 versionId，不在发布过程中重新查询“最新”而偷偷切换目标。下线只改状态，不删除版本和数据。
+
+### 2.3 生成应用数据
+
+| 方法与路径 | 范围 | 输出 |
+|---|---|---|
+| GET `/api/projects/{id}/preview-state?versionId=...` | 仅所有者的 PREVIEW 状态 | StateDocument |
+| PUT `/api/projects/{id}/preview-state` | 当前可写预览版本 | StateDocument |
+| GET `/api/public/apps/{slug}/state?versionId=...` | 当前访问者的 LIVE 状态 | StateDocument |
+| PUT `/api/public/apps/{slug}/state` | 当前访问者的 LIVE 状态 | StateDocument |
+
+这几个请求只能由可信外壳发出；实际访问仍由服务端身份与发布状态校验，不能把“来自外壳”当作服务器鉴权条件。公开 GET 元信息与 HTML 不需要登录；读写个人状态先建立访客会话。
+
+StateDocument：
+
+```json
+{
+  "value": { "todos": [{ "id": "t1", "title": "准备演示", "done": false }] },
+  "revision": 3,
+  "stateSchemaVersion": 1
+}
+```
+
+保存输入：
+
+```json
+{
+  "loadedVersionId": "ver_2",
+  "expectedRevision": 3,
+  "stateSchemaVersion": 1,
+  "value": { "todos": [{ "id": "t1", "title": "准备演示", "done": true }] }
+}
+```
+
+后端从身份确定 actorId、从路径确定项目与环境；请求不接收 ownerId 或任意数据库路径。保存成功返回 revision=4。同一保存意图因网络未知结果重试时复用幂等键；未使用幂等键的旧 revision 重试可能得到 409，必须重新读取，不能盲目覆盖。
+
+### 2.4 P1 账号
+
+可增加 POST `/api/registrations`、POST `/api/login` 和 DELETE `/api/session`。注册将当前访客升级，保留 userId；登录已有账号旋转会话 ID，并重新获取 CSRF token。登录不会把当前访客项目自动合并到已有账号，避免隐式转移所有权。
+
+## 3. 模型输出契约
+
+### Planner 输出
+
+```json
+{
+  "title": "个人任务板",
+  "goal": "记录并筛选个人任务",
+  "features": ["添加任务", "完成任务", "按状态筛选"],
+  "preserve": ["既有任务数据"],
+  "dataNeeded": true,
+  "steps": ["生成布局", "实现交互", "连接状态存储"]
+}
+```
+
+禁止将模型的 steps 直接当作执行过的日志；执行日志由 Worker 的真实动作产生。
+
+### Builder 输出 Artifact
+
+```json
+{
+  "formatVersion": 1,
+  "manifest": {
+    "title": "个人任务板",
+    "summary": "新增优先级筛选，保留原有功能。",
+    "runtime": "web-static-v1",
+    "stateSchemaVersion": 1,
+    "initialState": { "todos": [] }
+  },
+  "files": {
+    "view.html": "<main id=\"app\"><h1>个人任务板</h1><div id=\"tasks\"></div></main>",
+    "styles.css": "body { margin: 0; font-family: system-ui; }",
+    "main.js": "Atoms.ready(async (sdk) => { const state = await sdk.storage.get(); document.querySelector('#tasks').textContent = String(state.value.todos.length); });"
+  }
+}
+```
+
+上例仅展示协议结构，不是满足完整待办业务要求的应用。源码视图中的 manifest.json 由 manifest 对象格式化产生，避免模型重复返回两份不一致的 manifest。
+
+校验规则：
+
+- formatVersion/runtime 必须为支持值；三个源码键恰好匹配白名单。
+- view.html 为允许的 body 片段，不含 script、iframe、base、meta、object、内联事件或外部提交目标。
+- main.js 为经典脚本，通过 Atoms.ready 调用异步 SDK；禁止依赖 import、require、任意外部库。
+- CSS 与全部文本限制大小；危险或不支持内容报错，不静默改成另一套程序。
+- initialState 为 JSON 对象，最大 256 KiB；首次读无记录可初始化，修改版本不强制覆盖真实数据。
+- 没有模型密钥、数据库凭据、平台内部 token 或绝对服务器路径。
+
+产物内容是待运行的不可信代码；输出符合 JSON Schema 不等于代码安全或业务正确。
+
+## 4. SSE 事件协议
+
+```text
+id: 12
+event: artifact.created
+data: {"runId":"run_1","seq":12,"versionId":"ver_2","versionNo":2,"createdAt":"2026-10-07T08:00:00Z"}
+
+id: 13
+event: run.completed
+data: {"runId":"run_1","seq":13,"status":"SUCCEEDED","versionId":"ver_2","previewStatus":"UNKNOWN"}
+
+```
+
+| event | 关键字段 | 产生条件 |
+|---|---|---|
+| run.queued | runId、seq | 任务已持久化 |
+| stage.started | stage、attempt | 进入真实执行阶段 |
+| plan.ready | plan | Planner 输出已解析 |
+| model.progress | stage、receivedChars | 实际收到模型内容，可选聚合展示 |
+| validation.finished | passed、issues | 契约校验完成 |
+| repair.started | reason、attempt | 开始唯一一次修正 |
+| artifact.created | versionId、versionNo | 版本事务已提交 |
+| run.completed | status、versionId?、error? | SUCCEEDED/FAILED/CANCELLED/INTERRUPTED |
+
+`model.progress` 不包含内部思维链。心跳为 SSE 注释行，不占数据库 seq。重连读取 seq > cursor；run 状态中的 lastEventSeq 用于确认结果是否补齐。历史事件超出保留期时返回明确错误并让前端重新取快照，不能假装已完整回放。
+
+## 5. 运行 SDK 与消息桥
+
+生成代码使用：
+
+```typescript
+interface AppState<T extends Record<string, unknown>> {
+  value: T;
+  revision: number;
+  stateSchemaVersion: 1;
+}
+
+interface AppStorage {
+  get<T extends Record<string, unknown>>(): Promise<AppState<T>>;
+  save<T extends Record<string, unknown>>(
+    value: T,
+    expectedRevision: number
+  ): Promise<AppState<T>>;
+}
+
+interface AtomsRuntime {
+  storage: AppStorage;
+}
+```
+
+Atoms.ready 等待宿主桥接完成后调用回调，并捕获回调异常。SDK 不允许指定 projectId、environment、actorId、HTTP URL、header 或 SQL。宿主将当前绑定上下文映射到具体 API。
+
+桥请求：
+
+```json
+{
+  "protocol": "atoms-runtime-v1",
+  "channelId": "ephemeral-channel-id",
+  "requestId": "rpc_1",
+  "type": "STATE_SAVE",
+  "payload": {
+    "expectedRevision": 3,
+    "value": { "todos": [] }
+  }
+}
+```
+
+允许的 type 为 STATE_GET、STATE_SAVE、RUNTIME_ERROR、RUNTIME_READY。响应包含 requestId、ok 和 result 或统一错误；每个请求有超时，切换版本时拒绝所有未完成请求并关闭通道。
+
+宿主把每次 STATE_SAVE 的 requestId 映射为一次固定幂等键，HTTP 重试继续复用。桥消息不能触发生成、恢复、发布或读取平台项目。
+
+历史预览 mode=HISTORY 时，SDK get 返回该版本 initialState，save 返回 READ_ONLY_PREVIEW；不访问当前项目持久状态。加载只读模式由宿主与服务器确定，不接收模型指令覆盖。
+
+## 6. 契约验收重点
+
+- 相同生成键重试只创建一个 run；相同键不同 prompt 返回 422。
+- A 用户无法读取 B 的 projects、versions、runs 或 events。
+- 两个 state 写入同时基于 revision=3，只允许一个成功。
+- 旧 channelId、旧 iframe、未知消息 type 均被拒绝。
+- currentVersionId 变化不自动更改 publication.versionId。
+- 已下线 app 的 state 与 document 请求也被拒绝；已加载到客户端的页面不承诺远程擦除。
+- 直接打开 runtime document 仍有 HTTP CSP sandbox；管理页不会意外使用运行文档的宽松脚本策略。
