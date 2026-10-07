@@ -23,6 +23,7 @@
     "format": "prettier --write src *.ts *.json *.js index.html e2e e2e-runtime e2e-live"
   },
   "dependencies": {
+    "acorn": "8.19.0",
     "pinia": "4.0.3",
     "vue": "3.5.43",
     "vue-router": "5.3.1"
