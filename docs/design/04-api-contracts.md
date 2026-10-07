@@ -54,17 +54,19 @@
 | GET `/api/projects` | cursor、limit | Project 摘要列表，仅自己的 |
 | GET `/api/projects/{id}` | 项目 ID | Project |
 | PATCH `/api/projects/{id}` | `{name}` | 重命名后的 Project；纯赋值幂等 |
+| GET `/api/generation` | 会话 | `{configured, workerEnabled, remainingRequests, model}` |
 | GET `/api/projects/{id}/messages` | cursor、limit | Message 列表 |
-| POST `/api/projects/{id}/runs` | CreateRun，幂等键 | 202 `{runId, status, eventsUrl}` |
+| POST `/api/projects/{id}/runs` | CreateRun，幂等键 | 202 `{runId, status}`；eventsUrl 待 SSE 实现 |
+| GET `/api/projects/{id}/runs` | cursor、limit | Run 列表，新到旧 |
 | GET `/api/runs/{runId}` | runId | Run：状态、阶段、结果版本、错误、lastEventSeq |
-| GET `/api/runs/{runId}/events` | after，或 Last-Event-ID | SSE |
-| PUT `/api/runs/{runId}/cancellation` | `{}` | 200 `{runId, status, cancelRequested}` |
+| GET `/api/runs/{runId}/events` | after，或 Last-Event-ID | SSE，尚未实现 |
+| PUT `/api/runs/{runId}/cancellation` | `{}` | 200 Run，取消直接持久化终态 |
 
 Project 最小字段：`id, name, ownerId, currentVersionId?, projectRevision, activeRunId?, publication?, updatedAt`。其中 projectRevision 表示源码当前指针的修订号，重命名不改变它。
 
-本地 M2 实现约束（2026-10-07）：
+本地身份与项目实现约束（2026-10-07）：
 
-- 已实现本表截至 PATCH 项目的端点，消息及生成端点尚未实现。Project 另返回 createdAt；M3 起始终返回 currentVersionId（空项目为 null），运行/发布字段仍未实现。M2 已保存的幂等创建结果保持原样重放，旧响应可不含 currentVersionId。
+- 本表除 SSE 外均已实现。Project 另返回 createdAt，始终返回 currentVersionId、activeRunId（没有当前版本/活动任务时为 null），发布字段未实现。历史已保存的幂等创建响应保持原样重放，可缺少后来新增的字段。
 - name 去除首尾空白后为 1–80 个 UTF-16 单元，不允许控制字符；仅接受 name 字段。列表按 createdAt/id 倒序，cursor 为不透明游标，limit 为 1–100。
 - Idempotency-Key 允许 1–128 个 ASCII 字母、数字、点、下划线、冒号或短横线；缺失/无效返回 422 INVALID_INPUT。名称规范化后同键重试返回第一次 201 的原始 JSON，包括首次名称与时间，不受后续重命名影响。
 - 会话首次创建变更 session ID 和 CSRF，前端在 POST /api/session 后再取一次 GET /api/csrf。Cookie 为 HttpOnly、SameSite=Lax、7 天有效；只有本地 HTTP/test 配置允许 Secure=false。
@@ -85,7 +87,16 @@ CreateRun：
 
 intent 为 CREATE、MODIFY，P1 可增加 REPAIR。CREATE 使用 null 基线和 revision=0；MODIFY 要求基线为当前版本。REPAIR 还带对应 previewReportId，服务器验证报告属于项目和基线。
 
-取消非终态 run 设置标记；重复取消已取消任务返回当前状态。已经成功或失败的任务不能变为取消，返回 409 RUN_TERMINAL。结果处理与取消使用同一项目/run 锁，避免相互覆盖。
+取消 QUEUED/RUNNING run 直接持久化 CANCELLED 并清除活动标记；重复取消已取消任务返回当前状态。其他终态不能变为取消，返回 409 RUN_TERMINAL。结果处理与取消使用同一项目/run 锁，晚到结果无法提交。停止上游是尽力而为，已发请求仍可能计费。
+
+本地 DeepSeek 切片实现约束：
+
+- Run 返回 `id, projectId, ownerId, prompt, intent, baseVersionId, expectedProjectRevision, status, stage, resultVersionId, errorCode, errorMessage, lastEventSeq, createdAt, startedAt`。状态为 QUEUED/RUNNING/SUCCEEDED/FAILED/CANCELLED/INTERRUPTED，执行阶段为 PLANNING/BUILDING/REPAIRING；没有思维链字段或伪造百分比。
+- prompt strip 后为 1–8000 UTF-16 单元且不含 NUL；输入仅接受 CreateRun 四个字段，revision 为非负安全整数，基线为 null 或规范小写 UUID。归属、当前版本与单项目活动任务同时检查；同一幂等键在版本推进后仍返回原 202/runId。认证/密钥/预算校验不影响成功提交后的同键结果重放。
+- 消息与任务均按数据库递增序号倒序分页，默认 20、最大 100，cursor 为不透明正整数字符串；非法 cursor 返回 400。GET run、分页、取消都验证当前访客是所有者，跨身份返回 404。
+- GET generation 只返回是否配置、Worker 开关、剩余累计请求数及固定模型名；不验证 Key 真实有效性、不返回 Key。配置与预算生效需重启后端。默认预算 0；每轮开始至少需要 2 次余量，每次出网前再次原子预留，排队期间余量可能变化，耗尽时明确失败。
+- 当前固定官方 DeepSeek 端点和 deepseek-flash，不接受用户自定义 URL。thinking enabled/high、stream=false，JSON 对象模式。平台请求上限见 README；服务端记录实际可得 usage，未知值为 null，不将其伪造为 0。未知请求预留不退回。
+- 前端活动任务采用 1.5 秒短轮询，持久事件已写入但没有 SSE 订阅端点；终态任务之后再读取消息和项目版本。任务执行不依赖网页连接。消息通过 Vue 文本转义，不把模型输出作为平台页面 HTML 渲染；产物另经校验和受限运行文档展示。
 
 ### 2.2 版本、预览和发布
 

@@ -1,12 +1,12 @@
 # Atoms Demo · 可执行任务清单
 
-状态：T01–T03、T05–T15、C01、C03–C06 已通过本地验收；其余待实施。T00 的模型与公网资源验证仍未完成，T04 按本地优先决定暂后置。`[ ]` 表示尚未完成，不代表已经创建了对应文件。总体顺序、路径缩写和验证命令见 [开发计划](plan.md)。
+状态：T01–T03、T05–T16、C01、C03–C07 已通过本地验收；DeepSeek 网关、后台工作流、取消/恢复与普通工作台已部分完成 T17–T24，未满足整项验收的仍不勾选。T00 的真实模型与公网资源验证仍未完成，T04 按本地优先决定暂后置。`[ ]` 表示尚未完成，不代表没有对应代码。总体顺序、路径缩写和验证命令见 [开发计划](plan.md)。
 
 说明：范围 S 为约 1–2 个主要文件，M 为约 3–5 个；自动脚手架文件按计划约定整体审阅。每项必须同时满足自己的验收条件和统一完成标准。所有代码路径都是拟建工程中的相对路径。
 
 每个检查点完成后记录证据、汇报结果；未通过就修复当前切片，不堆叠后续复杂功能。检查点本身不替代用户对付费、部署或范围变化的授权。
 
-当前实施记录：[验收证据](../../verification.md)。T01 增加 V000 基线迁移；浏览器测试位于 frontend/e2e，避免独立前端包之外的依赖解析。T09 已接通 /projects/:id；/workbench 保留未保存草稿入口。项目元信息持久化，需求草稿仍只保留在页面会话中，消息保存留到 T16/T23。
+当前实施记录：[验收证据](../../verification.md)。T01 增加 V000 基线迁移；浏览器测试位于 frontend/e2e，避免独立前端包之外的依赖解析。T09 已接通 /projects/:id；/workbench 保留未保存草稿入口。项目、已提交需求、规划与任务结果持久化；未提交草稿仍只保留在页面会话中。
 
 T10–T15 使用固定手工计数器/待办检验源码落库、执行隔离、SDK 与应用状态保存；测试入口为独立 test-run 的 `/test-lab`，仅连接 atoms_demo_test，测试工作台为 5174，浏览器用例位于 frontend/e2e-runtime。计数器仍刷新归零；待办已可刷新恢复，并验证源码视图、私有独立预览、历史只读、断网重试和双标签冲突。这不是 AI 生成。用户决定保留访客方案，OAuth 暂不实现。
 
@@ -238,7 +238,7 @@ T10–T15 使用固定手工计数器/待办检验源码落库、执行隔离、
 
 ### T16 · 实现生成任务的持久化提交
 
-- [ ] 完成 T16（P0，M）
+- [x] 完成 T16（P0，M）
 - 说明：先把短请求提交与长任务执行分开，定义可查询的任务和事件记录。
 - 依赖：T10、T07。
 - 主要文件：`R/db/migration/V006__runs.sql`、`B/run/RunController.java`、`B/run/RunAdmissionService.java`、`B/run/RunRepository.java`、`BT/run/RunAdmissionIT.java`。
@@ -250,14 +250,15 @@ T10–T15 使用固定手工计数器/待办检验源码落库、执行隔离、
 
 ### C07 · 产物与任务检查点
 
-- [ ] 源码和独立预览可用；并发提交只得到一轮持久化任务。尚未接 Worker 的开发状态明确标注，不开放收费生成入口。
+- [x] 源码和独立预览可用；并发提交只得到一轮持久化任务。Worker 已接入；缺凭据/预算时明确禁用，不擅自发出收费请求。
 
 ### T17 · 接入一个真实模型供应商
 
 - [ ] 完成 T17（P0，M）
+- 进度：DeepSeekGateway、LimitedBody、协议/超时/取消/脱敏测试已实现；采用固定官方端点与 deepseek-flash，用户自定义后置。仍缺一次有预算的真实调用，不计完整完成。
 - 说明：在 ModelGateway 后隐藏具体协议，先验证最小真实接入，再复用到工作流。
 - 依赖：T01、T00 的真实模型资源。
-- 主要文件：`B/model/ModelGateway.java`、`B/model/HttpModelGateway.java`、`B/model/ModelProperties.java`、`R/application.yml`、`BT/model/ModelGatewayTest.java`。
+- 实际主要文件：`B/model/ModelGateway.java`、`B/model/DeepSeekGateway.java`、`B/model/LimitedBody.java`、`.env.local.example`、`BT/model/DeepSeekGatewayTest.java`。
 - 验收：
   1. 可配置端点/模型/服务端密钥，能解析所选供应商实际响应与 usage；不假定所有兼容接口能力相同。
   2. 超时、认证失败、限流、连接失败和取消有明确错误映射，不向前端泄露原始认证响应。
@@ -267,6 +268,7 @@ T10–T15 使用固定手工计数器/待办检验源码落库、执行隔离、
 ### T18 · 实现规划、生成、校验及有限修复
 
 - [ ] 完成 T18（P0，M）
+- 进度：Planner → Builder → 结构校验 → 最多一次 Repair 已接通，无模板兜底；协议替身覆盖正常/失败/空输出等分支。真实生成质量尚未验证。
 - 说明：实现有界工作流，角色阶段对应真实模型或程序动作。
 - 依赖：T17、T10。
 - 主要文件：`B/model/GenerationWorkflow.java`、`B/artifact/ArtifactValidator.java`、`R/prompts/planner.md`、`R/prompts/builder.md`、`BT/model/GenerationWorkflowTest.java`。
@@ -279,9 +281,10 @@ T10–T15 使用固定手工计数器/待办检验源码落库、执行隔离、
 ### T19 · 接入后台执行与原子版本提交
 
 - [ ] 完成 T19（P0，M）
+- 进度：GenerationScheduler/GenerationWorker/RunExecutionService 已实现，数据库任务领取、版本原子保存和修改保留数据通过真实 PostgreSQL 测试；仍待真实模型 V-M。
 - 说明：Worker 从数据库领取任务，执行工作流，将产物与终态原子落库。
 - 依赖：T16、T18。
-- 主要文件：`B/run/GenerationWorker.java`、`B/run/RunCompletionService.java`、`B/run/RunRepository.java`、`B/artifact/ArtifactService.java`、`BT/run/RunCompletionIT.java`。
+- 实际主要文件：`B/run/GenerationWorker.java`、`B/run/GenerationScheduler.java`、`B/run/RunExecutionService.java`、`B/artifact/ArtifactService.java`、`BT/run/GenerationExecutionIT.java`。
 - 验收：
   1. 有限 Worker 领取数据库任务，阶段状态和事件持久化；数据库事务不跨模型网络等待。
   2. 统一锁顺序检查取消、activeRunId 和项目 revision，再提交版本、当前指针、消息与终态；失败保留旧版。
@@ -307,6 +310,7 @@ T10–T15 使用固定手工计数器/待办检验源码落库、执行隔离、
 ### T21 · 实现取消与重启中断处理
 
 - [ ] 完成 T21（P0，M）
+- 进度：持久取消、晚到结果保护及启动恢复策略已实现并有测试；恢复测试直接调用启动处理，不等于进程崩溃演练。SSE 及完整重启/关闭页面场景仍待验证。
 - 说明：把用户取消和进程重启变成明确状态，禁止晚到输出覆盖结果。
 - 依赖：T19、T20。
 - 主要文件：`B/run/RunCancellationController.java`、`B/run/RunControlService.java`、`B/run/GenerationWorker.java`、`B/run/RunRecovery.java`、`BT/run/RunControlIT.java`。
@@ -319,6 +323,7 @@ T10–T15 使用固定手工计数器/待办检验源码落库、执行隔离、
 ### T22 · 加入生成资源边界
 
 - [ ] 完成 T22（P0，M）
+- 进度：已实现单 Worker/活动队列 8、整轮 6 分钟、prompt/output/响应限制、持久累计请求次数预留，未知结果不退回。次数不是货币预算；身份频率、并发预算争抢及队列满完整验收尚待补齐。
 - 说明：在准备开放线上生成前，限制队列、并发、输出与整体预算。
 - 依赖：T19、T21。
 - 主要文件：`B/run/GenerationLimits.java`、`B/run/GenerationBudgetService.java`、`B/run/RunAdmissionService.java`、`R/db/migration/V007__generation_budget.sql`、`BT/run/GenerationLimitsIT.java`。
@@ -337,9 +342,10 @@ T10–T15 使用固定手工计数器/待办检验源码落库、执行隔离、
 ### T23 · 接通聊天式生成工作台
 
 - [ ] 完成 T23（P0，M）
+- 进度：普通 5173 对话区已接通生成、历史消息、取消、错误输入恢复、同键重试与完成后新版本预览；当前 1.5 秒短轮询恢复任务，不宣称 SSE 已完成。浏览器生成响应使用显式替身，真实网页模型闭环待验收。
 - 说明：把已有生成内核接到首页/工作台，用户无需使用 API 工具。
 - 依赖：T15、T20、T21、T22。
-- 主要文件：`F/api/runs.ts`、`F/stores/run.ts`、`F/components/ConversationPanel.vue`、`F/pages/WorkbenchPage.vue`、`e2e/workbench.spec.ts`。
+- 实际主要文件：`F/api/runs.ts`、`F/composables/useGeneration.ts`、`F/components/ConversationPanel.vue`、`F/pages/WorkbenchPage.vue`、`e2e/generation.spec.ts`；未知意图缓存位于 `F/stores/generation.ts`。
 - 验收：
   1. 接收首页保留的需求或工作台新输入；用户消息、计划、阶段、结果、错误和取消有清楚状态；发送防重、重试复用意图键。
   2. 刷新通过项目 activeRunId、run 快照和事件游标恢复；按 seq 去重，不重新创建 run。
@@ -349,6 +355,7 @@ T10–T15 使用固定手工计数器/待办检验源码落库、执行隔离、
 ### T24 · 完成基于当前版本的继续修改
 
 - [ ] 完成 T24（P0，M）
+- 进度：前端按当前版本提交 MODIFY，后端新建完整版本、保留应用状态；单元/集成测试通过。两轮真实模型修改及业务兼容性验收待做。
 - 说明：把修改做成新的完整快照，而非原地覆盖文件或丢弃已有业务数据。
 - 依赖：T23、T18。
 - 主要文件：`B/run/RunAdmissionService.java`、`B/model/GenerationWorkflow.java`、`F/stores/run.ts`、`BT/run/ModifyRunIT.java`、`e2e/modify.spec.ts`。

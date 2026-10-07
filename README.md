@@ -1,6 +1,6 @@
 # Atoms Demo Studio
 
-Java 17 + Spring Boot + Vue 的本地开发工程。已实现基础网站、真实访客会话、项目持久化、不可变代码版本、受限运行文档、预览 SDK 与应用数据保存，以及工作台源码和私有独立预览。当前不是完整生成平台；真实模型生成、聊天持久化和发布尚未实现。功能设计和执行计划位于 [设计目录](docs/design/README.md)，唯一进度清单位于 [tasks/todo.md](docs/design/tasks/todo.md)。
+Java 17 + Spring Boot + Vue 的本地开发工程。已实现访客与项目持久化、代码版本与受限预览、应用数据保存，并接通 DeepSeek 网关、后台规划/构建/有限修复及普通工作台的生成与修改交互。已提交的需求、规划和任务结果会保存到数据库。**真实 DeepSeek 联网生成尚未验收**：当前没有配置密钥或授权收费调用，自动测试使用明确的模型替身。发布与在线链接尚未实现。设计见 [设计目录](docs/design/README.md)，唯一进度清单见 [tasks/todo.md](docs/design/tasks/todo.md)。
 
 本阶段仅本地开发，不配置云服务器或公开域名。挑战最终仍需在线链接，后续交付阶段再安排。
 
@@ -43,6 +43,25 @@ cd backend
 
 浏览器测试位于 `frontend/e2e`，当前配置使用本机已安装的 Google Chrome，并创建独立临时测试会话。运行前启动后端；Playwright 可复用本地前端或自动启动它。不连接个人浏览器资料，不依赖登录账号。没有 Chrome 的机器需准备对应浏览器并调整测试 channel，不能把未运行的浏览器测试当作通过。
 
+## DeepSeek 主工作台（5173）
+
+正常入口是 `http://127.0.0.1:5173`：描述需求 → 创建项目 → 点击“生成应用” → 查看规划与构建状态 → 自动装载新版本预览 → 继续输入需求“修改应用”。创建项目本身不调用模型。生成中保留旧版本；取消后晚到结果不会保存；刷新页面可以恢复已提交的任务及对话。
+
+维护者在**项目根目录已有的 `.env.local` 中追加或更新下列键**，不要覆盖原数据库配置，不要把真实密钥粘贴到聊天、源码或浏览器：
+
+```properties
+DEEPSEEK_API_KEY=
+DEEPSEEK_TIMEOUT_SECONDS=120
+DEEPSEEK_MAX_TOKENS=16384
+GENERATION_MAX_MODEL_CALLS=0
+```
+
+填入自己的 Key，并在确认调用预算后设置 `GENERATION_MAX_MODEL_CALLS`；随后重启普通后端使配置生效。0 表示不允许请求。上限是当前数据库自启用生成以来**累计请求次数的绝对上限**，不是每轮、每日、剩余额度或人民币金额；页面显示上限减去已预留数。首次生成/每次修改通常各需要 2 次请求，产物不合规时最多增加 1 次修复。例如首次空库设置为 3 只允许累计最多 3 次请求，后续需要显式提高上限，不通过删除记账数据重置。每次请求发出前持久预留，取消、失败或未知结果不退回，因此不会用无上限自动重试消耗额度。
+
+端点固定 `https://api.deepseek.com/chat/completions`，模型固定 `deepseek-flash`，采用用户指定的 `thinking.enabled`、`reasoning_effort=high`、`stream=false`，额外要求 JSON 输出。密钥仅供后端读取。发送内容包括本次需求和当前源码，不自动发送应用的真实业务状态；思考内容不保存或展示。普通用户不能自定义端点/密钥，后续再扩展。
+
+本地实现为单实例、1 个执行 Worker，最多 8 个活动任务；单请求默认 120 秒、最长 180 秒，整轮最长 6 分钟，上游响应最大 2 MiB。重启时旧 RUNNING 任务标记 INTERRUPTED，不自动重发；QUEUED 可继续。页面每 1.5 秒读取活动任务，网络失败停止自动刷新并给出重试入口；当前是阶段轮询，不是 SSE/token 流。首次真实调用与生成质量、SSE、按身份频率限制及完整上线预算仍需验收。细节见 [ADR-006](docs/decisions/006-deepseek-generation.md)。
+
 ## 运行与持久化测试台（T10–T15）
 
 在额外终端运行：
@@ -69,22 +88,22 @@ npm run dev:fixtures
 
 装载器只编译到 test classpath，校验数据库名、角色和回环绑定，不进入正式 JAR。不要把 test-run 入口暴露到公网。普通后端仍用 spring-boot:run，二者端口不同，可同时运行。
 
-前端目录运行 `npm run test:e2e:runtime`，会自动启动或复用 8081/5174 服务，执行 8 项独立 Chrome 验收。原有普通 E2E 为 11 项；建议两套按顺序运行。测试位于 `frontend/e2e-runtime`，截图/trace 位于忽略提交的 `frontend/test-results-runtime`；它与原有 E2E 输出分离。trace 可能含测试会话信息，不应公开上传。实现边界及官方依据见 [ADR-004](docs/decisions/004-immutable-artifacts-runtime.md) 和 [ADR-005](docs/decisions/005-preview-state-bridge.md)。
+前端目录运行 `npm run test:e2e:runtime`，会自动启动或复用 8081/5174 服务，执行 8 项独立 Chrome 验收。普通 E2E 增至 13 项；建议两套按顺序运行。测试位于 `frontend/e2e-runtime`，截图/trace 位于忽略提交的 `frontend/test-results-runtime`；它与普通 E2E 输出分离。trace 可能含测试会话信息，不应公开上传。测试 profile 关闭生成 Worker；不要在 5174 测试台调用模型。实现边界见 [ADR-004](docs/decisions/004-immutable-artifacts-runtime.md) 和 [ADR-005](docs/decisions/005-preview-state-bridge.md)。
 
 ## 当前可体验的交互
 
 - 首页自动建立/恢复访客会话；失败可重试，未连接不能创建项目。手机端也保留会话状态与重试入口。
 - 首页的三个示例只填充需求；非空输入通过按钮或 Enter 创建真实项目并进入 `/projects/:id`，Shift+Enter 换行，中文组合输入期间不提交。名称从需求前 40 字符整理而来，可在工作台重命名。
 - 项目名称保存到 PostgreSQL，刷新、重新打开和重启后端仍保留。我的项目仅列出当前访客自己的数据，其他访客猜测 ID 也不能打开或重命名。
-- 原始需求及本次意图标识在页面路由切换中保留，尚未作为聊天消息落库；刷新会清空需求草稿，但不删除项目。`/workbench` 仍可作为未保存草稿入口。
+- 未提交的需求草稿及未知提交的意图键仅在当前页面会话保留；提交成功后需求、规划和任务结果持久化。刷新可能丢弃未提交草稿，但不删除项目/对话；先查看恢复的任务再决定下一轮操作。`/workbench` 仍是未保存草稿入口。
 - 创建失败保留输入，同一次操作的重试复用幂等键，避免响应丢失造成重复项目。
-- 有版本的工作台展示真实运行预览、历史版本及 view.html/styles.css/main.js/manifest.json；源码只读转义展示，空项目不伪造文件。支持桌面/手机宽度和窄屏对话/预览切换；生成和发布按钮明确禁用。
+- 有版本的工作台展示运行预览、历史版本及 view.html/styles.css/main.js/manifest.json；源码只读转义展示，空项目不伪造文件。支持桌面/手机宽度和窄屏对话/预览切换。模型未配置、次数不足或任务仍在执行时不能新建生成；发布按钮仍禁用。
 - 当前版本应用状态存入 PostgreSQL，代码升级不重置数据；两标签保存竞争返回冲突。断网或响应异常时保留输入，手动重试复用同一保存意图，不静默覆盖。未知结果时刷新会丢失内存草稿，且不能撤销已发出的请求，界面有提示。
 - 独立预览 `/preview/:projectId/:versionId` 仍检查访客权限并复用受限 iframe，是私有页面而不是公开发布链接。
 - 侧栏服务状态来自真实 `/api/health`；失败时可重试。未知路由有返回入口。
 - Vite 开发页面有 CSP/基础安全响应头；仅开发 HMR 放行本地 WebSocket 与内联样式。`npm run preview` 使用更严格 CSP，但它只是本地构建预览，不是正式部署方案。
 
-下一步从 T16 开始：生成任务持久化提交，再接入事件流/执行流程与真实模型。调用模型前仍需落实端点、凭据和预算；用户自定义模型设置后续支持。T04 的部署骨架和公网验证保留待办。OAuth 暂不接入，继续采用访客模式。
+下一步是在明确密钥和次数上限后，验收一次真实生成及一次修改，再推进 SSE、资源限制与发布。用户自定义模型设置后续支持；T04 的部署骨架和公网验证保留待办。OAuth 暂不接入，继续采用访客模式。
 
 访客身份只绑定当前浏览器 Cookie，有效期最多 7 天；清除 Cookie、更换浏览器或过期后不能找回旧访客项目。统一使用上面的 `127.0.0.1` 地址，避免与 `localhost` 形成两个浏览器空间。请勿存放敏感资料。本地配置不应用于公网；部署前还需限流/总配额、数据保留与删除策略以及完整安全验收，见 [ADR-003](docs/decisions/003-guest-project-persistence.md)。
 
@@ -94,7 +113,9 @@ npm run dev:fixtures
 
 已接通 `GET /api/csrf`、`POST /api/session`、`GET /api/me`，以及 `/api/projects` 的创建/分页列表和 `/api/projects/{id}` 的详情/重命名。新增版本列表 `GET /api/projects/{id}/versions`、详情 `GET /api/projects/{id}/versions/{versionId}` 与受限 HTML `GET /api/projects/{id}/versions/{versionId}/document?previewMode=CURRENT|HISTORY`；均验证项目归属。生产没有提交任意源码的 HTTP 接口。
 
-预览状态使用 `GET /api/projects/{id}/preview-state?versionId=...` 与 `PUT /api/projects/{id}/preview-state`，仅项目所有者可访问；新保存意图必须绑定当前版本与预期状态 revision。所有写请求都要求 CSRF，创建项目和保存状态还要求 Idempotency-Key。单份状态上限 256 KiB，不代表已有总配额或数据清理策略。具体响应字段、限额及当前实现范围见 [接口契约](docs/design/04-api-contracts.md)。其他设计端点仍未实现。
+预览状态使用 `GET /api/projects/{id}/preview-state?versionId=...` 与 `PUT /api/projects/{id}/preview-state`，仅项目所有者可访问；新保存意图必须绑定当前版本与预期状态 revision。所有写请求都要求 CSRF，创建项目、提交生成和保存状态还要求 Idempotency-Key。单份状态上限 256 KiB，不代表已有总配额或数据清理策略。
+
+生成新增 `GET /api/generation`（是否配置、Worker 是否启用、剩余请求数）、`POST/GET /api/projects/{id}/runs`、`GET /api/projects/{id}/messages`、`GET /api/runs/{runId}`、`PUT /api/runs/{runId}/cancellation`。除健康检查外均需访客身份；项目、消息、任务必须属于当前访客。具体字段和当前边界见 [接口契约](docs/design/04-api-contracts.md)。SSE、发布、恢复等其他设计端点仍未实现。
 
 ## PostgreSQL
 
@@ -146,6 +167,6 @@ docker compose --env-file .env -f deploy/compose.db.yaml start postgres
 
 它不是 AI 编程助手帮助开发本网站时使用的账号，也不默认与编程助手订阅或 Atoms 赠送额度互通。
 
-首版由平台维护者在服务端配置模型端点、模型 ID、API Key 和预算。普通使用者不需要输入自己的 Key；用户自定义模型或自带 Key 是可选后续能力，当前不实现。
+首版由平台维护者在服务端配置 DeepSeek API Key 和调用上限，官方端点与模型 ID 已固定。普通使用者不需要输入自己的 Key；用户自定义模型或自带 Key 是可选后续能力，当前不实现。
 
-本次没有配置或调用任何付费模型。API 未就绪时可以开发基础页面、项目与数据库流程，但不能把测试产物冒充真实 AI 生成。
+本次没有配置或调用任何付费模型。接口实现及替身测试不等于真实模型生成质量验收。
