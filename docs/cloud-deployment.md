@@ -7,7 +7,7 @@
 - 工作台：<http://118.195.239.8:8443>；发布链接 origin 同此地址，应用沿用 `/a/<slug>`。用户明确要求直接 HTTP，已关闭此端口的 TLS，不自动跳 HTTPS。
 - 这是显式的临时 Demo 例外，HTTP 流量未加密。独立 Cookie `ATOMS_HTTP_SESSION` 保留 HttpOnly / SameSite=Lax，但不含 Secure；旧 HTTPS 访客数据保留，不自动映射到新 HTTP 访客。
 - 原 HTTPS 自签证书仅为回退保留，有效期至 **2026-11-07 02:15:58（Asia/Shanghai）**，没有自动续期。SHA-256 指纹：`C5:4F:98:43:36:47:87:F5:AA:3F:01:C6:6B:5C:CD:69:4F:9E:AA:85:09:BE:B2:C7:D9:7F:A1:FF:97:34:4D:34`。
-- 使用全新数据库，没有上传本地项目、会话或 `.env.local`。云端 Key 为空、累计调用上限为 0，因此 **尚不能生成应用**；密钥同步和新的调用预算须另行授权。云端模型请求记账为 0，本地 11 次记录未改动。
+- 使用全新数据库，没有上传本地项目、会话或整个 `.env.local`。已按用户授权单独同步 DeepSeek 密钥，但累计调用上限仍为 0，因此 **尚不能生成应用**；新的调用预算待用户确认。密钥同步没有发起生成或更改本地数据、模型记账。
 - 全站采用既有访客模式，项目按所有者隔离。身份频率限制、总存储配额、长期数据清理仍待完成；不适合无人监管地长期开放。侧栏个别“本地”字样仍是既有展示文案，不代表请求发往开发机。
 
 ## 实际安装
@@ -56,6 +56,14 @@
 
 本轮验收脚本和截图保留在 `/private/tmp/atoms-http-deploy.F425WE/`，远端切换脚本位于 `/var/tmp/atoms-http-deploy.X6eNYZ/`。本轮未重新验收 HTTP 会话跨后端重启，也未将本地 runtime 通过冒称为云端真实生成/发布闭环。
 
+## DeepSeek 配置同步（2026-10-08）
+
+用户明确要求将本地 DeepSeek 配置放到服务器。密钥只通过严格校验主机密钥的 SSH 标准输入传输；不出现在命令参数、终端输出、源码或临时上传文件中。仅更新 `/etc/atoms-demo/application.properties` 的 `DEEPSEEK_API_KEY`，保留 root:atoms / 0640；未复制本地数据库密码、会话或完整环境文件。模型仍为代码固定的 `deepseek-flash`，服务器既有超时 120 秒、输出上限 16384 tokens 不变。
+
+服务器向固定 HTTPS 上游请求[模型列表](https://api-docs.deepseek.com/zh-cn/api/list-models/)返回 200；没有发出 chat completion。后端重启后 health=UP，独立 Chrome 首页 200、控制台无错误；访客认证后的 `/api/generation` 返回 `configured=true`、`workerEnabled=true`、`model=deepseek-flash`、`remainingRequests=0`，仅有这四个字段，未包含密钥。此验证证明连接、认证和配置装载，不等于实际生成成功。
+
+旧配置备份：`/var/backups/atoms-demo/model-config.EA1LfF/application.properties`，父目录 root / 0700；备份中的模型密钥为空。回退此配置并重启即可撤销本次同步，数据库无需恢复。传输与验收脚本在本机 `/private/tmp/atoms-model-deploy.Jt7UIs/`，远端 `/var/tmp/atoms-model-deploy.Gly8wL/`；脚本本身不含密钥。本次仅更改外部配置，没有重新构建或部署程序，也未冒称重跑业务全套测试。
+
 ## 备份及运维
 
 已执行 `pg_dump -Fc`，备份为 `/var/backups/atoms-demo/atoms-demo-initial-20261008.dump`，root / 0600，目录 0700。恢复到独立临时库验证了 10 次迁移、1 个项目、调用预算记账 0；临时恢复库已删除，正式库未覆盖，备份保留。该备份在同机且未加密，不是异地灾备；自动定时、加密异地备份及保留策略仍待落实。未迁移或备份开发机业务数据。
@@ -72,7 +80,7 @@ nginx -t
 systemctl restart atoms-demo
 ```
 
-配置修改后重启后端，Nginx 配置改动须先 `nginx -t` 再 reload。不要输出完整配置、密码或 Cookie。启用 DeepSeek 前，确认密钥转移授权、累计调用预算和工作台开放范围；不删除预算记账。后端仍只允许单实例。
+配置修改后重启后端，Nginx 配置改动须先 `nginx -t` 再 reload。不要输出完整配置、密码或 Cookie。DeepSeek 密钥已授权同步，启用生成前仍需确认累计调用预算和工作台开放范围；公网访客共用这份预算，不删除记账或自动放开上限。后端仍只允许单实例。
 
 更新/回退遵循 [部署说明](../deploy/server/README.md)：备份 → 停后端 → 切换已校验版本 → 启动检查。回退至旧 `atoms-demo-XmTJCF` 时，必须同时恢复上述备份内的外部配置、HTTPS 站点和静态安全头，将 `http-demo.conf` 移出 systemd drop-in 目录后 daemon-reload，再启动后端、检查代理配置并重载。等待协议入口就绪，不以发出 reload 信号视为完成；旧证书必须仍有效。不恢复数据库、不删除新 HTTP 期间产生的数据，不将恢复数据库当成无损代码回退。
 
