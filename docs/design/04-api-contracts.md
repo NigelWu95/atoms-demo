@@ -177,6 +177,8 @@ StateDocument：
 
 后端从身份确定 actorId、从路径确定项目与环境；请求不接收 ownerId 或任意数据库路径。保存成功返回 revision=4。同一保存意图因网络未知结果重试时复用幂等键；未使用幂等键的旧 revision 重试可能得到 409，必须重新读取，不能盲目覆盖。
 
+本地 T13 实现：已实现 PREVIEW 的 GET/PUT；LIVE 尚未实现。仅接受上述四个保存字段，value 必须是序列化后不超过 256 KiB UTF-8 的 JSON 对象，schema 固定为整数 1，expectedRevision 为非负安全整数且小于 9007199254740991。所有者检查与代码指针变更共用项目行锁；不存在状态时只读返回 initialState/revision=0，首次写入用唯一约束，后续写入用修订号条件更新。新意图的旧代码返回 409 STALE_APP_VERSION，状态竞争返回 409 STATE_CONFLICT。已经提交的同键同体意图在重新鉴权后重放原结果（即使代码指针或状态修订号已推进），不再执行保存；同键异体返回 422。代码升级不会重置已有应用状态。
+
 ### 2.4 P1 账号
 
 可增加 POST `/api/registrations`、POST `/api/login` 和 DELETE `/api/session`。注册将当前访客升级，保留 userId；登录已有账号旋转会话 ID，并重新获取 CSRF token。登录不会把当前访客项目自动合并到已有账号，避免隐式转移所有权。
