@@ -2,7 +2,7 @@
 
 Java 17 + Spring Boot + Vue 工程。已实现访客与项目持久化、代码版本与受限预览、应用数据保存，并接通 DeepSeek 网关、后台规划/构建/有限修复及普通工作台的生成与修改交互。已提交的需求、规划和任务结果会保存到数据库。**本地真实 DeepSeek 的“生成待办 → 操作保存 → 刷新恢复 → 修改生成 V2 → 筛选且保留原数据”闭环已通过**，详见下文。固定版本发布、独立应用页面和 LIVE 数据隔离已实现；云端网站已部署，但模型生成尚未启用。设计见 [设计目录](docs/design/README.md)，唯一进度清单见 [tasks/todo.md](docs/design/tasks/todo.md)。
 
-2026-10-08 已按用户要求部署到 **<https://192.0.2.10:8443>**：单台云服务器原生运行整套平台和 PostgreSQL，按 `/a/<slug>` 发布应用。不接 ngrok、不等待域名；临时使用自签名证书，浏览器会警告。云端是新库，尚未配置模型密钥，调用上限为 0；本地数据与配置不变。公网健康检查、浏览器建项目/隔离、会话和项目重启恢复、备份恢复通过，生成/SSE/发布的云端闭环仍待验收。见 [实际部署记录与证书期限](docs/cloud-deployment.md)、[ADR-011](docs/decisions/011-single-server-release.md) 和 [服务器部署说明](deploy/server/README.md)。数据库和后端内部端口不直接开放公网。
+2026-10-08 已按用户要求部署到 **<http://192.0.2.10:8443>**：单台云服务器原生运行整套平台和 PostgreSQL，按 `/a/<slug>` 发布应用。不接 ngrok、不等待域名；初始 HTTPS 已按用户明确要求切换为临时 HTTP Demo，流量未加密。HTTP 使用独立访客 Cookie，旧 HTTPS 项目不删除但不会自动归属新访客。云端是新库，尚未配置模型密钥，调用上限为 0；本地数据与配置不变。公网 HTTP 健康检查、浏览器建项目/刷新/隔离通过，生成/SSE/发布的云端闭环仍待验收。见 [实际部署记录与回退](docs/cloud-deployment.md)、[ADR-011](docs/decisions/011-single-server-release.md) 和 [服务器部署说明](deploy/server/README.md)。数据库和后端内部端口不直接开放公网。
 
 ## 打包到服务器
 
@@ -84,7 +84,7 @@ GENERATION_MAX_MODEL_CALLS=0
 
 结果未知时只点“重试原发布操作”，不要把刷新当作撤销。链接当前标注“本地访问链接（尚未接入公网）”，其他设备不可通过本机的 127.0.0.1 地址访问。用户生成应用的初始数据与代码会公开，请勿放入密钥或敏感资料。下线不能收回浏览器已经下载的源码。
 
-部署到服务器后，由维护者将 `PUBLIC_APP_ORIGIN` 配置为站点 HTTPS origin 并重启后端；只接受 HTTPS origin（本机开发允许 loopback HTTP），不含路径。此时面板显示服务器上的应用链接；未配置时仍显示本地链接。无需新增发布 API 或启动隧道。不要直接将 5173/8080/5432/测试端口映射公网。
+部署到服务器后，由维护者将 `PUBLIC_APP_ORIGIN` 配置为站点 origin 并重启后端；默认只接受 HTTPS（本机开发允许 loopback HTTP），不含路径。用户明确接受明文风险的临时 Demo 可设置 `ALLOW_INSECURE_HTTP_PUBLIC_ORIGIN=true`，并按[部署说明](deploy/server/README.md)同步配置代理和 HTTP Cookie；前端只额外接受与当前 HTTP 页面同源的非回环 HTTP 链接。面板显示服务器上的应用链接；未配置时仍显示本地链接。无需新增发布 API 或启动隧道。不要直接将 5173/8080/5432/测试端口映射公网。
 
 ## 运行与持久化测试台（T10–T15）
 
