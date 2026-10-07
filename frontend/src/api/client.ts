@@ -21,7 +21,7 @@ export function errorMessage(error: unknown): string {
   return error.requestId ? `${error.message}（请求编号：${error.requestId}）` : error.message
 }
 type RequestOptions = {
-  method?: 'GET' | 'POST' | 'PATCH' | 'PUT'
+  method?: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE'
   body?: unknown
   idempotencyKey?: string
 }
@@ -62,6 +62,7 @@ export function createApiClient() {
         true,
       )
     }
+    if (response.status === 204) return decode(undefined)
     let body: unknown
     try {
       body = await response.json()

@@ -5,6 +5,19 @@ afterEach(() => vi.unstubAllGlobals())
 const decode = (value: unknown) => value
 
 describe('HTTP boundary', () => {
+  it('decodes an empty 204 DELETE response without weakening JSON response validation', async () => {
+    const fetch = vi.fn().mockResolvedValue(new Response(null, { status: 204 }))
+    vi.stubGlobal('fetch', fetch)
+    const client = createApiClient()
+    client.setCsrf({ token: 'test-only-token', headerName: 'X-CSRF-TOKEN' })
+    await expect(
+      client.request('/api/projects/p/publication', decode, {
+        method: 'DELETE',
+        idempotencyKey: 'offline',
+      }),
+    ).resolves.toBeUndefined()
+    expect(fetch.mock.calls[0]![1].headers['Idempotency-Key']).toBe('offline')
+  })
   it('invalidates the session on an HTML 401 without disguising its HTTP status', async () => {
     vi.stubGlobal(
       'fetch',
