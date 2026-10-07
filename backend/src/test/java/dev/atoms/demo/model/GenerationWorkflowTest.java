@@ -35,4 +35,16 @@ class GenerationWorkflowTest {
         }, ignored -> {})).isInstanceOf(ModelException.class);
         assertThat(stages).isEqualTo(List.of("PLANNING", "BUILDING", "REPAIRING"));
     }
+    @Test void blankOrJsonNullOutputsAreContractErrorsEligibleForOneRepair() {
+        var workflow = new GenerationWorkflow(json, new ArtifactValidator());
+        for (String invalid : List.of(" ", "null")) {
+            var stages = new ArrayList<String>();
+            var result = workflow.generate("test", null, (stage, system, user) -> {
+                stages.add(stage);
+                return new ModelGateway.Answer(stage.equals("PLANNING") ? plan : stage.equals("BUILDING") ? invalid : source, null);
+            }, ignored -> {});
+            assertThat(result.path("formatVersion").asInt()).isEqualTo(1);
+            assertThat(stages).containsExactly("PLANNING", "BUILDING", "REPAIRING");
+        }
+    }
 }

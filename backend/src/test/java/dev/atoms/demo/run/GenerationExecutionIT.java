@@ -32,6 +32,7 @@ class GenerationExecutionIT {
     @Autowired ObjectMapper json;
     @Autowired ArtifactService artifacts;
     @Autowired FakeModel model;
+    @Autowired org.springframework.transaction.PlatformTransactionManager transactions;
     @TestConfiguration static class Fakes { @Bean @Primary FakeModel fakeModel() { return new FakeModel(); } }
     static class FakeModel implements ModelGateway {
         final AtomicInteger calls = new AtomicInteger();
@@ -58,17 +59,24 @@ class GenerationExecutionIT {
         return new Setup(browser, owner, project);
     }
     Run enqueue(Setup s, UUID base, long revision) throws Exception {
+        return enqueue(s, base, revision, UUID.randomUUID().toString());
+    }
+    Run enqueue(Setup s, UUID base, long revision, String key) throws Exception {
         var input = json.createObjectNode().put("prompt", "创建或修改测试应用").put("intent", base == null ? "CREATE" : "MODIFY").put("expectedProjectRevision", revision);
         if (base == null) input.putNull("baseVersionId"); else input.put("baseVersionId", base.toString());
-        var response = s.browser.request("POST", "/api/projects/" + s.project + "/runs", input.toString(), UUID.randomUUID().toString());
+        var response = s.browser.request("POST", "/api/projects/" + s.project + "/runs", input.toString(), key);
         assertThat(response.status()).isEqualTo(202);
         return execution.start(s.owner, response.body().path("runId").asText());
     }
     @Test void createsAndModifiesRealVersionsPreservingApplicationState() throws Exception {
-        var s = setup(); Run first = enqueue(s, null, 0);
+        var s = setup(); String key = UUID.randomUUID().toString(); Run first = enqueue(s, null, 0, key);
         worker.process(first);
         Run result = runs.get(s.owner, first.id().toString());
         assertThat(result.status()).isEqualTo("SUCCEEDED");
+        var replay = s.browser.request("POST", "/api/projects/" + s.project + "/runs",
+                "{\"prompt\":\"创建或修改测试应用\",\"intent\":\"CREATE\",\"baseVersionId\":null,\"expectedProjectRevision\":0}", key);
+        assertThat(replay.status()).isEqualTo(202);
+        assertThat(replay.body().path("runId").asText()).isEqualTo(first.id().toString());
         assertThat(result.lastEventSeq()).isGreaterThan(3);
         assertThat(artifacts.get(s.owner, s.project, result.resultVersionId().toString()).versionNo()).isEqualTo(1);
         String value = "{\"loadedVersionId\":\"" + result.resultVersionId() + "\",\"expectedRevision\":0,\"stateSchemaVersion\":1,\"value\":{\"count\":7}}";
@@ -94,6 +102,31 @@ class GenerationExecutionIT {
         var result = runs.get(s.owner, run.id().toString());
         assertThat(result.status()).isEqualTo("FAILED"); assertThat(result.errorCode()).isEqualTo("MODEL_AUTH_FAILED");
         assertThat(model.calls.get()).isEqualTo(before + 1);
+        assertThat(artifacts.list(s.owner, s.project, null, 20).items()).isEmpty();
+    }
+    @Test void requestAllowanceIsDurableAndExhaustionCannotReserveAnotherCall() throws Exception {
+        var s = setup(); Run run = enqueue(s, null, 0);
+        long before = jdbc.queryForObject("SELECT requests_reserved FROM generation_budget WHERE id = 1", Long.class);
+        var limited = new RunExecutionService(runs, jdbc, artifacts,
+                new org.springframework.mock.env.MockEnvironment().withProperty("GENERATION_MAX_MODEL_CALLS", Long.toString(before + 1)));
+        var transaction = new org.springframework.transaction.support.TransactionTemplate(transactions);
+        try {
+            UUID call = transaction.execute(status -> limited.reserve(run, "PLANNING"));
+            assertThat(jdbc.queryForObject("SELECT status FROM model_calls WHERE id = ?", String.class, call)).isEqualTo("UNKNOWN");
+            assertThatThrownBy(() -> transaction.execute(status -> limited.reserve(run, "BUILDING")))
+                    .isInstanceOf(ModelException.class).hasMessageContaining("额度已用完");
+            assertThat(jdbc.queryForObject("SELECT requests_reserved FROM generation_budget WHERE id = 1", Long.class)).isEqualTo(before + 1);
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM model_calls WHERE run_id = ?", Integer.class, run.id())).isEqualTo(1);
+        } finally { execution.fail(run, "GENERATION_LIMIT_REACHED", "测试额度耗尽。"); }
+    }
+    @Test void startupRecoveryInterruptsUncertainWorkWithoutCallingProvider() throws Exception {
+        var s = setup(); Run run = enqueue(s, null, 0);
+        execution.reserve(run, "PLANNING");
+        int before = model.calls.get();
+        new GenerationScheduler(execution, worker).recover();
+        assertThat(runs.get(s.owner, run.id().toString()).status()).isEqualTo("INTERRUPTED");
+        assertThat(model.calls.get()).isEqualTo(before);
+        assertThat(s.browser.get("/api/projects/" + s.project).body().path("activeRunId").isNull()).isTrue();
         assertThat(artifacts.list(s.owner, s.project, null, 20).items()).isEmpty();
     }
 }
