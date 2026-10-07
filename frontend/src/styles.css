@@ -1,4 +1,5 @@
 @import './workbench.css';
+@import './projects.css';
 
 :root {
   color-scheme: dark;
@@ -29,6 +30,7 @@ body {
   min-width: 320px;
 }
 button,
+input,
 textarea {
   font: inherit;
 }
@@ -55,6 +57,7 @@ h3 {
 }
 button:focus-visible,
 a:focus-visible,
+input:focus-visible,
 textarea:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 4px;
@@ -502,9 +505,20 @@ h1:focus {
     margin-top: 4px;
   }
   .workspace-name,
-  .sidebar-note,
-  .profile {
+  .sidebar-note {
     display: none;
+  }
+  .profile {
+    padding: 12px 0 0;
+    margin-top: 8px;
+    align-items: flex-start;
+  }
+  .profile-avatar {
+    display: none;
+  }
+  .session-status > .muted {
+    display: inline;
+    margin-left: 12px;
   }
   .primary-nav {
     display: flex;
@@ -522,11 +536,13 @@ h1:focus {
     display: none;
   }
   .sidebar-footer {
+    position: static;
+    margin-top: 0;
+  }
+  .service-status {
     position: absolute;
     top: 16px;
     right: 16px;
-  }
-  .service-status {
     padding: 4px 0;
     font-size: 10px;
   }

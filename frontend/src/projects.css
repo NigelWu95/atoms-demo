@@ -1,0 +1,145 @@
+.session-status {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.session-status > .muted {
+  display: block;
+  font-size: 11px;
+}
+.session-status button {
+  margin-top: 8px;
+}
+.session-status [role='alert'] {
+  color: var(--danger);
+  font-size: 12px;
+}
+.project-privacy-note {
+  color: var(--muted);
+  margin: 12px 0 32px;
+  max-width: 72ch;
+}
+.project-list {
+  min-height: 112px;
+}
+.list-loading {
+  padding: 32px 24px;
+  color: var(--muted);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+}
+.project-rows {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 20px;
+  border-top: 1px solid var(--border);
+}
+.project-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px 8px;
+  border-bottom: 1px solid var(--border);
+}
+.project-row:hover {
+  background: var(--surface);
+}
+.project-mark {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  background: var(--surface-raised);
+  color: var(--accent);
+  border-radius: 8px;
+  font-size: 24px;
+}
+.project-copy {
+  min-width: 0;
+  flex: 1;
+}
+.project-copy strong {
+  display: block;
+  overflow-wrap: anywhere;
+  font-weight: 550;
+}
+.project-copy .muted {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+}
+.project-open {
+  flex-shrink: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+.inline-error {
+  color: var(--danger);
+  overflow-wrap: anywhere;
+  margin: 12px 0;
+  font-size: 13px;
+}
+.inline-error button {
+  margin-top: 12px;
+}
+.project-heading {
+  min-width: 0;
+}
+.project-heading h1 {
+  overflow-wrap: anywhere;
+}
+.project-heading-meta {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  font-size: 12px;
+}
+.text-button {
+  background: transparent;
+  color: var(--accent);
+  border: none;
+  padding: 8px 0;
+}
+.rename-form {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+  max-width: 460px;
+}
+.rename-form input {
+  width: 100%;
+  min-width: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+.rename-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+.workbench-header > div {
+  min-width: 0;
+  flex: 1;
+}
+.workbench-header > button {
+  flex-shrink: 0;
+}
+@media (max-width: 767px) {
+  .project-row {
+    gap: 12px;
+    padding: 16px 0;
+  }
+  .project-open {
+    font-size: 11px;
+  }
+  .workbench-header {
+    align-items: flex-start;
+  }
+  .workbench-header > button {
+    padding: 8px 12px;
+  }
+}

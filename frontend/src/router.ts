@@ -11,6 +11,7 @@ export function createAppRouter(history: RouterHistory) {
       { path: '/', component: HomePage, meta: { title: '开始创作' } },
       { path: '/workbench', component: WorkbenchPage, meta: { title: '工作台' } },
       { path: '/projects', component: ProjectsPage, meta: { title: '我的项目' } },
+      { path: '/projects/:id', component: WorkbenchPage, meta: { title: '项目工作台' } },
       { path: '/:pathMatch(.*)*', component: NotFoundPage, meta: { title: '页面不存在' } },
     ],
     scrollBehavior: () => ({ top: 0 }),

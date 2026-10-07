@@ -2,6 +2,7 @@
 import { nextTick, watch } from 'vue'
 import { RouterLink, RouterView, useRoute } from 'vue-router'
 import ServiceStatus from './components/ServiceStatus.vue'
+import SessionStatus from './components/SessionStatus.vue'
 
 const route = useRoute()
 watch(
@@ -15,7 +16,10 @@ watch(
 
 <template>
   <a href="#main-content" class="skip-link">跳到主要内容</a>
-  <div class="app-shell" :class="{ 'workbench-shell': route.path === '/workbench' }">
+  <div
+    class="app-shell"
+    :class="{ 'workbench-shell': route.path === '/workbench' || !!route.params.id }"
+  >
     <aside class="sidebar">
       <RouterLink class="brand" to="/" aria-label="Atoms Demo Studio 首页">
         <span class="brand-mark" aria-hidden="true">✳</span>
@@ -46,7 +50,7 @@ watch(
         <ServiceStatus />
         <div class="profile">
           <span class="profile-avatar" aria-hidden="true">你</span>
-          <div>本地体验<span class="muted">基础网站 · M1</span></div>
+          <SessionStatus />
         </div>
       </div>
     </aside>

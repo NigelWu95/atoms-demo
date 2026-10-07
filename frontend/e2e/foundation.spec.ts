@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
 
-test('real API, draft navigation, keyboard entry and disabled generation', async ({ page }) => {
+test('real API, project navigation, keyboard entry and disabled generation', async ({ page }) => {
   const errors: string[] = []
   page.on('pageerror', (error) => errors.push(error.message))
   page.on('console', (message) => {
@@ -13,6 +13,7 @@ test('real API, draft navigation, keyboard entry and disabled generation', async
   expect(pageResponse?.headers()['content-security-policy']).toContain("frame-ancestors 'none'")
   expect((await health).status()).toBe(200)
   await expect(page.getByText('服务已连接')).toBeVisible()
+  await expect(page.getByText('访客创作者', { exact: true })).toBeVisible()
   await page.keyboard.press('Tab')
   await expect(page.getByRole('link', { name: '跳到主要内容' })).toBeFocused()
   await page.getByRole('button', { name: '待办清单' }).click()
@@ -22,7 +23,7 @@ test('real API, draft navigation, keyboard entry and disabled generation', async
   await input.press('Shift+Enter')
   await expect(page).toHaveURL(/\/$/)
   await input.press('Enter')
-  await expect(page).toHaveURL(/\/workbench$/)
+  await expect(page).toHaveURL(/\/projects\/[0-9a-f-]+$/)
   await expect(page.getByRole('heading', { name: '还没有生成应用' })).toBeVisible()
   await expect(page.getByRole('button', { name: '生成应用' })).toBeDisabled()
   await expect(page.getByRole('button', { name: '发布应用' })).toBeDisabled()

@@ -1,27 +1,91 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import PromptComposer from '../components/PromptComposer.vue'
 import { useDraftStore } from '../stores/draft'
+import { useSessionStore } from '../stores/session'
+import { getProject, type Project } from '../api/projects'
+import { errorMessage } from '../api/client'
+import ProjectHeading from '../components/ProjectHeading.vue'
 
 const draft = useDraftStore()
+const session = useSessionStore()
+const route = useRoute()
+const projectId = computed(() => (typeof route.params.id === 'string' ? route.params.id : null))
+const project = ref<Project | null>(null)
+const loading = ref(false)
+const error = ref('')
+let requestRevision = 0
+const prompt = computed({
+  get: () =>
+    projectId.value ? (draft.projectDrafts[projectId.value]?.prompt ?? '') : draft.prompt,
+  set: (value: string) => {
+    if (projectId.value) draft.updateProjectPrompt(projectId.value, value)
+    else draft.prompt = value
+  },
+})
+async function loadProject() {
+  const request = ++requestRevision
+  project.value = null
+  error.value = ''
+  loading.value = false
+  if (!projectId.value || !session.ready) return
+  loading.value = true
+  try {
+    const result = await getProject(projectId.value)
+    if (request === requestRevision) project.value = result
+  } catch (failure) {
+    if (request === requestRevision) error.value = errorMessage(failure)
+  } finally {
+    if (request === requestRevision) loading.value = false
+  }
+}
+watch(
+  () => [projectId.value, session.ready, session.identity?.userId],
+  () => {
+    void loadProject()
+  },
+  { immediate: true },
+)
 const panel = ref<'conversation' | 'preview'>('conversation')
 const view = ref<'preview' | 'code'>('preview')
 const device = ref<'desktop' | 'mobile'>('desktop')
 </script>
 
 <template>
-  <div class="workbench-page">
+  <section v-if="projectId && !project" class="simple-page" :aria-busy="loading">
+    <h1 tabindex="-1">{{ error ? '项目无法打开' : '正在打开项目' }}</h1>
+    <p v-if="error" role="alert" class="inline-error">{{ error }}</p>
+    <p v-else role="status" class="muted">
+      {{ session.ready ? '正在读取项目资料…' : '请先连接访客会话。' }}
+    </p>
+    <div class="rename-actions">
+      <button
+        v-if="error"
+        class="button secondary"
+        type="button"
+        :disabled="!session.ready"
+        @click="loadProject"
+      >
+        重试打开
+      </button>
+      <RouterLink to="/projects" class="button secondary">返回我的项目</RouterLink>
+    </div>
+  </section>
+  <div v-else class="workbench-page">
     <header class="workbench-header">
       <div>
         <RouterLink to="/" class="subtle-link">← 返回创作</RouterLink>
-        <h1 tabindex="-1">需求草稿 <span class="outline-badge">未保存</span></h1>
+        <ProjectHeading v-if="project" :project="project" @renamed="project = $event" />
+        <h1 v-else tabindex="-1">需求草稿 <span class="outline-badge">未保存</span></h1>
       </div>
       <button class="button primary" type="button" disabled title="应用生成后才能发布">
         发布应用 ↗
       </button>
     </header>
     <p class="workbench-notice">
-      基础工作台已就绪。尚未创建项目、调用模型或生成代码；草稿仅在当前页面会话中保留。
+      {{ project ? '项目名称已保存到数据库。' : '这是尚未保存的需求草稿。' }}
+      需求文本仅在当前页面会话中保留，刷新后会清空。尚未调用模型或生成代码。
     </p>
     <div class="mobile-view-controls" role="group" aria-label="工作台区域">
       <button
@@ -50,7 +114,7 @@ const device = ref<'desktop' | 'mobile'>('desktop')
           <p class="muted">这是计划中的工作流程，不是正在执行的任务。</p>
         </div>
         <PromptComposer
-          v-model="draft.prompt"
+          v-model="prompt"
           disabled
           label="继续完善你的需求"
           action-label="生成应用"
