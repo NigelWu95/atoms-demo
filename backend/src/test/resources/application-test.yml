@@ -1,0 +1,5 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://127.0.0.1:5432/atoms_demo_test?currentSchema=atoms&connectTimeout=3&socketTimeout=5
+    username: atoms_test
+    password: ${TEST_DB_PASSWORD}

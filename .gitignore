@@ -1,0 +1,14 @@
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+.DS_Store
+node_modules/
+dist/
+target/
+test-results/
+playwright-report/
+coverage/
+.local/
+*.log
