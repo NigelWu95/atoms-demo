@@ -18,8 +18,8 @@
 
 | 项目 | 位置 / 状态 |
 |---|---|
-| 发布版本 | `atoms-demo-RTV1eK`，源码 `4c578800ce4209aae8955b44bdedde48ec8e2ce3`，打包时 dirty=false |
-| 程序 | `/opt/atoms-demo/releases/atoms-demo-RTV1eK`；`/opt/atoms-demo/current` 为其符号链接；旧 `atoms-demo-X4tLzj`、`atoms-demo-Dpprat`（HTTP）和 `atoms-demo-XmTJCF`（HTTPS）保留 |
+| 发布版本 | `atoms-demo-txj7Bn`，源码 `246c744efef4fe62ca3039f46bb2b7e898b350c8`，打包时 dirty=false |
+| 程序 | `/opt/atoms-demo/releases/atoms-demo-txj7Bn`；`/opt/atoms-demo/current` 为其符号链接；旧 `atoms-demo-RTV1eK`、`atoms-demo-X4tLzj`、`atoms-demo-Dpprat`（HTTP）和 `atoms-demo-XmTJCF`（HTTPS）保留 |
 | 外部配置 | `/etc/atoms-demo/application.properties`，root:atoms / 0640，目录 0750 |
 | TLS（未启用） | `/etc/atoms-demo/tls/server.crt`、`server.key` 为回退保留；私钥 root / 0600，目录 0700 |
 | 后端服务 | `atoms-demo.service`，非 root 的 `atoms` 账号，单实例 |
@@ -99,6 +99,18 @@
 远端及开发机公网 HTTP 健康检查均为 UP，首页 200，三个服务 active，后端 NRestarts=0；读取实际配置确认 16840 / 300 / 600 已生效。累计已预留 4、剩余 96，本次未发起付费模型请求，也未重跑浏览器或云端生成闭环。此前 2048 的 BUILDING 用了 18001 completion tokens，高于新上限，因此新配置仍可能触发 MODEL_INCOMPLETE，不能用历史成功保证任意需求完成。
 
 本机更新脚本位于 `/private/tmp/atoms-limit-upgrade.r05nQs/deploy.sh`，远端位于 `/var/tmp/atoms-limit-upgrade.ATQ9hP/`；脚本不含凭据。GNU tar 忽略 macOS provenance 扩展属性，所有载荷校验通过。
+
+## 单次额度提高至 168400（2026-10-08，当前）
+
+16840 配置下的新任务 `9e4dab9a-0f99-49d0-95b6-0b1fd2f559e0` 在 BUILDING 约 63 秒后返回 length：输入 1348、completion 16840、其中 reasoning 16266；规划成功，整轮共 2 次调用，没有新版本或自动重试。累计预留增至 6。这说明额度包含思考与最终内容，不能将其视为纯代码额度；不是超时或旧包未更新。
+
+按用户明确要求，当前云端 **DEEPSEEK_MAX_TOKENS=168400**，单次 300 秒、整轮 600 秒、thinking.enabled / high、累计 100 次均不变。代码校验上界由 32768 提高到 168400，保留有限上界和 2 MiB 响应/120 KiB 源码限制。本地私有配置、模型密钥、数据库、Nginx 和 HTTP 访问方式未改动。更高上限允许更高消耗，不保证所有需求均能完成；本次没有付费生成或浏览器闭环验收。
+
+验证：新增精确 168400 请求参数和思考设置回归，原实现下失败、修复后通过；将条件错误地改为拒绝 168400 时测试再次失败，恢复正确实现后完整构建通过。打包测试 3、前端 106、后端单测 26、PostgreSQL 集成 46 项通过，类型/lint/格式/构建通过；npm audit 为 0 已知漏洞，无新增依赖或数据库迁移。正式包与完整候选包 13 个载荷哈希一致，上传后逐项校验通过。
+
+升级前无活动任务，备份 `/var/backups/atoms-demo/model-168400.GjCYng/` 含私有配置与数据库 dump，目录 0700、文件 0600；仅检查 dump 目录，未做此次备份恢复演练。仅修改 token 一项，其他配置经无内容输出的比较确认一致，权限保留 root:atoms / 0640。服务重启后实际配置为 168400 / 300 / 600，三个服务 active、NRestarts=0；公网首页 200、健康检查 UP。累计仍为 6 / 100，剩余 94，没有额外模型调用。
+
+回退：停后端，切回 `atoms-demo-RTV1eK`，同时恢复本次备份配置为 root:atoms / 0640（16840 / 300 / 600），启动后检查健康；旧包不接受 168400，不可只切包而保留新值。不恢复数据库、不删除项目、不重置记账。脚本保留于本机 `/private/tmp/atoms-token-168400.AFQH4c/`、远端 `/var/tmp/atoms-token-168400.N2kmjU/`；不含凭据。GNU tar 的 macOS provenance 扩展属性警告不影响已通过校验的文件。
 
 ## 备份及运维
 
