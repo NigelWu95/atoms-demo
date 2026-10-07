@@ -11,11 +11,12 @@ import java.time.Duration;
 
 /** Isolated cookie jar: never prints authentication material. */
 public final class ApiBrowser {
-    private final String base;
+    private String base;
     private final ObjectMapper json = new ObjectMapper();
     private final HttpClient http = HttpClient.newBuilder().cookieHandler(new CookieManager()).build();
     private String csrf;
     public ApiBrowser(int port) { base = "http://127.0.0.1:" + port; }
+    public void usePort(int port) { base = "http://127.0.0.1:" + port; }
     public record Reply(int status, JsonNode body, HttpResponse<String> raw) {}
 
     public Reply request(String method, String path, String body, String key) throws Exception {

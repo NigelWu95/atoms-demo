@@ -35,6 +35,21 @@ class SessionIT {
     }
 
     @Test
+    void rotatesSessionAndCsrfOnFirstAuthentication() throws Exception {
+        var browser = new ApiBrowser(port);
+        var initial = browser.get("/api/csrf");
+        var oldCookie = initial.raw().headers().firstValue("set-cookie").orElseThrow().split(";", 2)[0];
+        var authenticated = browser.initialize();
+        var newCookie = authenticated.raw().headers().firstValue("set-cookie").orElseThrow().split(";", 2)[0];
+        assertThat(oldCookie.equals(newCookie)).isFalse();
+        assertThat(browser.request("POST", "/api/session", "{}", null, initial.body().path("token").asText()).status()).isEqualTo(403);
+        var stolenOldSession = java.net.http.HttpClient.newHttpClient().send(java.net.http.HttpRequest.newBuilder(
+                java.net.URI.create("http://127.0.0.1:" + port + "/api/me")).header("Cookie", oldCookie).build(),
+                java.net.http.HttpResponse.BodyHandlers.discarding());
+        assertThat(stolenOldSession.statusCode()).isEqualTo(401);
+    }
+
+    @Test
     void rejectsAnonymousReadsAndMissingOrWrongCsrfWithoutHtmlOrSecrets() throws Exception {
         var browser = new ApiBrowser(port);
         var anonymous = browser.get("/api/me");
