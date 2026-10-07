@@ -2,6 +2,7 @@
 @import './preview.css';
 @import './projects.css';
 @import './generation.css';
+@import './publication.css';
 
 :root {
   color-scheme: dark;

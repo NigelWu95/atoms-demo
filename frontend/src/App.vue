@@ -17,6 +17,7 @@ watch(
 <template>
   <a href="#main-content" class="skip-link">跳到主要内容</a>
   <div
+    v-if="route.matched.length && !route.meta.publicApp"
     class="app-shell"
     :class="{ 'workbench-shell': route.path === '/workbench' || !!route.params.id }"
   >
@@ -56,4 +57,7 @@ watch(
     </aside>
     <main id="main-content" class="main-content"><RouterView /></main>
   </div>
+  <main v-else-if="route.meta.publicApp" id="main-content" class="public-app-shell">
+    <RouterView />
+  </main>
 </template>

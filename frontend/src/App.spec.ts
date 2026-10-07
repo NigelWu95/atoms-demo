@@ -47,18 +47,84 @@ function mockApi() {
 
 afterEach(() => vi.unstubAllGlobals())
 
-async function openApp() {
+async function openApp(path = '/') {
   // jsdom has no layout/scroll implementation; actual scrolling is browser-tested.
   vi.stubGlobal('scrollTo', vi.fn())
   const router = createAppRouter(createMemoryHistory())
-  await router.push('/')
+  await router.push(path)
   await router.isReady()
-  const wrapper = mount(App, { global: { plugins: [createPinia(), router] } })
+  const wrapper = mount(App, {
+    global: { plugins: [createPinia(), router], stubs: { PublicFrame: true } },
+  })
   await flushPromises()
   return { wrapper, router }
 }
 
 describe('foundation website', () => {
+  it('does not mount the creator sidebar while the initial public route is resolving', async () => {
+    const fetch = vi
+      .fn()
+      .mockResolvedValue(
+        Response.json({ error: { code: 'APP_NOT_PUBLISHED', message: '已下线' } }, { status: 404 }),
+      )
+    vi.stubGlobal('fetch', fetch)
+    vi.stubGlobal('scrollTo', vi.fn())
+    const history = createMemoryHistory()
+    history.replace(`/a/${'c'.repeat(32)}`)
+    const router = createAppRouter(history)
+    const wrapper = mount(App, { global: { plugins: [createPinia(), router] } })
+    await router.isReady()
+    await flushPromises()
+    expect(fetch.mock.calls.map((call) => call[0])).toEqual([`/api/public/apps/${'c'.repeat(32)}`])
+    wrapper.unmount()
+  })
+  it('public app pages omit creator navigation and never request private resources', async () => {
+    const slug = 'a'.repeat(32)
+    const fetch = mockApi()
+    const original = fetch.getMockImplementation()!
+    fetch.mockImplementation((path: string, options?: RequestInit) =>
+      path === `/api/public/apps/${slug}`
+        ? Promise.resolve(
+            Response.json({
+              slug,
+              versionId: '11111111-1111-4111-8111-111111111111',
+              versionNo: 1,
+              title: '公开应用',
+              summary: '公开说明',
+              stateSchemaVersion: 1,
+              initialState: {},
+            }),
+          )
+        : original(path, options),
+    )
+    vi.stubGlobal('fetch', fetch)
+    const { wrapper } = await openApp(`/a/${slug}`)
+    expect(wrapper.get('h1').text()).toBe('公开应用')
+    expect(wrapper.find('.sidebar').exists()).toBe(false)
+    expect(wrapper.find('public-frame-stub').exists()).toBe(true)
+    expect(
+      fetch.mock.calls
+        .map((call) => call[0])
+        .some((path) => /projects|generation|health/.test(path)),
+    ).toBe(false)
+    wrapper.unmount()
+  })
+  it('unpublished apps show an unavailable page without creating a visitor or frame', async () => {
+    const fetch = vi
+      .fn()
+      .mockResolvedValue(
+        Response.json(
+          { error: { code: 'APP_NOT_PUBLISHED', message: '应用未发布或已下线' } },
+          { status: 404 },
+        ),
+      )
+    vi.stubGlobal('fetch', fetch)
+    const { wrapper } = await openApp(`/a/${'b'.repeat(32)}`)
+    expect(wrapper.get('[role="alert"]').text()).toContain('应用未发布或已下线')
+    expect(wrapper.find('public-frame-stub').exists()).toBe(false)
+    expect(fetch).toHaveBeenCalledTimes(1)
+    wrapper.unmount()
+  })
   it('fills examples, creates a project, and preserves its original draft on return', async () => {
     vi.stubGlobal('fetch', mockApi())
     const { wrapper, router } = await openApp()

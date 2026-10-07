@@ -4,11 +4,13 @@ import WorkbenchPage from './pages/WorkbenchPage.vue'
 import ProjectsPage from './pages/ProjectsPage.vue'
 import NotFoundPage from './pages/NotFoundPage.vue'
 import StandalonePreviewPage from './pages/StandalonePreviewPage.vue'
+import PublicAppPage from './pages/PublicAppPage.vue'
 
 export function createAppRouter(history: RouterHistory) {
   const router = createRouter({
     history,
     routes: [
+      { path: '/a/:slug', component: PublicAppPage, meta: { title: '公开应用', publicApp: true } },
       { path: '/', component: HomePage, meta: { title: '开始创作' } },
       { path: '/workbench', component: WorkbenchPage, meta: { title: '工作台' } },
       { path: '/projects', component: ProjectsPage, meta: { title: '我的项目' } },
