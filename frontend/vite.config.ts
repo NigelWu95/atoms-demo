@@ -12,19 +12,22 @@ const contentPolicy =
 
 // Same-origin API proxy keeps database credentials and CORS out of the browser.
 // Source: https://vite.dev/config/server-options.html#server-proxy
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [vue()],
   server: {
     host: '127.0.0.1',
-    port: 5173,
+    port: mode === 'fixtures' ? 5174 : 5173,
     strictPort: true,
-    proxy: { '/api': 'http://127.0.0.1:8080' },
+    proxy: { '/api': mode === 'fixtures' ? 'http://127.0.0.1:8081' : 'http://127.0.0.1:8080' },
     headers: {
       ...securityHeaders,
       // Vite HMR injects style tags and uses a local WebSocket in development only.
       'Content-Security-Policy': contentPolicy
         .replace("style-src 'self'", "style-src 'self' 'unsafe-inline'")
-        .replace("connect-src 'self'", "connect-src 'self' ws://127.0.0.1:5173"),
+        .replace(
+          "connect-src 'self'",
+          `connect-src 'self' ws://127.0.0.1:${mode === 'fixtures' ? 5174 : 5173}`,
+        ),
     },
   },
   preview: {
@@ -40,4 +43,4 @@ export default defineConfig({
     clearMocks: true,
     restoreMocks: true,
   },
-})
+}))

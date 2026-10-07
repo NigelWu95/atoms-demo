@@ -33,7 +33,7 @@ public class FixtureController {
     ResponseEntity<JsonNode> create(Principal principal, @RequestBody JsonNode input,
                                     @RequestHeader(value = "Idempotency-Key", required = false) String key) {
         if (!input.isObject() || input.size() != 1 || !input.path("fixture").isTextual()
-                || !Set.of("counter", "closing-tags", "security", "history").contains(input.path("fixture").asText())) {
+                || !Set.of("counter", "closing-tags", "security", "history", "todo", "todo-history").contains(input.path("fixture").asText())) {
             throw new ApiException(422, "INVALID_FIXTURE", "仅允许固定的测试产物，不能提交任意源码。");
         }
         String fixture = input.path("fixture").asText();
@@ -42,13 +42,14 @@ public class FixtureController {
             var project = projects.create(owner, "测试产物 · " + fixture);
             var source = source(fixture);
             var first = artifacts.save(owner, project.id().toString(), 0, null, source);
-            var current = "history".equals(fixture) ? artifacts.save(owner, project.id().toString(), 1, first.id(), source) : first;
+            var current = fixture.endsWith("history") ? artifacts.save(owner, project.id().toString(), 1, first.id(), source) : first;
             return new IdempotencyService.Result(201, json.valueToTree(Map.of("project", projects.get(owner, project.id().toString()),
                     "version", current, "firstVersionId", first.id(), "testOnly", true)));
         });
         return ResponseEntity.status(result.status()).body(result.body());
     }
     private JsonNode source(String fixture) {
+        if (fixture.startsWith("todo")) return TodoFixture.source(json);
         var source = json.createObjectNode().put("formatVersion", 1);
         source.putObject("manifest").put("title", "测试计数器").put("summary", "手工安全测试产物，不是 AI 生成；刷新会重置计数")
                 .put("runtime", "web-static-v1").put("stateSchemaVersion", 1).putObject("initialState").put("count", 0);

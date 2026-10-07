@@ -30,5 +30,9 @@ class FixtureIT {
         assertThat(browser.request("POST", "/api/test-fixtures", "{\"fixture\":\"counter\",\"files\":{}}", "invalid").status()).isEqualTo(422);
         assertThat(browser.request("POST", "/api/test-fixtures", "{\"fixture\":\"arbitrary\"}", "invalid").status()).isEqualTo(422);
         assertThat(browser.request("POST", "/api/test-fixtures", "{\"fixture\":\"counter\"}", null).status()).isEqualTo(422);
+        var todo = browser.request("POST", "/api/test-fixtures", "{\"fixture\":\"todo-history\"}", UUID.randomUUID().toString());
+        assertThat(todo.status()).isEqualTo(201);
+        assertThat(todo.body().path("version").path("versionNo").asInt()).isEqualTo(2);
+        assertThat(todo.body().path("version").path("artifact").path("files").path("main.js").asText()).contains("Atoms.ready", "sdk.storage.save");
     }
 }

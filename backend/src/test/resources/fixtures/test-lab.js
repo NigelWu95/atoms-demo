@@ -33,6 +33,16 @@
                 intentFixture = selector.value;
             }
             const result = await request('/api/test-fixtures', 'POST', { fixture: intentFixture }, intent);
+            const workbench = document.querySelector('#workbench');
+            workbench.href = `http://127.0.0.1:5174/projects/${encodeURIComponent(result.project.id)}`;
+            workbench.hidden = !intentFixture.startsWith('todo');
+            if (intentFixture.startsWith('todo')) {
+                document.querySelector('#preview').replaceChildren();
+                direct.hidden = true;
+                status.textContent = '测试待办已保存，请打开测试工作台体验 SDK 与持久化。';
+                intent = undefined;
+                return;
+            }
             const history = intentFixture === 'history';
             const version = history ? result.firstVersionId : result.version.id;
             const url = `/api/projects/${encodeURIComponent(result.project.id)}/versions/${encodeURIComponent(version)}/document?previewMode=${history ? 'HISTORY' : 'CURRENT'}`;
