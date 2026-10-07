@@ -10,6 +10,7 @@ dist/
 target/
 test-results/
 test-results-runtime/
+test-results-release/
 playwright-report/
 coverage/
 .local/
