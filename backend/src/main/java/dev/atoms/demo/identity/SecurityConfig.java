@@ -35,6 +35,9 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/health", "/api/csrf").permitAll()
+                        // Only published metadata/documents are anonymous. LIVE state still requires a guest session.
+                        // https://docs.spring.io/spring-security/reference/6.5/servlet/authorization/authorize-http-requests.html
+                        .requestMatchers(HttpMethod.GET, "/api/public/apps/{slug}", "/api/public/apps/{slug}/document").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/session").permitAll()
                         .anyRequest().authenticated())
                 .exceptionHandling(errors -> errors

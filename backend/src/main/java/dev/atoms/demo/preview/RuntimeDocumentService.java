@@ -37,7 +37,11 @@ public class RuntimeDocumentService {
         if ("CURRENT".equals(mode) && !version.id().equals(project.currentVersionId())) {
             throw new ApiException(409, "STALE_APP_VERSION", "当前版本已变化，请重新加载预览。");
         }
-        var files = version.artifact().files();
+        return renderArtifact(version.artifact());
+    }
+    /** Only render artifacts loaded through the owner's or published-version authorization gate. */
+    public String renderArtifact(dev.atoms.demo.artifact.Artifact artifact) {
+        var files = artifact.files();
         return template.formatted(validator.body(files.get("view.html")), bootstrap, serialize(Map.of("css", files.get("styles.css"), "js", files.get("main.js"))));
     }
     private String serialize(Object value) {
