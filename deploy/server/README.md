@@ -2,6 +2,8 @@
 
 适用：Linux + systemd，原生安装 Java 17、PostgreSQL 17、Nginx。应用只运行一个后端实例。服务器不需要 Node / Maven / Docker；发布包在开发机构建。下列是部署步骤，不表示已经部署；发行版、SSH、域名、TLS 证书和防火墙须在接入服务器后核实。
 
+本项目已于 2026-10-08 完成一台 TencentOS 3.3 主机的基础部署；地址、主机特有配置、证书期限和验收边界见[云部署记录](../../docs/cloud-deployment.md)。模板步骤和目标机事实分别记录，不将已验证主机的结论套用于其他服务器。
+
 ## 1. 本地构建与交付
 
 项目根执行 `nvm use`，首次先在 `frontend` 执行 `npm ci --ignore-scripts`。Java 使用现有的 17.0.5-oracle；开发测试库须已启动。回到项目根执行：
@@ -42,6 +44,8 @@ sudo -u atoms sh /opt/atoms-demo/current/server/start.sh /etc/atoms-demo/applica
 
 查看状态和日志：`systemctl status atoms-demo`、`journalctl -u atoms-demo -n 100 --no-pager`。后端端口保持回环，不开放 8080；数据库不开放 5432。`start.sh` 要求显式可读的外部配置，缺失即退出，不读取开发机相对路径配置。
 
+PGDG 包的数据库服务名可能是 `postgresql-17.service`，须在本机 drop-in 中补充启动顺序；用 drop-in 的 PATH/JAVA_HOME 指定应用 Java 17，保留其他程序的默认 Java。模板以 `SuccessExitStatus=143` 识别 JVM 收到 SIGTERM 后的正常关闭，其他故障仍使用 `Restart=on-failure`；验收须检查停止时 `Result=success` 和启动后的 health。
+
 ## 4. Nginx 与 HTTPS
 
 安装 `nginx-routes.conf`、`nginx-static-headers.conf` 到 `/etc/nginx/atoms-demo/`；将 `nginx-site.conf` 安装到发行版实际启用的站点目录（如 `sites-enabled` 或 `conf.d`）。修改 `atoms.example.com`、证书链和私钥路径，避免覆盖服务器上其他站点。模板要求证书已就绪；证书签发/续期按实际 DNS 和服务器配置办理，不在脚本中自动申请外部资源。
@@ -49,6 +53,8 @@ sudo -u atoms sh /opt/atoms-demo/current/server/start.sh /etc/atoms-demo/applica
 先 `nginx -t`，再 reload；不要在校验失败时继续。只开放需要的 80/443 和受限来源 SSH。测试、Vite 开发端口以及后端/数据库端口不对外开放。HTTP 只重定向到固定 HTTPS 域名；不能为直接 IP HTTP 访问关闭生产 Secure Cookie。没有域名/证书时先通过本机或 SSH 转发验收，再完成 TLS。
 
 首页、`/projects/<id>` 和 `/a/<slug>` 共用一个站点；API 同源。深链接刷新回到 Vue 外壳，API/运行 document/缺失 assets 不回落 HTML。SSE 禁止代理缓冲，响应间隔不能超过代理读超时。Nginx 不覆盖 API 的 CSP/X-Frame-Options，以保留受限 iframe 的运行策略；不要再在外层叠加全站 `DENY` 头。模板禁用访问日志，避免记录项目地址/查询参数；若需要访问统计，先定义脱敏与保留规则。
+
+用户明确选择 IP + 端口时，可将站点改为 `listen 8443 ssl`、`server_name <IP>`，设置含 IP SAN 的证书，并将 `PUBLIC_APP_ORIGIN` 设为 `https://<IP>:8443`。不需要 HTTP 入口，只公开该 HTTPS 端口。自签证书仅适合知情、受控的 Demo 体验，普通浏览器会警告；通过可信 SSH 核对指纹后再信任，并记录到期时间/更换计划。不得为省去证书提示关闭 Secure Cookie 或全局禁用浏览器证书校验。
 
 ## 5. 上线检查与运维
 

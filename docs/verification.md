@@ -395,6 +395,18 @@ T25–T28 的本地能力已完成。下一步为 T29 独立白名单网关和�
 
 实现提交：`aac1823` 服务器配置、`52258d0` 部署中立文案、`02bb49e` 发布包/模板、`3c1c604` 生产包浏览器验证。未推送或合并。打包命令和远程操作说明见 [服务器部署说明](../deploy/server/README.md)。
 
+## 云服务器首次部署 · IP:8443
+
+2026-10-08 用户提供 SSH 并要求不等待域名。发布包 `atoms-demo-XmTJCF`（源码 d2602bf、dirty=false）已部署到 TencentOS 3.3，使用原生 Java 17.0.20.1、PostgreSQL 17.11、Nginx 1.30.5；原系统 Java 8 和本地 Java/数据/密钥未改动。路径、证书指纹和边界见[云部署记录](cloud-deployment.md)。
+
+公网使用经 SSH 取得的证书校验 HTTPS health=UP；隔离 Chrome 验证真实建项目/刷新/跨访客拒绝，正常流程无控制台错误或警告。同一浏览器在 systemd 后端重启后仍保持会话并读到原项目；桌面/390px 截图已检查。安全 Cookie、JSON API 404、assets/test-lab/点文件 404、512 KiB 上限均通过。数据库只监听 localhost，TCP 使用 SCRAM；后端仅回环 8080，入口公网 8443。三个服务 active/enabled，未修改 SSH/防火墙/云安全组。
+
+发现并复现正常 SIGTERM 的 JVM 退出码 143 被 systemd 判失败；先增加失败回归，再修正模板及主机 drop-in。再次启停确认 `ExecMainStatus=143`、`Result=success`、health=UP、NRestarts=0。`node --test scripts/release.test.mjs` 3 项通过；`npm audit` 0 已知漏洞。原 JAR/前端/归档没有改写，此次不是重跑全套业务测试。GNU tar 对 macOS provenance 扩展属性发出忽略警告，13 个负载文件 SHA-256 一致且服务运行正常。
+
+新库 Flyway 10 项成功；预算记账和实际模型调用均为 0。`pg_dump -Fc` 保存到 root/0600 的同机目录，恢复到独立临时库后确认 10 次迁移、1 个项目、预算记账 0，已删除本次创建的临时库，正式库未覆盖。备份未加密、未异地复制、未配置自动定时，不宣称灾备完成。
+
+云端 Key 为空、调用上限 0，未执行真实生成或迁移本地数据。因此云端生成/SSE/重连/发布和 LIVE 闭环、活动任务崩溃、整机重启仍待验证；T29 总项未完成。证书为 30 天自签证书，不是公信证书；普通浏览器需要知情信任，当前证书于 2026-11-07 02:15:58（Asia/Shanghai）到期。按 shipping/security skill 保留回环数据服务、独立凭据和禁用付费生成的默认值。
+
 ## 官方实现依据
 
 - [Vue 表单及中文输入法](https://vuejs.org/guide/essentials/forms.html)
