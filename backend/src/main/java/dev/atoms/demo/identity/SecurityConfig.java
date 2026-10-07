@@ -23,6 +23,9 @@ public class SecurityConfig {
     @Bean SecurityFilterChain securityFilterChain(HttpSecurity http, ObjectMapper json,
             HttpSessionSecurityContextRepository contexts, HttpSessionCsrfTokenRepository csrf) throws Exception {
         return http
+                // Replace only the XFO writer; keep all other Spring headers and management DENY semantics.
+                .headers(headers -> headers.frameOptions(frame -> frame.disable())
+                        .addHeaderWriter(new dev.atoms.demo.preview.RuntimeDocumentPolicy()))
                 .securityContext(config -> config.securityContextRepository(contexts))
                 .csrf(config -> config.csrfTokenRepository(csrf))
                 .requestCache(AbstractHttpConfigurer::disable)

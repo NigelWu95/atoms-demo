@@ -32,6 +32,10 @@ public final class ApiBrowser {
         return new Reply(response.statusCode(), json.readTree(response.body()), response);
     }
     public Reply get(String path) throws Exception { return request("GET", path, null, null); }
+    public HttpResponse<String> document(String path) throws Exception {
+        return http.send(HttpRequest.newBuilder(URI.create(base + path)).timeout(Duration.ofSeconds(15)).GET().build(),
+                HttpResponse.BodyHandlers.ofString());
+    }
     public void refreshCsrf() throws Exception { csrf = get("/api/csrf").body().path("token").asText(); }
     public Reply initialize() throws Exception {
         refreshCsrf();
