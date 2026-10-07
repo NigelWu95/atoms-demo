@@ -1,0 +1,15 @@
+# Copy once to /etc/atoms-demo/application.properties; never overwrite existing secrets.
+# Owner root:atoms, mode 0640 (or service-user-owned 0600). NOT a shell script.
+DB_URL=jdbc:postgresql://127.0.0.1:5432/atoms_demo?currentSchema=atoms&connectTimeout=3&socketTimeout=5
+DB_USER=atoms_app
+APP_DB_PASSWORD=replace_with_a_new_random_database_password
+PORT=8080
+
+# Server-only. Default 0 forbids paid calls, including after a fresh database install.
+DEEPSEEK_API_KEY=
+DEEPSEEK_TIMEOUT_SECONDS=120
+DEEPSEEK_MAX_TOKENS=16384
+GENERATION_MAX_MODEL_CALLS=0
+
+# Same HTTPS origin as nginx-site.conf, without a path or trailing slash.
+PUBLIC_APP_ORIGIN=https://atoms.example.com

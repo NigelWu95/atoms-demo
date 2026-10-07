@@ -1,0 +1,25 @@
+[Unit]
+Description=Atoms Demo backend (single instance)
+After=network.target postgresql.service
+StartLimitIntervalSec=60
+StartLimitBurst=3
+
+[Service]
+Type=simple
+User=atoms
+Group=atoms
+WorkingDirectory=/opt/atoms-demo/current
+ExecStart=/bin/sh /opt/atoms-demo/current/server/start.sh /etc/atoms-demo/application.properties
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=45
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
