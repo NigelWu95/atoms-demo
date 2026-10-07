@@ -16,7 +16,7 @@ public class ProjectService {
     private final JdbcTemplate jdbc;
     private static final RowMapper<Project> ROW = (rs, row) -> new Project(rs.getObject("id", UUID.class),
             rs.getString("name"), rs.getObject("owner_id", UUID.class), rs.getLong("project_revision"),
-            rs.getTimestamp("created_at").toInstant(), rs.getTimestamp("updated_at").toInstant());
+            rs.getObject("current_version_id", UUID.class), rs.getTimestamp("created_at").toInstant(), rs.getTimestamp("updated_at").toInstant());
     public ProjectService(JdbcTemplate jdbc) { this.jdbc = jdbc; }
     public record Page(List<Project> items, String nextCursor) {}
     private record Cursor(Instant createdAt, UUID id) {}
@@ -27,6 +27,12 @@ public class ProjectService {
     }
     public Project get(UUID owner, String id) {
         return require(jdbc.query("SELECT * FROM projects WHERE owner_id = ? AND id = ?", ROW, owner, id(id)));
+    }
+    /** Caller must hold a Spring transaction: used for source/state pointer transitions. */
+    @org.springframework.transaction.annotation.Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
+    public Project lock(UUID owner, String id) {
+        jdbc.execute("SET LOCAL lock_timeout = '3s'");
+        return require(jdbc.query("SELECT * FROM projects WHERE owner_id = ? AND id = ? FOR UPDATE", ROW, owner, id(id)));
     }
     public Project rename(UUID owner, String id, String name) {
         return require(jdbc.query("""
