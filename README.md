@@ -60,7 +60,7 @@ GENERATION_MAX_MODEL_CALLS=0
 
 端点固定 `https://api.deepseek.com/chat/completions`，模型固定 `deepseek-flash`，采用用户指定的 `thinking.enabled`、`reasoning_effort=high`、`stream=false`，额外要求 JSON 输出。密钥仅供后端读取。发送内容包括本次需求和当前源码，不自动发送应用的真实业务状态；思考内容不保存或展示。普通用户不能自定义端点/密钥，后续再扩展。
 
-本地实现为单实例、1 个执行 Worker，最多 8 个活动任务；单请求默认 120 秒、最长 180 秒，整轮最长 6 分钟，上游响应最大 2 MiB。重启时旧 RUNNING 任务标记 INTERRUPTED，不自动重发；QUEUED 可继续。页面每 1.5 秒读取活动任务，网络失败停止自动刷新并给出重试入口；当前是阶段轮询，不是 SSE/token 流。更多应用的生成质量、SSE、按身份频率限制及完整上线预算仍需验收。细节见 [ADR-006](docs/decisions/006-deepseek-generation.md)。
+本地实现为单实例、1 个执行 Worker，最多 8 个活动任务；单请求默认 120 秒、最长 180 秒，整轮最长 6 分钟，上游响应最大 2 MiB。重启时旧 RUNNING 任务标记 INTERRUPTED，不自动重发；QUEUED 可继续。普通工作台已使用 SSE 显示数据库中真实提交的阶段，断线按事件游标补齐，不重新提交任务。连续三次异常连接会暂停并提供“刷新生成状态”；关闭网页不取消后台任务。这是阶段事件流，不是模型逐 token 输出，也不显示思维链。更多应用质量、完整重启演练、按身份频率限制及上线预算仍需验收。见 [ADR-006](docs/decisions/006-deepseek-generation.md) 和 [ADR-007](docs/decisions/007-persisted-run-events.md)。
 
 真实验收现状（2026-10-07）：前一轮累计 5 次之后，用户明确追加最多 6 次，临时启动累计上限设为 11。新一轮先遇到构建未完整结束（2 次），补充结束原因脱敏诊断并要求精简完整实现后，再用 4 次完成首次生成和一次修改，未触发修复。浏览器实际新增/完成/刷新恢复待办，V2 的“仅看未完成 / 显示全部”生效，旧任务与完成状态保留；完整 live 用例通过，console error/warning 为零。当前累计已用 11 次、剩余 0，不再发起模型调用。原配置文件和单次 token 上限未改动，11 仅用于本轮启动参数；普通重启仍使用本地配置或默认 0。历史失败保留在 [验收记录](docs/verification.md)，一次闭环通过不代表任意需求的生成质量保证。
 
@@ -107,7 +107,7 @@ npm run dev:fixtures
 - 侧栏服务状态来自真实 `/api/health`；失败时可重试。未知路由有返回入口。
 - Vite 开发页面有 CSP/基础安全响应头；仅开发 HMR 放行本地 WebSocket 与内联样式。`npm run preview` 使用更严格 CSP，但它只是本地构建预览，不是正式部署方案。
 
-下一步推进 SSE、资源限制与发布；T24 要求的第二轮真实修改及 T31 多类型应用质量验证仍需单独预算。用户自定义模型设置后续支持；T04 的部署骨架和公网验证保留待办。OAuth 暂不接入，继续采用访客模式。
+下一步推进任务重启演练、资源限制、预览检查与发布；T24 要求的第二轮真实修改及 T31 多类型应用质量验证仍需单独预算。用户自定义模型设置后续支持；T04 的部署骨架和公网验证保留待办。OAuth 暂不接入，继续采用访客模式。
 
 访客身份只绑定当前浏览器 Cookie，有效期最多 7 天；清除 Cookie、更换浏览器或过期后不能找回旧访客项目。统一使用上面的 `127.0.0.1` 地址，避免与 `localhost` 形成两个浏览器空间。请勿存放敏感资料。本地配置不应用于公网；部署前还需限流/总配额、数据保留与删除策略以及完整安全验收，见 [ADR-003](docs/decisions/003-guest-project-persistence.md)。
 
@@ -119,7 +119,7 @@ npm run dev:fixtures
 
 预览状态使用 `GET /api/projects/{id}/preview-state?versionId=...` 与 `PUT /api/projects/{id}/preview-state`，仅项目所有者可访问；新保存意图必须绑定当前版本与预期状态 revision。所有写请求都要求 CSRF，创建项目、提交生成和保存状态还要求 Idempotency-Key。单份状态上限 256 KiB，不代表已有总配额或数据清理策略。
 
-生成新增 `GET /api/generation`（是否配置、Worker 是否启用、剩余请求数）、`POST/GET /api/projects/{id}/runs`、`GET /api/projects/{id}/messages`、`GET /api/runs/{runId}`、`PUT /api/runs/{runId}/cancellation`。除健康检查外均需访客身份；项目、消息、任务必须属于当前访客。具体字段和当前边界见 [接口契约](docs/design/04-api-contracts.md)。SSE、发布、恢复等其他设计端点仍未实现。
+生成新增 `GET /api/generation`（是否配置、Worker 是否启用、剩余请求数）、`POST/GET /api/projects/{id}/runs`、`GET /api/projects/{id}/messages`、`GET /api/runs/{runId}`、`GET /api/runs/{runId}/events?after=...`（SSE）及 `PUT /api/runs/{runId}/cancellation`。这些生成接口均需访客身份；项目、消息、任务和事件必须属于当前访客。SSE 优先使用重连的 Last-Event-ID，终态已补齐返回 204。具体字段和边界见 [接口契约](docs/design/04-api-contracts.md)。发布、版本恢复等其他设计端点仍未实现。
 
 ## PostgreSQL
 

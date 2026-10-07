@@ -56,7 +56,7 @@
 | PATCH `/api/projects/{id}` | `{name}` | 重命名后的 Project；纯赋值幂等 |
 | GET `/api/generation` | 会话 | `{configured, workerEnabled, remainingRequests, model}` |
 | GET `/api/projects/{id}/messages` | cursor、limit | Message 列表 |
-| POST `/api/projects/{id}/runs` | CreateRun，幂等键 | 202 `{runId, status}`；eventsUrl 待 SSE 实现 |
+| POST `/api/projects/{id}/runs` | CreateRun，幂等键 | 202 `{runId, status}`；客户端按 runId 构造事件地址 |
 | GET `/api/projects/{id}/runs` | cursor、limit | Run 列表，新到旧 |
 | GET `/api/runs/{runId}` | runId | Run：状态、阶段、结果版本、错误、lastEventSeq |
 | GET `/api/runs/{runId}/events` | after，或 Last-Event-ID | 持久事件 SSE；读取终态全部事件后关闭，已补齐返回 204 |
@@ -250,7 +250,7 @@ StateDocument：
 
 每帧 data 为现有事件数据加 `runId, seq, createdAt`；终态额外含 `lastEventSeq`。当前实际事件是 run.queued、stage.started、plan.ready、artifact.created、run.completed；下表的其他类型仍是预留，不伪造模型 token 进度。每批最多 100 条、尾随间隔 500ms、心跳 15 秒、不缓存/请求代理禁用缓冲；单连接最多 60 秒后正常轮换，浏览器携带已读游标重连。独立的 4 线程 SSE 调度池最多接纳 32 个连接，满时 429；连接/任务生命周期互不影响。
 
-前端从 Run 快照的 lastEventSeq 开始订阅，按 seq 去重并拒绝跳号、跨任务或畸形事件；阶段实时更新，规划完成刷新持久对话，收到完整终态后再读取任务/版本/消息并关闭流。连续三次连接失败暂停自动重连，保留旧预览并提供“刷新生成状态”；项目切换和卸载清理旧连接。当前不清理历史事件；如发现数据库回放缺口，明确报错，不能冒充完整回放。
+前端从 Run 快照的 lastEventSeq 开始订阅，按 seq 去重并拒绝跳号、跨任务或畸形事件；阶段实时更新，规划完成刷新持久对话，收到完整终态后再读取任务/版本/消息并关闭流。连续三次连接失败暂停自动重连，保留旧预览并提供“刷新生成状态”；收到新事件或连接已稳定至少 15 秒才重置失败计数，避免快速连上/断开无限循环。项目切换和卸载清理旧连接。当前不清理历史事件；如发现数据库回放缺口，明确报错，不能冒充完整回放。
 
 ```text
 id: 12
@@ -259,7 +259,7 @@ data: {"runId":"run_1","seq":12,"versionId":"ver_2","versionNo":2,"createdAt":"2
 
 id: 13
 event: run.completed
-data: {"runId":"run_1","seq":13,"status":"SUCCEEDED","versionId":"ver_2","previewStatus":"UNKNOWN"}
+data: {"runId":"run_1","seq":13,"status":"SUCCEEDED","versionId":"ver_2","lastEventSeq":13,"createdAt":"2026-10-07T08:00:01Z"}
 
 ```
 
