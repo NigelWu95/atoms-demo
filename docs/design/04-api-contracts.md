@@ -62,6 +62,14 @@
 
 Project 最小字段：`id, name, ownerId, currentVersionId?, projectRevision, activeRunId?, publication?, updatedAt`。其中 projectRevision 表示源码当前指针的修订号，重命名不改变它。
 
+本地 M2 实现约束（2026-10-07）：
+
+- 已实现本表截至 PATCH 项目的端点，消息及生成端点尚未实现。Project 另返回 createdAt；空项目暂不返回可选的版本/运行/发布字段。
+- name 去除首尾空白后为 1–80 个 UTF-16 单元，不允许控制字符；仅接受 name 字段。列表按 createdAt/id 倒序，cursor 为不透明游标，limit 为 1–100。
+- Idempotency-Key 允许 1–128 个 ASCII 字母、数字、点、下划线、冒号或短横线；缺失/无效返回 422 INVALID_INPUT。名称规范化后同键重试返回第一次 201 的原始 JSON，包括首次名称与时间，不受后续重命名影响。
+- 会话首次创建变更 session ID 和 CSRF，前端在 POST /api/session 后再取一次 GET /api/csrf。Cookie 为 HttpOnly、SameSite=Lax、7 天有效；只有本地 HTTP/test 配置允许 Secure=false。
+- GET 私有端点无身份返回 401；写请求若同时缺少身份和 CSRF，安全过滤器会先返回 403。错误体不暴露私有项目是否存在。
+
 Message：`id, projectId, runId?, role, content, createdAt`。role 为 USER、PLANNER、BUILDER、SYSTEM；角色名称与是否独立模型不混为一谈。
 
 CreateRun：

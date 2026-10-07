@@ -1,12 +1,12 @@
 # Atoms Demo · 可执行任务清单
 
-状态：T01–T03、C01 已通过本地验收；其余待实施。T00 的模型与公网资源验证仍未完成，T04 按本地优先决定暂后置。`[ ]` 表示尚未完成，不代表已经创建了对应文件。总体顺序、路径缩写和验证命令见 [开发计划](plan.md)。
+状态：T01–T03、T05–T09、C01、C03–C04 已通过本地验收；其余待实施。T00 的模型与公网资源验证仍未完成，T04 按本地优先决定暂后置。`[ ]` 表示尚未完成，不代表已经创建了对应文件。总体顺序、路径缩写和验证命令见 [开发计划](plan.md)。
 
 说明：范围 S 为约 1–2 个主要文件，M 为约 3–5 个；自动脚手架文件按计划约定整体审阅。每项必须同时满足自己的验收条件和统一完成标准。所有代码路径都是拟建工程中的相对路径。
 
 每个检查点完成后记录证据、汇报结果；未通过就修复当前切片，不堆叠后续复杂功能。检查点本身不替代用户对付费、部署或范围变化的授权。
 
-当前实施记录：[验收证据](../../verification.md)。T01 增加 V000 基线迁移；T02 的浏览器测试位于 frontend/e2e，避免独立前端包之外的依赖解析；T03 使用 /workbench 草稿入口，真实 /projects/:id 路由在项目切片接入。
+当前实施记录：[验收证据](../../verification.md)。T01 增加 V000 基线迁移；浏览器测试位于 frontend/e2e，避免独立前端包之外的依赖解析。T09 已接通 /projects/:id；/workbench 保留未保存草稿入口。项目元信息持久化，需求草稿仍只保留在页面会话中，消息保存留到 T16/T23。
 
 ## M0 · 开工准备
 
@@ -84,7 +84,7 @@
 
 ### T05 · 建立可恢复的访客身份
 
-- [ ] 完成 T05（P0，M）
+- [x] 完成 T05（P0，M）
 - 说明：使用服务端会话建立真实用户身份，为所有项目和数据访问提供基础。
 - 依赖：T01。
 - 主要文件：`R/db/migration/V001__identity.sql`、`B/identity/SecurityConfig.java`、`B/identity/GuestIdentityService.java`、`B/identity/SessionController.java`、`BT/identity/SessionIT.java`。
@@ -96,7 +96,7 @@
 
 ### T06 · 接入前端会话与错误处理
 
-- [ ] 完成 T06（P0，M）
+- [x] 完成 T06（P0，M）
 - 说明：页面启动先建立身份，统一 HTTP、CSRF 和失败提示，不在每个组件重复拼请求。
 - 依赖：T03、T05。
 - 主要文件：`F/api/client.ts`、`F/api/session.ts`、`F/stores/session.ts`、`F/App.vue`、`F/api/client.spec.ts`。
@@ -108,11 +108,11 @@
 
 ### C03 · 身份检查点
 
-- [ ] 同一浏览器可恢复身份、不同浏览器身份不同、CSRF 测试通过；初始化失败有真实错误态。
+- [x] 同一浏览器可恢复身份、不同浏览器身份不同、CSRF 测试通过；初始化失败有真实错误态。
 
 ### T07 · 实现事务内幂等机制
 
-- [ ] 完成 T07（P0，M）
+- [x] 完成 T07（P0，M）
 - 说明：先把“同一操作重试只执行一次”做成可复用机制，后续项目、运行、状态和发布共用。
 - 依赖：T05。
 - 主要文件：`R/db/migration/V002__idempotency.sql`、`B/common/IdempotencyService.java`、`B/common/ApiError.java`、`B/common/ApiExceptionHandler.java`、`BT/common/IdempotencyIT.java`。
@@ -124,7 +124,7 @@
 
 ### T08 · 实现项目接口
 
-- [ ] 完成 T08（P0，M）
+- [x] 完成 T08（P0，M）
 - 说明：提供新建、列表、详情和重命名，先让一个真实的产品功能闭环落库。
 - 依赖：T07。
 - 主要文件：`R/db/migration/V003__projects.sql`、`B/project/Project.java`、`B/project/ProjectService.java`、`B/project/ProjectController.java`、`BT/project/ProjectIT.java`。
@@ -136,7 +136,7 @@
 
 ### T09 · 完成首页到项目页的真实链路
 
-- [ ] 完成 T09（P0，M）
+- [x] 完成 T09（P0，M）
 - 说明：把首页和“我的项目”接到真实接口，暂不伪装成已经接入生成器。
 - 依赖：T06、T08。
 - 主要文件：`F/api/projects.ts`、`F/pages/HomePage.vue`、`F/pages/ProjectsPage.vue`、`F/router.ts`、`e2e/projects.spec.ts`。
@@ -148,7 +148,7 @@
 
 ### C04 · 第一个业务闭环
 
-- [ ] 现场演示“访客进入 → 新建项目 → 重命名 → 刷新 → 再次打开”；记录数据库和浏览器证据。
+- [x] 现场演示“访客进入 → 新建项目 → 重命名 → 刷新 → 再次打开”；记录数据库和浏览器证据。
 
 ## M3 · 可运行预览与业务数据
 
