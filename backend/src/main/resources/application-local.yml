@@ -1,0 +1,6 @@
+# Only the loopback-only local development profile permits HTTP cookies.
+server:
+  servlet:
+    session:
+      cookie:
+        secure: false

@@ -1,0 +1,25 @@
+CREATE TABLE guest_users (
+    id uuid PRIMARY KEY,
+    created_at timestamptz NOT NULL DEFAULT now()
+);
+
+-- Spring Session 3.5.7 official PostgreSQL schema. Flyway is the only schema owner.
+-- https://github.com/spring-projects/spring-session/blob/3.5.7/spring-session-jdbc/src/main/resources/org/springframework/session/jdbc/schema-postgresql.sql
+CREATE TABLE SPRING_SESSION (
+    PRIMARY_ID char(36) PRIMARY KEY,
+    SESSION_ID char(36) NOT NULL,
+    CREATION_TIME bigint NOT NULL,
+    LAST_ACCESS_TIME bigint NOT NULL,
+    MAX_INACTIVE_INTERVAL integer NOT NULL,
+    EXPIRY_TIME bigint NOT NULL,
+    PRINCIPAL_NAME varchar(100)
+);
+CREATE UNIQUE INDEX SPRING_SESSION_IX1 ON SPRING_SESSION (SESSION_ID);
+CREATE INDEX SPRING_SESSION_IX2 ON SPRING_SESSION (EXPIRY_TIME);
+CREATE INDEX SPRING_SESSION_IX3 ON SPRING_SESSION (PRINCIPAL_NAME);
+CREATE TABLE SPRING_SESSION_ATTRIBUTES (
+    SESSION_PRIMARY_ID char(36) NOT NULL REFERENCES SPRING_SESSION(PRIMARY_ID) ON DELETE CASCADE,
+    ATTRIBUTE_NAME varchar(200) NOT NULL,
+    ATTRIBUTE_BYTES bytea NOT NULL,
+    PRIMARY KEY (SESSION_PRIMARY_ID, ATTRIBUTE_NAME)
+);
