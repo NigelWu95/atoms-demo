@@ -3,6 +3,7 @@ import { ApiFailure, errorMessage } from '../api/client'
 import { getProject, type Project } from '../api/projects'
 import { listVersions } from '../api/artifacts'
 import { getPreviewReport, type SavedReport } from '../api/previewReports'
+import { randomId } from '../runtime/randomId'
 import {
   getPublication,
   publish,
@@ -101,7 +102,7 @@ export function usePublication(project: () => Project, ready: () => boolean) {
     pending.value = {
       kind: 'publish',
       projectId: project().id,
-      key: crypto.randomUUID(),
+      key: randomId(),
       body: {
         versionId: current.value.currentVersionId,
         expectedProjectRevision: current.value.projectRevision,
@@ -122,7 +123,7 @@ export function usePublication(project: () => Project, ready: () => boolean) {
     pending.value = {
       kind: 'unpublish',
       projectId: project().id,
-      key: crypto.randomUUID(),
+      key: randomId(),
       revision: publication.value.revision,
     }
     await retry()

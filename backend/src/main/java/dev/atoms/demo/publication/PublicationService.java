@@ -26,7 +26,8 @@ public class PublicationService {
     public PublicationService(JdbcTemplate jdbc, ObjectMapper json, ProjectService projects,
             PreviewReportService reports, IdempotencyService idempotency, Environment env) {
         this.jdbc = jdbc; this.json = json; this.projects = projects; this.reports = reports; this.idempotency = idempotency;
-        origin = publicOrigin(env.getProperty("PUBLIC_APP_ORIGIN", ""));
+        origin = publicOrigin(env.getProperty("PUBLIC_APP_ORIGIN", ""),
+                env.getProperty("ALLOW_INSECURE_HTTP_PUBLIC_ORIGIN", Boolean.class, false));
     }
     public Publication get(UUID owner, String id) { return stored(projects.get(owner, id).id()); }
 
@@ -88,14 +89,17 @@ public class PublicationService {
     private String path(String id) { return "/api/projects/" + id + "/publication"; }
     private ApiException invalid() { return new ApiException(422, "INVALID_PUBLICATION", "发布请求必须包含有效版本和非负安全修订号，不能附加其他字段。"); }
     static String publicOrigin(String value) {
+        return publicOrigin(value, false);
+    }
+    private static String publicOrigin(String value, boolean allowInsecureHttp) {
         if (value.isBlank()) return "";
         try {
             URI uri = URI.create(value);
-            boolean local = "http".equals(uri.getScheme()) && ("127.0.0.1".equals(uri.getHost()) || "localhost".equals(uri.getHost()));
-            if ((!"https".equals(uri.getScheme()) && !local) || uri.getHost() == null || uri.getUserInfo() != null || uri.getPort() == 0 || uri.getPort() > 65535
+            boolean allowedHttp = "http".equals(uri.getScheme()) && (allowInsecureHttp || "127.0.0.1".equals(uri.getHost()) || "localhost".equals(uri.getHost()));
+            if ((!"https".equals(uri.getScheme()) && !allowedHttp) || uri.getHost() == null || uri.getUserInfo() != null || uri.getPort() == 0 || uri.getPort() > 65535
                     || uri.getRawQuery() != null || uri.getRawFragment() != null || !(uri.getRawPath().isEmpty() || "/".equals(uri.getRawPath())))
                 throw new IllegalArgumentException();
             return value.endsWith("/") ? value.substring(0, value.length() - 1) : value;
-        } catch (IllegalArgumentException error) { throw new IllegalStateException("PUBLIC_APP_ORIGIN must be an HTTPS origin or a local loopback HTTP origin"); }
+        } catch (IllegalArgumentException error) { throw new IllegalStateException("PUBLIC_APP_ORIGIN must be a valid HTTPS origin; non-loopback HTTP requires explicit demo opt-in"); }
     }
 }

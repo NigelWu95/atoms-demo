@@ -12,6 +12,15 @@ function startAtomsRuntime(launch) {
     const connection = new Promise((resolve, reject) => { resolveConnection = resolve; rejectConnection = reject; });
     connection.catch(() => {});
     const failure = (code, message) => Object.assign(new Error(message), { code });
+    // This standalone sandbox script cannot import the host's UUID helper.
+    // getRandomValues also works in HTTP contexts; retain cryptographic entropy.
+    function randomId() {
+        const bytes = crypto.getRandomValues(new Uint8Array(16));
+        bytes[6] = (bytes[6] & 0x0f) | 0x40;
+        bytes[8] = (bytes[8] & 0x3f) | 0x80;
+        const hex = Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
+        return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+    }
     let deadline = channelId ? setTimeout(dispose, 15000) : null;
     function dispose() {
         if (disposed) return;
@@ -24,10 +33,10 @@ function startAtomsRuntime(launch) {
         pending.clear();
         if (port) { port.onmessage = null; port.close(); }
     }
-    function send(type, payload, requestId = crypto.randomUUID()) {
+    function send(type, payload, requestId = randomId()) {
         if (port && !disposed) port.postMessage({ protocol, channelId, requestId, type, payload });
     }
-    function rpc(type, payload, requestId = crypto.randomUUID()) {
+    function rpc(type, payload, requestId = randomId()) {
         if (!port || disposed) return Promise.reject(failure('RUNTIME_DISPOSED', '预览连接不可用。'));
         if (pending.size >= 16 || pending.has(requestId)) return Promise.reject(failure('RPC_BUSY', '请等待当前操作完成。'));
         return new Promise((resolve, reject) => {
@@ -59,7 +68,7 @@ function startAtomsRuntime(launch) {
             const snapshot = JSON.stringify({ value, expectedRevision });
             if (intent && intent.snapshot !== snapshot) throw failure('SAVE_UNRESOLVED', '上一笔保存结果未知，请先重试原内容。');
             if (!intent && pending.size >= 16) throw failure('RPC_BUSY', '请等待当前操作完成。');
-            if (!intent) intent = { snapshot, requestId: crypto.randomUUID() };
+            if (!intent) intent = { snapshot, requestId: randomId() };
             const current = intent;
             try {
                 const result = await rpc('STATE_SAVE', JSON.parse(snapshot), current.requestId);

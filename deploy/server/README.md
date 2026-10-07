@@ -58,6 +58,14 @@ PGDG 包的数据库服务名可能是 `postgresql-17.service`，须在本机 dr
 
 ## 5. 上线检查与运维
 
+### 明确授权的临时 HTTP Demo
+
+仅在用户接受明文传输风险后使用；默认服务器模板仍要求 HTTPS。配置 `PUBLIC_APP_ORIGIN=http://<IP>:8443` 和 `ALLOW_INSECURE_HTTP_PUBLIC_ORIGIN=true`；systemd 独立 drop-in 设置 `SERVER_SERVLET_SESSION_COOKIE_SECURE=false`、`SERVER_SERVLET_SESSION_COOKIE_NAME=ATOMS_HTTP_SESSION`，保留 HttpOnly / SameSite / CSRF / 所有者鉴权。HTTP Cookie 使用新名称，避免浏览器拒绝覆盖已有 Secure Cookie；原 HTTPS 访客项目不删除，但不会自动归属新 HTTP 访客。
+
+备份当前版本、数据库、外部配置和 Nginx 站点后，将站点改为 `listen 8443`，删除该站点的证书/TLS 指令，保留原路由和其他安全头。HTTP 站点不发送 HSTS；不要同时以同一套非 Secure Cookie 对外提供 HTTPS。`nginx -t` 后切换、重启后端并 reload。回退需同时恢复 HTTPS 站点、原 origin 和 Secure Cookie 配置，不只切换 JAR。
+
+公网 HTTP 没有 `crypto.randomUUID`，平台及受限 runtime 使用 `crypto.getRandomValues` 构造 v4 标识，保持重试幂等性；不使用弱随机数。发布响应只接受与当前 HTTP 页面同源的非回环 HTTP 链接，不允许从 HTTPS 页面降级到远端 HTTP。剪贴板 API 不可用时，面板提示手动复制链接。此例外不改变模型额度或开放数据库端口，也不满足生产加密要求。
+
 - 用独立浏览器完成访客建项目、刷新恢复、查看已有版本、发布 `/a/<slug>`、公开访客保存/刷新、更新/下线；第二个访客不能读写第一人的私有项目或状态。
 - 检查 Cookie 的 Secure/HttpOnly/SameSite、无混合内容、受限 document 的唯一 CSP/XFO；确认 API 错误不是 HTML，SSE 阶段及时到达。
 - 实际启用模型前确认允许哪些人进入工作台以及预算。当前全站访客可创建项目；已有队列/超时/调用数限制不等于完整防滥用，身份限流与存储总配额仍须补齐或通过受控访问限制开放范围。

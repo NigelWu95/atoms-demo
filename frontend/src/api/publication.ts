@@ -68,7 +68,8 @@ function decode(value: unknown): Publication {
     if (
       !(
         url.protocol === 'https:' ||
-        (url.protocol === 'http:' && ['localhost', '127.0.0.1'].includes(url.hostname))
+        (url.protocol === 'http:' &&
+          (['localhost', '127.0.0.1'].includes(url.hostname) || url.origin === location.origin))
       ) ||
       url.username ||
       url.password ||

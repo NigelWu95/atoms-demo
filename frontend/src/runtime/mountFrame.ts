@@ -1,5 +1,6 @@
 import { createRuntimeBridge, type BridgeStatus } from './bridge'
 import type { StateDocument, StateRequest } from './protocol'
+import { randomId } from './randomId'
 
 /** Both private previews and public apps use the same opaque, capability-limited frame. */
 export function mountFrame(
@@ -9,7 +10,7 @@ export function mountFrame(
   report: (status: BridgeStatus, message: string) => void,
   title = '应用交互预览',
 ) {
-  const channelId = crypto.randomUUID()
+  const channelId = randomId()
   const frame = document.createElement('iframe')
   frame.title = title
   frame.setAttribute('sandbox', 'allow-scripts')
