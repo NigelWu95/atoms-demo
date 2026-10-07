@@ -1,6 +1,7 @@
 @import './workbench.css';
 @import './preview.css';
 @import './projects.css';
+@import './generation.css';
 
 :root {
   color-scheme: dark;

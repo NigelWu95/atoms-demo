@@ -8,6 +8,7 @@ import { getProject, type Project } from '../api/projects'
 import { errorMessage } from '../api/client'
 import ProjectHeading from '../components/ProjectHeading.vue'
 import ArtifactPanel from '../components/ArtifactPanel.vue'
+import ConversationPanel from '../components/ConversationPanel.vue'
 
 const draft = useDraftStore()
 const session = useSessionStore()
@@ -84,7 +85,7 @@ const panel = ref<'conversation' | 'preview'>('conversation')
     </header>
     <p class="workbench-notice">
       {{ project ? '项目名称已保存到数据库。' : '这是尚未保存的需求草稿。' }}
-      需求文本仅在当前页面会话中保留，刷新后会清空。尚未调用模型或生成代码。
+      已提交的需求与结果会保存；未提交草稿仅在当前页面会话中保留。发布功能尚未开放。
     </p>
     <div class="mobile-view-controls" role="group" aria-label="工作台区域">
       <button
@@ -98,7 +99,14 @@ const panel = ref<'conversation' | 'preview'>('conversation')
       </button>
     </div>
     <div class="workbench-grid" :class="{ 'mobile-preview': panel === 'preview' }">
-      <section class="conversation-panel" aria-labelledby="conversation-title">
+      <ConversationPanel
+        v-if="project"
+        :key="project.id"
+        v-model="prompt"
+        :project="project"
+        @changed="project = $event"
+      />
+      <section v-else class="conversation-panel" aria-labelledby="conversation-title">
         <div class="panel-heading">
           <h2 id="conversation-title">需求与对话</h2>
           <span class="muted">尚未开始生成</span>
@@ -110,14 +118,14 @@ const panel = ref<'conversation' | 'preview'>('conversation')
           <div class="workflow-explainer">
             <span>01 理解需求</span><span>02 构建应用</span><span>03 校验与预览</span>
           </div>
-          <p class="muted">这是计划中的工作流程，不是正在执行的任务。</p>
+          <p class="muted">请先返回首页创建项目，再提交生成任务。</p>
         </div>
         <PromptComposer
           v-model="prompt"
           disabled
           label="继续完善你的需求"
           action-label="生成应用"
-          hint="生成能力尚未接入"
+          hint="请先创建项目，再开始生成"
         />
       </section>
       <ArtifactPanel :project="project" />

@@ -142,7 +142,7 @@ watch(
                 : '真实生成的 HTML、CSS 和 JavaScript 将显示在这里。'
             }}
           </p>
-          <span v-if="!loading" class="outline-badge">等待生成能力接入</span>
+          <span v-if="!loading" class="outline-badge">等待首个代码版本</span>
         </div>
       </div>
     </div>

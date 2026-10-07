@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
-// Requirements are memory-only until messages are persisted in T16/T23. Never store credentials here.
+// Unsubmitted drafts are memory-only; submitted messages live on the server. Never store credentials here.
 export const useDraftStore = defineStore('draft', () => {
   const prompt = ref('')
   const projectDrafts = ref<Record<string, { prompt: string; intentKey: string }>>({})

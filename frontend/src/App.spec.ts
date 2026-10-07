@@ -25,6 +25,20 @@ function mockApi() {
     if (path === '/api/projects' && options?.method === 'POST')
       return Promise.resolve(Response.json(project, { status: 201 }))
     if (path === '/api/projects/project-1') return Promise.resolve(Response.json(project))
+    if (path === '/api/generation')
+      return Promise.resolve(
+        Response.json({
+          configured: false,
+          workerEnabled: true,
+          remainingRequests: 0,
+          model: 'deepseek-flash',
+        }),
+      )
+    if (
+      path.startsWith('/api/projects/project-1/runs?') ||
+      path.startsWith('/api/projects/project-1/messages?')
+    )
+      return Promise.resolve(Response.json({ items: [], nextCursor: null }))
     if (path.startsWith('/api/projects?'))
       return Promise.resolve(Response.json({ items: [], nextCursor: null }))
     throw new Error(`Unexpected test endpoint: ${path}`)
