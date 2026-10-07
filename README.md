@@ -1,8 +1,14 @@
 # Atoms Demo Studio
 
-Java 17 + Spring Boot + Vue 的本地开发工程。已实现访客与项目持久化、代码版本与受限预览、应用数据保存，并接通 DeepSeek 网关、后台规划/构建/有限修复及普通工作台的生成与修改交互。已提交的需求、规划和任务结果会保存到数据库。**真实 DeepSeek 的“生成待办 → 操作保存 → 刷新恢复 → 修改生成 V2 → 筛选且保留原数据”闭环已通过**，详见下文。固定版本发布、独立应用页面和 LIVE 数据隔离已实现；公网网关/隧道尚未接入。设计见 [设计目录](docs/design/README.md)，唯一进度清单见 [tasks/todo.md](docs/design/tasks/todo.md)。
+Java 17 + Spring Boot + Vue 工程。已实现访客与项目持久化、代码版本与受限预览、应用数据保存，并接通 DeepSeek 网关、后台规划/构建/有限修复及普通工作台的生成与修改交互。已提交的需求、规划和任务结果会保存到数据库。**真实 DeepSeek 的“生成待办 → 操作保存 → 刷新恢复 → 修改生成 V2 → 筛选且保留原数据”闭环已通过**，详见下文。固定版本发布、独立应用页面和 LIVE 数据隔离已实现；云服务器尚未部署。设计见 [设计目录](docs/design/README.md)，唯一进度清单见 [tasks/todo.md](docs/design/tasks/todo.md)。
 
-创作平台只在本地访问。按用户确认，后续仅已发布应用经独立端口的公开网关和 ngrok 类隧道提供 HTTPS 链接，不转发创作工作台、生成接口或数据库。目前链接只在本机可用，没有开启隧道，见 [ADR-008](docs/decisions/008-local-studio-public-apps.md) 与 [ADR-010](docs/decisions/010-publication-and-live-state.md)。
+2026-10-08 用户确认改为**单台云服务器原生运行整套平台和 PostgreSQL，按 `/a/<slug>` 发布应用**。不接 ngrok，不要求每项目独立容器或域名。本地开发方式不变；云部署使用 JAR + Vue 静态资源 + Nginx + systemd，服务器信息到位后再实际安装与验收。见 [ADR-011](docs/decisions/011-single-server-release.md) 和 [服务器部署说明](deploy/server/README.md)。数据库和后端内部端口不直接开放公网。
+
+## 打包到服务器
+
+本机准备好开发依赖与测试数据库后，在项目根执行 `node scripts/release.mjs`。脚本运行检查与构建，输出 `dist/releases/atoms-demo-*.tar.gz` 和 SHA-256 校验文件；服务器不需要 Node、Maven 或 Docker。真实密码、API Key、数据库数据与测试夹具不会进入包。服务器配置另存 `/etc/atoms-demo/application.properties`，首次初始化/启动/更新/回退步骤见[部署说明](deploy/server/README.md)。脚本不会上传、部署或调用模型；远程 TLS、systemd 与外网访问仍须单独验收。
+
+本机发布包验收：`node scripts/smoke-release.mjs /绝对路径/解包目录`。需要本地 Docker Desktop、Chrome、OpenSSL、测试数据库，以及脚本锁定 digest 的官方 Nginx 镜像（可通过 `docker pull public.ecr.aws/docker/library/nginx@sha256:0985e772fb9f729e6fa0980da05fca5d9c468e870eed43071545afa9d2e27d94` 准备）。它在回环 8082/18443 启动真实 JAR 和一次性 HTTPS 代理，执行 `frontend/e2e-release`，结束后停服务、清理临时凭据和测试私钥；截图在 `frontend/test-results-release`。这只是 Docker Desktop 上的本地验证工具，不是服务器对 Docker 的依赖；其他容器环境的 host gateway 需另行适配。测试证书只用于此流程，不放入发布包，不用于公网。
 
 ## 开发环境与启动
 
@@ -78,7 +84,7 @@ GENERATION_MAX_MODEL_CALLS=0
 
 结果未知时只点“重试原发布操作”，不要把刷新当作撤销。链接当前标注“本地访问链接（尚未接入公网）”，其他设备不可通过本机的 127.0.0.1 地址访问。用户生成应用的初始数据与代码会公开，请勿放入密钥或敏感资料。下线不能收回浏览器已经下载的源码。
 
-后续接通独立公开网关后，可由维护者配置 `PUBLIC_APP_ORIGIN` 并重启后端；只接受 HTTPS origin（本机开发允许 loopback HTTP），不含路径。未配置时返回本地链接，配置本身不会启动隧道。不要直接将 5173/8080/5432/测试端口映射公网。
+部署到服务器后，由维护者将 `PUBLIC_APP_ORIGIN` 配置为站点 HTTPS origin 并重启后端；只接受 HTTPS origin（本机开发允许 loopback HTTP），不含路径。此时面板显示服务器上的应用链接；未配置时仍显示本地链接。无需新增发布 API 或启动隧道。不要直接将 5173/8080/5432/测试端口映射公网。
 
 ## 运行与持久化测试台（T10–T15）
 
@@ -122,7 +128,7 @@ npm run dev:fixtures
 - 侧栏服务状态来自真实 `/api/health`；失败时可重试。未知路由有返回入口。
 - Vite 开发页面有 CSP/基础安全响应头；仅开发 HMR 放行本地 WebSocket 与内联样式。`npm run preview` 使用更严格 CSP，但它只是本地构建预览，不是正式部署方案。
 
-下一步接独立公开网关与隧道；任务重启演练和完整资源限制仍待完成。T24 要求的第二轮真实修改及 T31 多类型应用质量验证仍需单独预算。用户自定义模型设置后续支持；T04 的部署骨架和公网验证保留待办。OAuth 暂不接入，继续采用访客模式。
+下一步按单服务器方案部署验收，不再接隧道；任务重启演练和完整资源限制仍待完成。T24 要求的第二轮真实修改及 T31 多类型应用质量验证仍需单独预算。用户自定义模型设置后续支持；T04/T29 的远程验证保留待办。OAuth 暂不接入，继续采用访客模式。
 
 访客身份只绑定当前浏览器 Cookie，有效期最多 7 天；清除 Cookie、更换浏览器或过期后不能找回旧访客项目。统一使用上面的 `127.0.0.1` 地址，避免与 `localhost` 形成两个浏览器空间。请勿存放敏感资料。本地配置不应用于公网；部署前还需限流/总配额、数据保留与删除策略以及完整安全验收，见 [ADR-003](docs/decisions/003-guest-project-persistence.md)。
 
