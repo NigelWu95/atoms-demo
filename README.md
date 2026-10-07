@@ -67,7 +67,7 @@ GENERATION_MAX_MODEL_CALLS=0
 
 端点固定 `https://api.deepseek.com/chat/completions`，模型固定 `deepseek-flash`，采用用户指定的 `thinking.enabled`、`reasoning_effort=high`、`stream=false`，额外要求 JSON 输出。密钥仅供后端读取。发送内容包括本次需求和当前源码，不自动发送应用的真实业务状态；思考内容不保存或展示。普通用户不能自定义端点/密钥，后续再扩展。
 
-本地实现为单实例、1 个执行 Worker，最多 8 个活动任务；单请求默认 120 秒、最长 300 秒，输出默认 16384、最高可配置 32768 tokens。整轮时间由 `GENERATION_TIMEOUT_SECONDS` 控制，默认 360 秒、可配置 1–1800 秒；它独立于单次请求超时，作用于所有阶段及最终保存。上游响应仍最大 2 MiB。重启时旧 RUNNING 任务标记 INTERRUPTED，不自动重发；QUEUED 可继续。普通工作台已使用 SSE 显示数据库中真实提交的阶段，断线按事件游标补齐，不重新提交任务。连续三次异常连接会暂停并提供“刷新生成状态”；关闭网页不取消后台任务。这是阶段事件流，不是模型逐 token 输出，也不显示思维链。更多应用质量、完整重启演练、按身份频率限制及上线预算仍需验收。见 [ADR-006](docs/decisions/006-deepseek-generation.md) 和 [ADR-007](docs/decisions/007-persisted-run-events.md)。
+本地实现为单实例、1 个执行 Worker，最多 8 个活动任务；单请求默认 120 秒、最长 300 秒，输出默认 16384、最高可配置 168400 tokens（包含思考与最终输出）。整轮时间由 `GENERATION_TIMEOUT_SECONDS` 控制，默认 360 秒、可配置 1–1800 秒；它独立于单次请求超时，作用于所有阶段及最终保存。上游响应仍最大 2 MiB。重启时旧 RUNNING 任务标记 INTERRUPTED，不自动重发；QUEUED 可继续。普通工作台已使用 SSE 显示数据库中真实提交的阶段，断线按事件游标补齐，不重新提交任务。连续三次异常连接会暂停并提供“刷新生成状态”；关闭网页不取消后台任务。这是阶段事件流，不是模型逐 token 输出，也不显示思维链。更多应用质量、完整重启演练、按身份频率限制及上线预算仍需验收。见 [ADR-006](docs/decisions/006-deepseek-generation.md) 和 [ADR-007](docs/decisions/007-persisted-run-events.md)。
 
 真实验收现状（2026-10-07）：前一轮累计 5 次之后，用户明确追加最多 6 次，临时启动累计上限设为 11。新一轮先遇到构建未完整结束（2 次），补充结束原因脱敏诊断并要求精简完整实现后，再用 4 次完成首次生成和一次修改，未触发修复。浏览器实际新增/完成/刷新恢复待办，V2 的“仅看未完成 / 显示全部”生效，旧任务与完成状态保留；完整 live 用例通过，console error/warning 为零。当前累计已用 11 次、剩余 0，不再发起模型调用。原配置文件和单次 token 上限未改动，11 仅用于本轮启动参数；普通重启仍使用本地配置或默认 0。历史失败保留在 [验收记录](docs/verification.md)，一次闭环通过不代表任意需求的生成质量保证。
 
