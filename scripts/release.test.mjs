@@ -7,6 +7,13 @@ import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { assembleRelease } from './release.mjs';
 
+test('systemd accepts the JVM graceful SIGTERM exit without masking other failures', async () => {
+  const service = await readFile(new URL('../deploy/server/atoms-demo.service', import.meta.url), 'utf8');
+  assert.match(service, /^SuccessExitStatus=143$/m);
+  assert.match(service, /^Restart=on-failure$/m);
+  assert.doesNotMatch(service, /^SuccessExitStatus=.*\b(?:1|137)\b/m);
+});
+
 async function fixture() {
   const root = await mkdtemp(join(tmpdir(), 'atoms-release-test-'));
   const files = {

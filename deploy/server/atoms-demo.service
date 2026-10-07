@@ -11,6 +11,7 @@ Group=atoms
 WorkingDirectory=/opt/atoms-demo/current
 ExecStart=/bin/sh /opt/atoms-demo/current/server/start.sh /etc/atoms-demo/application.properties
 Restart=on-failure
+SuccessExitStatus=143
 RestartSec=5
 TimeoutStopSec=45
 UMask=0077
