@@ -154,8 +154,17 @@ class DeepSeekGatewayTest {
         assertThat(configured.complete("JSON", "test", () -> false).usage().totalTokens()).isEqualTo(50);
         assertThat(calls.get()).isEqualTo(1);
     }
+    @Test void sendsTheExactAuthorized168400TokenLimitWithExistingThinkingSettings() throws Exception {
+        var configured = new DeepSeekGateway(json, endpoint, "test-only-key", "deepseek-flash", Duration.ofSeconds(300), 168400);
+        assertThat(configured.complete("JSON", "test", () -> false).usage().totalTokens()).isEqualTo(50);
+        var request = json.readTree(received.get());
+        assertThat(request.path("max_tokens").asInt()).isEqualTo(168400);
+        assertThat(request.path("thinking").path("type").asText()).isEqualTo("enabled");
+        assertThat(request.path("reasoning_effort").asText()).isEqualTo("high");
+        assertThat(calls.get()).isEqualTo(1);
+    }
     @Test void rejectsLimitsOutsideTheAuthorizedBoundsBeforeCallingProvider() {
-        for (int invalid : new int[]{-1, 0, 32769, Integer.MAX_VALUE}) {
+        for (int invalid : new int[]{-1, 0, 168401, Integer.MAX_VALUE}) {
             assertThatThrownBy(() -> new DeepSeekGateway(json, endpoint, "test-only-key", "deepseek-flash", Duration.ofSeconds(120), invalid))
                     .isInstanceOf(IllegalArgumentException.class).hasMessage("Invalid model limits");
         }
