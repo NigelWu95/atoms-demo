@@ -16,7 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class RunAdmissionService {
     public record Input(String prompt, String intent, UUID baseVersionId, long expectedProjectRevision) {}
-    public record Availability(boolean configured, long remainingRequests, String model) {}
+    public record Availability(boolean configured, boolean workerEnabled, long remainingRequests, String model) {}
     private final RunRepository repo;
     private final org.springframework.jdbc.core.JdbcTemplate jdbc;
     private final ProjectService projects;
@@ -24,15 +24,17 @@ public class RunAdmissionService {
     private final ObjectMapper json;
     private final ModelGateway model;
     private final long ceiling;
+    private final boolean workerEnabled;
     public RunAdmissionService(RunRepository repo, ProjectService projects, IdempotencyService idempotency,
                                ObjectMapper json, ModelGateway model, Environment env, org.springframework.jdbc.core.JdbcTemplate jdbc) {
         this.repo = repo; this.projects = projects; this.idempotency = idempotency; this.json = json; this.model = model;
         this.jdbc = jdbc;
         ceiling = Math.max(0, env.getProperty("GENERATION_MAX_MODEL_CALLS", Long.class, 0L));
+        workerEnabled = env.getProperty("atoms.generation.worker-enabled", Boolean.class, true);
     }
     public Availability availability() {
         long used = jdbc.queryForObject("SELECT requests_reserved FROM generation_budget WHERE id = 1", Long.class);
-        return new Availability(model.configured(), Math.max(0, ceiling - used), "deepseek-flash");
+        return new Availability(model.configured(), workerEnabled, Math.max(0, ceiling - used), "deepseek-flash");
     }
     @Transactional(timeout = 5)
     public IdempotencyService.Result submit(UUID owner, String projectId, JsonNode body, String key) {
