@@ -18,8 +18,8 @@
 
 | 项目 | 位置 / 状态 |
 |---|---|
-| 发布版本 | `atoms-demo-X4tLzj`，源码 `5817a068fe2ddc465e0971a04f3c38768cfd8e8d`，打包时 dirty=false |
-| 程序 | `/opt/atoms-demo/releases/atoms-demo-X4tLzj`；`/opt/atoms-demo/current` 为其符号链接；旧 `atoms-demo-Dpprat`（HTTP）和 `atoms-demo-XmTJCF`（HTTPS）保留 |
+| 发布版本 | `atoms-demo-RTV1eK`，源码 `4c578800ce4209aae8955b44bdedde48ec8e2ce3`，打包时 dirty=false |
+| 程序 | `/opt/atoms-demo/releases/atoms-demo-RTV1eK`；`/opt/atoms-demo/current` 为其符号链接；旧 `atoms-demo-X4tLzj`、`atoms-demo-Dpprat`（HTTP）和 `atoms-demo-XmTJCF`（HTTPS）保留 |
 | 外部配置 | `/etc/atoms-demo/application.properties`，root:atoms / 0640，目录 0750 |
 | TLS（未启用） | `/etc/atoms-demo/tls/server.crt`、`server.key` 为回退保留；私钥 root / 0600，目录 0700 |
 | 后端服务 | `atoms-demo.service`，非 root 的 `atoms` 账号，单实例 |
@@ -85,6 +85,20 @@
 真实云端验收仅提交一轮原需求“帮我做一个 2048 小游戏”，使用独立临时 Chrome 访客，不复用/提取用户会话。项目 `486a94fd-30d0-4abb-8fa5-99cdb06f1200`、任务 `b391ceef-219e-4f6b-bb51-3e49fd21107f` 成功，V1 为 `55241c45-80d3-4450-a434-c3e78be32c65`。规划用量 395 / 660 / 1055、构建 1500 / 18001 / 19501（输入 / completion / 合计）；构建约 58 秒。此次 18001 completion tokens 高于旧上限，但不据此倒推原失败调用的未知计数。
 
 生成过程中刷新页面后继续完成，前后两次 SSE 均为 200，浏览器自动装载预览。实际方向键操作发生合并、分数增至 4，棋盘与最高分通过 PREVIEW 状态 API 保存（revision=3）；刷新后棋盘数组、分数、最高分不变，页面显示正确，控制台 warning/error/pageerror 均为空。只做 CREATE，一共 2 次请求，没有 Repair 或第二轮重试；云端累计 4 / 100，剩余 96。原失败任务未修改，测试项目保留为独立访客私有项目，没有公开发布或变更用户项目所有者。截图为 `2048-preview.png`。
+
+## 分层超时与输出上限调整（2026-10-08）
+
+用户最终选择 `DEEPSEEK_MAX_TOKENS=16840`、`DEEPSEEK_TIMEOUT_SECONDS=300`、`GENERATION_TIMEOUT_SECONDS=600`，已更新云端配置及部署包；早先提出的 327680 tokens / 单次 600 秒方案未部署。16840 按原值传给上游，不取整为 16384。单次模型请求最多 5 分钟，整轮从 RUNNING 开始最多 10 分钟，覆盖规划、构建、有限修复与保存；每次调用也受整轮剩余时间约束，不因进入下一阶段重新计时。累计请求上限仍为 100；本地私有配置不变。
+
+代码将单次允许的超时上界由 180 秒调整为 300 秒，整轮硬编码 360 秒改为独立配置（默认 360 秒、允许 1–1800 秒，云端实际 600 秒）。运行中检查和过期任务查询共用同一配置；取消、超时不自动重发，晚到产物不保存。token 配置上界仍为 32768，上游响应 2 MiB 和产物大小限制不变，不开放任意上游地址或用户自定义密钥。
+
+最终参数验证：新增精确 16840 请求体测试、300 秒配置测试、非法边界测试，以及真实测试库中的整轮截止/过期查询一致性测试。300 秒配置在原实现下失败；将边界误改为排除 300 时测试同样失败，恢复正确判断后正式构建通过。打包测试 3 项、前端 106 项、后端单测 25 项、真实 PostgreSQL 集成 46 项全部通过，类型/lint/格式/构建通过；npm audit 为 0 已知漏洞。提交后的正式包与完整构建候选包 13 个载荷哈希一致，服务器再次校验归档及全部文件。未增加依赖、数据库迁移或前端行为变更。
+
+升级前无活动任务，备份 `/var/backups/atoms-demo/model-limits.3qY5vM/` 包含私有 `application.properties` 和 `database.dump`，目录 0700、文件 0600；dump 目录检查通过，此次未做恢复演练。部署脚本仅修改三个限制配置，其他配置经不输出内容的比较确认未变，配置权限仍为 root:atoms / 0640。旧包、模型密钥、用户项目和调用记账保留。回退时停后端、切回 `atoms-demo-X4tLzj` 并恢复上述私有配置（32768 / 180 秒、未配置整轮值即默认 360 秒），再启动检查；旧包不支持 300 秒，不可只切包而保留新配置。不改 Nginx、不恢复数据库或重置额度。
+
+远端及开发机公网 HTTP 健康检查均为 UP，首页 200，三个服务 active，后端 NRestarts=0；读取实际配置确认 16840 / 300 / 600 已生效。累计已预留 4、剩余 96，本次未发起付费模型请求，也未重跑浏览器或云端生成闭环。此前 2048 的 BUILDING 用了 18001 completion tokens，高于新上限，因此新配置仍可能触发 MODEL_INCOMPLETE，不能用历史成功保证任意需求完成。
+
+本机更新脚本位于 `/private/tmp/atoms-limit-upgrade.r05nQs/deploy.sh`，远端位于 `/var/tmp/atoms-limit-upgrade.ATQ9hP/`；脚本不含凭据。GNU tar 忽略 macOS provenance 扩展属性，所有载荷校验通过。
 
 ## 备份及运维
 
