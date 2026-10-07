@@ -1,8 +1,8 @@
 # Atoms Demo Studio
 
-Java 17 + Spring Boot + Vue 工程。已实现访客与项目持久化、代码版本与受限预览、应用数据保存，并接通 DeepSeek 网关、后台规划/构建/有限修复及普通工作台的生成与修改交互。已提交的需求、规划和任务结果会保存到数据库。**本地真实 DeepSeek 的“生成待办 → 操作保存 → 刷新恢复 → 修改生成 V2 → 筛选且保留原数据”闭环已通过**，详见下文。固定版本发布、独立应用页面和 LIVE 数据隔离已实现；云端已配置模型和累计 100 次请求额度，真实生成闭环仍待验收。设计见 [设计目录](docs/design/README.md)，唯一进度清单见 [tasks/todo.md](docs/design/tasks/todo.md)。
+Java 17 + Spring Boot + Vue 工程。已实现访客与项目持久化、代码版本与受限预览、应用数据保存，并接通 DeepSeek 网关、后台规划/构建/有限修复及普通工作台的生成与修改交互。已提交的需求、规划和任务结果会保存到数据库。**本地真实 DeepSeek 的“生成待办 → 操作保存 → 刷新恢复 → 修改生成 V2 → 筛选且保留原数据”闭环已通过**，详见下文。固定版本发布、独立应用页面和 LIVE 数据隔离已实现；云端真实 2048 生成、预览操作和保存/刷新恢复已通过，云端发布与 LIVE 闭环仍待验收。设计见 [设计目录](docs/design/README.md)，唯一进度清单见 [tasks/todo.md](docs/design/tasks/todo.md)。
 
-2026-10-08 已按用户要求部署到 **<http://192.0.2.10:8443>**：单台云服务器原生运行整套平台和 PostgreSQL，按 `/a/<slug>` 发布应用。不接 ngrok、不等待域名；初始 HTTPS 已按用户明确要求切换为临时 HTTP Demo，流量未加密。HTTP 使用独立访客 Cookie，旧 HTTPS 项目不删除但不会自动归属新访客。云端已按用户授权同步 DeepSeek 密钥并验证模型列表认证，累计调用上限已设为 100 次，由公网访客共用；本地数据与配置不变。公网 HTTP 健康检查、浏览器建项目/刷新/隔离和模型额度读取通过，生成/SSE/发布的云端闭环仍待验收。见 [实际部署记录与回退](docs/cloud-deployment.md)、[ADR-011](docs/decisions/011-single-server-release.md) 和 [服务器部署说明](deploy/server/README.md)。数据库和后端内部端口不直接开放公网。
+2026-10-08 已按用户要求部署到 **<http://192.0.2.10:8443>**：单台云服务器原生运行整套平台和 PostgreSQL，按 `/a/<slug>` 发布应用。不接 ngrok、不等待域名；初始 HTTPS 已按用户明确要求切换为临时 HTTP Demo，流量未加密。HTTP 使用独立访客 Cookie，旧 HTTPS 项目不删除但不会自动归属新访客。云端已按用户授权同步 DeepSeek 密钥，累计调用上限 100 次由公网访客共用；长度错误修复后云端单次上限 32768 tokens、超时 180 秒，本地数据与配置不变。本轮云端 2048 实测使用 2 次请求，累计 4 / 100；已验证生成中刷新后 SSE 恢复、自动预览、游戏合并计分和状态刷新恢复，云端发布/LIVE 闭环仍待验收。见 [实际部署记录与回退](docs/cloud-deployment.md)、[ADR-011](docs/decisions/011-single-server-release.md) 和 [服务器部署说明](deploy/server/README.md)。数据库和后端内部端口不直接开放公网。
 
 ## 打包到服务器
 
