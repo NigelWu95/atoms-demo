@@ -16,7 +16,7 @@ public class ProjectService {
     private final JdbcTemplate jdbc;
     private static final RowMapper<Project> ROW = (rs, row) -> new Project(rs.getObject("id", UUID.class),
             rs.getString("name"), rs.getObject("owner_id", UUID.class), rs.getLong("project_revision"),
-            rs.getObject("current_version_id", UUID.class), rs.getTimestamp("created_at").toInstant(), rs.getTimestamp("updated_at").toInstant());
+            rs.getObject("current_version_id", UUID.class), rs.getTimestamp("created_at").toInstant(), rs.getTimestamp("updated_at").toInstant(), rs.getObject("active_run_id", UUID.class));
     public ProjectService(JdbcTemplate jdbc) { this.jdbc = jdbc; }
     public record Page(List<Project> items, String nextCursor) {}
     private record Cursor(Instant createdAt, UUID id) {}

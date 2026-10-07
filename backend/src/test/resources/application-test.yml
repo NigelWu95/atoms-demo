@@ -8,3 +8,6 @@ server:
     session:
       cookie:
         secure: false
+atoms:
+  generation:
+    worker-enabled: false
