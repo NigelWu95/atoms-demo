@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import type { CreateRun } from '../api/runs'
+import { randomId } from '../runtime/randomId'
 
 // In-memory pending intents survive route changes, not browser reloads. No credentials are stored.
 export const useGenerationStore = defineStore('generation', () => {
@@ -8,7 +9,7 @@ export const useGenerationStore = defineStore('generation', () => {
   function intent(projectId: string, body: CreateRun) {
     return (
       pending.value[projectId] ??
-      (pending.value[projectId] = { key: crypto.randomUUID(), body: { ...body } })
+      (pending.value[projectId] = { key: randomId(), body: { ...body } })
     )
   }
   function resolved(projectId: string) {

@@ -13,6 +13,41 @@ const published = {
   publicUrl: null,
 }
 afterEach(() => vi.unstubAllGlobals())
+it('accepts HTTP publication links only on the current HTTP origin', async () => {
+  vi.stubGlobal('location', new URL('http://198.51.100.1:8443/'))
+  const result = { ...published, publicUrl: 'http://198.51.100.1:8443' + published.publicPath }
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json(result)))
+  expect(await getPublication('p')).toEqual(result)
+})
+it.each(['http://other.example', 'http://198.51.100.1:80'])(
+  'rejects a different HTTP origin: %s',
+  async (origin) => {
+    vi.stubGlobal('location', new URL('http://198.51.100.1:8443/'))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        Response.json({
+          ...published,
+          publicUrl: origin + published.publicPath,
+        }),
+      ),
+    )
+    await expect(getPublication('p')).rejects.toMatchObject({ code: 'INVALID_RESPONSE' })
+  },
+)
+it('rejects a remote HTTP downgrade from an HTTPS page', async () => {
+  vi.stubGlobal('location', new URL('https://198.51.100.1:8443/'))
+  vi.stubGlobal(
+    'fetch',
+    vi.fn().mockResolvedValue(
+      Response.json({
+        ...published,
+        publicUrl: 'http://198.51.100.1:8443' + published.publicPath,
+      }),
+    ),
+  )
+  await expect(getPublication('p')).rejects.toMatchObject({ code: 'INVALID_RESPONSE' })
+})
 it('binds publish/unpublish to revisions and caller intents', async () => {
   const fetch = vi
     .fn()

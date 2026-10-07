@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { ApiFailure, errorMessage } from '../api/client'
+import { randomId } from '../runtime/randomId'
 import {
   getPreviewReport,
   savePreviewReport,
@@ -43,7 +44,7 @@ async function save() {
   if (!pending.value) {
     if (props.observation.status === 'UNKNOWN') return
     pending.value = {
-      key: crypto.randomUUID(),
+      key: randomId(),
       body: {
         status: props.observation.status,
         checks: [...props.observation.checks],

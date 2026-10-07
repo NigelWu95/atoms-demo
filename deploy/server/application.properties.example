@@ -13,3 +13,7 @@ GENERATION_MAX_MODEL_CALLS=0
 
 # Same HTTPS origin as nginx-site.conf, without a path or trailing slash.
 PUBLIC_APP_ORIGIN=https://atoms.example.com
+# Explicit temporary HTTP demo only (defaults remain HTTPS / Secure Cookie):
+# ALLOW_INSECURE_HTTP_PUBLIC_ORIGIN=true
+# Use systemd environment SERVER_SERVLET_SESSION_COOKIE_SECURE=false and
+# SERVER_SERVLET_SESSION_COOKIE_NAME=ATOMS_HTTP_SESSION; configure Nginx HTTP.

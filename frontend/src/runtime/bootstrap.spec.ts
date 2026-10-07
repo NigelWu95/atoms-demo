@@ -26,7 +26,8 @@ function setup() {
     window: win,
     URL,
     URLSearchParams,
-    crypto,
+    // Real public HTTP exposes getRandomValues, but not randomUUID.
+    crypto: { getRandomValues: crypto.getRandomValues.bind(crypto) },
     setTimeout,
     clearTimeout,
     startAtomsRuntime: vi.fn<(launch: () => void) => void>(),
