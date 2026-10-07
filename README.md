@@ -1,6 +1,6 @@
 # Atoms Demo Studio
 
-Java 17 + Spring Boot + Vue 的本地开发工程。已实现基础网站、真实访客会话和项目持久化：可创建、打开、重命名和分页浏览自己的项目。当前不是完整生成平台；真实模型生成、预览运行和发布尚未实现。功能设计和执行计划位于 [设计目录](docs/design/README.md)，唯一进度清单位于 [tasks/todo.md](docs/design/tasks/todo.md)。
+Java 17 + Spring Boot + Vue 的本地开发工程。已实现基础网站、真实访客会话、项目持久化，以及不可变代码版本和受限运行文档。当前不是完整生成平台；真实模型生成、预览 SDK/业务数据保存、工作台源码接入和发布尚未实现。功能设计和执行计划位于 [设计目录](docs/design/README.md)，唯一进度清单位于 [tasks/todo.md](docs/design/tasks/todo.md)。
 
 本阶段仅本地开发，不配置云服务器或公开域名。挑战最终仍需在线链接，后续交付阶段再安排。
 
@@ -43,6 +43,23 @@ cd backend
 
 浏览器测试位于 `frontend/e2e`，当前配置使用本机已安装的 Google Chrome，并创建独立临时测试会话。运行前启动后端；Playwright 可复用本地前端或自动启动它。不连接个人浏览器资料，不依赖登录账号。没有 Chrome 的机器需准备对应浏览器并调整测试 channel，不能把未运行的浏览器测试当作通过。
 
+## 运行文档测试台（T10–T11）
+
+在额外终端运行：
+
+```sh
+cd /Users/wubingheng/atoms-demo/backend
+./mvnw -B spring-boot:test-run
+```
+
+访问 `http://127.0.0.1:8081/test-lab`，选择“交互计数器”并点击“装载测试产物”。测试台创建独立访客、项目与真实代码版本，展示可点击的受限 iframe；也可直接打开运行文档，仍受 HTTP 沙箱约束。闭合标签、隔离与资源拦截、历史版本是另外三个固定测试场景。安全场景预期产生 CSP 拦截提示；正常计数器无控制台错误。
+
+这里不是 AI 生成入口。版本源码写入专用 `atoms_demo_test`，计数变化只在页面内，刷新会归零；Atoms.ready、消息桥及业务数据保存接下来实现。不会向正常开发数据库注入测试源码，也不会出现在 5173 的个人项目列表。测试 Cookie 名为 ATOMS_TEST_SESSION，与普通本地会话分离。
+
+装载器只编译到 test classpath，校验数据库名、角色和回环绑定，不进入正式 JAR。不要把 test-run 入口暴露到公网。普通后端仍用 spring-boot:run，二者端口不同，可同时运行。
+
+前端目录运行 `npm run test:e2e:runtime`，会自动启动或复用该测试服务，执行 4 项独立 Chrome 验收。测试位于 `frontend/e2e-runtime`，截图/trace 位于忽略提交的 `frontend/test-results-runtime`；它与原有 E2E 输出分离。trace 可能含测试会话信息，不应公开上传。实现边界及官方依据见 [ADR-004](docs/decisions/004-immutable-artifacts-runtime.md)。
+
 ## 当前可体验的交互
 
 - 首页自动建立/恢复访客会话；失败可重试，未连接不能创建项目。手机端也保留会话状态与重试入口。
@@ -54,7 +71,7 @@ cd backend
 - 侧栏服务状态来自真实 `/api/health`；失败时可重试。未知路由有返回入口。
 - Vite 开发页面有 CSP/基础安全响应头；仅开发 HMR 放行本地 WebSocket 与内联样式。`npm run preview` 使用更严格 CSP，但它只是本地构建预览，不是正式部署方案。
 
-下一步是 T10 起的产物版本、受限运行文档和交互预览。T04 的部署骨架和公网验证保留待办；模型 API 与用户自定义模型设置均未实现。
+下一步是 T12–T15：消息桥/SDK → 应用业务数据保存 → 工作台预览与源码 → 独立预览外壳。T04 的部署骨架和公网验证保留待办；模型 API 与用户自定义模型设置均未实现。OAuth 暂不接入，继续采用访客模式。
 
 访客身份只绑定当前浏览器 Cookie，有效期最多 7 天；清除 Cookie、更换浏览器或过期后不能找回旧访客项目。统一使用上面的 `127.0.0.1` 地址，避免与 `localhost` 形成两个浏览器空间。请勿存放敏感资料。本地配置不应用于公网；部署前还需限流/总配额、数据保留与删除策略以及完整安全验收，见 [ADR-003](docs/decisions/003-guest-project-persistence.md)。
 
@@ -62,7 +79,9 @@ cd backend
 
 `GET /api/health` 无需身份，执行真实数据库检查。可用时返回 `200 {"status":"UP"}`；不可用时返回 `503 {"error":{"code":"SERVICE_UNAVAILABLE","message":"服务暂不可用，请稍后重试。","retryable":true},"requestId":"..."}`。不提供数据库详情、版本、密钥或堆栈；失败日志只记关联 requestId。
 
-已接通 `GET /api/csrf`、`POST /api/session`、`GET /api/me`，以及 `/api/projects` 的创建/分页列表和 `/api/projects/{id}` 的详情/重命名。所有写请求都要求 CSRF，创建项目还要求 Idempotency-Key。具体约束见 [接口契约](docs/design/04-api-contracts.md#21-身份项目生成)。其他设计端点仍未实现。
+已接通 `GET /api/csrf`、`POST /api/session`、`GET /api/me`，以及 `/api/projects` 的创建/分页列表和 `/api/projects/{id}` 的详情/重命名。新增版本列表 `GET /api/projects/{id}/versions`、详情 `GET /api/projects/{id}/versions/{versionId}` 与受限 HTML `GET /api/projects/{id}/versions/{versionId}/document?previewMode=CURRENT|HISTORY`；均验证项目归属。生产没有提交任意源码的 HTTP 接口。
+
+所有写请求都要求 CSRF，创建项目还要求 Idempotency-Key。具体响应字段、限额及当前实现范围见 [接口契约](docs/design/04-api-contracts.md)。其他设计端点仍未实现。
 
 ## PostgreSQL
 

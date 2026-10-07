@@ -64,7 +64,7 @@ Project 最小字段：`id, name, ownerId, currentVersionId?, projectRevision, a
 
 本地 M2 实现约束（2026-10-07）：
 
-- 已实现本表截至 PATCH 项目的端点，消息及生成端点尚未实现。Project 另返回 createdAt；空项目暂不返回可选的版本/运行/发布字段。
+- 已实现本表截至 PATCH 项目的端点，消息及生成端点尚未实现。Project 另返回 createdAt；M3 起始终返回 currentVersionId（空项目为 null），运行/发布字段仍未实现。M2 已保存的幂等创建结果保持原样重放，旧响应可不含 currentVersionId。
 - name 去除首尾空白后为 1–80 个 UTF-16 单元，不允许控制字符；仅接受 name 字段。列表按 createdAt/id 倒序，cursor 为不透明游标，limit 为 1–100。
 - Idempotency-Key 允许 1–128 个 ASCII 字母、数字、点、下划线、冒号或短横线；缺失/无效返回 422 INVALID_INPUT。名称规范化后同键重试返回第一次 201 的原始 JSON，包括首次名称与时间，不受后续重命名影响。
 - 会话首次创建变更 session ID 和 CSRF，前端在 POST /api/session 后再取一次 GET /api/csrf。Cookie 为 HttpOnly、SameSite=Lax、7 天有效；只有本地 HTTP/test 配置允许 Secure=false。
@@ -103,6 +103,16 @@ intent 为 CREATE、MODIFY，P1 可增加 REPAIR。CREATE 使用 null 基线和 
 | GET `/api/public/apps/{slug}/document` | versionId | 当前已发布版本的受限运行 HTML |
 
 运行 HTML 不经过普通 SPA fallback。响应包含正确 MIME、no-store，以及 HTTP `Content-Security-Policy` 的 sandbox 与资源限制。直接打开 document URL 仍受沙箱约束；独立正常体验应打开可信 `/preview/...` 或 `/a/...` 外壳。
+
+本地 T10–T11 实现约束（2026-10-07）：
+
+- 已实现本表前三个 GET；其余仍是后续设计。版本写入只开放内部事务服务，没有生产 POST 源码接口。
+- 版本摘要字段为 `id, projectId, versionNo, contentHash, basedOnId, createdAt`；详情在相同字段之外返回 `artifact`。UUID 为小写标准格式；版本列表按 versionNo 倒序，cursor 是上一页最后版本号的十进制字符串（客户端仍按不透明游标传回）；limit=1–100，默认 20。
+- 内部保存同时验证项目 revision 和基线版本，冲突为 409 BASE_VERSION_CONFLICT；成功后 projectRevision+1。重复内容 hash 允许产生新版本，源码不可修改或删除。
+- document 的 previewMode 默认 CURRENT，非 CURRENT/HISTORY 返回 422 INVALID_PREVIEW_MODE；旧版本 CURRENT 返回 409 STALE_APP_VERSION。HISTORY 此阶段仅执行历史源码，不接入任何业务状态，后续只允许使用 initialState。
+- HTML 使用解析白名单：基本布局/文本、表格、交互控件、受限 SVG；不含 URL 属性、form、事件属性或嵌套框架。源码文件合计 120 KiB UTF-8；初始数据对象 256 KiB JSON UTF-8；不支持内容返回 422 INVALID_ARTIFACT。完整经典脚本语法检查/SDK 启动检查尚未实现。
+- 运行文档才有 inline-only 脚本/CSS 和 HTTP sandbox；管理 API 仍禁止嵌入。具体取舍见 [ADR-004](../decisions/004-immutable-artifacts-runtime.md)。
+- 固定测试装载 POST `/api/test-fixtures` 仅在 test-run 专用入口存在，接收 `{fixture: "counter"|"closing-tags"|"security"|"history"}`，必须具有访客会话、CSRF 和 Idempotency-Key；返回 `{project, version, firstVersionId, testOnly: true}`。只连接 atoms_demo_test/atoms_test，测试类和页面不进入正式 JAR。
 
 CURRENT 模式要求 versionId 等于项目当前版本；历史版本只允许 HISTORY 模式。后端状态接口也校验这个条件，不能通过伪造 previewMode 绕过历史只读限制。恢复版本和发布时均拒绝同项目仍有活动 run 的操作。
 
