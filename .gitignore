@@ -9,6 +9,7 @@ node_modules/
 dist/
 target/
 test-results/
+test-results-runtime/
 playwright-report/
 coverage/
 .local/

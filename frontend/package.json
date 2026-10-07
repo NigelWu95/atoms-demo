@@ -13,11 +13,12 @@
     "typecheck": "vue-tsc --noEmit",
     "test:unit": "vitest run",
     "test:e2e": "playwright test",
+    "test:e2e:runtime": "playwright test --config playwright.runtime.config.ts",
     "build": "vite build",
     "preview": "vite preview --host 127.0.0.1",
-    "lint": "eslint src vite.config.ts playwright.config.ts e2e",
-    "format:check": "prettier --check src *.ts *.json *.js index.html e2e",
-    "format": "prettier --write src *.ts *.json *.js index.html e2e"
+    "lint": "eslint src vite.config.ts playwright*.config.ts e2e e2e-runtime",
+    "format:check": "prettier --check src *.ts *.json *.js index.html e2e e2e-runtime",
+    "format": "prettier --write src *.ts *.json *.js index.html e2e e2e-runtime"
   },
   "dependencies": {
     "pinia": "4.0.3",
