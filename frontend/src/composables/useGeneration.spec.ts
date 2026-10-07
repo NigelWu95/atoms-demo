@@ -5,6 +5,9 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { getProject, type Project } from '../api/projects'
 import { generationAvailability, listMessages, listRuns, submitRun, type Run } from '../api/runs'
 import { useGeneration } from './useGeneration'
+import { subscribeToRun } from '../api/runEvents'
+
+vi.mock('../api/runEvents', () => ({ subscribeToRun: vi.fn(() => vi.fn()) }))
 
 vi.mock('../api/projects', () => ({ getProject: vi.fn() }))
 vi.mock('../api/runs', async (original) => ({
@@ -64,6 +67,7 @@ function setup(draft = '') {
 }
 beforeEach(() => {
   vi.resetAllMocks()
+  vi.mocked(subscribeToRun).mockImplementation(() => vi.fn())
   vi.mocked(generationAvailability).mockResolvedValue({
     configured: true,
     workerEnabled: true,
@@ -148,4 +152,54 @@ it('uses the completed current version as the baseline for the next modification
     expect.any(String),
   )
   expect(vi.mocked(submitRun).mock.calls[0]![2]).not.toBe(vi.mocked(submitRun).mock.calls[1]![2])
+})
+
+it('subscribes from the snapshot, applies live stages and refreshes the committed terminal version', async () => {
+  vi.mocked(listRuns).mockResolvedValue({
+    items: [{ ...task, status: 'RUNNING', stage: 'PLANNING' }],
+    nextCursor: null,
+  })
+  const { generation, project } = setup()
+  await flushPromises()
+  expect(subscribeToRun).toHaveBeenCalledWith(task.id, 3, expect.any(Object))
+  const handlers = vi.mocked(subscribeToRun).mock.calls[0]![2]
+  handlers.state('connected')
+  handlers.event({ type: 'stage.started', seq: 4, stage: 'BUILDING' })
+  expect(generation.run.value?.stage).toBe('BUILDING')
+  expect(generation.run.value?.lastEventSeq).toBe(4)
+  vi.mocked(listRuns).mockResolvedValue({
+    items: [
+      { ...task, status: 'SUCCEEDED', stage: 'SUCCEEDED', resultVersionId: 'v2', lastEventSeq: 5 },
+    ],
+    nextCursor: null,
+  })
+  vi.mocked(getProject).mockResolvedValue({
+    ...initial,
+    currentVersionId: 'v2',
+    projectRevision: 2,
+  })
+  handlers.event({ type: 'run.completed', seq: 5, lastEventSeq: 5 })
+  await flushPromises()
+  expect(project.value.currentVersionId).toBe('v2')
+  expect(submitRun).not.toHaveBeenCalled()
+  expect(vi.mocked(subscribeToRun).mock.results[0]!.value).toHaveBeenCalled()
+})
+
+it('closes an old project stream and ignores its late events after navigation', async () => {
+  vi.mocked(listRuns).mockResolvedValue({
+    items: [{ ...task, status: 'RUNNING', stage: 'PLANNING' }],
+    nextCursor: null,
+  })
+  const { generation, project } = setup()
+  await flushPromises()
+  const handlers = vi.mocked(subscribeToRun).mock.calls[0]![2]
+  vi.mocked(listRuns).mockResolvedValue({ items: [], nextCursor: null })
+  vi.mocked(getProject).mockResolvedValue({ ...initial, id: 'project-2' })
+  project.value = { ...initial, id: 'project-2' }
+  await flushPromises()
+  handlers.event({ type: 'stage.started', seq: 4, stage: 'BUILDING' })
+  handlers.error('旧任务错误')
+  expect(generation.run.value).toBeNull()
+  expect(generation.error.value).toBe('')
+  expect(vi.mocked(subscribeToRun).mock.results[0]!.value).toHaveBeenCalled()
 })

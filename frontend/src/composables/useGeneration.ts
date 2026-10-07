@@ -13,6 +13,7 @@ import {
   type Run,
 } from '../api/runs'
 import { useGenerationStore } from '../stores/generation'
+import { subscribeToRun, type StreamState } from '../api/runEvents'
 
 export function useGeneration(
   project: () => Project,
@@ -29,6 +30,7 @@ export function useGeneration(
   const busy = ref(false)
   const error = ref('')
   const loaded = ref(false)
+  const connection = ref<StreamState>('idle')
   const pending = computed(() => intents.pending[project().id])
   const active = computed(() => isActive(run.value))
   const canSubmit = computed(
@@ -43,13 +45,53 @@ export function useGeneration(
   )
   let revision = 0
   let mounted = true
-  let timer: ReturnType<typeof setTimeout> | undefined
-  const clearTimer = () => {
-    if (timer !== undefined) clearTimeout(timer)
+  let stopStream: (() => void) | undefined
+  const stopWatching = () => {
+    stopStream?.()
+    stopStream = undefined
+    connection.value = 'idle'
+  }
+  let conversationRevision = 0
+  function watchRun() {
+    const task = run.value
+    if (!task || !isActive(task)) return
+    const request = revision
+    const id = project().id
+    const current = () =>
+      mounted && revision === request && project().id === id && run.value?.id === task.id
+    stopStream = subscribeToRun(task.id, task.lastEventSeq, {
+      state: (state) => {
+        if (current()) connection.value = state
+      },
+      error: (message) => {
+        if (current()) error.value = message
+      },
+      event: (event) => {
+        if (!current() || !run.value) return
+        run.value.lastEventSeq = event.seq
+        if (event.type === 'stage.started') {
+          run.value.status = 'RUNNING'
+          run.value.stage = event.stage
+        }
+        if (event.type === 'plan.ready') {
+          const conversationRequest = ++conversationRevision
+          void listMessages(id)
+            .then((conversation) => {
+              if (!current() || conversationRequest !== conversationRevision) return
+              messages.value = [...conversation.items].reverse()
+              cursor.value = conversation.nextCursor
+            })
+            .catch((failure: unknown) => {
+              if (current()) error.value = errorMessage(failure)
+            })
+        }
+        if (event.type === 'run.completed') void refresh()
+      },
+    })
   }
 
   async function refresh() {
-    clearTimer()
+    stopWatching()
     const request = ++revision
     const id = project().id
     loading.value = true
@@ -77,10 +119,7 @@ export function useGeneration(
         !prompt().trim()
       )
         setPrompt(run.value.prompt)
-      if (isActive(run.value))
-        timer = setTimeout(() => {
-          void refresh()
-        }, 1500)
+      watchRun()
     } catch (failure) {
       if (mounted && request === revision) {
         error.value = errorMessage(failure)
@@ -102,7 +141,7 @@ export function useGeneration(
     })
     busy.value = true
     error.value = ''
-    clearTimer()
+    stopWatching()
     revision++
     loading.value = false
     try {
@@ -126,14 +165,17 @@ export function useGeneration(
     const taskId = run.value.id
     busy.value = true
     error.value = ''
-    clearTimer()
+    stopWatching()
     revision++
     loading.value = false
     try {
       await cancelRun(taskId)
       if (mounted && project().id === id) await refresh()
     } catch (failure) {
-      if (mounted && project().id === id) error.value = errorMessage(failure)
+      if (mounted && project().id === id) {
+        error.value = errorMessage(failure)
+        watchRun()
+      }
     } finally {
       if (mounted && project().id === id) busy.value = false
     }
@@ -171,13 +213,14 @@ export function useGeneration(
   onBeforeUnmount(() => {
     mounted = false
     revision++
-    clearTimer()
+    stopWatching()
   })
   return {
     run,
     messages,
     cursor,
     availability,
+    connection,
     loading,
     busy,
     error,

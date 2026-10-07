@@ -12,6 +12,7 @@ const {
   messages,
   cursor,
   availability,
+  connection,
   loading,
   busy,
   error,
@@ -41,6 +42,16 @@ const roles: Record<string, string> = {
   BUILDER: '构建助手',
   SYSTEM: '系统',
 }
+const connectionLabel = computed(
+  () =>
+    ({
+      idle: '',
+      connecting: '正在连接实时进度…',
+      connected: '实时进度已连接',
+      reconnecting: '进度连接中断，正在重连并补齐事件…',
+      paused: '实时进度已暂停，可刷新恢复；后台任务继续执行。',
+    })[connection.value],
+)
 </script>
 
 <template>
@@ -51,6 +62,9 @@ const roles: Record<string, string> = {
     </div>
     <div class="generation-conversation">
       <p class="muted generation-config">{{ configuration }}</p>
+      <p v-if="connectionLabel" role="status" aria-live="polite" class="muted">
+        {{ connectionLabel }}
+      </p>
       <div class="generation-actions">
         <button type="button" class="button secondary" :disabled="busy || loading" @click="refresh">
           刷新生成状态
