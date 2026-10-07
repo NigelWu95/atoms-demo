@@ -3,15 +3,47 @@ import { onMounted, onBeforeUnmount, ref } from 'vue'
 import type { Version } from '../api/artifacts'
 import { createRuntimeBridge, type BridgeStatus } from '../runtime/bridge'
 import { createPreviewContext, type PreviewMode } from '../runtime/previewContext'
+import { validateScript } from '../runtime/validateScript'
+import type { Observation } from '../api/previewReports'
+import PreviewChecks from './PreviewChecks.vue'
 
 // The parent keys this component by project/version/mode; a reload replaces the iframe entirely.
 const props = defineProps<{ version: Version; mode: PreviewMode }>()
 const container = ref<HTMLDivElement | null>(null)
 const status = ref<BridgeStatus>('connecting')
 const message = ref('正在加载预览…')
+const observation = ref<Observation>({ status: 'UNKNOWN', checks: [], errors: [] })
 let cleanup: (() => void) | undefined
+let revision = 0
 function reload() {
+  const current = ++revision
   cleanup?.()
+  status.value = 'connecting'
+  message.value = '正在加载预览…'
+  observation.value = { status: 'UNKNOWN', checks: [], errors: [] }
+  const report = (next: BridgeStatus, text: string) => {
+    if (revision !== current) return
+    status.value = next
+    message.value = text
+    if (next === 'error') {
+      observation.value.status = 'FAILED'
+      const bounded = text.slice(0, 1000)
+      if (observation.value.errors.length < 5 && !observation.value.errors.includes(bounded))
+        observation.value.errors.push(bounded)
+    } else if (next === 'ready' && observation.value.status !== 'FAILED') {
+      observation.value = {
+        status: 'PASSED',
+        checks: ['SCRIPT_PARSE', 'SDK_STARTUP', 'RUNTIME_ERRORS'],
+        errors: [],
+      }
+    }
+  }
+  const invalid = validateScript(props.version.artifact.files['main.js'])
+  if (invalid) {
+    report('error', invalid)
+    return
+  }
+  observation.value.checks = ['SCRIPT_PARSE']
   const channelId = crypto.randomUUID()
   const frame = document.createElement('iframe')
   frame.title = '应用交互预览'
@@ -26,17 +58,14 @@ function reload() {
       props.mode,
       props.version.artifact.manifest.initialState,
     ),
-    (next, text) => {
-      status.value = next
-      message.value = text
-    },
+    report,
   )
   let loaded = false
   frame.addEventListener('load', () => {
+    if (revision !== current) return
     if (loaded) {
       bridge.dispose()
-      status.value = 'error'
-      message.value = '预览发生导航，旧连接已关闭。请手动重新加载。'
+      report('error', '预览发生导航，旧连接已关闭。请手动重新加载。')
       return
     }
     loaded = true
@@ -50,7 +79,10 @@ function reload() {
   }
 }
 onMounted(reload)
-onBeforeUnmount(() => cleanup?.())
+onBeforeUnmount(() => {
+  revision++
+  cleanup?.()
+})
 </script>
 
 <template>
@@ -79,5 +111,11 @@ onBeforeUnmount(() => cleanup?.())
     >
       {{ message }}
     </p>
+    <PreviewChecks
+      :project-id="version.projectId"
+      :version-id="version.id"
+      :observation="observation"
+      :read-only="mode === 'HISTORY'"
+    />
   </div>
 </template>
