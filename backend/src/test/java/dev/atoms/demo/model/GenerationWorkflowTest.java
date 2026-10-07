@@ -47,4 +47,23 @@ class GenerationWorkflowTest {
             assertThat(stages).containsExactly("PLANNING", "BUILDING", "REPAIRING");
         }
     }
+    @Test void planContractErrorsIdentifyTheFieldWithoutExposingModelContent() {
+        var workflow = new GenerationWorkflow(json, new ArtifactValidator());
+        String invalidPlan = plan.replace("\"实现\"", "{\"private\":\"do-not-expose\"}");
+        assertThatThrownBy(() -> workflow.generate("test", null,
+                (stage, system, user) -> new ModelGateway.Answer(invalidPlan, null), ignored -> {}))
+                .isInstanceOf(ModelException.class).hasMessageContaining("steps[0]").hasMessageNotContaining("do-not-expose");
+    }
+    @Test void plannerReceivesAnExplicitSixFieldExampleEvenWhenModifyingSource() throws Exception {
+        var workflow = new GenerationWorkflow(json, new ArtifactValidator());
+        workflow.generate("增加筛选", json.readTree(source), (stage, system, user) -> {
+            if (stage.equals("PLANNING")) {
+                String example = system.lines().filter(line -> line.startsWith("{\"title\":")).findFirst().orElseThrow();
+                assertThat(example).contains("\"goal\":", "\"features\":[", "\"preserve\":[", "\"dataNeeded\":true", "\"steps\":[");
+                assertThat(system).contains("Do not return an Artifact", "Do not omit any field");
+                assertThat(user).contains("currentArtifact");
+            }
+            return new ModelGateway.Answer(stage.equals("PLANNING") ? plan : source, null);
+        }, ignored -> {});
+    }
 }
