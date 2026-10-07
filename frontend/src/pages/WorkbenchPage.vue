@@ -9,6 +9,7 @@ import { errorMessage } from '../api/client'
 import ProjectHeading from '../components/ProjectHeading.vue'
 import ArtifactPanel from '../components/ArtifactPanel.vue'
 import ConversationPanel from '../components/ConversationPanel.vue'
+import PublicationPanel from '../components/PublicationPanel.vue'
 
 const draft = useDraftStore()
 const session = useSessionStore()
@@ -79,13 +80,14 @@ const panel = ref<'conversation' | 'preview'>('conversation')
         <ProjectHeading v-if="project" :project="project" @renamed="project = $event" />
         <h1 v-else tabindex="-1">需求草稿 <span class="outline-badge">未保存</span></h1>
       </div>
-      <button class="button primary" type="button" disabled title="应用生成后才能发布">
+      <PublicationPanel v-if="project?.currentVersionId" :key="project.id" :project="project" />
+      <button v-else class="button primary" type="button" disabled title="应用生成后才能发布">
         发布应用 ↗
       </button>
     </header>
     <p class="workbench-notice">
       {{ project ? '项目名称已保存到数据库。' : '这是尚未保存的需求草稿。' }}
-      已提交的需求与结果会保存；未提交草稿仅在当前页面会话中保留。发布功能尚未开放。
+      已提交的需求与结果会保存；未提交草稿仅在当前页面会话中保留。发布仅开放应用，不开放创作工作台。
     </p>
     <div class="mobile-view-controls" role="group" aria-label="工作台区域">
       <button
