@@ -21,9 +21,11 @@ public class RuntimeDocumentService {
     private final ArtifactValidator validator;
     private final ObjectMapper json;
     private final String template;
+    private final String bootstrap;
     public RuntimeDocumentService(ArtifactService artifacts, ProjectService projects, ArtifactValidator validator, ObjectMapper json) throws IOException {
         this.artifacts = artifacts; this.projects = projects; this.validator = validator; this.json = json;
         template = new ClassPathResource("runtime/document.html").getContentAsString(StandardCharsets.UTF_8);
+        bootstrap = new ClassPathResource("runtime/bootstrap.js").getContentAsString(StandardCharsets.UTF_8);
     }
     @Transactional(timeout = 5)
     public String render(UUID owner, String projectId, String versionId, String mode) {
@@ -36,7 +38,7 @@ public class RuntimeDocumentService {
             throw new ApiException(409, "STALE_APP_VERSION", "当前版本已变化，请重新加载预览。");
         }
         var files = version.artifact().files();
-        return template.formatted(validator.body(files.get("view.html")), serialize(Map.of("css", files.get("styles.css"), "js", files.get("main.js"))));
+        return template.formatted(validator.body(files.get("view.html")), bootstrap, serialize(Map.of("css", files.get("styles.css"), "js", files.get("main.js"))));
     }
     private String serialize(Object value) {
         try {

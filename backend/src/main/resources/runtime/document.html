@@ -4,15 +4,18 @@
 <body>
 %s
 <script>
+%s
 (() => {
     'use strict';
     const source = %s;
+    startAtomsRuntime(() => {
     const style = document.createElement('style');
     style.textContent = source.css;
     document.head.append(style);
     const script = document.createElement('script');
     script.textContent = source.js;
     document.body.append(script);
+    });
 })();
 </script>
 </body>

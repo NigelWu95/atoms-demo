@@ -21,7 +21,7 @@ export function errorMessage(error: unknown): string {
   return error.requestId ? `${error.message}（请求编号：${error.requestId}）` : error.message
 }
 type RequestOptions = {
-  method?: 'GET' | 'POST' | 'PATCH'
+  method?: 'GET' | 'POST' | 'PATCH' | 'PUT'
   body?: unknown
   idempotencyKey?: string
 }
