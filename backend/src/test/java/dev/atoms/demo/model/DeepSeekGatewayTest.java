@@ -73,6 +73,24 @@ class DeepSeekGatewayTest {
             assertThatThrownBy(() -> gateway().complete("JSON", "test", () -> false)).isInstanceOf(ModelException.class);
         }
     }
+    @Test void distinguishesIncompleteReasonsWithoutExposingUpstreamTextOrRetrying() {
+        String complete = body;
+        String[][] reasons = {
+                {"length", "长度限制"}, {"content_filter", "过滤"},
+                {"insufficient_system_resource", "推理资源不足"}, {"aborted", "中断"},
+                {"tool_calls", "不支持的工具调用"}, {"private-provider-detail", "未完整结束"}
+        };
+        for (String[] reason : reasons) {
+            body = complete.replace("\"stop\"", "\"" + reason[0] + "\"");
+            assertThatThrownBy(() -> gateway().complete("JSON", "test", () -> false))
+                    .isInstanceOfSatisfying(ModelException.class, error ->
+                            assertThat(error.code()).isEqualTo("MODEL_INCOMPLETE"))
+                    .hasMessageContaining(reason[1])
+                    .hasMessageNotContaining("private-provider-detail").hasMessageNotContaining("private reasoning")
+                    .hasMessageNotContaining("完成").hasMessageNotContaining("test-only-key");
+        }
+        assertThat(calls.get()).isEqualTo(reasons.length);
+    }
     @Test void cancelledAndUnconfiguredCallsNeverReachTheProvider() {
         assertThatThrownBy(() -> gateway().complete("JSON", "test", () -> true))
                 .isInstanceOf(ModelException.class).hasMessageContaining("取消");

@@ -85,7 +85,7 @@ public class DeepSeekGateway implements ModelGateway {
             if (!choices.isArray() || choices.size() != 1) throw invalid();
             var choice = choices.get(0);
             if (!"stop".equals(choice.path("finish_reason").asText()))
-                throw new ModelException("MODEL_INCOMPLETE", "模型输出未完整结束，未保存为新版本。");
+                throw incomplete(choice.path("finish_reason").asText());
             var content = choice.path("message").path("content");
             if (!content.isTextual() || content.textValue().isBlank()) throw invalid();
             var usage = root.path("usage");
@@ -106,5 +106,16 @@ public class DeepSeekGateway implements ModelGateway {
         };
     }
     private ModelException invalid() { return new ModelException("MODEL_INVALID_RESPONSE", "模型响应格式不正确，未保存为新版本。"); }
+    private ModelException incomplete(String reason) {
+        String message = switch (reason) {
+            case "length" -> "模型达到输出或上下文长度限制，未保存为新版本。";
+            case "content_filter" -> "模型输出被上游过滤，未保存为新版本。";
+            case "insufficient_system_resource" -> "上游推理资源不足，未保存为新版本。";
+            case "aborted" -> "上游中断了生成，未保存为新版本。";
+            case "tool_calls" -> "模型返回了不支持的工具调用，未保存为新版本。";
+            default -> "模型输出未完整结束，未保存为新版本。";
+        };
+        return new ModelException("MODEL_INCOMPLETE", message);
+    }
     private ModelException cancelled() { return new ModelException("RUN_CANCELLED", "生成已取消。"); }
 }

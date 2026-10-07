@@ -66,4 +66,14 @@ class GenerationWorkflowTest {
             return new ModelGateway.Answer(stage.equals("PLANNING") ? plan : source, null);
         }, ignored -> {});
     }
+    @Test void builderAndRepairRequestConciseButCompleteApplications() {
+        var workflow = new GenerationWorkflow(json, new ArtifactValidator());
+        workflow.generate("生成应用", null, (stage, system, user) -> {
+            if (!stage.equals("PLANNING"))
+                assertThat(system).contains("Aim for <=12 KiB", "Do not omit requested behavior",
+                        "Never save initialState on startup", "all three files every time");
+            return new ModelGateway.Answer(stage.equals("PLANNING") ? plan
+                    : stage.equals("BUILDING") ? "{}" : source, null);
+        }, ignored -> {});
+    }
 }
