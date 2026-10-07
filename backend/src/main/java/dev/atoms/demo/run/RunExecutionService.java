@@ -51,6 +51,10 @@ public class RunExecutionService {
         jdbc.update("UPDATE model_calls SET status = 'SUCCEEDED', prompt_tokens = ?, completion_tokens = ?, total_tokens = ? WHERE id = ?",
                 usage == null ? null : usage.promptTokens(), usage == null ? null : usage.completionTokens(), usage == null ? null : usage.totalTokens(), call);
     }
+    public void recordFailedUsage(UUID call, ModelGateway.Usage usage) {
+        jdbc.update("UPDATE model_calls SET status = 'FAILED', prompt_tokens = ?, completion_tokens = ?, total_tokens = ? WHERE id = ?",
+                usage == null ? null : usage.promptTokens(), usage == null ? null : usage.completionTokens(), usage == null ? null : usage.totalTokens(), call);
+    }
     @Transactional(timeout = 5)
     public void plan(Run identity, JsonNode plan) {
         Run run = repo.lock(identity.ownerId(), identity.id().toString()); requireRunning(run);

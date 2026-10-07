@@ -103,6 +103,45 @@ class GenerationExecutionIT {
         assertThat(result.status()).isEqualTo("FAILED"); assertThat(result.errorCode()).isEqualTo("MODEL_AUTH_FAILED");
         assertThat(model.calls.get()).isEqualTo(before + 1);
         assertThat(artifacts.list(s.owner, s.project, null, 20).items()).isEmpty();
+        var call = jdbc.queryForMap("SELECT status, total_tokens FROM model_calls WHERE run_id = ?", run.id());
+        assertThat(call.get("status")).isEqualTo("UNKNOWN");
+        assertThat(call.get("total_tokens")).isNull();
+    }
+    @Test void truncatedBuildRecordsFailedUsageAndSafeDiagnosticsWithoutSavingOrRetrying() throws Exception {
+        var s = setup(); Run run = enqueue(s, null, 0);
+        long budgetBefore = jdbc.queryForObject("SELECT requests_reserved FROM generation_budget WHERE id = 1", Long.class);
+        int callsBefore = model.calls.get();
+        model.duringBuild = () -> { throw new ModelException("MODEL_INCOMPLETE", "长度限制，未保存为新版本。",
+                new ModelException.CompletionDetails("length", new ModelGateway.Usage(500L, 32768L, 33268L), 31000L, 32768)); };
+        var logger = (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger(GenerationWorker.class);
+        var captured = new ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent>();
+        captured.start(); logger.addAppender(captured);
+        try {
+            worker.process(run);
+            var result = runs.get(s.owner, run.id().toString());
+            assertThat(result.status()).isEqualTo("FAILED");
+            assertThat(result.errorCode()).isEqualTo("MODEL_INCOMPLETE");
+            assertThat(artifacts.list(s.owner, s.project, null, 20).items()).isEmpty();
+            assertThat(model.calls.get()).isEqualTo(callsBefore + 2);
+            assertThat(jdbc.queryForObject("SELECT requests_reserved FROM generation_budget WHERE id = 1", Long.class)).isEqualTo(budgetBefore + 2);
+            var call = jdbc.queryForMap("SELECT * FROM model_calls WHERE run_id = ? AND stage = 'BUILDING'", run.id());
+            assertThat(call.get("status")).isEqualTo("FAILED");
+            assertThat(call.get("prompt_tokens")).isEqualTo(500L);
+            assertThat(call.get("completion_tokens")).isEqualTo(32768L);
+            assertThat(call.get("total_tokens")).isEqualTo(33268L);
+            assertThat(captured.list).hasSize(2);
+            var message = captured.list.get(1).getFormattedMessage();
+            var event = json.readTree(message);
+            assertThat(event.path("runId").asText()).isEqualTo(run.id().toString());
+            assertThat(event.path("callId").asText()).isEqualTo(call.get("id").toString());
+            assertThat(event.path("stage").asText()).isEqualTo("BUILDING");
+            assertThat(event.path("outcome").asText()).isEqualTo("MODEL_INCOMPLETE");
+            assertThat(event.path("finishReason").asText()).isEqualTo("length");
+            assertThat(event.path("outputTokenLimit").asInt()).isEqualTo(32768);
+            assertThat(event.path("completionTokens").asLong()).isEqualTo(32768);
+            assertThat(event.path("reasoningTokens").asLong()).isEqualTo(31000);
+            assertThat(message).doesNotContain(run.prompt(), "reasoning_content", "authorization", "api_key");
+        } finally { logger.detachAppender(captured); captured.stop(); }
     }
     @Test void requestAllowanceIsDurableAndExhaustionCannotReserveAnotherCall() throws Exception {
         var s = setup(); Run run = enqueue(s, null, 0);
