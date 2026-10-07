@@ -35,7 +35,7 @@ public class DeepSeekGateway implements ModelGateway {
     }
     // Package-private test transport seam; no runtime configuration accepts an arbitrary upstream URL.
     DeepSeekGateway(ObjectMapper json, URI endpoint, String key, String model, Duration timeout, int maxTokens) {
-        if (timeout.isZero() || timeout.isNegative() || timeout.compareTo(Duration.ofSeconds(180)) > 0
+        if (timeout.isZero() || timeout.isNegative() || timeout.compareTo(Duration.ofSeconds(300)) > 0
                 || maxTokens < 1 || maxTokens > 32768) throw new IllegalArgumentException("Invalid model limits");
         this.json = json; this.endpoint = endpoint; this.key = key.strip(); this.model = model;
         this.timeout = timeout; this.maxTokens = maxTokens;

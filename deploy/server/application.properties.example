@@ -9,6 +9,8 @@ PORT=8080
 DEEPSEEK_API_KEY=
 DEEPSEEK_TIMEOUT_SECONDS=120
 DEEPSEEK_MAX_TOKENS=16384
+# Whole-run deadline (1..1800 seconds); keep within the approved latency budget.
+GENERATION_TIMEOUT_SECONDS=360
 GENERATION_MAX_MODEL_CALLS=0
 
 # Same HTTPS origin as nginx-site.conf, without a path or trailing slash.

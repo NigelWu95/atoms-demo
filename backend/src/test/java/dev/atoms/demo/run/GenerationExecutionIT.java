@@ -168,4 +168,38 @@ class GenerationExecutionIT {
         assertThat(s.browser.get("/api/projects/" + s.project).body().path("activeRunId").isNull()).isTrue();
         assertThat(artifacts.list(s.owner, s.project, null, 20).items()).isEmpty();
     }
+    @Test void configuredRunDeadlineControlsBothWorkerChecksAndExpiredTaskSelection() throws Exception {
+        var s = setup(); Run run = enqueue(s, null, 0);
+        var tenMinutes = new RunExecutionService(runs, jdbc, artifacts,
+                new org.springframework.mock.env.MockEnvironment().withProperty("GENERATION_TIMEOUT_SECONDS", "600"));
+        var thirtyMinutes = new RunExecutionService(runs, jdbc, artifacts,
+                new org.springframework.mock.env.MockEnvironment().withProperty("GENERATION_TIMEOUT_SECONDS", "1800"));
+        int callsBefore = model.calls.get();
+        try {
+            jdbc.update("UPDATE runs SET started_at = now() - interval '7 minutes' WHERE id = ?", run.id());
+            assertThatThrownBy(() -> execution.check(run)).isInstanceOfSatisfying(ModelException.class,
+                    error -> assertThat(error.code()).isEqualTo("RUN_TIMEOUT"));
+            assertThat(execution.expired()).extracting(Run::id).contains(run.id());
+            assertThatCode(() -> tenMinutes.check(run)).doesNotThrowAnyException();
+            assertThat(tenMinutes.expired()).extracting(Run::id).doesNotContain(run.id());
+            jdbc.update("UPDATE runs SET started_at = now() - interval '11 minutes' WHERE id = ?", run.id());
+            assertThatThrownBy(() -> tenMinutes.check(run)).isInstanceOf(ModelException.class);
+            assertThat(tenMinutes.expired()).extracting(Run::id).contains(run.id());
+            assertThatCode(() -> thirtyMinutes.check(run)).doesNotThrowAnyException();
+            assertThat(thirtyMinutes.expired()).extracting(Run::id).doesNotContain(run.id());
+            jdbc.update("UPDATE runs SET started_at = now() - interval '31 minutes' WHERE id = ?", run.id());
+            assertThatThrownBy(() -> thirtyMinutes.check(run)).isInstanceOfSatisfying(ModelException.class,
+                    error -> assertThat(error.code()).isEqualTo("RUN_TIMEOUT"));
+            assertThat(thirtyMinutes.expired()).extracting(Run::id).contains(run.id());
+            assertThat(model.calls.get()).isEqualTo(callsBefore);
+            assertThat(artifacts.list(s.owner, s.project, null, 20).items()).isEmpty();
+        } finally { execution.fail(run, "RUN_TIMEOUT", "测试任务结束。"); }
+    }
+    @Test void rejectsUnboundedOrInvalidRunTimeoutConfiguration() {
+        for (String value : new String[]{"0", "-1", "1801", "2147483647"}) {
+            assertThatThrownBy(() -> new RunExecutionService(runs, jdbc, artifacts,
+                    new org.springframework.mock.env.MockEnvironment().withProperty("GENERATION_TIMEOUT_SECONDS", value)))
+                    .isInstanceOf(IllegalArgumentException.class).hasMessage("Invalid generation timeout");
+        }
+    }
 }

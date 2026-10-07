@@ -19,9 +19,12 @@ public class RunExecutionService {
     private final JdbcTemplate jdbc;
     private final ArtifactService artifacts;
     private final long ceiling;
+    private final int timeoutSeconds;
     public RunExecutionService(RunRepository repo, JdbcTemplate jdbc, ArtifactService artifacts, Environment env) {
         this.repo = repo; this.jdbc = jdbc; this.artifacts = artifacts;
         ceiling = Math.max(0, env.getProperty("GENERATION_MAX_MODEL_CALLS", Long.class, 0L));
+        timeoutSeconds = env.getProperty("GENERATION_TIMEOUT_SECONDS", Integer.class, 360);
+        if (timeoutSeconds < 1 || timeoutSeconds > 1800) throw new IllegalArgumentException("Invalid generation timeout");
     }
     public Run next() {
         var queued = jdbc.query("SELECT * FROM runs WHERE status = 'QUEUED' ORDER BY ordinal LIMIT 1", RunRepository.ROW);
@@ -77,8 +80,11 @@ public class RunExecutionService {
     public void check(Run identity) { requireRunning(repo.get(identity.ownerId(), identity.id().toString())); }
     private void requireRunning(Run run) {
         if (!"RUNNING".equals(run.status())) throw new ModelException("RUN_CANCELLED", "任务已结束，晚到结果不会保存。");
-        if (run.startedAt().plusSeconds(360).isBefore(Instant.now())) throw new ModelException("RUN_TIMEOUT", "整轮生成超过 6 分钟，未自动重试。");
+        if (run.startedAt().plusSeconds(timeoutSeconds).isBefore(Instant.now())) throw new ModelException("RUN_TIMEOUT", "整轮生成超过时限，未自动重试。");
     }
     public java.util.List<Run> interrupted() { return jdbc.query("SELECT * FROM runs WHERE status = 'RUNNING'", RunRepository.ROW); }
-    public java.util.List<Run> expired() { return jdbc.query("SELECT * FROM runs WHERE status = 'RUNNING' AND started_at < now() - interval '6 minutes'", RunRepository.ROW); }
+    public java.util.List<Run> expired() {
+        return jdbc.query("SELECT * FROM runs WHERE status = 'RUNNING' AND started_at < ?", RunRepository.ROW,
+                java.sql.Timestamp.from(Instant.now().minusSeconds(timeoutSeconds)));
+    }
 }

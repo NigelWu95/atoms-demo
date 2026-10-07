@@ -143,4 +143,26 @@ class DeepSeekGatewayTest {
         assertThatThrownBy(() -> gateway().complete("JSON", "test", () -> calls.get() > before))
                 .isInstanceOf(ModelException.class).hasMessageContaining("取消");
     }
+    @Test void sendsTheExactAuthorized16840TokenLimitWithoutRounding() throws Exception {
+        var configured = new DeepSeekGateway(json, endpoint, "test-only-key", "deepseek-flash", Duration.ofSeconds(2), 16840);
+        assertThat(configured.complete("JSON", "test", () -> false).usage().totalTokens()).isEqualTo(50);
+        assertThat(json.readTree(received.get()).path("max_tokens").asInt()).isEqualTo(16840);
+        assertThat(calls.get()).isEqualTo(1);
+    }
+    @Test void supportsFiveMinuteTimeoutWithoutWaitingForTheWholeDeadline() {
+        var configured = new DeepSeekGateway(json, endpoint, "test-only-key", "deepseek-flash", Duration.ofSeconds(300), 8192);
+        assertThat(configured.complete("JSON", "test", () -> false).usage().totalTokens()).isEqualTo(50);
+        assertThat(calls.get()).isEqualTo(1);
+    }
+    @Test void rejectsLimitsOutsideTheAuthorizedBoundsBeforeCallingProvider() {
+        for (int invalid : new int[]{-1, 0, 32769, Integer.MAX_VALUE}) {
+            assertThatThrownBy(() -> new DeepSeekGateway(json, endpoint, "test-only-key", "deepseek-flash", Duration.ofSeconds(120), invalid))
+                    .isInstanceOf(IllegalArgumentException.class).hasMessage("Invalid model limits");
+        }
+        for (Duration invalid : new Duration[]{Duration.ZERO, Duration.ofSeconds(-1), Duration.ofSeconds(301)}) {
+            assertThatThrownBy(() -> new DeepSeekGateway(json, endpoint, "test-only-key", "deepseek-flash", invalid, 16384))
+                    .isInstanceOf(IllegalArgumentException.class).hasMessage("Invalid model limits");
+        }
+        assertThat(calls.get()).isZero();
+    }
 }
