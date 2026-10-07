@@ -41,7 +41,7 @@ Spring MVC 官方支持 `SseEmitter`；Go 的 `net/http` 提供流式 flush，`c
 | 会话 | Spring Security + Spring Session JDBC | Cookie 会话与持久化 |
 | 模型 | 自定义 ModelGateway + HTTP 客户端 | 先接通一个实际可用模型 |
 | 数据库 | PostgreSQL | JSONB、项目和任务状态 |
-| 入口部署 | Nginx 或已熟悉的 HTTPS 反代 + Docker Compose | 单域静态前端与 API |
+| 入口部署 | 本地创作平台 + 独立公开网关 + ngrok 类 HTTPS 隧道 | 只公开已发布应用，见 ADR-008 |
 
 访问时 Spring 3.5 文档列出 Java 17 为最低要求，并提示最新稳定系列为 4.1；这里偏向 3.5 是对熟悉度与既有依赖的选择，不表示它是最新系列或承诺长期支持。开工时锁定可下载、通过测试的补丁版本和镜像标签。[Spring 系统要求](https://docs.spring.io/spring-boot/3.5/system-requirements.html)
 
@@ -271,7 +271,7 @@ P0 所有版本保持 stateSchemaVersion=1，只允许兼容性新增字段并�
 
 ## 8. API、身份与额度边界
 
-- 单域部署：SPA 与 `/api` 由反代统一入口，会话 Cookie 为 HttpOnly、Secure、SameSite；不向生成代码暴露会话值。
+- 创作端与公开端分入口，各自保持前端/API 同源。公开端只转发白名单路径，不代理创作 API；HTTPS 会话 Cookie 为 HttpOnly、Secure、SameSite，不向生成代码暴露会话值。本地 HTTP 开发与公网 Cookie 配置须分开验证。
 - 写接口校验 CSRF token；启动会话前从允许公开访问的 CSRF 获取接口领取。
 - Spring Security 负责会话、密码验证和安全上下文；所有项目查询仍检查 ownerId。
 - 模型密钥仅在服务端环境；供应商 URL 由部署配置指定，不接受访客提交任意地址。
@@ -282,22 +282,23 @@ P0 所有版本保持 stateSchemaVersion=1，只允许兼容性新增字段并�
 
 ## 9. 部署结构与运行条件
 
+2026-10-07 用户明确：创作平台不开放公网，仅已发布的用户应用需要公网链接。以下替代原全站云部署目标，详见 [ADR-008](../decisions/008-local-studio-public-apps.md)；公开网关和隧道尚未实现。
+
 ```text
-HTTPS 域名
-  └─ reverse-proxy
-      ├─ Vue dist 静态资源及 SPA 路由回退
-      └─ /api → backend:8080
-                    ├─ 配置的 LLM API
-                    └─ postgres:5432 → 命名持久卷
+本地创作者 → 127.0.0.1:5173 → backend:8080 → LLM API / PostgreSQL
+公网访问者 → ngrok HTTPS → 127.0.0.1:8090（计划独立网关）
+                            ├─ /a/:slug + 公开外壳资源
+                            ├─ 公开应用 API + 必需的访客/CSRF 接口 → backend
+                            └─ 其他路由/方法 → 拒绝（无创作 SPA fallback）
 ```
 
 独立发布应用首版走 `/a/:slug`，不为每个项目启动服务进程。公开外壳只下载 publication 指定的快照，缓存必须随版本键变化；发布元信息短缓存或不缓存，避免更新后仍取旧指针。
 
 数据库不暴露到公网；容器重建保留数据卷。日志包含 runId、阶段、耗时、错误类型和供应商用量，不默认记录完整提示、源码、密钥和业务数据。
 
-无需 Redis、Kubernetes、向量数据库、独立消息中间件。容器配置需要真实持久化卷和健康检查；选择云平台时验证 SSE、后台任务、持久盘和休眠策略，不能只依赖静态站点托管。
+无需 Redis、Kubernetes、向量数据库、独立消息中间件。不直接转发 5173/8080/5432 或测试端口；端口不同不等于安全隔离，还要验证路径/方法白名单、服务端鉴权、转发头、Cookie 和 CSP。生成与 SSE 留在本地，公网使用应用不触发模型请求。
 
-推荐预先准备可访问服务器与 HTTPS 域名。资源规格先按低并发 Java 服务和数据库的实际运行占用测量；不承诺某个固定小内存规格足够。部署平台、地区、价格与额度尚未选定。
+实际接入时需要本地配置隧道凭据与可用 HTTPS 域名，再做外部网络验收；不在聊天中提供 token。本机休眠、关机、断网会使链接不可访问，免费隧道可能有提示页及额度限制。没有将本地隧道描述为持续托管服务。
 
 ## 10. 项目目录建议
 

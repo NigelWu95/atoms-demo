@@ -299,6 +299,37 @@ UI 沿用已有深色/青柠 tokens，增加实时连接状态的 aria-live 文�
 
 T20 完成，T23 的 SSE 界面部分通过；T21 进程重启演练、T22 身份频率/完整资源边界仍未完成，所以不勾选 T23 全项。第二轮真实修改、多类型生成、预览检查报告、公开发布与在线链接仍待推进。普通 8080 已加载新接口；没有修改 .env.local、提高调用上限、删除业务数据或操作 Docker 登录。
 
+## 版本预览检查与持久报告 · 本地切片验收
+
+2026-10-07，按用户确认采用“创作平台本地、仅已发布应用公开”的后续部署方向。本轮实现 T25 的报告切片，未开启发布或隧道，不增加真实模型调用。Java 仍为 17.0.5；正常 8080 与测试 8081 已加载增量 V008，原项目、版本、状态和模型用量未删除或重置。
+
+| 检查 | 结果 |
+|---|---|
+| `./mvnw -B verify` | 18 单元 + 34 PostgreSQL 集成测试通过，无失败/跳过，JAR 构建通过 |
+| 前端 `test:unit` | 15 文件、73 项通过，无跳过 |
+| typecheck / lint / format:check / build | 全部通过 |
+| 普通工作台 Chrome E2E | 14 项通过，57.1 秒 |
+| 受限运行时 Chrome E2E | 13 项通过，最终 58.8 秒，包括新增 5 项报告场景；与普通套件顺序运行 |
+| `npm ci --ignore-scripts` / `npm audit` | 冻结安装通过；0 项已知公告，不表示没有未知漏洞 |
+| `npm audit signatures` | 253 包注册签名通过，114 包有经验证的 attestations |
+| 构建体积 | JS gzip 91.88 kB、CSS gzip 4.07 kB；未做性能基准 |
+
+实现：普通工作台/独立私有预览在创建 iframe 前按 ES2022 经典脚本解析，SDK 启动完成才产生 PASSED；语法、启动/连接、运行异常形成有界错误，失败在同次观察中不会被保存成功/重复 ready 清除。观察与已保存报告分别显示；用户点击保存后持久到当前版本，刷新可读，历史版本只读报告。解析器不执行代码，不使用 eval/Function，不改变宿主或运行文档 CSP。
+
+后端新增 3 组真实数据库场景：UNKNOWN→通过→失败→旧意图重放仍保持最新失败；所有者/跨项目版本/身份/CSRF 检查；畸形枚举、重复检查、缺检查、超长错误、错误状态、非法视口、额外 actor 字段及旧版本拒写。报告不改变项目 revision 或 run/source。幂等键同体重放，异体拒绝；提交序号确定最新记录，不依赖同毫秒时间戳。
+
+新浏览器场景使用 test-run 已有固定待办，不扩展测试台、不向正常库注入产物。报告全部调用真实 API 与 PostgreSQL；畸形脚本/SDK 启动失败/window error/unhandledrejection 通过该隔离浏览器的 HTTP 响应夹具构造，保留受限 iframe 和 CSP，不能称为真实模型故障实测。语法失败断言 iframe/document 请求均为零；错误可保存。正常场景故意丢失已成功保存的响应，手动重试的 body/key/reportId 完全相同，刷新后报告恢复。正常场景 console error/warning/pageerror 为空，故障场景允许其明确构造的错误。
+
+320/768/1024/1440px 无页面横向溢出，新增报告页面 axe WCAG 2 A/AA、2.1 AA 无 violation。已查看桌面与 390px 截图，位于 `frontend/test-results-runtime/preview-reports-saves-a-ve-70091-nd-restores-it-after-reload-chromium/`。初次全页桌面截图中 iframe 内容未显示，随后通过真实输入框填写与值断言确认控件可交互，重新截图后应用及报告可见；未修改应用实现或删断言。未进行人工读屏、所有设备或 CPU 隔离验收。使用隔离 Chrome/Playwright，不连接个人资料，不读取 Cookie；截图/trace 不提交或公开上传。
+
+测试驱动与审查：后端先出现报告接口 404，前端先因缺失解析/API/行为失败，再逐步实现；失败错误中的空白文本由响应解码测试驱动拒绝。按 code-review-and-quality 技能暂时反转“失败不能被 ready 清除”的条件，5 个组件测试中 4 个失败；恢复后完整 73 项通过，未保留变异代码。浏览器首次在沙箱内无法探测本地 webServer，按审批改为沙箱外运行，没有改超时或禁用断言。
+
+五轴复核：报告属于 preview 模块；界面拆为 PreviewChecks 与有界解析辅助函数，未把报告状态混进 run/store。参数化 SQL、现有认证/CSRF/幂等、版本归属复用既有边界；错误仅作文本输出。最新报告用版本/序号索引，每次只读一条，无轮询或后台自动保存。新增直接依赖 Acorn 8.19.0（MIT，锁文件原有同版本），不升级其他依赖、不运行安装脚本；已知包体增长明确记录。采用 incremental-implementation 将报告、发布、公开状态和隧道分为相邻切片，security-and-hardening 将公网入口限定为后续公开路由白名单。
+
+剩余范围：T25 原验收含发布门禁，随 T26 继续，故清单仍未全量勾选；T26–T29 发布指针、LIVE 数据、公开外壳、网关/隧道尚未实现。T21/T22 的重启演练、身份限流、HTTP 总请求体上限、总量配额/保留策略仍待办。浏览器报告可伪造，PASSED 不证明后续交互、语义正确或安全；直接 document 不经过宿主静态解析，但原 HTTP sandbox 仍有效。更多真实模型验收需另有预算，本轮未提高累计上限或运行 live 测试。没有修改 .env.local、操作 Docker 登录、推送、合并或开放公网。
+
+决策见 [ADR-008](decisions/008-local-studio-public-apps.md)、[ADR-009](decisions/009-preview-check-reports.md)，公共接口与部署任务已同步。后端、客户端解析/API、报告界面、浏览器验收分别保存为本地提交 `5480836`、`580c5e9`、`3ae5ff0`、`c871786`。最终正常 8080 健康检查返回 UP。
+
 ## 官方实现依据
 
 - [Vue 表单及中文输入法](https://vuejs.org/guide/essentials/forms.html)

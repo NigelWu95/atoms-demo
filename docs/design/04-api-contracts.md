@@ -106,6 +106,7 @@ intent 为 CREATE、MODIFY，P1 可增加 REPAIR。CREATE 使用 null 基线和 
 | GET `/api/projects/{id}/versions/{versionId}` | 路径 | Version + Artifact |
 | GET `/api/projects/{id}/versions/{versionId}/document` | previewMode=CURRENT/HISTORY | 带强制响应级沙箱的 HTML，需项目权限 |
 | POST `/api/projects/{id}/versions/{versionId}/preview-reports` | PreviewReport，幂等键 | 201 `{reportId, status}` |
+| GET `/api/projects/{id}/versions/{versionId}/preview-reports/latest` | 所有者权限 | 最近保存的检查报告；未检查为 UNKNOWN |
 | POST `/api/projects/{id}/restorations` | `{sourceVersionId, expectedProjectRevision}` | P1，201 新版本 |
 | GET `/api/projects/{id}/publication` | 项目权限 | `{slug, versionId, status, revision}` 或未发布状态 |
 | PUT `/api/projects/{id}/publication` | PublishRequest，幂等键 | 200 Publication + publicUrl |
@@ -115,13 +116,13 @@ intent 为 CREATE、MODIFY，P1 可增加 REPAIR。CREATE 使用 null 基线和 
 
 运行 HTML 不经过普通 SPA fallback。响应包含正确 MIME、no-store，以及 HTTP `Content-Security-Policy` 的 sandbox 与资源限制。直接打开 document URL 仍受沙箱约束；独立正常体验应打开可信 `/preview/...` 或 `/a/...` 外壳。
 
-本地 T10–T15 实现约束（2026-10-07）：
+本地 T10–T15 / T25 实现约束（2026-10-07）：
 
-- 已实现本表前三个 GET；其余仍是后续设计。版本写入只开放内部事务服务，没有生产 POST 源码接口。
+- 已实现本表前三个 GET 及预览报告 POST/最新 GET；恢复和发布仍是后续设计。版本写入只开放内部事务服务，没有生产 POST 源码接口。
 - 版本摘要字段为 `id, projectId, versionNo, contentHash, basedOnId, createdAt`；详情在相同字段之外返回 `artifact`。UUID 为小写标准格式；版本列表按 versionNo 倒序，cursor 是上一页最后版本号的十进制字符串（客户端仍按不透明游标传回）；limit=1–100，默认 20。
 - 内部保存同时验证项目 revision 和基线版本，冲突为 409 BASE_VERSION_CONFLICT；成功后 projectRevision+1。重复内容 hash 允许产生新版本，源码不可修改或删除。
 - document 的 previewMode 默认 CURRENT，非 CURRENT/HISTORY 返回 422 INVALID_PREVIEW_MODE；旧版本 CURRENT 返回 409 STALE_APP_VERSION。HISTORY 的 SDK get 只返回该版本 initialState/revision=0，save 返回 READ_ONLY_PREVIEW，不调用持久状态接口。
-- HTML 使用解析白名单：基本布局/文本、表格、交互控件、受限 SVG；不含 URL 属性、form、事件属性或嵌套框架。源码文件合计 120 KiB UTF-8；初始数据对象 256 KiB JSON UTF-8；不支持内容返回 422 INVALID_ARTIFACT。宿主已根据 SDK ready/error 提供真实启动反馈；完整静态经典脚本语法检查与服务端预览报告仍未实现。
+- HTML 使用解析白名单：基本布局/文本、表格、交互控件、受限 SVG；不含 URL 属性、form、事件属性或嵌套框架。源码文件合计 120 KiB UTF-8；初始数据对象 256 KiB JSON UTF-8；不支持内容返回 422 INVALID_ARTIFACT。宿主使用 Acorn 的 ES2022 经典脚本语法解析，失败时不创建 iframe；SDK ready/error、error/unhandledrejection 形成独立观察结果，用户显式保存为版本报告。直接 document 不经过宿主解析，因此解析和报告不属于安全边界。
 - 运行文档才有 inline-only 脚本/CSS 和 HTTP sandbox；管理 API 仍禁止嵌入。具体取舍见 [ADR-004](../decisions/004-immutable-artifacts-runtime.md)。
 - 固定测试装载 POST `/api/test-fixtures` 仅在 test-run 专用入口存在，接收 `{fixture: "counter"|"closing-tags"|"security"|"history"|"todo"|"todo-history"}`，必须具有访客会话、CSRF 和 Idempotency-Key；返回 `{project, version, firstVersionId, testOnly: true}`。只连接 atoms_demo_test/atoms_test，测试类和页面不进入正式 JAR。待办通过 5174 的测试工作台使用消息桥，5173 仍连接正常开发库。
 
@@ -134,13 +135,15 @@ PreviewReport：
 ```json
 {
   "status": "PASSED",
-  "checks": ["SCRIPT_PARSE", "SDK_STARTUP"],
+  "checks": ["SCRIPT_PARSE", "SDK_STARTUP", "RUNTIME_ERRORS"],
   "errors": [],
   "viewport": { "width": 1440, "height": 900 }
 }
 ```
 
 报告属于浏览器反馈，可被用户伪造，只用于体验反馈与问题定位，不作为授权或恶意代码安全证明。限制错误数组长度和每条文本长度；用户行为不经过模型自动授权。
+
+T25 实施契约：只接受 status/checks/errors/viewport 四字段；status 为 PASSED 或 FAILED；checks 是上述三项的不重复子集；PASSED 必须三项齐全且 errors 为空，FAILED 必须 1–5 条非空错误，每条最多 1000 字符，viewport.width/height 为 1–10000 整数。当前观察会随着运行错误变为 FAILED；用户显式保存检查结果，网络结果未知时保留原报告和幂等键重试。报告说明的是该次观察，不代表完整业务验收。仅允许对当前版本创建新报告；历史可读取旧报告，成功的原意图重放不重写状态。最新读取返回 reportId/status/checks/errors/viewport/createdAt，未记录时 status=UNKNOWN、reportId/viewport/createdAt=null。报告不会改变 run 状态、源码或项目 revision。
 
 PublishRequest：
 
