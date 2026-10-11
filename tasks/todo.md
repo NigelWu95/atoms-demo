@@ -1,6 +1,6 @@
 # engineering-bundle · 开发任务
 
-状态：2026-10-12 用户确认继续后，EB01–EB12 已实现并验证；当前交付 C-EB05，下一步 EB13–EB14。
+状态：2026-10-12 用户确认继续后，EB01–EB14 已实现并验证；当前交付 C-EB06，下一步 EB15–EB17。
 依据：[计划及验证命令](plan.md)、[已批准规格](../SPEC-engineering-bundle.md)。本清单只负责 `engineering-bundle`；原平台任务清单不变。
 
 路径缩写：`P/` = `backend/src/main/java/dev/atoms/demo/engineering/`；`PT/` = 对应平台 `src/test/java/dev/atoms/demo/engineering/`；`T/` = `templates/standalone-v1/`；`B/` = `T/backend/src/main/java/dev/atoms/standalone/`；`BT/` = 对应模板 `src/test/java/dev/atoms/standalone/`；`R/` = `T/backend/src/main/resources/`；`F/` = `T/frontend/src/`。各路径的实现进度以下列任务勾选及切片记录为准。
@@ -151,25 +151,30 @@
 ### C-EB05 · 外壳可以构建
 
 - [x] EB11–EB12 类型、lint、单元及实际构建通过；无平台管理页面、Pinia/Router、模型 Key 或平台 URL。真实浏览器和截图已核对，详细证据见新增验收记录。
-- [ ] 人工审阅 C-EB05；尚未连接前端会话、应用描述与 iframe，状态保存、新目录构建和完整工程导出仍待后续任务。本轮仅本地提交，未推送/部署。
+- [x] 已交付 C-EB05，用户回复“继续”，按计划推进 EB13–EB14；不等同于合并或部署授权。状态保存、新目录构建和完整工程导出仍待后续任务。
 
 ### EB13 · 连接真实会话与应用描述（M）
 
-- [ ] 完成 EB13。依赖：EB08、EB10、EB12。
+- [x] 完成 EB13。依赖：EB08、EB10、EB12。
 - 文件：`F/api/client.ts`、`F/api/client.spec.ts`、`F/App.vue`、`F/App.spec.ts`。
 - 验收：① 前端按 csrf/session/app 顺序连接本应用 API，令牌仅存内存；② 严格解码响应，身份过期/403/数据库不可用提示真实原因，不无限重试写入；③ 不持有平台 URL、项目 ID 或 API Key。
 - 验证：V-F、V-B、V-D；在 Vite 同源代理下浏览器检查实际接口返回，不把模拟组件测试当成联调。
+- 实施拆分：EB13a 严格响应解码与客户端/测试（3 文件）；EB13b 启动组合函数、App 与组件测试（3 文件）。实际顺序为 health → csrf → session → 旋转后 csrf → app；失败不自动重放 POST，令牌不进入 DOM/日志/持久存储。
+- 验收结果：真实 Vite 代理下建立访客并读取当前应用信息，重新连接保留同一访客；整体初始化 15 秒、JSON 响应 16 KiB 上限、严格状态/字段解码。401/403/503、畸形响应、取消与失败重试有测试，错误只显示固定文案和合法 requestId；暂无业务数据写入客户端。
 
 ### EB14 · 挂载沙箱与兼容消息桥（M）
 
-- [ ] 完成 EB14。依赖：EB13。
+- [x] 完成 EB14。依赖：EB13。
 - 文件：`F/runtime/protocol.ts`、`F/runtime/bridge.ts`、`F/runtime/mountFrame.ts`、`F/runtime/bridge.spec.ts`、`F/App.vue`。
 - 验收：① 仅 allow-scripts、随机通道及严格 source 校验，MessageChannel 不传 Cookie/令牌；② Atoms.ready、协议输入校验、运行失败、加载超时和卸载清理符合原行为；③ 固定计数器真实运行，状态接口尚未完成时不显示保存成功。
 - 验证：V-F、V-D；协议反例/重复 HELLO/过期通道/卸载后消息；浏览器操作计数器及检查 CSP 报错，持久化留待下一切片。
+- 实施拆分：EB14a 协议/解析测试、桥/桥测试（4 文件）；EB14b 挂载器/测试、随机 ID（3 文件）；EB14c RuntimeFrame/组件测试、App/测试、样式（5 文件）；EB14d 显式测试应用夹具、原文档浏览器定位器、新外壳浏览器验收、ApplicationArtifactTest 固定规范化输入（4 文件）。夹具增加明确的“本页计数”以验证纯页面交互，原 SDK 存储计数保留；正式外壳对未接入的存储明确拒绝，不伪造初始值或保存成功。规范化单元测试不依赖可演进的浏览器布局，保留原精确输出断言。
+- 验收结果：固定文档地址、allow-scripts-only、随机通道、严格 opaque origin/source、单次端口转移、16 个并发请求上限、启动/数据错误分离；文档加载和握手各限 10 秒，导航/卸载清理连接，重载前确认。独立前端 53 项、真实外壳 Chrome 9 项、原文档 Chrome 2 项通过；数据接口明确返回 READ_ONLY_PREVIEW，迟到 READY 不覆盖失败。
 
 ### C-EB06 · 第一条浏览器运行链路
 
-- [ ] EB13–EB14 真实会话 → 应用文档 → 沙箱运行可操作；人工检查没有放宽同源/联网权限。该证据不是完整独立构建验收。
+- [x] EB13–EB14 真实会话 → 应用文档 → 沙箱运行可操作；源码/截图复核未放宽同源、Cookie 或联网权限。模板后端 121 单元 + 44 PostgreSQL/HTTP IT、原组装 46 项、脚本 20 项、原 SDK/桥 9 项通过，详情见新增验收记录。该证据不是持久化或完整独立构建验收。
+- [x] 本轮交付 C-EB06；最终外壳浏览器 9 项连续三轮 27 次通过，无自动重试。下一步 EB15–EB17；当前不提供完整工程下载入口，不推送/合并或部署。
 
 ## D · 可持久化应用
 

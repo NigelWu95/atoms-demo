@@ -4,7 +4,7 @@
 
 ## 当前交付边界
 
-EB01–EB12 已实现并验证：纯内存工程组装、独立启动/数据库/安装身份、访客与持久会话、固定应用资源/内容指纹/受限运行文档，以及带真实健康检查的独立 Vue 启动外壳。当前交付 C-EB05，下一步 EB13–EB14 前端会话与沙箱接线。没有下载 HTTP API、工作台按钮、真实模板装载器、独立业务状态接口、完整工程构建执行器或托管实例，不宣称完整工程已可导出运行。本轮未改动线上服务、原平台生产源码/迁移或原交付文档；下文各节保留当时阶段的证据，不代表后续能力也已完成。
+EB01–EB14 已实现并验证：纯内存工程组装、独立启动/数据库/安装身份、访客与持久会话、固定应用资源/内容指纹/受限运行文档，以及连接真实会话/API/沙箱的独立 Vue 外壳。当前交付 C-EB06，下一步 EB15–EB17 独立访客数据读写与幂等保存。没有下载 HTTP API、工作台按钮、真实模板装载器、独立业务状态接口、完整工程构建执行器或托管实例，不宣称完整工程已可导出运行。本轮未改动线上服务、原平台生产源码/迁移或原交付文档；下文各节保留当时阶段的证据，不代表后续能力也已完成。
 
 `BundleSource` 冻结来源 UUID、原内容 hash 和 Artifact；调用方必须先完成版本所有者授权。组装器再次调用原 `ArtifactValidator`，并且只读取传入的代码快照及固定模板快照；没有数据库、环境变量、网络、文件系统或进程操作。`TemplateSnapshot` 构造入口限定于 engineering 包，后续只有固定目录的 TemplateCatalog 提供真实模板。
 
@@ -382,7 +382,51 @@ STANDALONE_TEST_CONFIG=/absolute/path/test.properties ./node_modules/.bin/playwr
 
 本轮保持单执行流，仅本地提交；未合并、推送 GitHub、更新线上服务或修改原 README/交付说明。后续仍按 EB13–EB25 推进，不提前勾选完整工程导出。
 
+## EB13–EB14 · 真实访客与沙箱接线（C-EB06）
+
+### 用户可见变化与接口边界
+
+独立 Vue 页面现在按 `health → csrf → POST session → 新 csrf → app → app/document` 连接真实后端。标题/摘要来自严格解码的应用描述；不会将“信息已就绪”当成生成或保存成功。整体初始化最多 15 秒，卸载中止请求，失败由用户手动重试；不自动重放结果未知的 POST。重新加载应用前提示未保存输入将丢失，取消时保留当前 iframe 和输入。
+
+认证会清除旧 CSRF，因此 POST session 后重新获取并验证令牌；本阶段令牌仅在初始化调用的内存中使用，随后释放，没有尚未使用的长期令牌缓存。访客 ID 不持久化到浏览器存储，也不交给应用代码。API 客户端只允许固定同源路径、固定 CSRF header，拒绝重定向、非 200 成功码、非 JSON、超 16 KiB/非法 UTF-8 及不符合契约的响应。401/403/503 等错误使用固定用户文案与合法 UUID requestId，不显示上游原文。
+
+沙箱来自固定 `/api/app/document#atoms-channel=<随机 UUID>`，只允许 `allow-scripts`。通道使用 `crypto.getRandomValues`，兼容本地 HTTP；不使用 Math.random。HELLO 同时核对当前 iframe、opaque origin `null`、协议、通道与精确字段，端口只转移一次；消息不带 Cookie/CSRF、平台 URL、项目 ID 或任意 fetch 能力。SDK/bootstrap 和运行 HTML 仍与原平台逐字节一致。
+
+宿主协议拒绝额外授权字段、过期通道、非法修订号、非 JSON 对象及 UTF-8 超 256 KiB 的状态。状态容器最多 63 层，为独立后端 64 层的 JSON 请求体预留外层；这是既有独立后端限制的前置校验，不改变平台解析器。最多 16 个未完成数据请求，重复请求 ID 不重复调用，RUNTIME_READY/ERROR 不被数据队列阻塞。文档加载与握手分别最多 10 秒；导航、卸载、超时关闭旧连接，迟到异步结果不再回写 UI。
+
+业务数据服务仍归 EB15–EB17：当前 GET/SAVE 能力明确拒绝为 `READ_ONLY_PREVIEW`，不返回假初始状态、不进行本地伪保存；迟到 READY 不能覆盖数据失败，运行错误不能被后续数据结果遮掉。只有显式 test-classpath 计数器增加了“本页计数”，用于验证点击/键盘运行，标签说明刷新归零且不保存；原 SDK 存储计数器保留，读失败时禁用并说明原因。没有将测试夹具或数据兜底放进正式 JAR。
+
+### 本轮验证与排错
+
+| 检查 | 实际结果 |
+|---|---|
+| 红绿 | API、协议/桥、挂载器及 RuntimeFrame 缺失时测试先失败；App 的真实描述/重载确认断言先失败后通过。浏览器 320px 在新增本页计数器前因找不到按钮失败，补齐测试夹具后通过 |
+| 模板前端 | typecheck、lint、Prettier、**53 项单元**、生产 build 通过；没有新增/升级依赖或修改 lockfile |
+| 安全条件变异 | 将 `event.origin !== 'null'` 临时反转，错误 origin 创建端口导致断言失败；恢复后完整 53 项全绿。变异期间未运行 Vite/浏览器验收 |
+| 真实外壳 Chrome | **9 项 × 3 轮 = 27 次**全部通过，约 2.1 分钟，retries=0；五种尺寸、点击/空格、本页计数、真实访客不变、取消/确认重载、新通道、宿主键盘/焦点/axe、断网恢复、401 与安全 requestId、握手超时、dev/preview 边界 |
+| 浏览器隔离 | iframe origin=null，不能读取 parent.document/localStorage；宿主 document.cookie 为空，会话 Cookie HttpOnly/SameSite=Lax，localStorage/sessionStorage 不保存会话。正常链路无控制台 error/warning，宿主 axe 无违规；查看 320/1440 截图无横向溢出 |
+| 原文档协议 Chrome | **2 项**通过，16.4 秒；原 SDK 的两次计数交互仍通过（此套状态响应是明示协议夹具，不是持久化服务）；直接访问仍 opaque，陌生访客 401 |
+| 独立后端 | Java 17 `clean verify`：**121 单元 + 44 PostgreSQL/HTTP IT** 全部通过、无跳过，48.304 秒，JAR 构建成功 |
+| 原平台及脚本回归 | 组装/策略 **46 项**、SDK/bootstrap 与桥 **9 项**、Node 脚本与资源一致性 **20 项**通过；平台前端 typecheck、两份浏览器测试 lint 通过；未重跑平台全量 E2E/后端 verify |
+| 构建体积 | HTML 0.61 kB、CSS 3.37 kB、JS 75.38 kB（gzip 29.72 kB）；非最终工程配额测量 |
+
+真实回归暴露过一处测试输入耦合：ApplicationArtifactTest 精确期待旧版单按钮 HTML，但复用了已扩展的浏览器夹具。修复为该规范化用例显式指定原输入，**原精确断言及其余断言全部保留**；随后完整 121+44 重跑通过。原文档浏览器的首次启动因沙箱无法连接专用测试库失败，经权限流程重跑后 2 项通过，没有改数据库连接/降低安全校验。格式检查曾要求 client.spec.ts 再格式化一次，最终统一检查通过。
+
+外壳首轮 9 项通过后，重建产物重复验收时 768px 曾在测试端延迟调用 `response.json()` 报 `Network.getResponseBody: No data found`；当时宿主已读取应用信息并挂载新 iframe，并非业务客户端报错。测试改为监听到真实响应后立即读取，与键盘操作一同等待；保留身份相等断言，增加 `performance.timeOrigin` 不变断言排除意外整页刷新。另据 Playwright 响应契约将 health 无 Set-Cookie 的检查改为 `headerValue`，避免只检查过滤后的 `headers()`。随后完整三轮 27 次全部通过，未加自动重试、延时兜底或删除断言。
+
+复现命令沿用上节的独立前端检查、`playwright.standalone-shell.config.ts` 和 EB05 的后端 `clean verify`；原文档使用 `playwright.standalone-document.config.ts`。它们共用专用 IT 库，必须顺序运行，不能在浏览器运行中执行数据库清理或源码变异。浏览器测试自动启动/关闭自己的进程，不复用用户登录态，不记录 trace/令牌，不停共享 PostgreSQL。
+
+### 评审与后续
+
+按五轴复核：边界输入严格校验、异步销毁与错误状态有反例；启动、解析、消息协议和 Vue 展示各自独立；无新增第三方依赖、网络权限或原平台生产改动。所有字符串由 Vue 文本渲染，没有宿主 v-html/eval；生成代码只在既有受控 iframe 执行。当前前端存储拒绝属于明确的未完成状态，不是假实现成功。
+
+本轮只本地提交，不合并/推送/部署。按增量计划先交付本检查点；下一步 EB15–EB17 接真实状态读取、原子幂等保存与未知结果处理，再做新目录工程构建/启动和独立性验收。正式 JAR 的 Vue 静态资源及最终 runtime 指纹仍待 EB18。原 README、方案/交付说明继续留待完整功能完成后统一更新。
+
 ## 已核对的官方依据
+
+- [HTML Channel Messaging](https://html.spec.whatwg.org/multipage/web-messaging.html#channel-messaging)、[MDN postMessage](https://developer.mozilla.org/en-US/docs/Web/API/Window/postMessage)：MessageChannel 生命周期与 opaque origin 的目标限制；仅在验证来源后转移能力端口，不向通道发送宿主凭据。
+- [Vue onUnmounted](https://vuejs.org/api/composition-api-lifecycle.html#onunmounted)：组件销毁时清理副作用；本实现使用 onBeforeUnmount 先关闭连接。
+- [Playwright Response](https://playwright.dev/docs/api/class-response)、[waitForResponse](https://playwright.dev/docs/api/class-page#page-wait-for-response)：在触发动作前监听响应并及时读取响应体；`headers()` 不包含完整 Cookie 相关头，检查 Set-Cookie 使用 headerValue。
 
 - [Vite 开发服务与代理](https://vite.dev/config/server-options)：固定回环、strictPort、自定义代理和前置中间件；本模板主动收紧默认本机 CORS 与 Host 行为。
 - [Vue 生命周期](https://vuejs.org/guide/essentials/lifecycle.html)、[Vitest 配置](https://vitest.dev/config/)：挂载初始化/卸载清理及真实组件测试，不创建空测试补绿。
