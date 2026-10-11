@@ -66,7 +66,7 @@
 - 验收：① 新库建立安装记录、访客/JDBC 会话表；schema/角色/实例身份不符在迁移及业务写入前拒绝，同库首次并发认领无交叉成功；② health 数据库正常 200、断开 503且脱敏，重复启动不重置数据；③ Flyway/JDBC Session 只作用于独立 schema，不修改平台迁移。
 - 验证：V-B；覆盖重复迁移、错误实例 ID、平台库目标、超权限角色、数据库断开与并发首次启动。
 - [x] EB06a：DatabaseTarget 与单元测试；复用实际角色/schema 核验到 TestDatabase，避免测试和正式启动维护两套权限规则。新类型缺失 RED 后，模板 clean verify 96 项单元 + 6 项真实 IT 全部通过；支持无开发标记的人工准备运行库，运行/测试用途标记不能互换。
-- [ ] EB06b：DatabaseInstallation、V001、DatabaseInstallationIT、固定连接/迁移配置；会话级数据库锁覆盖迁移前安装校验与 V001 原子身份写入，非空且未认领的 schema 拒绝自动接管。
+- [x] EB06b：DatabaseInstallation、V001、DatabaseInstallationIT、固定连接/迁移配置及测试专用清理助手；会话级数据库锁覆盖迁移前安装校验与 V001 原子身份写入。96 项单元 + 15 项真实 IT 通过（含 9 项迁移/并发场景）；非空未认领 schema、错误实例 ID、用途混淆均拒绝。首轮 Flyway 日志选项错误已修正，未跳过测试。
 - [ ] EB06c：HealthController、HealthIT 与最小 SecurityConfiguration；仅 GET health 开放、其他入口默认拒绝，真实 HTTP 验证数据库故障与重复启动；访客认证仍归 EB08。
 
 ### C-EB02 · 可安全连接自己的数据库

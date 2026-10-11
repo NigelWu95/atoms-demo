@@ -11,9 +11,34 @@ import org.springframework.context.ApplicationContextInitializer;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.core.env.ConfigurableEnvironment;
 import org.springframework.core.env.MapPropertySource;
+import org.springframework.jdbc.datasource.DriverManagerDataSource;
 
 /** Test-classpath only: verifies the dedicated database before Spring can migrate or write. */
 public final class TestDatabase implements ApplicationContextInitializer<ConfigurableApplicationContext> {
+    static DriverManagerDataSource dataSource(ConfigurableEnvironment environment) {
+        var source = new DriverManagerDataSource(environment.getRequiredProperty("spring.datasource.url"),
+                environment.getRequiredProperty("spring.datasource.username"),
+                environment.getRequiredProperty("spring.datasource.password"));
+        var properties = new Properties();
+        properties.setProperty("connectTimeout", "3");
+        properties.setProperty("socketTimeout", "15");
+        properties.setProperty("logServerErrorDetail", "false");
+        source.setConnectionProperties(properties);
+        return source;
+    }
+
+    /** Test-only fixed tables; never drops a database/schema or uses administrator credentials. */
+    static void resetInstallation() {
+        var environment = load(); // Actual test marker/role/schema verified before any cleanup.
+        try (var connection = dataSource(environment).getConnection(); var statement = connection.createStatement()) {
+            statement.setQueryTimeout(3);
+            statement.execute("DROP TABLE IF EXISTS standalone_app.spring_session_attributes, standalone_app.spring_session, "
+                    + "standalone_app.guest_users, standalone_app.installation, standalone_app.flyway_schema_history");
+        } catch (SQLException ignored) {
+            throw new IllegalStateException("TEST_DATABASE_RESET_FAILED: dedicated fixture tables could not be reset.");
+        }
+    }
+
     @Override
     public void initialize(ConfigurableApplicationContext context) {
         initialize(context, System.getenv("STANDALONE_TEST_CONFIG"));

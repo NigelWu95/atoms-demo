@@ -7,12 +7,18 @@ spring:
       maximum-pool-size: 5
       connection-timeout: 3000
       validation-timeout: 2000
+      data-source-properties:
+        connectTimeout: 3
+        socketTimeout: 15
+        logServerErrorDetail: false
   flyway:
     schemas: standalone_app
     default-schema: standalone_app
     create-schemas: false
     clean-disabled: true
     validate-migration-naming: true
+    placeholders:
+      instanceId: ${standalone.instance-id}
   sql:
     init:
       mode: never
@@ -38,3 +44,12 @@ server:
     include-binding-errors: never
     whitelabel:
       enabled: false
+logging:
+  structured:
+    format:
+      console: logstash
+  level:
+    # These libraries may log connection strings or SQL before exceptions reach our guard.
+    # DatabaseInstallation emits the sanitized result and correlation ID instead.
+    com.zaxxer.hikari: 'OFF'
+    org.flywaydb: 'OFF'
