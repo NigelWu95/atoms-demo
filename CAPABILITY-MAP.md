@@ -11,7 +11,7 @@
 
 | 稳定模块 ID | 职责 | 依赖 | 规格入口 |
 |---|---|---|---|
-| `engineering-bundle` | 工程格式、固定模板、兼容运行层、独立数据服务与启动契约 | 现有不可变代码版本契约 | [规格已确认](SPEC-engineering-bundle.md)；[开发计划待审](tasks/plan.md) |
+| `engineering-bundle` | 工程格式、固定模板、兼容运行层、独立数据服务与启动契约 | 现有不可变代码版本契约 | [规格已确认](SPEC-engineering-bundle.md)；[开发计划已确认，实施中](tasks/plan.md) |
 | `project-export` | 所有者下载选定版本的工程 ZIP；界面说明和下载失败处理 | `engineering-bundle` | 后续单独编写 |
 | `workspace-build` | 专用目录、模板校验、受限构建/测试、构建日志与产物 | `engineering-bundle` | 后续单独编写 |
 | `app-runtime` | 独立实例的启动/停止、健康、数据卷、资源限制与回收 | `workspace-build` | 后续单独编写 |

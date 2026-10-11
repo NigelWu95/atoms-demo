@@ -1,6 +1,6 @@
 # engineering-bundle · 开发任务
 
-状态：计划与任务待审，所有实现项尚未开始。日期：2026-10-11。
+状态：2026-10-11 用户已批准计划与任务；EB01–EB02 已验证，EB03 开始实施，其余未开始。
 依据：[计划及验证命令](plan.md)、[已批准规格](../SPEC-engineering-bundle.md)。本清单只负责 `engineering-bundle`；原平台任务清单不变。
 
 路径缩写：`P/` = `backend/src/main/java/dev/atoms/demo/engineering/`；`PT/` = 对应平台 `src/test/java/dev/atoms/demo/engineering/`；`T/` = `templates/standalone-v1/`；`B/` = `T/backend/src/main/java/dev/atoms/standalone/`；`BT/` = 对应模板 `src/test/java/dev/atoms/standalone/`；`R/` = `T/backend/src/main/resources/`；`F/` = `T/frontend/src/`。下列路径尚未实现。
@@ -11,17 +11,18 @@
 
 ### EB01 · 可复现的工程清单（M）
 
-- [ ] 完成 EB01。依赖：用户批准本计划与任务。
-- 文件：`P/BundleSource.java`、`P/EngineeringBundle.java`、`P/EngineeringBundleAssembler.java`、`PT/EngineeringBundleTest.java`。
+- [x] 完成 EB01。依赖：用户批准本计划与任务。
+- 文件：`P/BundleSource.java`、`P/EngineeringBundle.java`、`P/TemplateSnapshot.java`、`P/EngineeringBundleAssembler.java`、`PT/EngineeringBundleTest.java`。
 - 验收：① 输入快照再次经现有产物验证，错误不替换为空白模板；② 有序清单、规范 JSON、SHA-256 及 bundleId 可复现，数组/集合防御性复制；③ sourceContentHash 与版本 UUID 作为来源保存，不冒充运行身份。
 - 验证：平台 `backend/` 执行 `./mvnw -B -Dtest=EngineeringBundleTest test`；先证明错序/变更字节/非法产物测试失败，再实现。组装器使用受控内存模板样本，不接磁盘或 HTTP。
 
 ### EB02 · 路径、配额与数据排除（M）
 
-- [ ] 完成 EB02。依赖：EB01。
-- 文件：`P/TemplateSnapshot.java`、`P/TemplatePolicy.java`、`P/EngineeringBundleAssembler.java`、`PT/TemplatePolicyTest.java`、`PT/EngineeringBundleTest.java`。
+- [x] 完成 EB02。依赖：EB01。
+- 文件：`P/TemplateSnapshot.java`、`P/TemplatePolicy.java`、`P/EngineeringBundle.java`、`PT/TemplatePolicyTest.java`、`PT/EngineeringBundleTest.java`。
 - 验收：① 固定应用路径及模板白名单拒绝穿越、绝对路径、反斜杠、NUL、重复/大小写冲突与符号链接元数据；② 按计划拟定的 128 文件/单文件 2 MiB/总量 8 MiB 校验含 manifest 的最终输出，原产物限制不变；③ 密钥、真实状态与会话 canary 不进入文件清单，应用字符串不变成模板命令。
 - 验证：V-P；测试恰好上限和超出 1 的边界、UTF-8 字节而非字符数、输入修改不污染已组装输出。
+- 实施证据：[验证记录](../docs/engineering-bundle-verification.md)。文件模型只接受常规文件名/字节，无法表示链接元数据；真实磁盘符号链接/祖先链接由 EB20 校验，本阶段不读取磁盘。
 
 ### EB03 · 独立后端编译骨架（M）
 
