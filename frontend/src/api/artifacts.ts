@@ -93,3 +93,16 @@ export function listVersions(
     },
   )
 }
+
+export type RestoreInput = { sourceVersionId: string; expectedProjectRevision: number }
+export function restoreVersion(
+  projectId: string,
+  body: RestoreInput,
+  key: string,
+): Promise<VersionSummary> {
+  return api.request(`/api/projects/${encodeURIComponent(projectId)}/restorations`, summary, {
+    method: 'POST',
+    body,
+    idempotencyKey: key,
+  })
+}

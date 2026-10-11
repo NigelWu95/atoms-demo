@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.atoms.demo.common.ApiException;
+import dev.atoms.demo.common.IdempotencyService;
 import dev.atoms.demo.project.ProjectService;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -20,23 +21,27 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class ArtifactService {
-    public record Version(UUID id, UUID projectId, long versionNo, String contentHash, UUID basedOnId, Instant createdAt, Artifact artifact) {}
-    public record Summary(UUID id, UUID projectId, long versionNo, String contentHash, UUID basedOnId, Instant createdAt) {}
+    public record Version(UUID id, UUID projectId, long versionNo, String contentHash, UUID basedOnId, UUID restoredFromId, Instant createdAt, Artifact artifact) {}
+    public record Summary(UUID id, UUID projectId, long versionNo, String contentHash, UUID basedOnId, UUID restoredFromId, Instant createdAt) {}
     public record Page(List<Summary> items, String nextCursor) {}
     private static final RowMapper<Summary> SUMMARY = (rs, row) -> new Summary(rs.getObject("id", UUID.class),
             rs.getObject("project_id", UUID.class), rs.getLong("version_no"), rs.getString("content_hash"),
-            rs.getObject("based_on_id", UUID.class), rs.getTimestamp("created_at").toInstant());
+            rs.getObject("based_on_id", UUID.class), rs.getObject("restored_from_id", UUID.class), rs.getTimestamp("created_at").toInstant());
     private final JdbcTemplate jdbc;
     private final ProjectService projects;
     private final ArtifactValidator validator;
     private final ObjectMapper json;
-    public ArtifactService(JdbcTemplate jdbc, ProjectService projects, ArtifactValidator validator, ObjectMapper json) {
-        this.jdbc = jdbc; this.projects = projects; this.validator = validator; this.json = json;
+    private final IdempotencyService idempotency;
+    public ArtifactService(JdbcTemplate jdbc, ProjectService projects, ArtifactValidator validator, ObjectMapper json, IdempotencyService idempotency) {
+        this.jdbc = jdbc; this.projects = projects; this.validator = validator; this.json = json; this.idempotency = idempotency;
     }
 
     /** Internal worker seam only. No production HTTP source-write endpoint. No upstream I/O in this transaction. */
     @Transactional(timeout = 5)
     public Version save(UUID owner, String projectId, long expectedRevision, UUID baseVersionId, JsonNode source) {
+        return save(owner, projectId, expectedRevision, baseVersionId, source, null);
+    }
+    private Version save(UUID owner, String projectId, long expectedRevision, UUID baseVersionId, JsonNode source, UUID restoredFromId) {
         var artifact = validator.parse(source);
         var project = projects.lock(owner, projectId);
         if (project.projectRevision() != expectedRevision || !Objects.equals(project.currentVersionId(), baseVersionId)) {
@@ -47,11 +52,32 @@ public class ArtifactService {
         long number = jdbc.queryForObject("SELECT coalesce(max(version_no), 0) + 1 FROM versions WHERE project_id = ?", Long.class, project.id());
         UUID id = UUID.randomUUID();
         String encoded = encode(artifact);
-        jdbc.update("INSERT INTO versions(id, project_id, version_no, source_json, content_hash, based_on_id) VALUES (?, ?, ?, ?, ?, ?)",
-                id, project.id(), number, encoded, hash(encoded), baseVersionId);
+        jdbc.update("INSERT INTO versions(id, project_id, version_no, source_json, content_hash, based_on_id, restored_from_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                id, project.id(), number, encoded, hash(encoded), baseVersionId, restoredFromId);
         jdbc.update("UPDATE projects SET current_version_id = ?, project_revision = project_revision + 1, updated_at = now() WHERE id = ?",
                 id, project.id());
         return get(owner, projectId, id.toString());
+    }
+
+    @Transactional(timeout = 5)
+    public IdempotencyService.Result restore(UUID owner, String projectId, JsonNode input, String key) {
+        var project = projects.lock(owner, projectId);
+        var revision = input.path("expectedProjectRevision");
+        if (!input.isObject() || input.size() != 2 || !input.path("sourceVersionId").isTextual()
+                || !revision.isIntegralNumber() || !revision.canConvertToLong()
+                || revision.longValue() < 0 || revision.longValue() >= 9007199254740991L)
+            throw new ApiException(422, "INVALID_RESTORATION", "恢复请求需要历史版本和有效的项目修订号。");
+        UUID sourceId = versionId(input.path("sourceVersionId").asText());
+        return idempotency.execute(owner, "POST", "/api/projects/" + projectId + "/restorations", key, input, () -> {
+            if (project.activeRunId() != null)
+                throw new ApiException(409, "RUN_ALREADY_ACTIVE", "生成仍在进行，请等待或取消后再恢复版本。");
+            if (project.projectRevision() != revision.longValue())
+                throw new ApiException(409, "BASE_VERSION_CONFLICT", "当前代码版本已经变化，请刷新后重新确认恢复。");
+            var source = get(owner, projectId, sourceId.toString());
+            var restored = save(owner, projectId, revision.longValue(), project.currentVersionId(),
+                    json.valueToTree(source.artifact()), sourceId);
+            return new IdempotencyService.Result(201, json.valueToTree(restored));
+        });
     }
 
     public Version get(UUID owner, String projectId, String versionId) {
@@ -60,7 +86,7 @@ public class ArtifactService {
         var versions = jdbc.query("SELECT * FROM versions WHERE project_id = ? AND id = ?", (rs, row) -> {
             var summary = SUMMARY.mapRow(rs, row);
             return new Version(summary.id(), summary.projectId(), summary.versionNo(), summary.contentHash(),
-                    summary.basedOnId(), summary.createdAt(), decode(rs.getString("source_json")));
+                    summary.basedOnId(), summary.restoredFromId(), summary.createdAt(), decode(rs.getString("source_json")));
         }, project.id(), id);
         if (versions.isEmpty()) throw missing();
         return versions.get(0);
@@ -76,7 +102,7 @@ public class ArtifactService {
             } catch (NumberFormatException error) { throw new ApiException(400, "INVALID_CURSOR", "版本分页位置无效。"); }
         }
         var rows = jdbc.query("""
-                SELECT id, project_id, version_no, content_hash, based_on_id, created_at FROM versions
+                SELECT id, project_id, version_no, content_hash, based_on_id, restored_from_id, created_at FROM versions
                 WHERE project_id = ? AND version_no < ? ORDER BY version_no DESC LIMIT ?
                 """, SUMMARY, project.id(), before, limit + 1);
         var items = List.copyOf(rows.subList(0, Math.min(limit, rows.size())));

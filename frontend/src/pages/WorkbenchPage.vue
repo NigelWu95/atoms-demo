@@ -130,7 +130,7 @@ const panel = ref<'conversation' | 'preview'>('conversation')
           hint="请先创建项目，再开始生成"
         />
       </section>
-      <ArtifactPanel :project="project" />
+      <ArtifactPanel :project="project" @changed="project = $event" />
     </div>
   </div>
 </template>
