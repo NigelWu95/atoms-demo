@@ -480,7 +480,7 @@ T10–T15 使用固定手工计数器/待办检验源码落库、执行隔离、
 
 ### T32 · 实现恢复为新版本
 
-- [x] 完成 T32（P1 优先，M；2026-10-11 本地通过，未部署）
+- [x] 完成 T32（P1 优先，M；2026-10-11 本地通过，已部署；云端有效恢复未实测）
 - 说明：复用快照能力，历史恢复不覆盖历史记录，也不回滚业务数据。
 - 依赖：T31、T10、T07。
 - 主要文件：`B/artifact/RestorationController.java`、`B/artifact/ArtifactService.java`、`B/project/ProjectService.java`、`BT/artifact/RestorationIT.java`。
@@ -493,7 +493,7 @@ T10–T15 使用固定手工计数器/待办检验源码落库、执行隔离、
 
 ### T33 · 完成历史查看和恢复交互
 
-- [x] 完成 T33（P1 优先，M；2026-10-11 本地通过，未部署）
+- [x] 完成 T33（P1 优先，M；2026-10-11 本地通过，已部署；云端有效恢复未实测）
 - 说明：提供历史入口、只读预览和明确说明后果的恢复确认。
 - 依赖：T32、T15。
 - 主要文件：`F/components/VersionHistoryPanel.vue`、`F/pages/WorkbenchPage.vue`、`F/api/artifacts.ts`、`F/runtime/previewContext.ts`、`e2e/history.spec.ts`。
@@ -506,7 +506,7 @@ T10–T15 使用固定手工计数器/待办检验源码落库、执行隔离、
 
 ### C13 · 延展能力检查点
 
-- [x] M8 / A20 已在本地通过并记录证据；云端升级与真实用户项目验收仍未执行。
+- [x] M8 / A20 已在本地通过并记录证据；云端已升级并完成基础交互、恢复接口校验与权限检查，未操作真实用户项目执行恢复。
 
 ## M9 · 最终回归与交付
 

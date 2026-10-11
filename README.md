@@ -6,6 +6,8 @@ Java 17 + Spring Boot + Vue 工程。已实现访客与项目持久化、代码�
 
 2026-10-08 已按用户要求部署到 **<http://192.0.2.10:8443>**：单台云服务器原生运行整套平台和 PostgreSQL，按 `/a/<slug>` 发布应用。不接 ngrok、不等待域名；初始 HTTPS 已按用户明确要求切换为临时 HTTP Demo，流量未加密。HTTP 使用独立访客 Cookie，旧 HTTPS 项目不删除但不会自动归属新访客。云端已按用户授权同步 DeepSeek 密钥，累计调用上限 100 次由公网访客共用；最新配置为单次上限 **168400 tokens**（包含思考与最终输出）、单次超时 300 秒、整轮超时 600 秒，本地数据与私有配置不变。此前云端 2048 在 32768 tokens / 180 秒配置下已验证生成中刷新后 SSE 恢复、自动预览、游戏合并计分和状态刷新恢复。随后 16840 配置下的一次构建因 length 失败，其中 16266 tokens 用于推理；用户因此要求提高至 168400。本次调整不调用模型，部署后累计 6 / 100；更高额度不保证所有需求均能在超时和响应大小限制内完成。云端发布/LIVE 闭环仍待验收。见 [实际部署记录与回退](docs/cloud-deployment.md)、[ADR-011](docs/decisions/011-single-server-release.md) 和 [服务器部署说明](deploy/server/README.md)。数据库和后端内部端口不直接开放公网。
 
+2026-10-11 已更新到源码 `ca4dac8` 对应发布包，首页/列表状态修复与历史代码恢复已上线；原有项目、版本、业务数据和模型配置保留。此次升级不调用模型，切换前后累计记账均为 18 / 100。公网基础交互与接口验收已通过，云端有效恢复闭环仍待实测；详见[更新与回退记录](docs/cloud-deployment.md)。
+
 ## 打包到服务器
 
 本机准备好开发依赖与测试数据库后，在项目根执行 `node scripts/release.mjs`。脚本运行检查与构建，输出 `dist/releases/atoms-demo-*.tar.gz` 和 SHA-256 校验文件；服务器不需要 Node、Maven 或 Docker。真实密码、API Key、数据库数据与测试夹具不会进入包。服务器配置另存 `/etc/atoms-demo/application.properties`，首次初始化/启动/更新/回退步骤见[部署说明](deploy/server/README.md)。脚本不会上传、部署或调用模型；远程 TLS、systemd 与外网访问仍须单独验收。
@@ -149,7 +151,7 @@ npm run dev:fixtures
 
 生成新增 `GET /api/generation`（是否配置、Worker 是否启用、剩余请求数）、`POST/GET /api/projects/{id}/runs`、`GET /api/projects/{id}/messages`、`GET /api/runs/{runId}`、`GET /api/runs/{runId}/events?after=...`（SSE）及 `PUT /api/runs/{runId}/cancellation`。这些生成接口均需访客身份；项目、消息、任务和事件必须属于当前访客。SSE 优先使用重连的 Last-Event-ID，终态已补齐返回 204。具体字段和边界见 [接口契约](docs/design/04-api-contracts.md)。
 
-历史恢复：在工作台选择历史代码版本，点击“恢复此版本”并确认，服务端通过 `POST /api/projects/{id}/restorations` 复制源码为新版本（例如恢复 V1 得到 V3），保留 V2、业务数据和已发布指针，不自动发布。要求项目所有者、CSRF、幂等键、项目修订号匹配且无活动生成；结果未知时可重试原恢复操作。V010 是新增可空恢复来源列的迁移，详见 [ADR-012](docs/decisions/012-version-restoration.md)。本轮仅本地实现与验证，云端尚未更新。首页与项目列表按 `currentVersionId` 显示是否已生成，不再使用固定“尚未生成”文案；“已生成”不代表预览检查或发布通过。
+历史恢复：在工作台选择历史代码版本，点击“恢复此版本”并确认，服务端通过 `POST /api/projects/{id}/restorations` 复制源码为新版本（例如恢复 V1 得到 V3），保留 V2、业务数据和已发布指针，不自动发布。要求项目所有者、CSRF、幂等键、项目修订号匹配且无活动生成；结果未知时可重试原恢复操作。V010 是新增可空恢复来源列的迁移，详见 [ADR-012](docs/decisions/012-version-restoration.md)。2026-10-11 已部署云端，完整恢复流程在本地验证，云端基础接口检查通过。首页与项目列表按 `currentVersionId` 显示是否已生成，不再使用固定“尚未生成”文案；“已生成”不代表预览检查或发布通过。
 
 ## PostgreSQL
 
