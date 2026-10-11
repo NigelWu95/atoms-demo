@@ -82,7 +82,7 @@ async function continueToWorkbench(prompt: string) {
         </button>
       </div>
       <p class="development-note">
-        创建项目会保存名称，不会调用模型。需求草稿暂存在当前页面会话，AI 生成稍后接入。
+        创建项目会保存名称，不会调用模型。进入工作台后点击“生成应用”开始生成；未提交的需求草稿仅在当前页面会话中保留。
       </p>
     </section>
     <section class="recent-section" aria-labelledby="recent-title">
