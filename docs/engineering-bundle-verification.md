@@ -4,7 +4,7 @@
 
 ## 当前交付边界
 
-EB01–EB10 已实现并验证：纯内存工程组装、独立启动/数据库/安装身份、访客与持久会话，以及固定应用资源加载、内容指纹和受限运行文档接口。当前交付 C-EB04，下一步 EB11–EB12 独立 Vue 外壳。没有下载 HTTP API、工作台按钮、真实模板装载器、独立业务状态接口、完整工程构建执行器或托管实例，不宣称完整工程已可导出运行。本轮未改动线上服务、原平台生产源码/迁移或原交付文档；下文各节保留当时阶段的证据，不代表后续能力也已完成。
+EB01–EB12 已实现并验证：纯内存工程组装、独立启动/数据库/安装身份、访客与持久会话、固定应用资源/内容指纹/受限运行文档，以及带真实健康检查的独立 Vue 启动外壳。当前交付 C-EB05，下一步 EB13–EB14 前端会话与沙箱接线。没有下载 HTTP API、工作台按钮、真实模板装载器、独立业务状态接口、完整工程构建执行器或托管实例，不宣称完整工程已可导出运行。本轮未改动线上服务、原平台生产源码/迁移或原交付文档；下文各节保留当时阶段的证据，不代表后续能力也已完成。
 
 `BundleSource` 冻结来源 UUID、原内容 hash 和 Artifact；调用方必须先完成版本所有者授权。组装器再次调用原 `ArtifactValidator`，并且只读取传入的代码快照及固定模板快照；没有数据库、环境变量、网络、文件系统或进程操作。`TemplateSnapshot` 构造入口限定于 engineering 包，后续只有固定目录的 TemplateCatalog 提供真实模板。
 
@@ -324,7 +324,69 @@ npm run typecheck
 
 本切片只做本地提交，没有主分支合并、GitHub 推送、模型调用、SSH 部署或原交付文档更新。完整产品外壳、真实状态保存、新目录构建及最终工程导出仍待后续任务。
 
+## EB11–EB12 · 独立 Vue 启动外壳（C-EB05）
+
+### 范围与设计取舍
+
+主入口：`templates/standalone-v1/frontend/`。这是后续独立应用的宿主，不是平台工作台或测试面板。本切片仅接真实 `GET /api/health`；API 返回 200 且严格 `{status:"UP"}` 后显示“服务连接正常”，明确应用界面尚未接入，不制造运行、生成或保存成功。会话/应用描述/沙箱属于 EB13–EB14，真实持久化属于 EB15–EB17。
+
+界面设计契约：沿用平台的深色底与绿色强调色、系统中文字体；单列启动区域，移除平台侧栏和管理功能。状态由图形与文字共同表达；原生按钮、跳过导航、可见焦点、稳定 live region，重试不清除前次错误、不移除当前聚焦按钮。无动画或外部图片/字体，320px 不横向溢出。请求、启动生命周期与 Vue 模板分离，未引入全局状态库或路由。
+
+健康检查不携带 Cookie、不建访客、不写应用数据；5 秒截止，响应体即使分块传输也最多读取 1 KiB。非 JSON/错误状态/未知字段/非法 UTF-8/格式异常不能算成功。错误使用固定文案，丢弃上游异常或响应原文；卸载取消请求和计时器，没有自动轮询或无限重试。
+
+### 开发与依赖边界
+
+- Vue 3.5.43、Vite 8.3.3、TS 5.9.3 及必要 lint/test 工具沿用平台的直接版本；生产依赖仅 Vue。不带 Pinia/Router、管理页面、浏览器验收依赖或模型密钥。独立 npm 11.19.0 lock 由 npm 生成，没有复制/手改平台锁文件。
+- `.npmrc` 固定 `ignore-scripts=true`、`engine-strict=true`；实际冻结安装、类型检查、lint、单元和构建成功，无需放行第三方生命周期脚本。锁中 237 个条目均有 integrity 且仅来自 registry.npmjs.org；本机实际安装 213 个包，其他主要为跨平台可选依赖。
+- Vite 开发 127.0.0.1:5273、构建预览 127.0.0.1:4273，端口冲突失败；只代理精确 `/api` 命名空间至固定 127.0.0.1 后端。`STANDALONE_DEV_API_PORT` 仅接受 1024–65535 的规范端口，默认 8088，不接受任意 URL。
+- 先校验 Host、单个精确 Origin 和 Fetch Metadata，再将本机前端 Origin 转译为后端 Origin。外站/null/重复来源不会因代理而被洗成可信来源；没有放宽后端同源或 CSRF 策略，没有 CORS。
+- 关闭 `.env` 自动装载与客户端 env 前缀注入；开发文件服务只允许当前前端目录，拒绝配置/密钥/.git。HMR 的 inline style 与 loopback WebSocket 仅开发启用，构建预览没有这两项放宽；两者都禁止 inline script、外部资源、嵌入宿主页面。
+- 模板自己的忽略规则覆盖真实配置、密钥、依赖、dist/target 和测试结果；不会依赖原仓库的 .gitignore 才能安全使用。
+
+### 真实验证
+
+| 检查 | 本轮结果 |
+|---|---|
+| 红绿 | 代理、health、App 的模块缺失测试先失败，随后实现通过；健康状态测试发现说明文案混入成功状态词，调整说明后通过 |
+| 模板前端 | 冻结安装、typecheck、lint、**25 项单元**与生产 build 均通过；无测试匹配时明确 exit 1 |
+| 条件变异 | Origin 计数 `<= 1` 临时反转为 `> 1`，2 项断言失败；恢复后 25 项全绿 |
+| 真实 Chrome | **7 项**通过，约 28.2 秒；320/390/768/1024/1440px、键盘/焦点/44px 触控、axe、断网后重新连接真实后端、开发与构建预览代理安全边界 |
+| 浏览器状态 | 正常页面无 console error/warning，axe 无违规；错误场景仅测试注入首次断网，重试是真实 Java/PostgreSQL；查看了 320/1440 成功及断网截图 |
+| 前端资源 | HTML 0.61 kB、CSS 3.09 kB、JS 65.58 kB（gzip 26.36 kB）；这是本切片构建值，不是最终完整工程预算 |
+| 依赖检查 | 安装审计 0 个已知漏洞；`npm audit signatures`：213 包 registry 签名、90 个来源证明通过；不代表未知供应链风险不存在 |
+| 回归 | 原平台工程组装/策略 **46 项**、仓库脚本及 runtime 一致性 **20 项**通过；原前端 typecheck、新增浏览器脚本 ESLint/Prettier 通过。本轮没有改平台生产代码或模板 Java，不把历史 121+44 后端全量结果称为本轮重跑 |
+
+排障记录：首次锁生成因 registry 网络访问受限遗漏可选平台依赖，冻结安装拒绝；授权访问官方 registry 后由 npm 补全并重跑冻结安装成功。Playwright 最初通过继承的代理误判端口占用；本轮验收配置仅为本机地址追加 NO_PROXY，保留其他代理配置且不改用户 shell。实际页面随后暴露 `/favicon.ico` 404，补齐受控 SVG 图标及 HTML 引用后全绿。一次开发服务运行中执行条件变异触发热重载，污染当轮 390px 验收；该轮作废，恢复后在固定源码上重跑上述完整 7 项，无跳过或降低断言。
+
+仅使用专用 `TestApplication`/测试数据库启动 Java，健康检查实际查询安装记录。浏览器用隔离 Chrome，不复用用户登录态；不记录 trace、Cookie、CSRF 或数据库配置。测试完成后本次 18088/5273/4273 监听均关闭，未停止共享 PostgreSQL 或平台进程。当前仍不是正式 JAR 的 Vue 静态资源接线；该接线、宿主正式 CSP 与最终 runtime hash 由 EB18 完成。
+
+### 复现
+
+先配置本机 Java 17、Node 24.20.x/npm 11.19.x。模板前端执行：
+
+```sh
+npm ci --ignore-scripts
+npm run typecheck
+npm run lint
+npm run test:unit
+npm run build
+```
+
+仓库 frontend 执行（测试配置对应已准备的专用库；自动启动并关闭本次 Java、Vite 与 preview）：
+
+```sh
+STANDALONE_TEST_CONFIG=/absolute/path/test.properties ./node_modules/.bin/playwright test --config playwright.standalone-shell.config.ts --project chromium
+```
+
+手动查看时，在模板 backend 执行 `STANDALONE_TEST_CONFIG=/absolute/path/test.properties ./mvnw -B spring-boot:test-run`；另一个终端在模板 frontend 执行 `STANDALONE_DEV_API_PORT=18088 npm run dev`，访问 `http://127.0.0.1:5273/`。端口应替换为该专用测试配置的实际 `server.port`。只适用于模板联调，不是导出后正式启动说明；正式入口仍拒绝测试配置，也不会用测试应用补缺文件。
+
+本轮保持单执行流，仅本地提交；未合并、推送 GitHub、更新线上服务或修改原 README/交付说明。后续仍按 EB13–EB25 推进，不提前勾选完整工程导出。
+
 ## 已核对的官方依据
+
+- [Vite 开发服务与代理](https://vite.dev/config/server-options)：固定回环、strictPort、自定义代理和前置中间件；本模板主动收紧默认本机 CORS 与 Host 行为。
+- [Vue 生命周期](https://vuejs.org/guide/essentials/lifecycle.html)、[Vitest 配置](https://vitest.dev/config/)：挂载初始化/卸载清理及真实组件测试，不创建空测试补绿。
+- [npm ci](https://docs.npmjs.com/cli/v11/commands/npm-ci/)：独立冻结安装和禁用安装脚本，实际以 npm 11.19.0 验证。
 
 - [Java 17 Record](https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/Record.html)：可变组件需要防御性复制，复制后仍需保持值语义。
 - [Java 17 MessageDigest](https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/security/MessageDigest.html)：使用平台 SHA-256，避免新增摘要依赖。
