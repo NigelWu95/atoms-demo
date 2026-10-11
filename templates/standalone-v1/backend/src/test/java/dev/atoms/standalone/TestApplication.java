@@ -31,16 +31,38 @@ public final class TestApplication {
                 {"title":"计数器","summary":"独立测试应用","runtime":"web-static-v1",
                  "stateSchemaVersion":1,"initialState":{"count":0}}
                 """));
-        files.put("application/view.html", bytes("<main><button id=count>0</button></main>"));
-        files.put("application/styles.css", bytes("body { color: black; }"));
+        files.put("application/view.html", bytes("""
+                <main><h1>计数交互</h1><p>本页计数只验证页面交互，刷新后归零，不保存数据。</p>
+                <button id=local-count>本页计数：0</button>
+                <p>SDK 存储计数（需要数据服务）</p><button id=count>0</button>
+                <p id=storage-status role=status></p></main>
+                """));
+        files.put("application/styles.css", bytes("""
+                body { color: #172017; background: #fff; font-family: sans-serif; margin: 0; padding: 20px; }
+                h1 { font-size: 24px; } p { line-height: 1.7; }
+                button { min-height: 44px; padding: 10px 16px; font: inherit; }
+                button:focus-visible { outline: 3px solid #286a16; outline-offset: 3px; }
+                """));
         files.put("application/main.js", bytes("""
                 Atoms.ready(async sdk => {
+                    const local = document.querySelector('#local-count');
+                    let count = 0;
+                    local.onclick = () => { local.textContent = '本页计数：' + ++count; };
                     const button = document.querySelector('#count');
-                    let state = await sdk.storage.get();
+                    const status = document.querySelector('#storage-status');
+                    let state;
+                    try { state = await sdk.storage.get(); }
+                    catch {
+                        button.disabled = true;
+                        status.textContent = '数据服务不可用，存储计数器已停用。';
+                        return;
+                    }
                     button.textContent = state.value.count;
                     button.onclick = async () => {
-                        state = await sdk.storage.save({count: state.value.count + 1}, state.revision);
-                        button.textContent = state.value.count;
+                        try {
+                            state = await sdk.storage.save({count: state.value.count + 1}, state.revision);
+                            button.textContent = state.value.count;
+                        } catch { status.textContent = '保存失败，当前数据未更新。'; }
                     };
                 });
                 """));

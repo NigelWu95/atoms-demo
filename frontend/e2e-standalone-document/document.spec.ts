@@ -68,7 +68,7 @@ test('real document runs in an opaque iframe with the compatible SDK', async ({
   expect(response.headers()['x-frame-options']).toBe('SAMEORIGIN')
   expect(response.headers()['content-security-policy']).toContain('sandbox allow-scripts')
   await expect(page.locator('#status')).toHaveText('ready')
-  const button = page.frameLocator('iframe').getByRole('button')
+  const button = page.frameLocator('iframe').locator('#count')
   await button.click()
   await expect(button).toHaveText('1')
   await button.press('Space')
@@ -96,7 +96,7 @@ test('direct document navigation stays opaque and a fresh visitor cannot read it
   ).toBe(200)
   expect((await page.goto('/api/app/document'))?.status()).toBe(200)
   expect(await page.evaluate(() => window.origin)).toBe('null')
-  await expect(page.getByRole('button')).toHaveText('0')
+  await expect(page.locator('#count')).toHaveText('0')
   const stranger = await browser.newContext()
   try {
     expect((await stranger.request.get(page.url())).status()).toBe(401)

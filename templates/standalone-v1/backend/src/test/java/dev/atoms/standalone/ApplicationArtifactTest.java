@@ -16,6 +16,8 @@ class ApplicationArtifactTest {
 
     @Test void loadsOnlyFixedFilesAndDefensivelyCopiesState() {
         var input = files();
+        // Keep this normalization vector independent of the browser fixture's layout.
+        input.put("application/view.html", bytes("<main><button id=count>0</button></main>"));
         var artifact = ApplicationArtifactLoader.parse(input, "a".repeat(64));
         assertThat(artifact.title()).isEqualTo("计数器");
         assertThat(artifact.body()).isEqualTo("<main><button id=\"count\">0</button></main>");
