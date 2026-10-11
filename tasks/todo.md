@@ -67,7 +67,8 @@
 - 验证：V-B；覆盖重复迁移、错误实例 ID、平台库目标、超权限角色、数据库断开与并发首次启动。
 - [x] EB06a：DatabaseTarget 与单元测试；复用实际角色/schema 核验到 TestDatabase，避免测试和正式启动维护两套权限规则。新类型缺失 RED 后，模板 clean verify 96 项单元 + 6 项真实 IT 全部通过；支持无开发标记的人工准备运行库，运行/测试用途标记不能互换。
 - [x] EB06b：DatabaseInstallation、V001、DatabaseInstallationIT、固定连接/迁移配置及测试专用清理助手；会话级数据库锁覆盖迁移前安装校验与 V001 原子身份写入。96 项单元 + 15 项真实 IT 通过（含 9 项迁移/并发场景）；非空未认领 schema、错误实例 ID、用途混淆均拒绝。首轮 Flyway 日志选项错误已修正，未跳过测试。
-- [ ] EB06c：HealthController、HealthIT 与最小 SecurityConfiguration；仅 GET health 开放、其他入口默认拒绝，真实 HTTP 验证数据库故障与重复启动；访客认证仍归 EB08。
+- [x] EB06c：HealthController、HealthIT 与最小 SecurityConfiguration；仅 GET health 开放、其他入口默认拒绝。5 项真实 HTTP 用例先失败后通过，模板 96 单元 + 20 IT 全部通过；验证独立连接池故障、安装 ID 异常、重启保留表数据和安全头。访客认证仍归 EB08。
+- [ ] EB06d 安全复核：测试引导在清理前也核对已存在的安装记录；补充失败路径、日志关联和关键判断变异，更新验收记录后关闭 EB06。
 
 ### C-EB02 · 可安全连接自己的数据库
 
