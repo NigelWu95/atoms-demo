@@ -1,0 +1,22 @@
+# Initialize with: node scripts/init-config.mjs --output /absolute/path/application.properties
+# Keep the real file outside source control. Only the keys below are supported.
+# Standard Java .properties syntax: escape backslashes and use \uXXXX for Unicode.
+# This file is NOT a working database configuration. Prepare a dedicated database,
+# a non-superuser role and its standalone_app schema, then replace all three values.
+# URL form: jdbc:postgresql://HOST:PORT/DATABASE (no query parameters or credentials).
+STANDALONE_DB_URL=REPLACE_WITH_DATABASE_URL
+STANDALONE_DB_USER=REPLACE_WITH_DATABASE_USER
+STANDALONE_DB_PASSWORD=REPLACE_WITH_DATABASE_PASSWORD
+
+# Generated once per installation. Keep unchanged across restarts and upgrades.
+APP_INSTANCE_ID=GENERATE_INSTANCE_ID
+
+# Local development: HTTP is allowed only with a loopback bind and matching origin.
+server.address=127.0.0.1
+server.port=8088
+standalone.origin=http://127.0.0.1:8088
+# Public deployment: configure an HTTPS reverse proxy and set an explicit HTTPS
+# origin, e.g. https://app.example.com. This enables Secure cookies, not server TLS.
+# Listen addresses supported by this template: 127.0.0.1, ::1, 0.0.0.0, ::.
+# Do not use test-database=true in a runtime configuration.
+standalone.test-database=false
