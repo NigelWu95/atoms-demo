@@ -1,6 +1,6 @@
 # engineering-bundle · 实施计划
 
-状态：2026-10-11 用户确认 C-EB02 后继续，EB01–EB08 已实现并验证；当前交付 C-EB03 独立访客与持久会话检查点，下一步 EB09–EB10 应用资源与沙箱运行文档。完成情况见任务清单。
+状态：2026-10-12 用户确认继续后，EB01–EB10 已实现并验证；当前交付 C-EB04 应用资源与沙箱运行文档检查点，下一步 EB11–EB12 独立 Vue 外壳。完成情况见任务清单。
 依据：[已批准规格](../SPEC-engineering-bundle.md)、[能力地图](../CAPABILITY-MAP.md)。代码基线 `109bcb5`，工作分支 `feature/standalone-engineering`。
 
 ## 1. 本轮交付什么
