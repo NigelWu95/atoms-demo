@@ -12,20 +12,38 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
+import org.springframework.security.web.csrf.HttpSessionCsrfTokenRepository;
 import org.springframework.session.web.http.DefaultCookieSerializer;
 
 @Configuration(proxyBeanMethods = false)
 class SecurityConfiguration {
     @Bean
-    SecurityFilterChain endpoints(HttpSecurity http, ApiExceptionHandler apiErrors) throws Exception {
-        // Narrow deny-by-default surface until guest/CSRF endpoints land in EB08.
-        // A health probe must not create a JDBC session when the database is unavailable.
+    HttpSessionSecurityContextRepository securityContexts() {
+        var repository = new HttpSessionSecurityContextRepository();
+        repository.setDisableUrlRewriting(true);
+        return repository;
+    }
+
+    @Bean
+    HttpSessionCsrfTokenRepository csrfTokens() { return new HttpSessionCsrfTokenRepository(); }
+
+    @Bean
+    SecurityFilterChain endpoints(HttpSecurity http, ApiExceptionHandler apiErrors,
+            HttpSessionSecurityContextRepository contexts, HttpSessionCsrfTokenRepository csrf) throws Exception {
+        // Only the explicit public and authenticated application contract is reachable.
         // https://docs.spring.io/spring-security/reference/6.5/servlet/authorization/authorize-http-requests.html
-        return http.authorizeHttpRequests(rules -> rules.requestMatchers(HttpMethod.GET, "/api/health").permitAll()
+        return http.authorizeHttpRequests(rules -> rules.requestMatchers(HttpMethod.GET, "/api/health", "/api/csrf").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/session").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/app", "/api/app/document", "/api/state").hasRole("GUEST")
+                        .requestMatchers(HttpMethod.PUT, "/api/state").hasRole("GUEST")
                         .anyRequest().denyAll())
-                .sessionManagement(sessions -> sessions.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .securityContext(config -> config.securityContextRepository(contexts).requireExplicitSave(true))
+                .csrf(config -> config.csrfTokenRepository(csrf))
+                .sessionManagement(sessions -> sessions.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
                 .requestCache(AbstractHttpConfigurer::disable)
                 .formLogin(AbstractHttpConfigurer::disable).httpBasic(AbstractHttpConfigurer::disable)
+                .logout(AbstractHttpConfigurer::disable)
                 .exceptionHandling(errors -> errors.authenticationEntryPoint((request, response, failure) ->
                                 apiErrors.write(request, response, ApiException.Code.SESSION_REQUIRED))
                         .accessDeniedHandler((request, response, failure) -> apiErrors.write(request, response,
