@@ -13,7 +13,6 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.springframework.boot.SpringApplication;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.boot.web.servlet.context.ServletWebServerApplicationContext;
@@ -41,7 +40,7 @@ class HealthIT {
         var environment = TestDatabase.load();
         environment.getPropertySources().addFirst(new MapPropertySource("httpTest", Map.of(
                 "server.port", 0, "spring.main.banner-mode", "off", "logging.level.root", "WARN")));
-        var application = new SpringApplication(StandaloneApplication.class);
+        var application = TestApplication.application();
         application.setEnvironment(environment);
         application.setAddCommandLineProperties(false);
         context = (ServletWebServerApplicationContext) application.run();

@@ -13,7 +13,6 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.springframework.boot.SpringApplication;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.boot.web.servlet.context.ServletWebServerApplicationContext;
@@ -37,7 +36,7 @@ class ApiBoundaryIT {
         var env = TestDatabase.load();
         env.getPropertySources().addFirst(new MapPropertySource("httpTest", Map.of(
                 "server.port", 0, "spring.main.banner-mode", "off", "logging.level.root", "WARN")));
-        var app = new SpringApplication(StandaloneApplication.class);
+        var app = TestApplication.application();
         app.setEnvironment(env);
         context = (ServletWebServerApplicationContext) app.run();
         var mappings = context.getBean(org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping.class);

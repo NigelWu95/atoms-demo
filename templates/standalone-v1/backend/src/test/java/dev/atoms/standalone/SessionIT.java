@@ -14,7 +14,6 @@ import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.SpringApplication;
 import org.springframework.boot.web.servlet.context.ServletWebServerApplicationContext;
 import org.springframework.core.env.MapPropertySource;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -31,7 +30,7 @@ class SessionIT {
         var env = TestDatabase.load();
         env.getPropertySources().addFirst(new MapPropertySource("httpTest", Map.of(
                 "server.port", requestedPort, "spring.main.banner-mode", "off", "logging.level.root", "WARN")));
-        var app = new SpringApplication(StandaloneApplication.class);
+        var app = TestApplication.application();
         app.setEnvironment(env);
         context = (ServletWebServerApplicationContext) app.run();
         port = context.getWebServer().getPort();
