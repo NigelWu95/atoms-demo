@@ -14,15 +14,15 @@ for (const width of [320, 390, 768, 1024, 1440]) {
         failures.push(`${message.text().slice(0, 600)} (${message.location().url.split('?')[0]})`)
     })
     const health = page.waitForResponse('**/api/health')
-    const session = page.waitForResponse('**/api/session')
+    const session = page.waitForResponse('**/api/session').then((response) => response.json())
     const documentLoaded = page.waitForResponse('**/api/app/document')
     const navigation = await page.goto('/')
     expect(navigation?.headers()['content-security-policy']).toContain("script-src 'self';")
     const response = await health
     expect(response.status()).toBe(200)
     expect(await response.json()).toEqual({ status: 'UP' })
-    expect(response.headers()['set-cookie']).toBeUndefined()
-    const identity = await (await session).json()
+    expect(await response.headerValue('set-cookie')).toBeNull()
+    const identity = await session
     expect(identity.isGuest).toBe(true)
     const appDocument = await documentLoaded
     expect(appDocument.status()).toBe(200)
@@ -84,13 +84,19 @@ for (const width of [320, 390, 768, 1024, 1440]) {
     await page.keyboard.press('Space')
     await expect(frame.getByRole('button', { name: '本页计数：2' })).toBeVisible()
     expect(await page.locator('iframe').getAttribute('src')).toBe(oldChannel)
-    const nextSession = page.waitForResponse('**/api/session')
+    const timeOrigin = await page.evaluate(() => performance.timeOrigin)
     page.once('dialog', (dialog) => dialog.accept())
-    await page.keyboard.press('Space')
-    expect(await (await nextSession).json()).toEqual(identity)
+    // Capture the body as it arrives, before replacing the opaque frame can retire
+    // its Chrome network records. This still observes the real browser request.
+    const [nextIdentity] = await Promise.all([
+      page.waitForResponse('**/api/session').then((response) => response.json()),
+      page.keyboard.press('Space'),
+    ])
+    expect(nextIdentity).toEqual(identity)
     await expect(frame.getByRole('button', { name: '本页计数：0' })).toBeVisible()
     await expect(page.getByRole('alert')).toContainText('不能读取或保存')
     expect(await page.locator('iframe').getAttribute('src')).not.toBe(oldChannel)
+    expect(await page.evaluate(() => performance.timeOrigin)).toBe(timeOrigin)
     await expect(button).toBeFocused()
     const box = await button.boundingBox()
     expect(box?.height).toBeGreaterThanOrEqual(44)
