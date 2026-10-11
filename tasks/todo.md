@@ -1,6 +1,6 @@
 # engineering-bundle · 开发任务
 
-状态：2026-10-11 用户已确认 C-EB02 后继续；EB01–EB06 已实现并验证；EB07–EB08 进行中。
+状态：2026-10-11 用户已确认 C-EB02 后继续；EB01–EB08 已实现并验证；当前交付 C-EB03，后续任务未开始。
 依据：[计划及验证命令](plan.md)、[已批准规格](../SPEC-engineering-bundle.md)。本清单只负责 `engineering-bundle`；原平台任务清单不变。
 
 路径缩写：`P/` = `backend/src/main/java/dev/atoms/demo/engineering/`；`PT/` = 对应平台 `src/test/java/dev/atoms/demo/engineering/`；`T/` = `templates/standalone-v1/`；`B/` = `T/backend/src/main/java/dev/atoms/standalone/`；`BT/` = 对应模板 `src/test/java/dev/atoms/standalone/`；`R/` = `T/backend/src/main/resources/`；`F/` = `T/frontend/src/`。下列路径尚未实现。
@@ -87,16 +87,18 @@
 
 ### EB08 · 独立访客与 CSRF（M）
 
-- [ ] 完成 EB08。依赖：EB07。
+- [x] 完成 EB08。依赖：EB07。
 - 文件：`B/SecurityConfig.java`、`B/SessionController.java`、`B/GuestIdentityService.java`、`B/SecurityHeadersFilter.java`、`BT/SessionIT.java`。
 - 验收：① csrf → 空对象 session 建立自己的访客、持久会话和身份，重复初始化不换访客；② 登录旋转 Cookie/CSRF，7 天有效期，缺/错 CSRF、跨访客与平台 Cookie 都不能越权；③ Cookie 名区分实例，宿主 CSP 严格、无 wildcard CORS，未认证应用/状态端点 401。
 - 验证：V-B；两个 Cookie jar、旧 Cookie/令牌和另一实例 Cookie 反例；跨真实进程重启在 EB22 再验。
 - [x] EB08a：GuestIdentityService、SessionController、既有 SecurityConfiguration、SessionIT、ApiExceptionHandler；复用已有安全配置类，接通 JDBC 会话和 CSRF/会话 ID 轮换。7 项会话用例先失败，补齐数据库事务异常映射后 110 单元 + 36 IT 全部通过。
-- [ ] EB08b：SecurityHeadersFilter、SecurityHeadersTest、RequestBoundaryFilter、SecurityConfiguration、SessionIT；统一早期拒绝的安全响应头、同源策略与仅请求头 CSRF，完成安全复核。
+- [x] EB08b：SecurityHeadersFilter、SecurityHeadersTest、RequestBoundaryFilter、SecurityConfiguration、SessionIT；统一早期拒绝的安全响应头、同源策略与仅请求头 CSRF。查询参数 CSRF 先被错误接受，修复后拒绝；反转 Origin 判断导致两项测试失败，恢复后通过。
+- [x] EB08c：application.yml、SessionIT；注入会话最终保存故障，确认不会发送缓冲的成功响应，并补齐重复框架日志的脱敏保护。日志反例先失败，修复后完整验证为 112 单元 + 39 IT，无跳过。
 
 ### C-EB03 · 真实会话切片
 
-- [ ] EB07–EB08 接口可调用且鉴权失败路径通过；审阅 Cookie/CSRF 与持久会话表，不以不同端口代替凭据隔离。
+- [x] 技术验收与自审：EB07–EB08 接口可调用且鉴权失败路径通过；真实 JAR 的 A/B 实例各有独立库及 Cookie 名称，A Cookie 即使改成 B 的名称也不能鉴权；A 的有效 Cookie/CSRF 跨真实进程重启恢复同一访客且不影响 B。进程已停止，数据库保留；未完成业务状态保存或浏览器工程验收。
+- [ ] 人工审阅本检查点交付；未授权主分支合并、GitHub 推送或部署。
 
 ## C · 应用进入沙箱
 
