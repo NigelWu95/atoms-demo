@@ -182,6 +182,33 @@ describe('standalone runtime bridge', () => {
     expect(port.close).toHaveBeenCalledOnce()
   })
 
+  it('distinguishes unknown writes, conflicts and offline reads; late READY cannot hide them', async () => {
+    const s = setup()
+    s.bridge.start()
+    s.hello()
+    const port = ports[0]!
+    for (const [failure, expected] of [
+      [new ApiFailure('NETWORK_ERROR', 0, undefined, true), 'unknown'],
+      [new ApiFailure('INVALID_RESPONSE', 0, undefined, true), 'unknown'],
+      [new ApiFailure('STATE_CONFLICT', 409), 'conflict'],
+      [new ApiFailure('STALE_APP_VERSION', 409), 'conflict'],
+    ] as const) {
+      s.handler.mockRejectedValueOnce(failure)
+      port.receive(rpc('STATE_SAVE', { value: {}, expectedRevision: 0 }))
+      expect(s.report).toHaveBeenLastCalledWith('saving', expect.any(String))
+      await flushPromises()
+      port.receive(rpc('RUNTIME_READY'))
+      expect(s.report).toHaveBeenLastCalledWith(expected, expect.any(String))
+    }
+    s.handler.mockRejectedValueOnce(new ApiFailure('SERVICE_UNAVAILABLE', 503))
+    port.receive(rpc())
+    await flushPromises()
+    expect(s.report).toHaveBeenLastCalledWith('offline', expect.any(String))
+    port.receive(rpc('STATE_SAVE', { value: {}, expectedRevision: 0 }))
+    await flushPromises()
+    expect(s.report).toHaveBeenLastCalledWith('saved', '已保存到数据库')
+  })
+
   it('times out without allowing late hello or state access', async () => {
     vi.useFakeTimers()
     const s = setup()
