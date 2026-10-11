@@ -1,5 +1,7 @@
 # Initialize with: node scripts/init-config.mjs --output /absolute/path/application.properties
-# Keep the real file outside source control. Only the keys below are supported.
+# Keep the real file outside source control; its path must not contain commas or semicolons.
+# Only the keys below are supported. Runtime Spring/env/-D overrides are not loaded.
+# Direct Java startup accepts only the documented --spring.config.location argument.
 # Standard Java .properties syntax: escape backslashes and use \uXXXX for Unicode.
 # This file is NOT a working database configuration. Prepare a dedicated database,
 # a non-superuser role and its standalone_app schema, then replace all three values.

@@ -80,7 +80,9 @@ test('rejects missing, relative, duplicate and unknown arguments with no path di
   const output = join(directory(t), 'application.properties');
   for (const args of [[], ['--output'], ['--output', 'relative.properties'],
     ['--output', output, '--output', output], ['--unknown', output],
-    ['--output', output, '--force'], ['--output', output.replace('.properties', '.env')]]) {
+    ['--output', output, '--force'], ['--output', output.replace('.properties', '.env')],
+    ['--output', output.replace('.properties', ',extra.properties')],
+    ['--output', output.replace('.properties', ';extra.properties')]]) {
     const result = run(...args);
     assert.equal(result.status, 1);
     assert.match(result.stderr, /^CONFIG_USAGE:/);

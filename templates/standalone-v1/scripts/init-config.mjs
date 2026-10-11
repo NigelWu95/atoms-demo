@@ -4,7 +4,7 @@ import { isAbsolute } from 'node:path';
 
 const args = process.argv.slice(2);
 if (args.length !== 2 || args[0] !== '--output' || !isAbsolute(args[1])
-  || !args[1].endsWith('.properties') || args[1].includes('\0')) {
+  || !args[1].endsWith('.properties') || /[\0,;]/.test(args[1])) {
   console.error('CONFIG_USAGE: use --output with an absolute .properties file path.');
   process.exitCode = 1;
 } else {
