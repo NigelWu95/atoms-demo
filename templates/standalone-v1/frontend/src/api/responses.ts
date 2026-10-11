@@ -11,27 +11,35 @@ export function keys(value: unknown, names: string[]): value is Record<string, u
   )
 }
 
-export async function readJson(response: Response): Promise<unknown> {
+export async function readJson(response: Response, limit = 16 * 1024): Promise<unknown> {
   if (response.headers.get('content-type')?.split(';')[0]?.trim() !== 'application/json') {
     await response.body?.cancel()
     throw new InvalidResponse()
   }
   const reader = response.body?.getReader()
   if (!reader) throw new InvalidResponse()
-  const bytes: number[] = []
+  const chunks: Uint8Array[] = []
+  let length = 0
   try {
     while (true) {
       const { value, done } = await reader.read()
       if (done) break
-      if (bytes.length + value.byteLength > 16 * 1024) throw new InvalidResponse()
-      bytes.push(...value)
+      length += value.byteLength
+      if (length > limit) throw new InvalidResponse()
+      chunks.push(value)
     }
   } finally {
     await reader.cancel()
     reader.releaseLock()
   }
   try {
-    return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(new Uint8Array(bytes)))
+    const bytes = new Uint8Array(length)
+    let offset = 0
+    for (const chunk of chunks) {
+      bytes.set(chunk, offset)
+      offset += chunk.byteLength
+    }
+    return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes))
   } catch {
     throw new InvalidResponse()
   }
