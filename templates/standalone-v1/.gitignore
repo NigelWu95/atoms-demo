@@ -1,0 +1,15 @@
+.env
+.env.*
+*.pem
+*.key
+*.log
+.DS_Store
+.local/
+config/*.properties
+!config/*.properties.example
+node_modules/
+dist/
+target/
+coverage/
+test-results/
+playwright-report/
