@@ -63,6 +63,7 @@ final class RequestBoundaryFilter extends OncePerRequestFilter {
             buffered.resetBuffer();
             errors.write(request, buffered, ApiExceptionHandler.classify(failure));
         }
+        RuntimeDocumentPolicy.apply(request, buffered);
         buffered.copyBodyToResponse();
     }
 
