@@ -159,7 +159,8 @@ class HealthIT {
     private HttpResponse<String> request(String method, String path) throws Exception {
         int port = context.getWebServer().getPort();
         return http.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + path))
-                .timeout(Duration.ofSeconds(5)).method(method, HttpRequest.BodyPublishers.noBody()).build(),
+                .timeout(Duration.ofSeconds(5)).header("Content-Type", "application/json")
+                .method(method, method.equals("POST") ? HttpRequest.BodyPublishers.ofString("{}") : HttpRequest.BodyPublishers.noBody()).build(),
                 HttpResponse.BodyHandlers.ofString());
     }
 }

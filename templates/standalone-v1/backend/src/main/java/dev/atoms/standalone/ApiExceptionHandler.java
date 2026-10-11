@@ -47,7 +47,8 @@ final class ApiExceptionHandler {
             if (failure instanceof DataAccessException) return ApiException.Code.SERVICE_UNAVAILABLE;
             if (failure instanceof NoResourceFoundException) return ApiException.Code.NOT_FOUND;
             if (failure instanceof HttpRequestMethodNotSupportedException) return ApiException.Code.METHOD_NOT_ALLOWED;
-            if (failure instanceof HttpMessageNotReadableException || failure instanceof HttpMediaTypeNotSupportedException)
+            if (failure instanceof HttpMessageNotReadableException || failure instanceof HttpMediaTypeNotSupportedException
+                    || failure instanceof org.springframework.web.HttpMediaTypeNotAcceptableException)
                 return ApiException.Code.INVALID_INPUT;
         }
         return ApiException.Code.INTERNAL_ERROR;
