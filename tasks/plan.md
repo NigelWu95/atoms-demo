@@ -1,6 +1,6 @@
 # engineering-bundle · 实施计划
 
-状态：2026-10-11 用户已确认计划及配套任务，EB01–EB06 已实现并验证；C-EB02 技术验收通过，等待人工审阅数据库护栏后继续 EB07。完成情况见任务清单。
+状态：2026-10-11 用户确认 C-EB02 后继续，EB01–EB08 已实现并验证；当前交付 C-EB03 独立访客与持久会话检查点，下一步 EB09–EB10 应用资源与沙箱运行文档。完成情况见任务清单。
 依据：[已批准规格](../SPEC-engineering-bundle.md)、[能力地图](../CAPABILITY-MAP.md)。代码基线 `109bcb5`，工作分支 `feature/standalone-engineering`。
 
 ## 1. 本轮交付什么

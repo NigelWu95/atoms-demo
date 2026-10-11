@@ -156,7 +156,8 @@ class SessionIT {
     }
 
     @Test
-    void failureWhileSavingASessionCannotSendTheBufferedSuccessResponse() throws Exception {
+    @org.junit.jupiter.api.extension.ExtendWith(org.springframework.boot.test.system.OutputCaptureExtension.class)
+    void failureWhileSavingASessionCannotSendTheBufferedSuccessResponse(org.springframework.boot.test.system.CapturedOutput output) throws Exception {
         var browser = new Browser();
         browser.csrf();
         var mappings = context.getBean(org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping.class);
@@ -168,6 +169,9 @@ class SessionIT {
         var response = browser.send("GET", "/api/csrf?failSave=true", null, null);
         error(response, 503, "SERVICE_UNAVAILABLE");
         assertThat(response.body()).doesNotContain("false-success");
+        assertThat(output.getOut()).contains("\"code\":\"SERVICE_UNAVAILABLE\"", "\"requestId\":\""
+                        + response.headers().firstValue("x-request-id").orElseThrow() + "\"")
+                .doesNotContain("stack_trace", "HikariPool-", "SQLException", "failure-canary");
         TestDatabase.load();
     }
 

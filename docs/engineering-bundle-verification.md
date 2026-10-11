@@ -4,7 +4,7 @@
 
 ## 当前交付边界
 
-EB01/EB02 的纯内存工程组装及边界校验已实现且通过后端完整回归；EB03 的独立后端模板骨架通过 Java 17 编译；EB04–EB06 的配置初始化、专用数据库、安装身份、迁移与健康检查已完成。当前位于 C-EB02：技术验收通过，人工审阅后继续 EB07 API 错误边界与 EB08 访客会话。没有下载 HTTP API、工作台按钮、真实模板装载器、独立业务数据接口、构建执行器或托管实例，不宣称完整工程已可导出运行。本轮 EB06 没有改动线上服务、原平台源码/迁移或原交付文档。
+EB01–EB08 已实现并验证：纯内存工程组装及边界校验、独立后端配置/数据库/安装身份，以及统一 API 错误、访客初始化、CSRF 与 JDBC 持久会话。当前交付 C-EB03，下一步 EB09–EB10 应用资源和沙箱运行文档。没有下载 HTTP API、工作台按钮、真实模板装载器、独立业务状态接口、构建执行器或托管实例，不宣称完整工程已可导出运行。本轮未改动线上服务、原平台源码/迁移或原交付文档；下文各节保留当时阶段的证据，不代表后续能力也已完成。
 
 `BundleSource` 冻结来源 UUID、原内容 hash 和 Artifact；调用方必须先完成版本所有者授权。组装器再次调用原 `ArtifactValidator`，并且只读取传入的代码快照及固定模板快照；没有数据库、环境变量、网络、文件系统或进程操作。`TemplateSnapshot` 构造入口限定于 engineering 包，后续只有固定目录的 TemplateCatalog 提供真实模板。
 
@@ -204,6 +204,57 @@ curl --noproxy '*' --fail --max-time 5 -i http://127.0.0.1:18089/api/health
 - 访客/会话表已建立，但访客初始化、CSRF 流程、统一 API 错误、应用资源与独立状态接口仍在后续任务。
 - 原平台完整 IT、UI/E2E 未在本轮重跑；没有模型调用、GitHub 推送、主分支合并或云端部署。原 README/交付/部署文档继续等整项功能完成后统一更新。
 
+## EB07–EB08 · 独立 API 与持久访客
+
+### 当前接口契约与取舍
+
+| 接口 | 当前行为 |
+|---|---|
+| GET /api/health | 保持 200/503 健康语义，不读取会话 Cookie，不创建访客 |
+| GET /api/csrf | 返回 `{ token, headerName: "X-CSRF-TOKEN" }`；匿名也可用，令牌存于独立 JDBC 会话，JSON 返回掩码令牌；客户端仅保存在内存 |
+| POST /api/session | 仅接受 JSON 空对象及有效 CSRF 请求头；首次返回 `{ userId, isGuest: true }` 并轮换会话 ID/CSRF；再次初始化返回原身份，不新建访客 |
+| GET /api/app、/api/app/document、/api/state；PUT /api/state | 已建立鉴权边界，但业务实现仍属 EB09/EB10/EB15；未认证读请求 401，不能把鉴权通过后的 404 说成接口完成 |
+
+客户端先 GET csrf，再 POST session；首次认证后必须再次 GET csrf，旧令牌和旧 Cookie 均失效。Cookie 为实例专属名称、HttpOnly、SameSite=Lax、Path=/、7 天 max-age；JDBC Session 的空闲有效期 7 天。本地回环 HTTP 为非 Secure，HTTPS 配置为 Secure。用户名/密码、OAuth、找回访客、账号合并不在此模块范围。身份只来自持久化的服务端认证上下文，不能由请求体选择其他 UUID。
+
+错误统一为 `{ error: { code, message, retryable }, requestId }`，响应头含同一 X-Request-Id、no-store。错误消息来自固定枚举，不透传异常 message/cause。未认证 401、CSRF/来源拒绝 403、未知 API 404、输入 422、请求体超限 413、冲突类 409、内部错误 500、数据库不可用 503；409 当前只完成公共错误映射，实际状态冲突和幂等逻辑仍待 EB15–EB16。5xx 的 retryable 不表示事务肯定回滚，未来状态客户端仍须遵守原意图重试契约。
+
+请求入口先于 JDBC Session 和安全链运行：总字节上限 320 KiB，包含分块传输；JSON 容器深度最多 64，拒绝重复键、尾随文档、非 JSON/非 UTF-8 声明及压缩请求。状态值自身的 256 KiB 限制仍由后续业务接口实施，不能用入口余量替代。固定 API 路径白名单之外返回 JSON 404，不转成页面；未来新增 API 必须显式更新契约。
+
+Origin 存在时必须唯一且精确匹配外部配置，拒绝 `null`/外站及 Sec-Fetch-Site=cross-site，不启用 CORS。无 Origin 的命令行客户端仍可使用，但写入同样需要 Cookie + CSRF。CSRF 仅从请求头读取，不接受 URL 参数；保留 Spring 的掩码/BREACH 保护。安全头在所有早期拒绝之前写入，目前严格 CSP 不开放宿主脚本；Vue 外壳允许同源资源的策略会随 EB11–EB14 实际页面落地。
+
+有限同步 API 响应先缓冲，待 Spring Session 的请求结束保存完成后才发送，避免数据库提交会话失败时客户端已收到 200。数据库异常只输出脱敏错误；MVC 在错误响应再次触发会话保存失败时的重复原始堆栈日志关闭，应用自己的 requestId/错误码日志保留。此缓冲策略不适用于 SSE、异步或无限流，这些不在独立应用接口契约中。
+
+### 安全与可观测性审阅
+
+边界为不可信 HTTP/JSON/Cookie → CSRF/认证 → 独立库。保护资产为实例会话、访客隔离及后续业务状态；使用固定字段、绑定 SQL、服务端随机身份、Cookie/CSRF 轮换和显式授权，无新依赖/平台会话复用。匿名 UUID 不写日志，不采集姓名/邮箱/密码。失效会话由 Spring Session 清理；访客记录/未来业务数据的删除与保留策略、公开服务的频率限制尚未实现，不能据此声称已经满足生产隐私或抗滥用要求。
+
+可诊断问题：请求为何被拒绝、故障在会话加载还是健康检查入口、初始化是否走到身份建立阶段。`api_rejected`、`guest_initialized`、已有 `health_checked` 用稳定事件/入口/requestId 关联，不记录请求体、Cookie、CSRF 或异常 SQL。guest_initialized 表示准备好身份，不冒充最终响应成功；最终会话保存故障另有 api_rejected。尚无指标面板、分布式追踪或告警采集器，不新增未批准的监控依赖。
+
+创建访客与请求结束保存会话不在同一个事务中；连接中断可能遗留不可访问的匿名访客记录。当前保证不发送假成功、有效会话恢复和跨访客隔离，不承诺失败初始化恰好一次、跨进程并发初始化同一未认证 Cookie 的合并或孤儿记录自动清理。后续业务写入的原子性由 EB15–EB16 的事务协议承担。
+
+### 本轮红绿与真实运行证据
+
+| 检查 | 实际结果 |
+|---|---|
+| EB07a | 缺少错误类型时编译失败；实现后新增 14 单元通过，health 回归保持通过 |
+| EB07b | 6 项真实 HTTP 反例最初全部失败；实现入口约束后通过。专用测试 profile 未装配故障控制器、Accept=text/html 引发媒体协商的测试问题已定位，改为单测试显式注册夹具，不加入生产测试入口 |
+| EB08a | 7 项访客用例先失败；实现后验证两访客、空对象校验、轮换/旧凭据拒绝、过期会话及 Spring 上下文重启；另补 JDBC Session 事务异常中 SQLException 的 503 映射 |
+| EB08b | URL 参数中的 CSRF 原先导致 200，新反例失败；仅请求头策略后 403。错误 Origin、跨站标记均在会话处理前拒绝 |
+| 关键判断变异 | 暂时反转 Origin 相等判断，2 项安全测试均失败；恢复后完整回归通过 |
+| 会话最终保存故障 | 真实请求中读取会话后关闭该测试上下文连接池，返回 503，成功响应内容没有发出；共享 PostgreSQL 仍运行 |
+| 日志脱敏回归 | 新断言发现 MVC 异常解析器额外输出数据库堆栈，先失败；关闭该条重复框架日志后通过，503 错误码与 requestId 日志仍可定位 |
+| 最终模板完整 verify | **112 单元 + 39 真实 PostgreSQL/HTTP IT**，0 失败/跳过，JAR 构建成功；SessionIT 为 10 项 |
+| 原平台工程组装 | **46 项**通过；原后端源码与平台数据库迁移未改动 |
+| 脚本组合回归 | **14 项**通过；建库、原发布打包及初始化脚本无回归 |
+| 正式 JAR 内容 | 包含访客、会话、请求边界和安全头组件；不含 SessionIT、ApiBoundaryIT、测试引导、application-test.yml 或私有配置 |
+| 两个实际 JAR 实例 | A/B 分别连接 atoms_standalone_a / atoms_standalone_b，Cookie 名及访客不同；A Cookie 原样或改成 B Cookie 名均在 B 被拒绝 |
+| 真实 OS 进程重启 | 停止本次 A 进程后用原配置重启，保留的 Cookie 与 CSRF 仍返回同一访客；B 不受影响。全部本次创建的进程已停止，两个专用运行库与夹具访客保留 |
+
+模板与平台命令沿用 EB05/EB06 记录。真实双实例辅助脚本是本机已忽略的 `.local/standalone/verify-session-runtime.mjs`，仅供这次验收，配置仍为同目录 runtime-a/b.properties。脚本使用 Java 17 与正式 JAR，拒绝复用占用端口，只停止自身启动的进程，不输出/保存 Cookie、CSRF 或数据库凭据。这不是可移植的最终工程验收脚本；EB22 会交付仓库内正式验收装配。
+
+本轮没有修改旧 README/提交说明/部署文档，没有真实模型调用、GitHub 推送、合并或云端部署。没有 UI 改动，未把 HTTP Cookie jar 验收称为浏览器验收；原平台完整 IT/UI、独立应用保存状态及全新目录构建仍未在此阶段完成。
+
 ## 已核对的官方依据
 
 - [Java 17 Record](https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/Record.html)：可变组件需要防御性复制，复制后仍需保持值语义。
@@ -225,3 +276,7 @@ curl --noproxy '*' --fail --max-time 5 -i http://127.0.0.1:18089/api/health
 - [Spring Security 6.5 请求授权](https://docs.spring.io/spring-security/reference/6.5/servlet/authorization/authorize-http-requests.html)、[会话管理](https://docs.spring.io/spring-security/reference/6.5/servlet/authentication/session-management.html)：health 单一路由放行，其他默认拒绝；STATELESS 不等于整个过滤链不会查询请求 Cookie。
 - [SessionRepositoryFilter 3.5.7](https://github.com/spring-projects/spring-session/blob/3.5.7/spring-session-core/src/main/java/org/springframework/session/web/http/SessionRepositoryFilter.java)、[Boot 3.5.16 SessionAutoConfiguration](https://github.com/spring-projects/spring-boot/blob/v3.5.16/spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/session/SessionAutoConfiguration.java)：核对会话按需加载和 CookieSerializer 自动配置退让条件；自定义序列化器显式保留配置中的 Cookie 安全属性。
 - [Boot 3.5 结构化日志](https://docs.spring.io/spring-boot/3.5/reference/features/logging.html#features.logging.structured)：使用内置 Logstash JSON 格式和 SLF4J key-value 关联故障，不新增日志依赖。
+- [Spring Security 6.5 CSRF](https://docs.spring.io/spring-security/reference/6.5/servlet/exploits/csrf.html)、[认证持久化](https://docs.spring.io/spring-security/reference/6.5/servlet/authentication/session-management.html)：会话令牌、JSON csrf 入口、认证后刷新令牌，以及自定义认证的显式 SecurityContext 保存与会话轮换。
+- [Spring Session 3.5 JDBC](https://docs.spring.io/spring-session/reference/3.5/configuration/jdbc.html)：独立数据库持久会话；依赖版本仍由 Boot 3.5.16 锁定。
+- [Jackson 2.21 StreamReadConstraints](https://github.com/FasterXML/jackson-core/blob/2.21/src/main/java/com/fasterxml/jackson/core/StreamReadConstraints.java)、[Spring MVC 错误响应](https://docs.spring.io/spring-framework/reference/6.2/web/webmvc/mvc-ann-rest-exceptions.html)：专用解析器深度约束与异常处理边界，不改变全局 Jackson 默认值。
+- [Spring 6.2 ContentCachingResponseWrapper](https://docs.spring.io/spring-framework/docs/6.2.x/javadoc-api/org/springframework/web/util/ContentCachingResponseWrapper.html)、[安全响应头](https://docs.spring.io/spring-security/reference/6.5/servlet/exploits/headers.html)：缓冲完整响应直到会话过滤器完成，保留其他框架安全头；早期拒绝由外层过滤器提供同等响应保护。

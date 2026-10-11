@@ -53,3 +53,6 @@ logging:
     # DatabaseInstallation emits the sanitized result and correlation ID instead.
     com.zaxxer.hikari: 'OFF'
     org.flywaydb: 'OFF'
+    # A JDBC session failure during error-response flush is caught by RequestBoundaryFilter.
+    # MVC otherwise logs the raw nested database exception before that sanitized boundary.
+    org.springframework.web.servlet.mvc.method.annotation.ExceptionHandlerExceptionResolver: 'OFF'
