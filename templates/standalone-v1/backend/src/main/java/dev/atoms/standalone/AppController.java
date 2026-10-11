@@ -25,8 +25,11 @@ final class AppController {
         return new Description(artifact.title(), artifact.summary(), "web-static-v1", 1, artifact.loadedRuntimeId());
     }
     @GetMapping(value = "/api/app/document", produces = "text/html;charset=UTF-8")
-    ResponseEntity<String> document(Principal principal) {
+    ResponseEntity<String> document(Principal principal, jakarta.servlet.http.HttpServletResponse response) {
         guests.get(principal.getName());
+        // ResponseEntity headers append to the filter's default CSP. Replace it instead:
+        // multiple CSP policies intersect and would prevent both scripts and embedding.
+        response.setHeader("Content-Security-Policy", RuntimeDocumentPolicy.CSP);
         return ResponseEntity.ok().contentType(new MediaType("text", "html", java.nio.charset.StandardCharsets.UTF_8))
                 .body(documents.render());
     }
