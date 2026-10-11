@@ -61,6 +61,34 @@ async function openApp(path = '/') {
 }
 
 describe('foundation website', () => {
+  it.each(['/', '/projects'])('shows saved generation state on %s', async (path) => {
+    const fetch = mockApi()
+    const original = fetch.getMockImplementation()!
+    fetch.mockImplementation((url: string, options?: RequestInit) =>
+      url.startsWith('/api/projects?')
+        ? Promise.resolve(
+            Response.json({
+              items: [
+                { ...project, name: '已生成项目', currentVersionId: 'version-1' },
+                { ...project, id: 'project-2', name: '空白项目', currentVersionId: null },
+              ],
+              nextCursor: null,
+            }),
+          )
+        : original(url, options),
+    )
+    vi.stubGlobal('fetch', fetch)
+    const { wrapper } = await openApp(path)
+    try {
+      const rows = wrapper.findAll('.project-row')
+      expect(rows[0]!.text()).toContain('已生成')
+      expect(rows[0]!.text()).not.toContain('尚未生成')
+      expect(rows[1]!.text()).toContain('尚未生成')
+      expect(wrapper.text()).not.toContain('AI 生成稍后接入')
+    } finally {
+      wrapper.unmount()
+    }
+  })
   it('does not mount the creator sidebar while the initial public route is resolving', async () => {
     const fetch = vi
       .fn()
