@@ -52,9 +52,18 @@ EB03 模板是未公开的编译骨架：只扫描 `dev.atoms.standalone`，沿�
 
 原前端源码未变，本轮尚未重跑其 UI/E2E；不复用旧结果冒充本轮通过。没有推送、合并或部署。
 
+## EB04 · 显式配置（进行中）
+
+EB04a 已完成：Node 初始化器要求绝对 `.properties` 路径，使用 `wx` 排他创建与 `0600` 权限。两个进程同时初始化只有一个成功；已有文件、正常/断开的符号链接都不会被覆盖。每个新安装生成一次 UUID，重复执行不会重置。数据库三项均保留明确占位符，不读取平台环境，不生成真实数据库密码，也不输出路径或内容。父目录须由操作者预先准备。
+
+- RED：先添加 5 项真实 CLI 测试，初始化脚本不存在，5 项全部失败。
+- GREEN：模板根执行 `node --test scripts/init-config.test.mjs`，5 项通过、0 跳过。
+- Java 入口防护尚待 EB04b；本切片不建立数据库、不启动平台/云端服务，不代表独立工程已可运行。
+
 ## 已核对的官方依据
 
 - [Java 17 Record](https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/Record.html)：可变组件需要防御性复制，复制后仍需保持值语义。
 - [Java 17 MessageDigest](https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/security/MessageDigest.html)：使用平台 SHA-256，避免新增摘要依赖。
 - [Jackson 2.21 JsonNode 源码](https://github.com/FasterXML/jackson-databind/blob/2.21/src/main/java/com/fasterxml/jackson/databind/JsonNode.java)：deepCopy 与 properties 契约；新代码没有使用已废弃的 fields 方法。
 - [Spring Boot 3.5 Maven Plugin](https://docs.spring.io/spring-boot/3.5/maven-plugin/using.html)：后续模板沿用 3.5.16 parent 的 Java 17、依赖管理和 repackage 配置，不升级平台依赖。
+- [Node 24.20 文件打开标志](https://nodejs.org/download/release/v24.20.0/docs/api/fs.html#file-system-flags)：使用排他创建而非先检查存在再覆盖；不承诺网络文件系统的排他语义。

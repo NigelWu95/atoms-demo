@@ -1,6 +1,6 @@
 # engineering-bundle · 开发任务
 
-状态：2026-10-11 用户已批准计划与任务；EB01–EB03 已验证，到达第一检查点 C-EB01，后续任务未开始。
+状态：2026-10-11 用户已批准计划与任务；EB01–EB03 已验证；EB04 正在实现，后续任务未开始。
 依据：[计划及验证命令](plan.md)、[已批准规格](../SPEC-engineering-bundle.md)。本清单只负责 `engineering-bundle`；原平台任务清单不变。
 
 路径缩写：`P/` = `backend/src/main/java/dev/atoms/demo/engineering/`；`PT/` = 对应平台 `src/test/java/dev/atoms/demo/engineering/`；`T/` = `templates/standalone-v1/`；`B/` = `T/backend/src/main/java/dev/atoms/standalone/`；`BT/` = 对应模板 `src/test/java/dev/atoms/standalone/`；`R/` = `T/backend/src/main/resources/`；`F/` = `T/frontend/src/`。下列路径尚未实现。
@@ -44,6 +44,8 @@
 - 文件：`T/config/application.properties.example`、`T/scripts/init-config.mjs`、`T/scripts/init-config.test.mjs`、`B/StartupConfig.java`、`BT/StartupConfigTest.java`。
 - 验收：① 初始化只创建缺失文件并生成稳定实例 ID，不覆盖已有文件、不打印密码；② Java 入口拒绝缺失配置、占位符及非法 origin/监听配置；③ 默认 loopback HTTP 与明确 HTTPS 部署的 Cookie 安全设置分开，实例 Cookie 名由稳定 ID 派生。
 - 验证：模板根 `node --test scripts/init-config.test.mjs`；模板后端 `./mvnw -B -Dtest=StartupConfigTest test`；检查错误不包含配置值。
+- [x] 切片 EB04a（3 文件）：配置示例、Node 初始化器及其测试，只创建缺失配置；5 项真实 CLI 测试通过（含并发与符号链接），不创建数据库。
+- 切片 EB04b（4 文件）：StartupConfig、Java 入口接线、application.yml、StartupConfigTest；在 Spring 启动前校验并加载显式配置，避免先触发数据库连接。外部文件仅接受示例列出的配置项，不继承进程中的平台/Spring 连接配置；数据库实际身份验证仍由 EB06 完成。
 
 ### EB05 · 专用测试库与配置引导（M）
 
