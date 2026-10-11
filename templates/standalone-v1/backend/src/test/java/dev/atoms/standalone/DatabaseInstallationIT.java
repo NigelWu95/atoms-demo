@@ -169,7 +169,7 @@ class DatabaseInstallationIT {
 
     private void assertMigrations() {
         assertThat(jdbc.queryForList("SELECT version FROM standalone_app.flyway_schema_history ORDER BY installed_rank", String.class))
-                .containsExactly("001", "002");
+                .containsExactly("001", "002", "003");
         assertThat(jdbc.queryForObject("SELECT bool_and(success) FROM standalone_app.flyway_schema_history", Boolean.class)).isTrue();
     }
 
