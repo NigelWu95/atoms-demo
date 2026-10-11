@@ -91,7 +91,8 @@
 - 文件：`B/SecurityConfig.java`、`B/SessionController.java`、`B/GuestIdentityService.java`、`B/SecurityHeadersFilter.java`、`BT/SessionIT.java`。
 - 验收：① csrf → 空对象 session 建立自己的访客、持久会话和身份，重复初始化不换访客；② 登录旋转 Cookie/CSRF，7 天有效期，缺/错 CSRF、跨访客与平台 Cookie 都不能越权；③ Cookie 名区分实例，宿主 CSP 严格、无 wildcard CORS，未认证应用/状态端点 401。
 - 验证：V-B；两个 Cookie jar、旧 Cookie/令牌和另一实例 Cookie 反例；跨真实进程重启在 EB22 再验。
-- 切片 EB08a：GuestIdentityService、SessionController、既有 SecurityConfiguration、SecurityHeadersFilter、SessionIT；复用已有安全配置类，不另建同职责 SecurityConfig。
+- [x] EB08a：GuestIdentityService、SessionController、既有 SecurityConfiguration、SessionIT、ApiExceptionHandler；复用已有安全配置类，接通 JDBC 会话和 CSRF/会话 ID 轮换。7 项会话用例先失败，补齐数据库事务异常映射后 110 单元 + 36 IT 全部通过。
+- [ ] EB08b：SecurityHeadersFilter、SecurityHeadersTest、RequestBoundaryFilter、SecurityConfiguration、SessionIT；统一早期拒绝的安全响应头、同源策略与仅请求头 CSRF，完成安全复核。
 
 ### C-EB03 · 真实会话切片
 

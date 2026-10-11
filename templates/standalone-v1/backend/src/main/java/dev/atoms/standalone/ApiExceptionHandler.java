@@ -44,7 +44,8 @@ final class ApiExceptionHandler {
     static ApiException.Code classify(Throwable failure) {
         for (int depth = 0; failure != null && depth < 10; depth++, failure = failure.getCause()) {
             if (failure instanceof ApiException api) return api.code();
-            if (failure instanceof DataAccessException) return ApiException.Code.SERVICE_UNAVAILABLE;
+            if (failure instanceof DataAccessException || failure instanceof java.sql.SQLException)
+                return ApiException.Code.SERVICE_UNAVAILABLE;
             if (failure instanceof NoResourceFoundException) return ApiException.Code.NOT_FOUND;
             if (failure instanceof HttpRequestMethodNotSupportedException) return ApiException.Code.METHOD_NOT_ALLOWED;
             if (failure instanceof HttpMessageNotReadableException || failure instanceof HttpMediaTypeNotSupportedException
