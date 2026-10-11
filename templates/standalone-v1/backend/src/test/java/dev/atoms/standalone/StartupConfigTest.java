@@ -189,6 +189,18 @@ class StartupConfigTest {
     }
 
     @Test
+    void sharedRuntimeValidationStillRejectsTestModeAndDoesNotMutateProperties() {
+        var values = new Properties();
+        values.putAll(settings());
+        Properties before = (Properties) values.clone();
+        StartupConfig.runtimeEnvironment(values);
+        assertThat(values).isEqualTo(before);
+        values.setProperty("standalone.test-database", "true");
+        assertThatThrownBy(() -> StartupConfig.runtimeEnvironment(values))
+                .hasMessageStartingWith("CONFIG_INVALID:").hasNoCause();
+    }
+
+    @Test
     void realJavaProcessExitsNonzeroWithoutStartingSpringOrPrintingSecrets() throws Exception {
         var values = settings();
         values.remove("STANDALONE_DB_PASSWORD");

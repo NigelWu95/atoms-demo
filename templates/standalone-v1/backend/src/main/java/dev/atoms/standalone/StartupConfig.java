@@ -28,7 +28,10 @@ final class StartupConfig {
     private StartupConfig() {}
 
     static ConfigurableEnvironment load(String... args) {
-        Properties config = read(location(args));
+        return runtimeEnvironment(read(location(args)));
+    }
+
+    static ConfigurableEnvironment runtimeEnvironment(Properties config) {
         if (!KEYS.containsAll(config.stringPropertyNames())) throw invalid("supported configuration keys");
         if (!"false".equals(config.getProperty("standalone.test-database", "false"))) {
             throw invalid("runtime configuration must not use a test database file");
@@ -88,7 +91,7 @@ final class StartupConfig {
         throw new IllegalStateException("CONFIG_USAGE: supply only --spring.config.location=classpath:/application.yml,file:/absolute/path/application.properties");
     }
 
-    private static Properties read(Path file) {
+    static Properties read(Path file) {
         try {
             if (!Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS)) throw new IOException();
             try (var input = Files.newInputStream(file, LinkOption.NOFOLLOW_LINKS)) {
