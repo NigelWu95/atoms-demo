@@ -18,8 +18,8 @@
 
 | 项目 | 位置 / 状态 |
 |---|---|
-| 发布版本 | `atoms-demo-txj7Bn`，源码 `246c744efef4fe62ca3039f46bb2b7e898b350c8`，打包时 dirty=false |
-| 程序 | `/opt/atoms-demo/releases/atoms-demo-txj7Bn`；`/opt/atoms-demo/current` 为其符号链接；旧 `atoms-demo-RTV1eK`、`atoms-demo-X4tLzj`、`atoms-demo-Dpprat`（HTTP）和 `atoms-demo-XmTJCF`（HTTPS）保留 |
+| 发布版本 | `atoms-demo-slKx1w`，源码 `ca4dac816345be8c05c180202703f21aa561b564`，打包时 dirty=false；2026-10-11 更新 |
+| 程序 | `/opt/atoms-demo/releases/atoms-demo-slKx1w`；`/opt/atoms-demo/current` 为其符号链接；旧 `atoms-demo-txj7Bn` 及此前发布包保留 |
 | 外部配置 | `/etc/atoms-demo/application.properties`，root:atoms / 0640，目录 0750 |
 | TLS（未启用） | `/etc/atoms-demo/tls/server.crt`、`server.key` 为回退保留；私钥 root / 0600，目录 0700 |
 | 后端服务 | `atoms-demo.service`，非 root 的 `atoms` 账号，单实例 |
@@ -100,7 +100,7 @@
 
 本机更新脚本位于 `/private/tmp/atoms-limit-upgrade.r05nQs/deploy.sh`，远端位于 `/var/tmp/atoms-limit-upgrade.ATQ9hP/`；脚本不含凭据。GNU tar 忽略 macOS provenance 扩展属性，所有载荷校验通过。
 
-## 单次额度提高至 168400（2026-10-08，当前）
+## 单次额度提高至 168400（2026-10-08，参数仍沿用）
 
 16840 配置下的新任务 `9e4dab9a-0f99-49d0-95b6-0b1fd2f559e0` 在 BUILDING 约 63 秒后返回 length：输入 1348、completion 16840、其中 reasoning 16266；规划成功，整轮共 2 次调用，没有新版本或自动重试。累计预留增至 6。这说明额度包含思考与最终内容，不能将其视为纯代码额度；不是超时或旧包未更新。
 
@@ -111,6 +111,24 @@
 升级前无活动任务，备份 `/var/backups/atoms-demo/model-168400.GjCYng/` 含私有配置与数据库 dump，目录 0700、文件 0600；仅检查 dump 目录，未做此次备份恢复演练。仅修改 token 一项，其他配置经无内容输出的比较确认一致，权限保留 root:atoms / 0640。服务重启后实际配置为 168400 / 300 / 600，三个服务 active、NRestarts=0；公网首页 200、健康检查 UP。累计仍为 6 / 100，剩余 94，没有额外模型调用。
 
 回退：停后端，切回 `atoms-demo-RTV1eK`，同时恢复本次备份配置为 root:atoms / 0640（16840 / 300 / 600），启动后检查健康；旧包不接受 168400，不可只切包而保留新值。不恢复数据库、不删除项目、不重置记账。脚本保留于本机 `/private/tmp/atoms-token-168400.AFQH4c/`、远端 `/var/tmp/atoms-token-168400.N2kmjU/`；不含凭据。GNU tar 的 macOS provenance 扩展属性警告不影响已通过校验的文件。
+
+## 项目状态与历史恢复上线（2026-10-11，当前程序）
+
+新增：在工作台选择历史版本并确认后，将历史代码复制为新版本，保留所有历史、业务数据和已发布指针，不自动发布。修复：首页/项目列表按当前保存版本显示“已生成 / 尚未生成”，不再固定显示未生成。完整工程导出、独立后端和应用级数据库仍未实现。
+
+源码 `ca4dac816345be8c05c180202703f21aa561b564` 已推送至 GitHub main；发布包 `atoms-demo-slKx1w.tar.gz` 的 SHA-256 为 `0680171e3c4664354075aebf1774e68efe6ea67d5f06e5b206515052eaa09cb9`，干净工作树构建，服务器校验归档与 13 个载荷文件一致。文档提交可晚于该程序提交，不改写已发布归档。
+
+- 正式构建：3 项打包测试、前端 112 项单测、后端 26 项单测与 50 项 PostgreSQL 集成测试通过，类型、lint、格式、构建通过；npm audit 为 0 已知漏洞，未更改依赖。
+- 同一源码的 18 项本地 runtime Chrome 回归已在功能验收时通过；本次额外用真实新发布包运行 Nginx/TLS/JAR 浏览器验收，3 项通过，覆盖会话、项目刷新、预览、发布/LIVE 数据隔离、下线及代理边界。
+- 先在隔离测试库验证旧 `atoms-demo-txj7Bn`：V010 已存在时 Flyway 校验通过，只提示数据库比旧包最新迁移 V009 更新；旧包启动正常，3 项发布包浏览器验收通过。这是程序回退兼容性验证，不是把旧包部署回服务器，也没有恢复数据库。
+- 升级前没有 QUEUED/RUNNING 任务。停后端后备份 `/var/backups/atoms-demo/restoration.zDKZ1V/`，含数据库 dump、外部配置、Nginx 和 systemd 配置；目录 root/0700，dump 与配置 root/0600，不公开。dump 目录校验通过，本次未另做备份恢复演练。
+- 15:47（Asia/Shanghai）新程序启动，Flyway 从 V009 增量迁移至 V010，共 11 条成功记录。升级前后原有 7 个项目、7 个版本、5 条应用状态、发布记录、模型调用及预算的内容摘要一致；仅新增恢复来源字段，未回填或删除数据。外部配置逐字节一致，模型参数仍为 168400 / 300 秒 / 600 秒 / 累计 100 次。
+- 三个服务 active，后端 NRestarts=0，公网 HTTP 首页 200、health=UP。独立 Chrome 实际验证新版资源、创建/列表/深链接刷新、恢复接口非法请求 422 且不改变项目、CSRF 403、另一访客读取私有项目 404、测试/敏感路径 404；正常 UI 无 console warning/error/pageerror，已检查 1440px 与 390px 截图。
+- 公网验收只新增一个独立访客的空测试项目，没有操作真实用户项目或提交有效恢复请求。累计模型请求仍为 18 / 100，未发起任何付费模型调用。云端实际历史恢复闭环、生成发布/LIVE 闭环仍未实测，不能把本地通过等同于云端全流程通过。
+
+本机脚本与截图位于 `/private/tmp/atoms-restoration-deploy.VQzXE8/`，服务器脚本位于 `/var/tmp/atoms-restoration-deploy.UBXZbO/`，无凭据；不上传浏览器会话。GNU tar 忽略 macOS provenance 扩展属性的警告不影响载荷哈希。Chrome DevTools MCP 不可用，使用现有 Playwright 独立 Chrome。
+
+回退：停止 `atoms-demo`，将 `current` 切回保留的 `/opt/atoms-demo/releases/atoms-demo-txj7Bn`，启动并检查 HTTP health 与页面。**保留 V010、全部新版本和业务数据，不删列、不改 Flyway 记录、不恢复数据库**；配置及 Nginx 不需要改变。旧包不会展示恢复入口或来源信息，但仍可读取恢复后保存的新版本。旧包与迁移后 schema 的兼容性已在隔离库实测；真正恢复备份会丢失备份后的写入，必须另外获批。
 
 ## 备份及运维
 
