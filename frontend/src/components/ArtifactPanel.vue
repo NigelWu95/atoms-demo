@@ -5,8 +5,11 @@ import { getVersion, listVersions, type Version, type VersionSummary } from '../
 import { errorMessage } from '../api/client'
 import PreviewFrame from './PreviewFrame.vue'
 import SourceViewer from './SourceViewer.vue'
+import RestorationPanel from './RestorationPanel.vue'
 
 const props = defineProps<{ project: Project | null }>()
+const emit = defineEmits<{ changed: [Project] }>()
+const restorationLocked = ref(false)
 const view = ref<'preview' | 'code'>('preview')
 const device = ref<'desktop' | 'mobile'>('desktop')
 const versions = ref<VersionSummary[]>([])
@@ -91,7 +94,7 @@ watch(
     <div v-if="project?.currentVersionId" class="version-toolbar">
       <label
         >代码版本
-        <select v-model="selected" aria-label="代码版本">
+        <select v-model="selected" aria-label="代码版本" :disabled="restorationLocked">
           <option v-for="item in versions" :key="item.id" :value="item.id">
             V{{ item.versionNo }} ·
             {{ item.id === project.currentVersionId ? '当前版本' : '历史只读' }}
@@ -109,6 +112,14 @@ watch(
         >独立预览 ↗</RouterLink
       >
     </div>
+    <RestorationPanel
+      v-if="project?.currentVersionId"
+      :key="project.id"
+      :project="project"
+      :version="version"
+      @changed="emit('changed', $event)"
+      @locked="restorationLocked = $event"
+    />
     <p v-if="error" class="inline-error" role="alert">{{ error }} 请重新打开项目。</p>
     <div class="preview-stage" :aria-busy="loading">
       <div class="preview-canvas" :class="{ 'mobile-canvas': device === 'mobile' }">

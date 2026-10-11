@@ -9,6 +9,34 @@ async function openTodo(page: Page, fixture = 'todo') {
   await expect(page.getByText('应用已启动', { exact: true })).toBeVisible()
   return page.frameLocator('iframe')
 }
+test('generated projects retain their status on home, project list and reload', async ({
+  page,
+}, testInfo) => {
+  const errors: string[] = []
+  page.on('pageerror', (error) => errors.push(error.message))
+  page.on('console', (message) => {
+    if (['warning', 'error'].includes(message.type())) errors.push(message.text())
+  })
+  await openTodo(page)
+  const path = new URL(page.url()).pathname
+  await page.getByRole('link', { name: '← 返回创作' }).click()
+  const row = page.locator(`.project-row[href="${path}"]`)
+  await expect(row).toContainText('已生成')
+  await expect(row).not.toContainText('尚未生成')
+  await expect(page.getByText('AI 生成稍后接入', { exact: false })).toHaveCount(0)
+  await page.getByRole('link', { name: '我的项目', exact: true }).click()
+  await expect(row).toContainText('已生成')
+  await page.reload()
+  await expect(row).toContainText('已生成')
+  await expect(row).not.toContainText('尚未生成')
+  await page.screenshot({
+    path: testInfo.outputPath('generated-project-status.png'),
+    fullPage: true,
+  })
+  await row.click()
+  await expect(page.getByText('应用已启动', { exact: true })).toBeVisible()
+  expect(errors).toEqual([])
+})
 test('todo adds, completes, survives reload and shows real source in a private wrapper', async ({
   page,
   context,
@@ -120,7 +148,7 @@ test('history uses initial state only and refuses saving', async ({ page }) => {
   page.on('request', (request) => {
     if (request.url().includes('/preview-state')) requests.push(request.url())
   })
-  await page.getByLabel('代码版本').selectOption({ label: 'V1 · 历史只读' })
+  await page.getByLabel('代码版本', { exact: true }).selectOption({ label: 'V1 · 历史只读' })
   await expect(page.getByText('历史只读 · 使用初始数据')).toBeVisible()
   await expect(page.getByText('应用已启动', { exact: true })).toBeVisible()
   await expect(frame.getByRole('checkbox')).toHaveCount(0)
@@ -128,7 +156,7 @@ test('history uses initial state only and refuses saving', async ({ page }) => {
   await frame.getByRole('button', { name: '添加待办' }).click()
   await expect(page.getByText(/历史预览只读，不能保存/).first()).toBeVisible()
   expect(requests).toEqual([])
-  await page.getByLabel('代码版本').selectOption({ label: 'V2 · 当前版本' })
+  await page.getByLabel('代码版本', { exact: true }).selectOption({ label: 'V2 · 当前版本' })
   await expect(frame.getByText('当前版本真实数据', { exact: true })).toBeVisible()
 })
 

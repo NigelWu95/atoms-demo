@@ -76,7 +76,7 @@ test('real DeepSeek creates, persists and modifies a working todo app', async ({
       '保留现有任务、完成状态、添加与完成操作以及所有可访问名称。增加两个筛选按钮，文字分别为“仅看未完成”和“显示全部”。点击前者只显示未完成任务，后者显示所有任务。不要改变现有数据字段，也不要清空已保存任务。',
     )
   await generate(page, '修改应用')
-  await expect(page.getByLabel('代码版本')).toContainText('V2')
+  await expect(page.getByLabel('代码版本', { exact: true })).toContainText('V2')
   await expect(frame.getByRole('checkbox', { name: '真实生成验收任务', exact: true })).toBeChecked()
   await frame.getByRole('button', { name: '仅看未完成', exact: true }).click()
   await expect(frame.getByRole('checkbox', { name: '真实生成验收任务', exact: true })).toHaveCount(
