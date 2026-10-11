@@ -98,7 +98,7 @@
 ### C-EB03 · 真实会话切片
 
 - [x] 技术验收与自审：EB07–EB08 接口可调用且鉴权失败路径通过；真实 JAR 的 A/B 实例各有独立库及 Cookie 名称，A Cookie 即使改成 B 的名称也不能鉴权；A 的有效 Cookie/CSRF 跨真实进程重启恢复同一访客且不影响 B。进程已停止，数据库保留；未完成业务状态保存或浏览器工程验收。
-- [ ] 人工审阅本检查点交付；未授权主分支合并、GitHub 推送或部署。
+- [x] 2026-10-12 用户确认继续下一切片；未授权主分支合并、GitHub 推送或部署，完整代码人工审阅仍留在合并前。
 
 ## C · 应用进入沙箱
 
@@ -108,6 +108,7 @@
 - 文件：`B/ApplicationArtifactLoader.java`、`BT/ApplicationArtifactTest.java`、`BT/TestApplication.java`、`T/scripts/package-application.mjs`、`T/scripts/package-application.test.mjs`。
 - 验收：① 只读取四个固定 application 文件，校验 manifest/初始状态/源码，非法或缺失明确失败；② 打包脚本对实际应用与受控运行资源计算稳定 runtime ID，变化会更新，路径/时间不影响；③ 公开描述不泄露内部配置，sourceContentHash 仅标示历史来源。
 - 验证：V-BU；模板根 `node --test scripts/package-application.test.mjs`；TestApplication 提供独立工程自身检查需要的固定输入与 V-D 引导，不在正式包缺文件时 fallback 到夹具。实际应用不可变模型作为 loader 的嵌套 record，若扩散则拆子任务；构建接线在 EB18 完成。
+- 实施拆分（每组最多 5 个主要文件）：EB09a 应用校验及 HTML 白名单（loader、ApplicationHtml、单元测试）；EB09b 内容指纹、资源打包脚本及双语言一致性测试；EB09c 测试专用引导与现有 HTTP 测试接线。测试夹具只通过显式测试引导注入，不成为生产缺文件的后备。
 
 ### EB10 · 受限运行文档端点（M）
 
@@ -115,6 +116,7 @@
 - 文件：`B/RuntimeDocumentService.java`、`B/AppController.java`、`R/runtime/bootstrap.js`、`R/runtime/document.html`、`BT/RuntimeDocumentIT.java`。
 - 验收：① GET app/document 只服务当前独立应用并要求身份；② 复用净化与上下文编码语义，iframe 专用 CSP 不放宽宿主策略；③ 保持 Atoms.ready/storage 协议，恶意闭合 script、事件属性/导航/联网输入不能扩大权限。
 - 验证：V-B；测试与平台运行文档共用的攻击向量，核对 document 的 CSP/X-Frame-Options 组合，不能通过删除冲突头之外的所有保护来放行。
+- 实施拆分：EB10a 原样移植受控 runtime 资源及兼容校验；EB10b 渲染服务、端点、生产资源 Bean 和 HTTP 测试；EB10c 专用响应头策略与失败响应回归。先有 runtime 资源再完成 EB09b 指纹验收；最终前端构建产物纳入标识在 EB18 接线时补齐。
 
 ### C-EB04 · 内容边界检查点
 
