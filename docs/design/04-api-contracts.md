@@ -107,7 +107,7 @@ intent 为 CREATE、MODIFY，P1 可增加 REPAIR。CREATE 使用 null 基线和 
 | GET `/api/projects/{id}/versions/{versionId}/document` | previewMode=CURRENT/HISTORY | 带强制响应级沙箱的 HTML，需项目权限 |
 | POST `/api/projects/{id}/versions/{versionId}/preview-reports` | PreviewReport，幂等键 | 201 `{reportId, status}` |
 | GET `/api/projects/{id}/versions/{versionId}/preview-reports/latest` | 所有者权限 | 最近保存的检查报告；未检查为 UNKNOWN |
-| POST `/api/projects/{id}/restorations` | `{sourceVersionId, expectedProjectRevision}` | P1，201 新版本 |
+| POST `/api/projects/{id}/restorations` | `{sourceVersionId, expectedProjectRevision}`，幂等键 | 201 新版本详情 |
 | GET `/api/projects/{id}/publication` | 项目权限 | Publication，首次未发布时 revision=0 |
 | PUT `/api/projects/{id}/publication` | PublishRequest，幂等键 | 200 Publication + publicUrl |
 | DELETE `/api/projects/{id}/publication?expectedPublicationRevision=...` | 项目权限、CSRF、幂等键 | 204，下线；原意图重试不影响后续重新发布 |
@@ -118,9 +118,10 @@ intent 为 CREATE、MODIFY，P1 可增加 REPAIR。CREATE 使用 null 基线和 
 
 本地 T10–T15 / T25 实现约束（2026-10-07）：
 
-- 已实现本表版本 GET、预览报告 POST/最新 GET、发布 GET/PUT/DELETE 及公开元信息/运行文档；恢复版本仍是后续设计。版本写入只开放内部事务服务，没有生产 POST 源码接口。公开入口目前仅本地可用，公网网关尚未接通。
-- 版本摘要字段为 `id, projectId, versionNo, contentHash, basedOnId, createdAt`；详情在相同字段之外返回 `artifact`。UUID 为小写标准格式；版本列表按 versionNo 倒序，cursor 是上一页最后版本号的十进制字符串（客户端仍按不透明游标传回）；limit=1–100，默认 20。
+- 已实现本表版本 GET、历史恢复 POST、预览报告 POST/最新 GET、发布 GET/PUT/DELETE 及公开元信息/运行文档。任意源码写入只开放内部事务服务，恢复 POST 只能复制同项目既有版本，不接受客户端源码。公开入口按服务器配置提供路径链接；云端验收范围见部署记录。
+- 版本摘要字段为 `id, projectId, versionNo, contentHash, basedOnId, restoredFromId, createdAt`；详情在相同字段之外返回 `artifact`。`restoredFromId` 为可空的增量字段，普通生成和旧版本为 null，恢复版本指向历史来源；`basedOnId` 仍为恢复时的当前版本。UUID 为小写标准格式；版本列表按 versionNo 倒序，cursor 是上一页最后版本号的十进制字符串（客户端仍按不透明游标传回）；limit=1–100，默认 20。
 - 内部保存同时验证项目 revision 和基线版本，冲突为 409 BASE_VERSION_CONFLICT；成功后 projectRevision+1。重复内容 hash 允许产生新版本，源码不可修改或删除。
+- 恢复要求项目归属、有效 CSRF、幂等键、规范来源 UUID，以及 `0 <= expectedProjectRevision < 9007199254740991` 的整数，拒绝额外字段。来源不可读返回 404，输入形状错误为 422 INVALID_RESTORATION；新意图有活动生成时返回 409 RUN_ALREADY_ACTIVE，修订号不匹配为 409 BASE_VERSION_CONFLICT。成功创建下一版本并推进当前指针，保留业务数据、历史、发布指针；新报告 UNKNOWN。原成功意图在项目推进后仍返回原 201，不再次恢复。端点恢复流程不调用模型，前端成功后再 GET 当前项目。
 - document 的 previewMode 默认 CURRENT，非 CURRENT/HISTORY 返回 422 INVALID_PREVIEW_MODE；旧版本 CURRENT 返回 409 STALE_APP_VERSION。HISTORY 的 SDK get 只返回该版本 initialState/revision=0，save 返回 READ_ONLY_PREVIEW，不调用持久状态接口。
 - HTML 使用解析白名单：基本布局/文本、表格、交互控件、受限 SVG；不含 URL 属性、form、事件属性或嵌套框架。源码文件合计 120 KiB UTF-8；初始数据对象 256 KiB JSON UTF-8；不支持内容返回 422 INVALID_ARTIFACT。宿主使用 Acorn 的 ES2022 经典脚本语法解析，失败时不创建 iframe；SDK ready/error、error/unhandledrejection 形成独立观察结果，用户显式保存为版本报告。直接 document 不经过宿主解析，因此解析和报告不属于安全边界。
 - 运行文档才有 inline-only 脚本/CSS 和 HTTP sandbox；管理 API 仍禁止嵌入。具体取舍见 [ADR-004](../decisions/004-immutable-artifacts-runtime.md)。

@@ -1,5 +1,7 @@
 # Atoms Demo Studio
 
+提交说明：[实现思路、完成程度与后续优先级](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-summary.md)。
+
 Java 17 + Spring Boot + Vue 工程。已实现访客与项目持久化、代码版本与受限预览、应用数据保存，并接通 DeepSeek 网关、后台规划/构建/有限修复及普通工作台的生成与修改交互。已提交的需求、规划和任务结果会保存到数据库。**本地真实 DeepSeek 的“生成待办 → 操作保存 → 刷新恢复 → 修改生成 V2 → 筛选且保留原数据”闭环已通过**，详见下文。固定版本发布、独立应用页面和 LIVE 数据隔离已实现；云端真实 2048 生成、预览操作和保存/刷新恢复已通过，云端发布与 LIVE 闭环仍待验收。设计见 [设计目录](docs/design/README.md)，唯一进度清单见 [tasks/todo.md](docs/design/tasks/todo.md)。
 
 2026-10-08 已按用户要求部署到 **<http://118.195.239.8:8443>**：单台云服务器原生运行整套平台和 PostgreSQL，按 `/a/<slug>` 发布应用。不接 ngrok、不等待域名；初始 HTTPS 已按用户明确要求切换为临时 HTTP Demo，流量未加密。HTTP 使用独立访客 Cookie，旧 HTTPS 项目不删除但不会自动归属新访客。云端已按用户授权同步 DeepSeek 密钥，累计调用上限 100 次由公网访客共用；最新配置为单次上限 **168400 tokens**（包含思考与最终输出）、单次超时 300 秒、整轮超时 600 秒，本地数据与私有配置不变。此前云端 2048 在 32768 tokens / 180 秒配置下已验证生成中刷新后 SSE 恢复、自动预览、游戏合并计分和状态刷新恢复。随后 16840 配置下的一次构建因 length 失败，其中 16266 tokens 用于推理；用户因此要求提高至 168400。本次调整不调用模型，部署后累计 6 / 100；更高额度不保证所有需求均能在超时和响应大小限制内完成。云端发布/LIVE 闭环仍待验收。见 [实际部署记录与回退](docs/cloud-deployment.md)、[ADR-011](docs/decisions/011-single-server-release.md) 和 [服务器部署说明](deploy/server/README.md)。数据库和后端内部端口不直接开放公网。
@@ -113,7 +115,7 @@ npm run dev:fixtures
 
 装载器只编译到 test classpath，校验数据库名、角色和回环绑定，不进入正式 JAR。不要把 test-run 入口暴露到公网。普通后端仍用 spring-boot:run，二者端口不同，可同时运行。
 
-前端目录运行 `npm run test:e2e:runtime`，会自动启动或复用 8081/5174 服务，执行 15 项独立 Chrome 验收，包含发布/下线和公开访客数据。普通 E2E 为 14 项；建议两套按顺序运行。测试位于 `frontend/e2e-runtime`，截图/trace 位于忽略提交的 `frontend/test-results-runtime`；它与普通 E2E 输出分离。trace 可能含测试会话信息，不应公开上传。测试 profile 关闭生成 Worker；不要在 5174 测试台调用模型。实现边界见 [ADR-004](docs/decisions/004-immutable-artifacts-runtime.md) 和 [ADR-005](docs/decisions/005-preview-state-bridge.md)。
+前端目录运行 `npm run test:e2e:runtime`，会自动启动或复用 8081/5174 服务，执行 18 项独立 Chrome 验收，包含发布/下线、公开访客数据、版本恢复与项目生成状态。普通 E2E 为 14 项；建议两套按顺序运行。测试位于 `frontend/e2e-runtime`，截图/trace 位于忽略提交的 `frontend/test-results-runtime`；它与普通 E2E 输出分离。trace 可能含测试会话信息，不应公开上传。测试 profile 关闭生成 Worker；不要在 5174 测试台调用模型。实现边界见 [ADR-004](docs/decisions/004-immutable-artifacts-runtime.md) 和 [ADR-005](docs/decisions/005-preview-state-bridge.md)。
 
 ## 当前可体验的交互
 
@@ -145,7 +147,9 @@ npm run dev:fixtures
 
 发布新增 `GET/PUT /api/projects/{id}/publication` 和 `DELETE /api/projects/{id}/publication?expectedPublicationRevision=...`，仅所有者可管理，写入需 CSRF/幂等键。匿名 `GET /api/public/apps/{slug}`、`GET /api/public/apps/{slug}/document?versionId=...` 仅返回已发布版本；`GET/PUT /api/public/apps/{slug}/state` 要求访客会话，GET 携带 versionId，PUT 携带已加载版本和预期状态 revision。已下线返回 404，旧版本新请求返回 409。
 
-生成新增 `GET /api/generation`（是否配置、Worker 是否启用、剩余请求数）、`POST/GET /api/projects/{id}/runs`、`GET /api/projects/{id}/messages`、`GET /api/runs/{runId}`、`GET /api/runs/{runId}/events?after=...`（SSE）及 `PUT /api/runs/{runId}/cancellation`。这些生成接口均需访客身份；项目、消息、任务和事件必须属于当前访客。SSE 优先使用重连的 Last-Event-ID，终态已补齐返回 204。具体字段和边界见 [接口契约](docs/design/04-api-contracts.md)。版本恢复等扩展端点仍未实现。
+生成新增 `GET /api/generation`（是否配置、Worker 是否启用、剩余请求数）、`POST/GET /api/projects/{id}/runs`、`GET /api/projects/{id}/messages`、`GET /api/runs/{runId}`、`GET /api/runs/{runId}/events?after=...`（SSE）及 `PUT /api/runs/{runId}/cancellation`。这些生成接口均需访客身份；项目、消息、任务和事件必须属于当前访客。SSE 优先使用重连的 Last-Event-ID，终态已补齐返回 204。具体字段和边界见 [接口契约](docs/design/04-api-contracts.md)。
+
+历史恢复：在工作台选择历史代码版本，点击“恢复此版本”并确认，服务端通过 `POST /api/projects/{id}/restorations` 复制源码为新版本（例如恢复 V1 得到 V3），保留 V2、业务数据和已发布指针，不自动发布。要求项目所有者、CSRF、幂等键、项目修订号匹配且无活动生成；结果未知时可重试原恢复操作。V010 是新增可空恢复来源列的迁移，详见 [ADR-012](docs/decisions/012-version-restoration.md)。本轮仅本地实现与验证，云端尚未更新。首页与项目列表按 `currentVersionId` 显示是否已生成，不再使用固定“尚未生成”文案；“已生成”不代表预览检查或发布通过。
 
 ## PostgreSQL
 

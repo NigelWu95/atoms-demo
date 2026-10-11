@@ -480,7 +480,7 @@ T10–T15 使用固定手工计数器/待办检验源码落库、执行隔离、
 
 ### T32 · 实现恢复为新版本
 
-- [ ] 完成 T32（P1 优先，M）
+- [x] 完成 T32（P1 优先，M；2026-10-11 本地通过，未部署）
 - 说明：复用快照能力，历史恢复不覆盖历史记录，也不回滚业务数据。
 - 依赖：T31、T10、T07。
 - 主要文件：`B/artifact/RestorationController.java`、`B/artifact/ArtifactService.java`、`B/project/ProjectService.java`、`BT/artifact/RestorationIT.java`。
@@ -489,10 +489,11 @@ T10–T15 使用固定手工计数器/待办检验源码落库、执行隔离、
   2. 检查所有者、expectedProjectRevision 和无活动 run；相同幂等请求不重复恢复。
   3. 当前指针更新，但 app_states 和 publication 不变；新版本检查状态按契约重新建立。
 - 验证：V-B；A20、恢复竞争、越权、重复请求和活动 run 冲突用例。
+- 证据：RestorationIT 4 项通过；V1 → V2 → 恢复 V1 为 V3，来源、hash、旧版本、数据、发布指针、报告 UNKNOWN、CSRF/归属与并发幂等均验证。全量后端 26 单元 + 50 集成测试通过。
 
 ### T33 · 完成历史查看和恢复交互
 
-- [ ] 完成 T33（P1 优先，M）
+- [x] 完成 T33（P1 优先，M；2026-10-11 本地通过，未部署）
 - 说明：提供历史入口、只读预览和明确说明后果的恢复确认。
 - 依赖：T32、T15。
 - 主要文件：`F/components/VersionHistoryPanel.vue`、`F/pages/WorkbenchPage.vue`、`F/api/artifacts.ts`、`F/runtime/previewContext.ts`、`e2e/history.spec.ts`。
@@ -501,10 +502,11 @@ T10–T15 使用固定手工计数器/待办检验源码落库、执行隔离、
   2. 确认弹窗说明“恢复代码、不回滚数据、不自动发布”，恢复后展示新的版本号。
   3. 恢复失败保留现状；检查旧版本和业务数据仍在，线上版本未改变。
 - 验证：V-F、历史 E2E、V-X；录制完整 V1 → V2 → V3 过程。
+- 证据：恢复确认使用内联区域和显式勾选；浏览器验证 V3 数据保留、V2 可读、已发布 V2 不变及未知响应同键重试。4 项组件用例通过，完整运行时 18 项 Chrome 回归通过；详见 verification 和 ADR-012。
 
 ### C13 · 延展能力检查点
 
-- [ ] 已做 M8 时，通过 A20 并记录证据；未做时明确标注跳过，不把该功能写入已实现清单。
+- [x] M8 / A20 已在本地通过并记录证据；云端升级与真实用户项目验收仍未执行。
 
 ## M9 · 最终回归与交付
 
