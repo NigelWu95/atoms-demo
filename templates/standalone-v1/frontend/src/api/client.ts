@@ -22,6 +22,11 @@ const messages = {
   CANCELLED: '连接已取消。',
   READ_ONLY_PREVIEW: '当前版本尚未接入数据服务，不能读取或保存应用数据。',
   BRIDGE_ERROR: '应用操作未完成，请保留输入后重试。',
+  STATE_CONFLICT: '数据已更新，请先读取最新数据再修改；本次保存未覆盖数据。',
+  STALE_APP_VERSION: '应用版本已更新，请保留输入后重新加载。',
+  IDEMPOTENCY_PAYLOAD_MISMATCH: '同一请求标识不能用于不同内容。',
+  INVALID_INPUT: '请求格式或内容不正确，本次保存未提交。',
+  PAYLOAD_TOO_LARGE: '请求体超过大小限制，本次保存未提交。',
 }
 type FailureCode = keyof typeof messages
 export class ApiFailure extends Error {
@@ -29,12 +34,13 @@ export class ApiFailure extends Error {
     readonly code: FailureCode,
     readonly status = 0,
     readonly requestId?: string,
+    readonly writeUnknown = false,
   ) {
     super(messages[code])
   }
 }
 
-function responseFailure(body: unknown, status: number): ApiFailure {
+export function responseFailure(body: unknown, status: number): ApiFailure {
   const codes: Record<string, number> = {
     SESSION_REQUIRED: 401,
     CSRF_REJECTED: 403,
@@ -42,6 +48,11 @@ function responseFailure(body: unknown, status: number): ApiFailure {
     NOT_FOUND: 404,
     INTERNAL_ERROR: 500,
     SERVICE_UNAVAILABLE: 503,
+    STATE_CONFLICT: 409,
+    STALE_APP_VERSION: 409,
+    IDEMPOTENCY_PAYLOAD_MISMATCH: 409,
+    INVALID_INPUT: 422,
+    PAYLOAD_TOO_LARGE: 413,
   }
   if (
     keys(body, ['error', 'requestId']) &&
@@ -58,6 +69,10 @@ function responseFailure(body: unknown, status: number): ApiFailure {
   )
     return new ApiFailure(body.error.code as FailureCode, status, body.requestId)
   return new ApiFailure('INVALID_RESPONSE', status)
+}
+
+export async function freshCsrf(signal: AbortSignal): Promise<string> {
+  return csrfToken(await request('/api/csrf', signal))
 }
 
 async function request(
