@@ -2,7 +2,16 @@ import { ApiFailure } from '../api/client'
 import { keys } from '../api/responses'
 import { parseRequest, PROTOCOL, type StateDocument, type StateRequest } from './protocol'
 
-export type BridgeStatus = 'connecting' | 'ready' | 'error' | 'saving' | 'saved' | 'unsaved'
+export type BridgeStatus =
+  | 'connecting'
+  | 'ready'
+  | 'error'
+  | 'saving'
+  | 'saved'
+  | 'unsaved'
+  | 'unknown'
+  | 'conflict'
+  | 'offline'
 export type StateHandler = (request: StateRequest, key: string) => Promise<StateDocument>
 export type BridgeReport = (status: BridgeStatus, message: string) => void
 
@@ -95,7 +104,18 @@ export function createRuntimeBridge(
       dataFailed = true
       const error = failure instanceof ApiFailure ? failure : new ApiFailure('BRIDGE_ERROR')
       reply({ ok: false, error: { code: error.code, message: error.message.slice(0, 1000) } })
-      if (!disposed && !runtimeFailed) report('unsaved', error.message)
+      if (!disposed && !runtimeFailed) {
+        if (error.writeUnknown)
+          report(
+            'unknown',
+            `保存结果尚未确认。${error.message}请在应用内重试原操作，不要重复创建。`,
+          )
+        else if (error.code === 'STATE_CONFLICT' || error.code === 'STALE_APP_VERSION')
+          report('conflict', error.message)
+        else if (['NETWORK_ERROR', 'TIMEOUT', 'SERVICE_UNAVAILABLE'].includes(error.code))
+          report('offline', error.message)
+        else report('unsaved', error.message)
+      }
     } finally {
       pending.delete(request.requestId)
     }

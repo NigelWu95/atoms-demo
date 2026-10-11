@@ -16,7 +16,13 @@ const status = computed(
 )
 function reload() {
   if (busy.value) return
-  if (app.value && !window.confirm('重新加载会清除未保存的输入，是否继续？')) return
+  if (
+    app.value &&
+    !window.confirm(
+      '重新加载会清除未保存的输入及待确认操作的重试信息，但不会撤销服务器可能已经完成的保存。是否继续？',
+    )
+  )
+    return
   void refresh()
 }
 </script>
@@ -58,7 +64,7 @@ function reload() {
           </button>
         </div>
 
-        <RuntimeFrame v-if="app" :title="app.title" />
+        <RuntimeFrame v-if="app" :title="app.title" :loaded-runtime-id="app.loadedRuntimeId" />
       </section>
     </main>
 
