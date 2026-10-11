@@ -8,14 +8,7 @@ import static org.assertj.core.api.Assertions.*;
 
 class RuntimeResourcesTest {
     static Map<String, byte[]> fixture() throws Exception {
-        var resources = ApplicationArtifactTest.files();
-        for (String path : new String[]{"runtime/bootstrap.js", "runtime/document.html"}) {
-            try (var stream = RuntimeResourcesTest.class.getClassLoader().getResourceAsStream(path)) {
-                resources.put(path, stream.readAllBytes());
-            }
-        }
-        resources.put("runtime/content.sha256", ApplicationArtifactTest.bytes(RuntimeResources.contentId(resources) + "\n"));
-        return resources;
+        return TestApplication.resourceFiles(TestApplication.files());
     }
     static RuntimeResources load(Map<String, byte[]> resources) {
         return RuntimeResources.load(path -> resources.containsKey(path) ? new ByteArrayInputStream(resources.get(path)) : null);
