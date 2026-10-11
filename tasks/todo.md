@@ -1,6 +1,6 @@
 # engineering-bundle · 开发任务
 
-状态：2026-10-11 用户已批准计划与任务；EB01–EB06 已实现并验证；停在 C-EB02 人工审阅检查点，后续任务未开始。
+状态：2026-10-11 用户已确认 C-EB02 后继续；EB01–EB06 已实现并验证；EB07–EB08 进行中。
 依据：[计划及验证命令](plan.md)、[已批准规格](../SPEC-engineering-bundle.md)。本清单只负责 `engineering-bundle`；原平台任务清单不变。
 
 路径缩写：`P/` = `backend/src/main/java/dev/atoms/demo/engineering/`；`PT/` = 对应平台 `src/test/java/dev/atoms/demo/engineering/`；`T/` = `templates/standalone-v1/`；`B/` = `T/backend/src/main/java/dev/atoms/standalone/`；`BT/` = 对应模板 `src/test/java/dev/atoms/standalone/`；`R/` = `T/backend/src/main/resources/`；`F/` = `T/frontend/src/`。下列路径尚未实现。
@@ -73,7 +73,7 @@
 ### C-EB02 · 可安全连接自己的数据库
 
 - [x] 技术验收：EB04–EB06 单元/脚本/真实 PostgreSQL 测试通过；配置/安装身份误用在迁移或测试清理前失败；私有配置位置与复现命令已记录，未记录凭据。
-- [ ] 人工审阅数据库护栏后继续 EB07；本轮不将自审等同于人工批准。
+- [x] 已向用户交付数据库护栏、取舍与验证记录，用户回复“继续吧”，批准继续 EB07–EB08；不包含合并或部署授权。
 
 ### EB07 · 独立 API 错误与入口限制（M）
 
@@ -81,6 +81,9 @@
 - 文件：`B/ApiError.java`、`B/ApiException.java`、`B/ApiExceptionHandler.java`、`B/RequestBoundaryFilter.java`、`BT/ApiBoundaryIT.java`。
 - 验收：① 错误含稳定 code/retryable/requestId，日志关联但不泄露 SQL/路径/配置；② JSON 大小/深度和非法请求明确拒绝，未知 API 返回 404 JSON 而非页面；③ 401/403/409/413/422/503 状态映射按新契约，不修改平台的错误映射。
 - 验证：V-B，覆盖超限、截断 JSON、未知路由、内部异常脱敏与 requestId 对应。
+- 切片 EB07a：ApiError、ApiException、ApiExceptionHandler、ApiErrorsTest、HealthController，统一可信错误码与脱敏响应。
+- 切片 EB07b：RequestBoundaryFilter、SecurityConfiguration、ApiBoundaryIT、HealthIT，入口字节/JSON 深度限制和安全链错误接线；每片单独验证提交。
+- 入口约束细化：请求体最多 320 KiB（为 256 KiB 状态及外层字段留余量），JSON 最大容器深度 64；拒绝重复键、尾随文档和非 JSON 写入。该上限不是业务状态上限，状态值仍单独限制 256 KiB。
 
 ### EB08 · 独立访客与 CSRF（M）
 
@@ -88,6 +91,7 @@
 - 文件：`B/SecurityConfig.java`、`B/SessionController.java`、`B/GuestIdentityService.java`、`B/SecurityHeadersFilter.java`、`BT/SessionIT.java`。
 - 验收：① csrf → 空对象 session 建立自己的访客、持久会话和身份，重复初始化不换访客；② 登录旋转 Cookie/CSRF，7 天有效期，缺/错 CSRF、跨访客与平台 Cookie 都不能越权；③ Cookie 名区分实例，宿主 CSP 严格、无 wildcard CORS，未认证应用/状态端点 401。
 - 验证：V-B；两个 Cookie jar、旧 Cookie/令牌和另一实例 Cookie 反例；跨真实进程重启在 EB22 再验。
+- 切片 EB08a：GuestIdentityService、SessionController、既有 SecurityConfiguration、SecurityHeadersFilter、SessionIT；复用已有安全配置类，不另建同职责 SecurityConfig。
 
 ### C-EB03 · 真实会话切片
 

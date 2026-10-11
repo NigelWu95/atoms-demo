@@ -1,6 +1,7 @@
 package dev.atoms.standalone;
 
 import java.sql.SQLException;
+import jakarta.servlet.http.HttpServletRequest;
 import java.util.UUID;
 import javax.sql.DataSource;
 import org.slf4j.Logger;
@@ -25,8 +26,8 @@ final class HealthController {
     }
 
     @GetMapping("/api/health")
-    ResponseEntity<?> health() {
-        String requestId = UUID.randomUUID().toString();
+    ResponseEntity<?> health(HttpServletRequest request) {
+        String requestId = ApiError.requestId(request);
         long started = System.nanoTime();
         boolean healthy = available();
         int status = healthy ? 200 : 503;
@@ -34,8 +35,7 @@ final class HealthController {
         event.addKeyValue("event", "health_checked").addKeyValue("entryPoint", "health")
                 .addKeyValue("requestId", requestId).addKeyValue("status", status)
                 .addKeyValue("durationMs", (System.nanoTime() - started) / 1_000_000).log("Database readiness checked");
-        Object body = healthy ? new Health("UP") : new Failure(
-                new Error("SERVICE_UNAVAILABLE", "服务暂不可用，请稍后重试。", true), requestId);
+        Object body = healthy ? new Health("UP") : ApiError.of(request, ApiException.Code.SERVICE_UNAVAILABLE);
         return ResponseEntity.status(status).header("X-Request-Id", requestId).header("Cache-Control", "no-store").body(body);
     }
 
@@ -53,6 +53,4 @@ final class HealthController {
     }
 
     record Health(String status) {}
-    record Error(String code, String message, boolean retryable) {}
-    record Failure(Error error, String requestId) {}
 }
