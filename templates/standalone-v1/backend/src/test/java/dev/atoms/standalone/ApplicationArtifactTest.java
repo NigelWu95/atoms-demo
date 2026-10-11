@@ -3,7 +3,6 @@ package dev.atoms.standalone;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.nio.charset.StandardCharsets;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -11,15 +10,7 @@ import static org.assertj.core.api.Assertions.*;
 
 class ApplicationArtifactTest {
     static Map<String, byte[]> files() {
-        var files = new HashMap<String, byte[]>();
-        files.put("application/manifest.json", bytes("""
-                {"title":"计数器","summary":"独立测试应用","runtime":"web-static-v1",
-                 "stateSchemaVersion":1,"initialState":{"count":0}}
-                """));
-        files.put("application/view.html", bytes("<main><button id=count>0</button></main>"));
-        files.put("application/styles.css", bytes("body { color: black; }"));
-        files.put("application/main.js", bytes("Atoms.ready(async sdk => { await sdk.storage.get(); });"));
-        return files;
+        return TestApplication.files();
     }
     static byte[] bytes(String value) { return value.getBytes(StandardCharsets.UTF_8); }
 
