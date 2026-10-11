@@ -184,6 +184,7 @@
 - 文件：`R/db/migration/V002__app_state.sql`、`B/AppStateService.java`、`B/StateController.java`、`BT/StateReadIT.java`、`F/api/client.ts`。
 - 验收：① 首次 GET 返回 manifest 初始值、revision=0、schema=1，不修改平台数据；② 每个有效访客读取自己的状态，初始对象不会被共享引用污染；③ SDK get 通过真实 API 返回，并保持登录/数据库错误语义。
 - 验证：V-B、V-F；两个会话读取与缺省初始值边界，GET 不意外重置已有数据。
+- 实施拆分：EB15a（3 文件）V002、专用测试清理白名单、迁移断言；EB15b（5 文件）状态文档/服务/控制器、HTTP 测试助手、读取 IT；EB15c 与 EB17 客户端接线一起验证真实 SDK，避免中间界面宣称可保存。
 
 ### EB16 · 原子保存与幂等重放（M）
 
@@ -191,6 +192,7 @@
 - 文件：`R/db/migration/V003__idempotency.sql`、`B/IdempotencyService.java`、`B/AppStateService.java`、`B/StateController.java`、`BT/StateWriteIT.java`。
 - 验收：① 严格 value/大小/revision/schema/runtime ID 校验，旧版本和修订冲突 409；② 同键相同请求只提交一次，同键异体 409，并发由数据库约束与事务保证；③ 成功重放优先于当前 runtime ID 检查，事务失败不留下占位结果，记录保留不短于允许重试期。
 - 验证：V-B；并发同键/异键、初始并发、事务回滚、更新 runtime 后旧成功请求重放、上限输入；不得用内存锁代替数据库测试。
+- 实施拆分：EB16a（5 文件）V003、专用清理/迁移断言、输入规范化及单元测试；EB16b（4 文件）幂等服务、状态保存/控制器、写入 IT。事务按当前访客行锁串行化写入，3 秒锁等待和 5 秒事务预算；状态与成功响应同一事务提交，先重放再核验运行版本。键沿用平台的 1–128 位 ASCII 标识约束；仅收集访客 UUID、请求摘要和必要重放响应，不记录内容日志。当前不自动清理重放记录（至少覆盖 7 天会话重试窗口）；访客删除级联清除状态/重放，定期回收留后续。
 
 ### EB17 · 保存状态与未知结果重试（M）
 
@@ -198,6 +200,7 @@
 - 文件：`F/api/client.ts`、`F/api/client.spec.ts`、`F/runtime/bridge.spec.ts`、`F/App.vue`、`F/App.spec.ts`。
 - 验收：① 待办可保存并刷新恢复，UI 明确 saving/saved/unknown/conflict/offline；② 超时/5xx/坏 2xx 不视为事务失败，只用相同 key/body 重试原意图；③ 冲突/版本变化不覆盖已存状态，不把重新加载称为失败请求已经取消。
 - 验证：V-F、V-B、V-D；注入响应丢失/坏响应/慢请求，并观察真实待办保存和刷新；端到端故障验证由 EB22 固化。
+- 实施拆分：EB17a（最多 5 文件）通用响应边界/错误码、状态客户端及测试；EB17b（最多 5 文件）桥状态/测试、RuntimeFrame/测试、App 重载提示；EB17c（最多 5 文件）真实待办测试应用、外壳浏览器/文档浏览器回归及必要组件断言。未知结果由 SDK 保留原意图，应用内显式重试；宿主不偷偷改键、重放或重建访客。
 
 ### C-EB07 · 独立数据主流程
 

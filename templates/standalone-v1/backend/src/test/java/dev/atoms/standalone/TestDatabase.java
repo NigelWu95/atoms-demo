@@ -32,7 +32,7 @@ public final class TestDatabase implements ApplicationContextInitializer<Configu
         var environment = load(); // Actual test marker/role/schema verified before any cleanup.
         try (var connection = dataSource(environment).getConnection(); var statement = connection.createStatement()) {
             statement.setQueryTimeout(3);
-            statement.execute("DROP TABLE IF EXISTS standalone_app.spring_session_attributes, standalone_app.spring_session, "
+            statement.execute("DROP TABLE IF EXISTS standalone_app.app_state, standalone_app.spring_session_attributes, standalone_app.spring_session, "
                     + "standalone_app.guest_users, standalone_app.installation, standalone_app.flyway_schema_history");
         } catch (SQLException ignored) {
             throw new IllegalStateException("TEST_DATABASE_RESET_FAILED: dedicated fixture tables could not be reset.");
