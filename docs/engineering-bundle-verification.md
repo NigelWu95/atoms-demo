@@ -4,7 +4,7 @@
 
 ## 当前交付边界
 
-EB01/EB02 的纯内存工程组装及边界校验已实现且通过后端完整回归；EB03 的独立后端模板骨架通过 Java 17 编译；EB04 的配置初始化与 Java 启动校验、EB05 的专用测试数据库与测试引导已完成。下一步 EB06 安装身份、迁移与健康检查。没有下载 HTTP API、工作台按钮、真实模板装载器、独立数据接口、构建执行器或托管实例，不宣称完整工程已可导出运行。本轮 EB05 没有改动线上服务、原平台源码/迁移或原交付文档。
+EB01/EB02 的纯内存工程组装及边界校验已实现且通过后端完整回归；EB03 的独立后端模板骨架通过 Java 17 编译；EB04–EB06 的配置初始化、专用数据库、安装身份、迁移与健康检查已完成。当前位于 C-EB02：技术验收通过，人工审阅后继续 EB07 API 错误边界与 EB08 访客会话。没有下载 HTTP API、工作台按钮、真实模板装载器、独立业务数据接口、构建执行器或托管实例，不宣称完整工程已可导出运行。本轮 EB06 没有改动线上服务、原平台源码/迁移或原交付文档。
 
 `BundleSource` 冻结来源 UUID、原内容 hash 和 Artifact；调用方必须先完成版本所有者授权。组装器再次调用原 `ArtifactValidator`，并且只读取传入的代码快照及固定模板快照；没有数据库、环境变量、网络、文件系统或进程操作。`TemplateSnapshot` 构造入口限定于 engineering 包，后续只有固定目录的 TemplateCatalog 提供真实模板。
 
@@ -143,6 +143,67 @@ EB05 校验的是准备好的测试数据库与连接身份，**不是 EB06 的�
 
 EB05 评审未发现需阻塞本切片交付的问题：没有新增依赖、平台公开接口、生产测试开关或质量门槛削弱；实际连接失败保留稳定错误语义。脚本假 SQL 单元测试不冒充真实权限验证，真实数据库证据单独列出。原平台完整 IT、UI/E2E 未在本轮重跑；没有真实模型调用、GitHub 推送、合并或部署。原 README/交付/部署文档继续保持不变，待整项功能实现后统一更新。
 
+## EB06 · 安装身份、迁移与健康检查
+
+### 实现与关键取舍
+
+`DatabaseTarget` 统一测试入口与正式迁移入口的只读系统目录核验：检查实际库/角色、权限、schema 归属及用途标记，不只相信配置字符串。测试库必须有一致的管理员测试标记；正式运行拒绝测试标记，也接受操作者自行准备、权限合规且没有开发用途标记的数据库。安装记录另外校验实例 UUID，不能以准备脚本的标记代替安装身份。
+
+`DatabaseInstallation` 作为 FlywayMigrationStrategy，先检查实际目标，再取得 PostgreSQL 会话级 advisory lock，重新核验目标和已有安装记录后才调用 Flyway。锁覆盖 Flyway 的独立连接/事务；返回连接池前释放。首次只接受完全空的独立 schema；V001 在迁移事务中写入唯一安装记录并创建访客及 JDBC Session 表。重复启动核对原身份，不重置记录；不同实例 ID 不能接管同一安装。真实并发测试分别覆盖相同 ID 两者成功、不同 ID 恰好一个成功。
+
+测试引导也复用安装核验，避免错误安装 ID 在测试清理时被抹除。只有核验通过的专用 IT 库允许清理固定 5 张夹具表，没有 CASCADE、删库或平台连接兜底。负面测试通过已核验连接恢复其自身引入的 UUID/夹具；正式代码没有修复、接管或重置接口。
+
+`GET /api/health` 检查数据库中的安装身份，正常返回 `200 {"status":"UP"}`；连接池故障或身份异常返回脱敏的 503，含稳定 `SERVICE_UNAVAILABLE`、retryable 和 requestId。响应不创建 Cookie，含 no-store 与安全头。除 GET health 外当前所有入口默认拒绝，访客 API 尚未实现。
+
+单纯设置 STATELESS 仍可能让 Spring Session 在安全过滤器读取现有 Cookie 时先查询数据库。新增真实 Cookie + 连接池故障测试捕获了提前 500；最终通过 DefaultCookieSerializer 仅忽略精确 GET health 的会话读取。其他路径保留常规 Cookie 解析，名称、HttpOnly、SameSite、有效期与 HTTP/HTTPS Secure 设置继续来自已校验配置。没有全局关闭会话、CSRF 或匿名过滤器来绕过问题。
+
+启动/health 使用结构化日志，记录 event、entryPoint、requestId 及成功耗时/health 状态；失败启动记录稳定错误码，不输出底层数据库异常、SQL 或凭据。Hikari/Flyway 原始日志关闭，保留应用自己的脱敏事件。监控面板、指标采集、链路追踪和告警尚未实现，没有为此新增依赖。
+
+### 本轮验证证据
+
+环境沿用 Oracle Java 17.0.5、Boot 3.5.16、Flyway 11.7.2、Spring Session 3.5.7 和 PostgreSQL 17.11，未升级依赖。
+
+| 检查 | 实际结果 |
+|---|---|
+| 数据库目标/迁移 RED → GREEN | 新类型缺失时编译失败；实现后真实目录核验、首次迁移、重复迁移与并发用例通过 |
+| 首轮 IT 配置修正 | Flyway 不支持日志选项 none，首轮失败；按锁定 API 改为 slf4j 后通过，没有跳过测试 |
+| health RED → GREEN | 初始 5 项失败，暴露 health 未开放、默认登录入口及故障错误响应；实现最小安全链与控制器后通过 |
+| 清理前安装校验 | 新反例先失败：原测试引导未拒绝已存在的错误安装 ID；共享正式身份校验后通过，错误记录及迁移历史保持不变 |
+| 迁移前拒绝证明 | 不匹配实例 ID 时 BEFORE_MIGRATE 回调未触发；相同回调在合法实例重复迁移时触发，避免无效探针产生假绿 |
+| Cookie + 数据库故障 | 初始实际 HTTP 返回 500；尝试调整匿名认证/自定义 resolver 未通过，已撤回。最终仅 health 免读 Cookie 后返回 503，无 Set-Cookie，其他路径 Cookie 行为断言通过 |
+| 关键判断变异 | 暂时将 !safeRole 反转为 safeRole，8 项目标拒绝反例中 1 项失败；恢复后重新完整 verify，通过 |
+| 最终模板 clean verify | StartupConfig 62 + TestDatabase 24 + DatabaseTarget 10 = **96 单元**；DatabaseInstallation 10 + DedicatedDatabase 6 + Health 7 = **23 真实 PostgreSQL/HTTP IT**；0 失败/跳过，JAR 构建成功，约 21 秒 |
+| HTTP 故障注入范围 | 关闭单个测试上下文的连接池；专用 PostgreSQL 仍可连接，未停止共享数据库或平台服务 |
+| 重复启动数据保持 | 实际 Spring Web 上下文关闭后重新启动，安装记录、插入的访客/会话行仍存在，health 200；不是已完成访客登录 Cookie 的跨进程验收 |
+| 平台定向回归 | EngineeringBundleTest 8 + TemplatePolicyTest 38 = **46 项**通过，无跳过 |
+| 脚本组合回归 | 建库脚本 6 + 原发布脚本 3 + 配置初始化 5 = **14 项**通过，无跳过 |
+| JAR 边界 | 包含 DatabaseInstallation、HealthController 与 V001；不含 TestDatabase、迁移/health IT、application-test.yml 或 .local 私有配置 |
+| 实际 JAR 启停 | 首次沙箱内连接失败，返回脱敏 DATABASE_UNAVAILABLE；经权限流程重跑后，专用运行库 A 的首次启动和同配置新进程重启均成功，GET health 两次 200。两次均只停止本次创建的 Java 进程，未停止 PostgreSQL/平台服务 |
+
+复现模板完整验证仍使用 EB05 中的 Java 17 + 显式 `STANDALONE_TEST_CONFIG` 命令。平台定向命令在平台 backend 执行 `./mvnw -B -Dtest=EngineeringBundleTest,TemplatePolicyTest test`；脚本组合在仓库根执行：
+
+```sh
+node --test scripts/provision-standalone-db.test.mjs scripts/release.test.mjs templates/standalone-v1/scripts/init-config.test.mjs
+```
+
+实际 JAR 冒烟在模板 backend 目录执行下列命令；仅使用 `.local/standalone/runtime-a.properties`，监听 `127.0.0.1:18089`、连接 `atoms_standalone_a`。此库已建立安装/访客/会话表，验收后保留，不删除数据库。运行库 B 未使用。验证进程均已停止；尚未通过新目录导出工程构建。
+
+```sh
+/Users/wubingheng/.sdkman/candidates/java/17.0.5-oracle/bin/java -jar target/app.jar \
+  --spring.config.location=classpath:/application.yml,file:/Users/wubingheng/atoms-demo/.local/standalone/runtime-a.properties
+curl --noproxy '*' --fail --max-time 5 -i http://127.0.0.1:18089/api/health
+```
+
+### 审阅与未完成项
+
+本轮代码审阅核对迁移顺序、锁释放、参数绑定、错误脱敏、配置隔离、测试清理边界及 Cookie 行为，未新增依赖或削弱质量门槛。C-EB02 的人工审阅仍待完成，不将测试通过或代理自审视为人工批准。
+
+- 数据库锁协调遵循该协议的启动实例；不承诺抵抗拥有数据库管理权限的操作者修改权限、对象或连接。
+- 首次迁移若在 Flyway 建立历史表后、V001 成功前中断，可能留下未认领的非空 schema。后续启动会拒绝并要求人工核查，不自动清空/接管；这是保数据优先的取舍。
+- health 只表示数据库与安装身份就绪，不表示应用源码、浏览器或业务保存流程已完成。
+- 访客/会话表已建立，但访客初始化、CSRF 流程、统一 API 错误、应用资源与独立状态接口仍在后续任务。
+- 原平台完整 IT、UI/E2E 未在本轮重跑；没有模型调用、GitHub 推送、主分支合并或云端部署。原 README/交付/部署文档继续等整项功能完成后统一更新。
+
 ## 已核对的官方依据
 
 - [Java 17 Record](https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/Record.html)：可变组件需要防御性复制，复制后仍需保持值语义。
@@ -158,3 +219,9 @@ EB05 评审未发现需阻塞本切片交付的问题：没有新增依赖、平
 - [pgJDBC 连接参数](https://jdbc.postgresql.org/documentation/use/)、[Java 17 Connection](https://docs.oracle.com/en/java/javase/17/docs/api/java.sql/java/sql/Connection.html#setReadOnly(boolean))：显式超时与只读事务；实际服务器只读状态另行查询确认。
 - [Spring 测试上下文初始化器](https://docs.spring.io/spring-framework/reference/testing/testcontext-framework/ctx-management/initializers.html)、[Boot 3.5 ConfigDataEnvironmentPostProcessor](https://docs.spring.io/spring-boot/3.5/api/java/org/springframework/boot/context/config/ConfigDataEnvironmentPostProcessor.html)：测试环境在上下文刷新前校验并装载固定默认配置。
 - [Surefire 用例发现](https://maven.apache.org/surefire/maven-surefire-plugin/examples/inclusion-exclusion.html)、[Failsafe 用例发现](https://maven.apache.org/surefire/maven-failsafe-plugin/examples/inclusion-exclusion.html)：避免 Test 前缀和 IT 后缀交叉命中；仓库锁定的 3.5.6 已实际验证，不升级插件。
+- [Boot 3.5 数据初始化](https://docs.spring.io/spring-boot/3.5/how-to/data-initialization.html)、[PostgreSQL 17 advisory lock](https://www.postgresql.org/docs/17/explicit-locking.html#ADVISORY-LOCKS)：使用自定义 FlywayMigrationStrategy 在迁移前检查，数据库会话锁覆盖迁移连接，健康检查依赖数据库初始化完成。
+- [Flyway 11.7.2 配置源码](https://github.com/flyway/flyway/blob/flyway-11.7.2/flyway-core/src/main/java/org/flywaydb/core/api/configuration/FluentConfiguration.java)：核对严格 schema/placeholder、迁移回调及日志选项，未使用不存在的 none 日志实现。
+- [Spring Session 3.5.7 PostgreSQL schema](https://github.com/spring-projects/spring-session/blob/3.5.7/spring-session-jdbc/src/main/resources/org/springframework/session/jdbc/schema-postgresql.sql)：会话表字段、索引与关联删除来自锁定版本，由独立 Flyway 迁移管理。
+- [Spring Security 6.5 请求授权](https://docs.spring.io/spring-security/reference/6.5/servlet/authorization/authorize-http-requests.html)、[会话管理](https://docs.spring.io/spring-security/reference/6.5/servlet/authentication/session-management.html)：health 单一路由放行，其他默认拒绝；STATELESS 不等于整个过滤链不会查询请求 Cookie。
+- [SessionRepositoryFilter 3.5.7](https://github.com/spring-projects/spring-session/blob/3.5.7/spring-session-core/src/main/java/org/springframework/session/web/http/SessionRepositoryFilter.java)、[Boot 3.5.16 SessionAutoConfiguration](https://github.com/spring-projects/spring-boot/blob/v3.5.16/spring-boot-project/spring-boot-autoconfigure/src/main/java/org/springframework/boot/autoconfigure/session/SessionAutoConfiguration.java)：核对会话按需加载和 CookieSerializer 自动配置退让条件；自定义序列化器显式保留配置中的 Cookie 安全属性。
+- [Boot 3.5 结构化日志](https://docs.spring.io/spring-boot/3.5/reference/features/logging.html#features.logging.structured)：使用内置 Logstash JSON 格式和 SLF4J key-value 关联故障，不新增日志依赖。
