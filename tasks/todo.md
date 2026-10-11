@@ -1,6 +1,6 @@
 # engineering-bundle · 开发任务
 
-状态：2026-10-11 用户已批准计划与任务；EB01–EB05 已实现并验证；下一步 EB06 安装身份、迁移与健康检查，后续任务未开始。
+状态：2026-10-11 用户已批准计划与任务；EB01–EB05 已实现并验证；EB06 安装身份、迁移与健康检查进行中，后续任务未开始。
 依据：[计划及验证命令](plan.md)、[已批准规格](../SPEC-engineering-bundle.md)。本清单只负责 `engineering-bundle`；原平台任务清单不变。
 
 路径缩写：`P/` = `backend/src/main/java/dev/atoms/demo/engineering/`；`PT/` = 对应平台 `src/test/java/dev/atoms/demo/engineering/`；`T/` = `templates/standalone-v1/`；`B/` = `T/backend/src/main/java/dev/atoms/standalone/`；`BT/` = 对应模板 `src/test/java/dev/atoms/standalone/`；`R/` = `T/backend/src/main/resources/`；`F/` = `T/frontend/src/`。下列路径尚未实现。
@@ -65,6 +65,9 @@
 - 文件：`R/db/migration/V001__identity.sql`、`B/DatabaseInstallation.java`、`BT/DatabaseInstallationIT.java`、`B/HealthController.java`、`BT/HealthIT.java`。
 - 验收：① 新库建立安装记录、访客/JDBC 会话表；schema/角色/实例身份不符在迁移及业务写入前拒绝，同库首次并发认领无交叉成功；② health 数据库正常 200、断开 503且脱敏，重复启动不重置数据；③ Flyway/JDBC Session 只作用于独立 schema，不修改平台迁移。
 - 验证：V-B；覆盖重复迁移、错误实例 ID、平台库目标、超权限角色、数据库断开与并发首次启动。
+- [x] EB06a：DatabaseTarget 与单元测试；复用实际角色/schema 核验到 TestDatabase，避免测试和正式启动维护两套权限规则。新类型缺失 RED 后，模板 clean verify 96 项单元 + 6 项真实 IT 全部通过；支持无开发标记的人工准备运行库，运行/测试用途标记不能互换。
+- [ ] EB06b：DatabaseInstallation、V001、DatabaseInstallationIT、固定连接/迁移配置；会话级数据库锁覆盖迁移前安装校验与 V001 原子身份写入，非空且未认领的 schema 拒绝自动接管。
+- [ ] EB06c：HealthController、HealthIT 与最小 SecurityConfiguration；仅 GET health 开放、其他入口默认拒绝，真实 HTTP 验证数据库故障与重复启动；访客认证仍归 EB08。
 
 ### C-EB02 · 可安全连接自己的数据库
 

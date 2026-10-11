@@ -14,29 +14,6 @@ import org.springframework.core.env.MapPropertySource;
 
 /** Test-classpath only: verifies the dedicated database before Spring can migrate or write. */
 public final class TestDatabase implements ApplicationContextInitializer<ConfigurableApplicationContext> {
-    private static final String IDENTITY_SQL = """
-            SELECT current_database(), current_user, shobj_description(d.oid, 'pg_database'),
-              (current_user = session_user AND r.rolcanlogin
-                AND NOT (r.rolsuper OR r.rolcreatedb OR r.rolcreaterole OR r.rolreplication OR r.rolbypassrls)
-                AND NOT EXISTS (SELECT FROM pg_auth_members WHERE member = r.oid OR roleid = r.oid)
-                AND shobj_description(r.oid, 'pg_authid') = ?) AS safe_role,
-              (d.datdba <> r.oid AND has_database_privilege(r.oid, d.oid, 'CONNECT')
-                AND NOT has_database_privilege(r.oid, d.oid, 'CREATE')
-                AND NOT has_database_privilege(r.oid, d.oid, 'TEMP')) AS safe_database,
-              (s.nspowner = r.oid AND has_schema_privilege(r.oid, s.oid, 'USAGE')
-                AND has_schema_privilege(r.oid, s.oid, 'CREATE')
-                AND NOT EXISTS (SELECT FROM pg_namespace WHERE nspname = 'atoms')
-                AND NOT EXISTS (SELECT FROM pg_namespace n
-                  WHERE n.nspname <> 'standalone_app' AND n.nspname <> 'information_schema'
-                    AND n.nspname !~ '^pg_'
-                    AND (has_schema_privilege(r.oid, n.oid, 'USAGE')
-                      OR has_schema_privilege(r.oid, n.oid, 'CREATE')))) AS safe_schema,
-              current_setting('transaction_read_only') = 'on'
-            FROM pg_database d JOIN pg_roles r ON r.rolname = current_user
-            LEFT JOIN pg_namespace s ON s.nspname = 'standalone_app'
-            WHERE d.datname = current_database()
-            """;
-
     @Override
     public void initialize(ConfigurableApplicationContext context) {
         initialize(context, System.getenv("STANDALONE_TEST_CONFIG"));
@@ -101,13 +78,14 @@ public final class TestDatabase implements ApplicationContextInitializer<Configu
         try (var connection = DriverManager.getConnection(
                 environment.getRequiredProperty("spring.datasource.url"), connectionProperties)) {
             connection.setAutoCommit(false);
-            try (var statement = connection.prepareStatement(IDENTITY_SQL)) {
+            try (var statement = connection.prepareStatement("SELECT pg_catalog.current_setting('transaction_read_only') = 'on'")) {
                 statement.setQueryTimeout(3);
-                statement.setString(1, marker(environment));
+                var target = DatabaseTarget.inspect(connection);
                 try (var row = statement.executeQuery()) {
                     if (!row.next()) throw unsafe();
-                    assertIdentity(environment, new Identity(row.getString(1), row.getString(2), row.getString(3),
-                            row.getBoolean(4), row.getBoolean(5), row.getBoolean(6), row.getBoolean(7)));
+                    assertIdentity(environment, new Identity(target.database(), target.role(), target.databaseMarker(),
+                            target.safeRole() && marker(environment).equals(target.roleMarker()),
+                            target.safeDatabase(), target.safeSchema(), row.getBoolean(1)));
                 }
             } finally {
                 connection.rollback();
