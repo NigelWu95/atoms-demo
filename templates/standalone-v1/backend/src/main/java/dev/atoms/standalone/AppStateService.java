@@ -11,9 +11,27 @@ final class AppStateService {
     private final JdbcTemplate jdbc;
     private final ObjectMapper json;
     private final RuntimeResources resources;
+    private final IdempotencyService idempotency;
 
-    AppStateService(JdbcTemplate jdbc, ObjectMapper json, RuntimeResources resources) {
-        this.jdbc = jdbc; this.json = json; this.resources = resources;
+    AppStateService(JdbcTemplate jdbc, ObjectMapper json, RuntimeResources resources, IdempotencyService idempotency) {
+        this.jdbc = jdbc; this.json = json; this.resources = resources; this.idempotency = idempotency;
+    }
+
+    StateDocument save(UUID guest, StateWriteRequest request) {
+        return idempotency.execute(guest, request, () -> {
+            if (!resources.artifact().loadedRuntimeId().equals(request.loadedRuntimeId()))
+                throw new ApiException(ApiException.Code.STALE_APP_VERSION);
+            if (get(guest).revision() != request.expectedRevision()) throw new ApiException(ApiException.Code.STATE_CONFLICT);
+            long revision = request.expectedRevision() + 1;
+            int changed = jdbc.update("""
+                    INSERT INTO standalone_app.app_state(guest_id, value, revision, state_schema_version)
+                    VALUES (?, ?::json, ?, 1)
+                    ON CONFLICT (guest_id) DO UPDATE SET value = EXCLUDED.value, revision = EXCLUDED.revision, updated_at = now()
+                    WHERE app_state.revision = ?
+                    """, guest, request.valueJson(), revision, request.expectedRevision());
+            if (changed != 1) throw new ApiException(ApiException.Code.STATE_CONFLICT);
+            return parse(request.valueJson(), revision, 1);
+        });
     }
 
     StateDocument get(UUID guest) {
