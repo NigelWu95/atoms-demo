@@ -48,7 +48,7 @@ class DatabaseInstallationIT {
         assertThat(jdbc.queryForObject("SELECT count(*) FROM standalone_app.guest_users WHERE id = ?", Integer.class, visitor)).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM standalone_app.spring_session WHERE session_id = ?", Integer.class, session)).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM standalone_app.installation", Integer.class)).isEqualTo(1);
-        assertThat(jdbc.queryForObject("SELECT count(*) FROM standalone_app.flyway_schema_history WHERE success", Integer.class)).isEqualTo(1);
+        assertMigrations();
     }
 
     @Test
@@ -66,7 +66,7 @@ class DatabaseInstallationIT {
         assertThat(enteredFlyway).isFalse();
         assertThat(jdbc.queryForObject("SELECT instance_id::text FROM standalone_app.installation", String.class))
                 .isEqualTo(environment.getProperty("standalone.instance-id"));
-        assertThat(jdbc.queryForObject("SELECT count(*) FROM standalone_app.flyway_schema_history", Integer.class)).isEqualTo(1);
+        assertMigrations();
         var accepted = Flyway.configure().configuration(flyway(environment).getConfiguration()).callbacks(callback).load();
         new DatabaseInstallation(environment).migrate(accepted);
         assertThat(enteredFlyway).isTrue(); // The probe is real, not a callback that never fires.
@@ -99,7 +99,7 @@ class DatabaseInstallationIT {
             assertThat(results).containsExactlyInAnyOrder("READY", "INSTALLATION_MISMATCH");
             String winningId = (results.get(0).equals("READY") ? first : second).getProperty("standalone.instance-id");
             assertThat(jdbc.queryForObject("SELECT instance_id::text FROM standalone_app.installation", String.class)).isEqualTo(winningId);
-            assertThat(jdbc.queryForObject("SELECT count(*) FROM standalone_app.flyway_schema_history", Integer.class)).isEqualTo(1);
+            assertMigrations();
         } finally {
             // Restore only the IDs introduced by this test, using its already verified source.
             jdbc.update("UPDATE standalone_app.installation SET instance_id = ? WHERE instance_id IN (?, ?)",
@@ -113,7 +113,7 @@ class DatabaseInstallationIT {
     void sameIdRacingOnFirstStartupBothSucceedWithOneMigration() throws Exception {
         assertThat(race(environment, TestDatabase.load())).containsExactly("READY", "READY");
         assertThat(jdbc.queryForObject("SELECT count(*) FROM standalone_app.installation", Integer.class)).isEqualTo(1);
-        assertThat(jdbc.queryForObject("SELECT count(*) FROM standalone_app.flyway_schema_history", Integer.class)).isEqualTo(1);
+        assertMigrations();
     }
 
     @Test
@@ -138,7 +138,7 @@ class DatabaseInstallationIT {
             assertThatThrownBy(TestDatabase::load).hasMessageStartingWith("TEST_DATABASE_UNSAFE:").hasNoCause();
             assertThatThrownBy(TestDatabase::resetInstallation).hasMessageStartingWith("TEST_DATABASE_UNSAFE:").hasNoCause();
             assertThat(jdbc.queryForObject("SELECT instance_id FROM standalone_app.installation", UUID.class)).isEqualTo(other);
-            assertThat(jdbc.queryForObject("SELECT count(*) FROM standalone_app.flyway_schema_history", Integer.class)).isEqualTo(1);
+            assertMigrations();
         } finally {
             jdbc.update("UPDATE standalone_app.installation SET instance_id = ? WHERE instance_id = ?",
                     UUID.fromString(environment.getRequiredProperty("standalone.instance-id")), other);
@@ -165,6 +165,12 @@ class DatabaseInstallationIT {
         assertThatThrownBy(() -> migrate(environment)).hasMessageStartingWith("DATABASE_UNAVAILABLE:")
                 .hasNoCause().hasMessageNotContaining("private_canary").hasMessageNotContaining("jdbc:");
         assertThat(jdbc.queryForObject("SELECT to_regclass('standalone_app.flyway_schema_history') IS NULL", Boolean.class)).isTrue();
+    }
+
+    private void assertMigrations() {
+        assertThat(jdbc.queryForList("SELECT version FROM standalone_app.flyway_schema_history ORDER BY installed_rank", String.class))
+                .containsExactly("001", "002");
+        assertThat(jdbc.queryForObject("SELECT bool_and(success) FROM standalone_app.flyway_schema_history", Boolean.class)).isTrue();
     }
 
     private List<String> race(ConfigurableEnvironment first, ConfigurableEnvironment second) throws Exception {
