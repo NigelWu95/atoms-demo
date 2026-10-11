@@ -1,0 +1,13 @@
+# Loaded only after TestDatabase verifies the explicit STANDALONE_TEST_CONFIG.
+# No credentials, config imports, production fallback or automatic database cleanup.
+spring:
+  datasource:
+    hikari:
+      maximum-pool-size: 3
+      minimum-idle: 0
+  flyway:
+    clean-disabled: true
+    create-schemas: false
+  session:
+    jdbc:
+      initialize-schema: never

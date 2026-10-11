@@ -55,7 +55,7 @@
 - 验收：① 从显式管理员连接准备专用测试/浏览器库及受限角色，不读取平台应用密码、不重置已有角色；② 输出配置在已忽略目录，分别对应 IT 与浏览器运行 A/B，重复执行安全；③ 测试要求 STANDALONE_TEST_CONFIG 与专用库标记，验证实际库/角色，不接受运行配置或平台库。
 - 验证：仓库根 `node --test scripts/provision-standalone-db.test.mjs`；V-BU；经权限流程后执行脚本的 `--config-dir .local/standalone` 模式，核对 schema/角色权限，不输出凭据。
 - [x] EB05a（3 文件）：管理员专用 Node 脚本、固定 SQL 模板、脚本测试；6 项脚本测试通过，按权限流程在本地创建 `atoms_standalone_it` / `atoms_standalone_a` / `atoms_standalone_b` 库与同名受限角色。再次执行成功，4 个私有配置文件逐字节未变。Java 实际连接身份验证仍待后续切片。
-- [ ] EB05b（5 文件）：TestDatabase、单元测试、application-test.yml，以及 StartupConfig/StartupConfigTest 的共享解析接线；正式入口仍拒绝测试标记，不加入生产跳过选项。
+- [x] EB05b（5 文件）：TestDatabase、单元测试、application-test.yml，以及 StartupConfig/StartupConfigTest 的共享解析接线；86 项单元测试通过。反转角色安全判断时反例失败，恢复后全部通过；正式入口仍拒绝测试标记，不加入生产跳过选项。
 - [ ] EB05c（1 文件）：TestDatabaseIT；真实 PostgreSQL 只读核对库名、角色、权限、schema 和管理员标记，在迁移或清理之前失败；重复初始化不改配置/密码，运行 A/B 配置与平台库不作为测试目标。安装身份表的并发认领仍归 EB06。
 
 ### EB06 · 安装身份、迁移与健康检查（M）
