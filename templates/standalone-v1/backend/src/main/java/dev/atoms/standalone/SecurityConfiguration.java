@@ -1,7 +1,9 @@
 package dev.atoms.standalone;
 
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import java.util.List;
+import java.util.function.Supplier;
 import org.springframework.boot.autoconfigure.web.ServerProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -14,6 +16,9 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.security.web.csrf.HttpSessionCsrfTokenRepository;
+import org.springframework.security.web.csrf.CsrfToken;
+import org.springframework.security.web.csrf.CsrfTokenRequestHandler;
+import org.springframework.security.web.csrf.XorCsrfTokenRequestAttributeHandler;
 import org.springframework.session.web.http.DefaultCookieSerializer;
 
 @Configuration(proxyBeanMethods = false)
@@ -39,7 +44,7 @@ class SecurityConfiguration {
                         .requestMatchers(HttpMethod.PUT, "/api/state").hasRole("GUEST")
                         .anyRequest().denyAll())
                 .securityContext(config -> config.securityContextRepository(contexts).requireExplicitSave(true))
-                .csrf(config -> config.csrfTokenRepository(csrf))
+                .csrf(config -> config.csrfTokenRepository(csrf).csrfTokenRequestHandler(headerOnlyCsrf()))
                 .sessionManagement(sessions -> sessions.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
                 .requestCache(AbstractHttpConfigurer::disable)
                 .formLogin(AbstractHttpConfigurer::disable).httpBasic(AbstractHttpConfigurer::disable)
@@ -49,8 +54,20 @@ class SecurityConfiguration {
                         .accessDeniedHandler((request, response, failure) -> apiErrors.write(request, response,
                                 failure instanceof org.springframework.security.web.csrf.CsrfException
                                         ? ApiException.Code.CSRF_REJECTED : ApiException.Code.FORBIDDEN)))
-                .headers(headers -> headers.contentSecurityPolicy(csp -> csp.policyDirectives("default-src 'none'; frame-ancestors 'none'")))
+                .headers(headers -> headers.contentSecurityPolicy(csp -> csp.policyDirectives("default-src 'none'; frame-ancestors 'none'; base-uri 'none'")))
                 .build();
+    }
+
+    private CsrfTokenRequestHandler headerOnlyCsrf() {
+        var masked = new XorCsrfTokenRequestAttributeHandler();
+        return new CsrfTokenRequestHandler() {
+            @Override public void handle(HttpServletRequest request, HttpServletResponse response, Supplier<CsrfToken> token) {
+                masked.handle(request, response, token);
+            }
+            @Override public String resolveCsrfTokenValue(HttpServletRequest request, CsrfToken token) {
+                return request.getHeader(token.getHeaderName()) == null ? null : masked.resolveCsrfTokenValue(request, token);
+            }
+        };
     }
 
     @Bean

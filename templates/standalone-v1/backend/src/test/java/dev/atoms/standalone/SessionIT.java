@@ -135,6 +135,54 @@ class SessionIT {
     }
 
     private JdbcTemplate jdbc() { return context.getBean(JdbcTemplate.class); }
+
+    @Test
+    void csrfInTheQueryStringIsNotAcceptedAsAHeader() throws Exception {
+        var browser = new Browser();
+        String token = browser.csrf();
+        error(browser.send("POST", "/api/session?_csrf=" + token, "{}", null), 403, "CSRF_REJECTED");
+        assertThat(count("guest_users")).isZero();
+    }
+
+    @Test
+    void foreignOriginCannotInitializeEvenWithValidCookieAndToken() throws Exception {
+        var browser = new Browser();
+        String token = browser.csrf();
+        var response = browser.client.send(browser.base("/api/session").header("Origin", "https://foreign.example")
+                .header("Content-Type", "application/json").header("X-CSRF-TOKEN", token)
+                .POST(HttpRequest.BodyPublishers.ofString("{}")).build(), HttpResponse.BodyHandlers.ofString());
+        error(response, 403, "FORBIDDEN");
+        assertThat(count("guest_users")).isZero();
+    }
+
+    @Test
+    void failureWhileSavingASessionCannotSendTheBufferedSuccessResponse() throws Exception {
+        var browser = new Browser();
+        browser.csrf();
+        var mappings = context.getBean(org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping.class);
+        var info = org.springframework.web.servlet.mvc.method.RequestMappingInfo.paths("/api/csrf")
+                .methods(org.springframework.web.bind.annotation.RequestMethod.GET).params("failSave=true")
+                .options(mappings.getBuilderConfiguration()).build();
+        mappings.registerMapping(info, new SessionSaveFailure(context.getBean(HikariDataSource.class)),
+                SessionSaveFailure.class.getDeclaredMethod("fail", jakarta.servlet.http.HttpServletRequest.class));
+        var response = browser.send("GET", "/api/csrf?failSave=true", null, null);
+        error(response, 503, "SERVICE_UNAVAILABLE");
+        assertThat(response.body()).doesNotContain("false-success");
+        TestDatabase.load();
+    }
+
+    // Installed explicitly in one test only, never component-scanned or shipped in the JAR.
+    @org.springframework.web.bind.annotation.RestController
+    @org.springframework.context.annotation.Profile("session-save-failure-fixture")
+    static class SessionSaveFailure {
+        private final HikariDataSource source;
+        SessionSaveFailure(HikariDataSource source) { this.source = source; }
+        Map<String, String> fail(jakarta.servlet.http.HttpServletRequest request) {
+            request.getSession().setAttribute("test-save", "fixture");
+            source.close();
+            return Map.of("status", "false-success");
+        }
+    }
     private int count(String table) { // Only fixed, test-owned identifiers above.
         return jdbc().queryForObject("SELECT count(*) FROM standalone_app." + table, Integer.class);
     }
