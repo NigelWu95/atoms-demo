@@ -49,11 +49,6 @@ final class RequestBoundaryFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
         String path = request.getRequestURI().substring(request.getContextPath().length());
-        response.setHeader("X-Request-Id", ApiError.requestId(request));
-        response.setHeader("Cache-Control", "no-store");
-        response.setHeader("X-Content-Type-Options", "nosniff");
-        response.setHeader("X-Frame-Options", "DENY");
-        response.setHeader("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'");
         if (!(path.equals("/api") || path.startsWith("/api/"))) { chain.doFilter(request, response); return; }
         // Do not expose new API routes just because a controller was added. Update the contract explicitly.
         if (!API_PATHS.contains(path)) { errors.write(request, response, ApiException.Code.NOT_FOUND); return; }
