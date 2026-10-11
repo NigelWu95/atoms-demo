@@ -112,6 +112,10 @@ public final class TestDatabase implements ApplicationContextInitializer<Configu
                             target.safeRole() && marker(environment).equals(target.roleMarker()),
                             target.safeDatabase(), target.safeSchema(), row.getBoolean(1)));
                 }
+                // The test marker alone is insufficient once an installation exists.
+                // Reuse the same read-only identity check before any fixture cleanup.
+                try { new DatabaseInstallation(environment).checkInstallation(connection, true); }
+                catch (IllegalStateException ignored) { throw unsafe(); }
             } finally {
                 connection.rollback();
             }

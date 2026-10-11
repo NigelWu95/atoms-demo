@@ -85,7 +85,7 @@ final class DatabaseInstallation implements FlywayMigrationStrategy {
         }
     }
 
-    private void checkInstallation(Connection connection, boolean allowEmpty) throws SQLException {
+    void checkInstallation(Connection connection, boolean allowEmpty) throws SQLException {
         try (var statement = connection.prepareStatement("""
                 SELECT c.relkind = 'r' AND c.relowner = r.oid AND NOT c.relrowsecurity
                 FROM pg_catalog.pg_class c

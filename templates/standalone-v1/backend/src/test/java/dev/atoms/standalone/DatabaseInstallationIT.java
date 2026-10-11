@@ -6,6 +6,10 @@ import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import org.flywaydb.core.api.callback.BaseCallback;
+import org.flywaydb.core.api.callback.Context;
+import org.flywaydb.core.api.callback.Event;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -51,10 +55,21 @@ class DatabaseInstallationIT {
     void mismatchedInstanceFailsBeforeMigrationAndDoesNotOverwriteTheClaim() {
         migrate(environment);
         var other = withId(UUID.randomUUID());
-        assertThatThrownBy(() -> migrate(other)).hasMessageStartingWith("INSTALLATION_MISMATCH:").hasNoCause();
+        var enteredFlyway = new AtomicBoolean();
+        var callback = new BaseCallback() {
+            @Override public boolean supports(Event event, Context context) { return event == Event.BEFORE_MIGRATE; }
+            @Override public void handle(Event event, Context context) { enteredFlyway.set(true); }
+        };
+        var rejected = Flyway.configure().configuration(flyway(other).getConfiguration()).callbacks(callback).load();
+        assertThatThrownBy(() -> new DatabaseInstallation(other).migrate(rejected))
+                .hasMessageStartingWith("INSTALLATION_MISMATCH:").hasNoCause();
+        assertThat(enteredFlyway).isFalse();
         assertThat(jdbc.queryForObject("SELECT instance_id::text FROM standalone_app.installation", String.class))
                 .isEqualTo(environment.getProperty("standalone.instance-id"));
         assertThat(jdbc.queryForObject("SELECT count(*) FROM standalone_app.flyway_schema_history", Integer.class)).isEqualTo(1);
+        var accepted = Flyway.configure().configuration(flyway(environment).getConfiguration()).callbacks(callback).load();
+        new DatabaseInstallation(environment).migrate(accepted);
+        assertThat(enteredFlyway).isTrue(); // The probe is real, not a callback that never fires.
     }
 
     @Test
@@ -79,11 +94,19 @@ class DatabaseInstallationIT {
     void differentIdsRacingOnFirstStartupHaveExactlyOneWinner() throws Exception {
         var first = withId(UUID.randomUUID());
         var second = withId(UUID.randomUUID());
-        var results = race(first, second);
-        assertThat(results).containsExactlyInAnyOrder("READY", "INSTALLATION_MISMATCH");
-        String winningId = (results.get(0).equals("READY") ? first : second).getProperty("standalone.instance-id");
-        assertThat(jdbc.queryForObject("SELECT instance_id::text FROM standalone_app.installation", String.class)).isEqualTo(winningId);
-        assertThat(jdbc.queryForObject("SELECT count(*) FROM standalone_app.flyway_schema_history", Integer.class)).isEqualTo(1);
+        try {
+            var results = race(first, second);
+            assertThat(results).containsExactlyInAnyOrder("READY", "INSTALLATION_MISMATCH");
+            String winningId = (results.get(0).equals("READY") ? first : second).getProperty("standalone.instance-id");
+            assertThat(jdbc.queryForObject("SELECT instance_id::text FROM standalone_app.installation", String.class)).isEqualTo(winningId);
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM standalone_app.flyway_schema_history", Integer.class)).isEqualTo(1);
+        } finally {
+            // Restore only the IDs introduced by this test, using its already verified source.
+            jdbc.update("UPDATE standalone_app.installation SET instance_id = ? WHERE instance_id IN (?, ?)",
+                    UUID.fromString(environment.getRequiredProperty("standalone.instance-id")),
+                    UUID.fromString(first.getRequiredProperty("standalone.instance-id")),
+                    UUID.fromString(second.getRequiredProperty("standalone.instance-id")));
+        }
     }
 
     @Test
@@ -97,8 +120,29 @@ class DatabaseInstallationIT {
     void emptyInstallationRecordIsNotSilentlyReclaimed() {
         migrate(environment);
         jdbc.update("DELETE FROM standalone_app.installation");
-        assertThatThrownBy(() -> migrate(environment)).hasMessageStartingWith("INSTALLATION_MISMATCH:").hasNoCause();
-        assertThat(jdbc.queryForObject("SELECT count(*) FROM standalone_app.installation", Integer.class)).isZero();
+        try {
+            assertThatThrownBy(() -> migrate(environment)).hasMessageStartingWith("INSTALLATION_MISMATCH:").hasNoCause();
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM standalone_app.installation", Integer.class)).isZero();
+        } finally {
+            jdbc.update("INSERT INTO standalone_app.installation(singleton, instance_id, format_version) VALUES (true, ?, 1)",
+                    UUID.fromString(environment.getRequiredProperty("standalone.instance-id")));
+        }
+    }
+
+    @Test
+    void testBootstrapAndCleanupBothRejectAnExistingWrongInstallationIdentity() {
+        migrate(environment);
+        UUID other = UUID.randomUUID();
+        jdbc.update("UPDATE standalone_app.installation SET instance_id = ?", other);
+        try {
+            assertThatThrownBy(TestDatabase::load).hasMessageStartingWith("TEST_DATABASE_UNSAFE:").hasNoCause();
+            assertThatThrownBy(TestDatabase::resetInstallation).hasMessageStartingWith("TEST_DATABASE_UNSAFE:").hasNoCause();
+            assertThat(jdbc.queryForObject("SELECT instance_id FROM standalone_app.installation", UUID.class)).isEqualTo(other);
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM standalone_app.flyway_schema_history", Integer.class)).isEqualTo(1);
+        } finally {
+            jdbc.update("UPDATE standalone_app.installation SET instance_id = ? WHERE instance_id = ?",
+                    UUID.fromString(environment.getRequiredProperty("standalone.instance-id")), other);
+        }
     }
 
     @Test
@@ -147,10 +191,13 @@ class DatabaseInstallationIT {
     }
 
     static void migrate(ConfigurableEnvironment configuration) {
-        var flyway = Flyway.configure().dataSource(TestDatabase.dataSource(configuration))
+        new DatabaseInstallation(configuration).migrate(flyway(configuration));
+    }
+
+    private static Flyway flyway(ConfigurableEnvironment configuration) {
+        return Flyway.configure().dataSource(TestDatabase.dataSource(configuration))
                 .schemas("standalone_app").defaultSchema("standalone_app").createSchemas(false).cleanDisabled(true)
                 .placeholders(Map.of("instanceId", configuration.getRequiredProperty("standalone.instance-id")))
                 .loggers("slf4j").load();
-        new DatabaseInstallation(configuration).migrate(flyway);
     }
 }

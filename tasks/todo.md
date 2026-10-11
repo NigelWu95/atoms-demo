@@ -1,6 +1,6 @@
 # engineering-bundle · 开发任务
 
-状态：2026-10-11 用户已批准计划与任务；EB01–EB05 已实现并验证；EB06 安装身份、迁移与健康检查进行中，后续任务未开始。
+状态：2026-10-11 用户已批准计划与任务；EB01–EB06 已实现并验证；停在 C-EB02 人工审阅检查点，后续任务未开始。
 依据：[计划及验证命令](plan.md)、[已批准规格](../SPEC-engineering-bundle.md)。本清单只负责 `engineering-bundle`；原平台任务清单不变。
 
 路径缩写：`P/` = `backend/src/main/java/dev/atoms/demo/engineering/`；`PT/` = 对应平台 `src/test/java/dev/atoms/demo/engineering/`；`T/` = `templates/standalone-v1/`；`B/` = `T/backend/src/main/java/dev/atoms/standalone/`；`BT/` = 对应模板 `src/test/java/dev/atoms/standalone/`；`R/` = `T/backend/src/main/resources/`；`F/` = `T/frontend/src/`。下列路径尚未实现。
@@ -61,18 +61,19 @@
 
 ### EB06 · 安装身份、迁移与健康检查（M）
 
-- [ ] 完成 EB06。依赖：EB05。
+- [x] 完成 EB06。依赖：EB05。
 - 文件：`R/db/migration/V001__identity.sql`、`B/DatabaseInstallation.java`、`BT/DatabaseInstallationIT.java`、`B/HealthController.java`、`BT/HealthIT.java`。
 - 验收：① 新库建立安装记录、访客/JDBC 会话表；schema/角色/实例身份不符在迁移及业务写入前拒绝，同库首次并发认领无交叉成功；② health 数据库正常 200、断开 503且脱敏，重复启动不重置数据；③ Flyway/JDBC Session 只作用于独立 schema，不修改平台迁移。
 - 验证：V-B；覆盖重复迁移、错误实例 ID、平台库目标、超权限角色、数据库断开与并发首次启动。
 - [x] EB06a：DatabaseTarget 与单元测试；复用实际角色/schema 核验到 TestDatabase，避免测试和正式启动维护两套权限规则。新类型缺失 RED 后，模板 clean verify 96 项单元 + 6 项真实 IT 全部通过；支持无开发标记的人工准备运行库，运行/测试用途标记不能互换。
 - [x] EB06b：DatabaseInstallation、V001、DatabaseInstallationIT、固定连接/迁移配置及测试专用清理助手；会话级数据库锁覆盖迁移前安装校验与 V001 原子身份写入。96 项单元 + 15 项真实 IT 通过（含 9 项迁移/并发场景）；非空未认领 schema、错误实例 ID、用途混淆均拒绝。首轮 Flyway 日志选项错误已修正，未跳过测试。
 - [x] EB06c：HealthController、HealthIT 与最小 SecurityConfiguration；仅 GET health 开放、其他入口默认拒绝。5 项真实 HTTP 用例先失败后通过，模板 96 单元 + 20 IT 全部通过；验证独立连接池故障、安装 ID 异常、重启保留表数据和安全头。访客认证仍归 EB08。
-- [ ] EB06d 安全复核：测试引导在清理前也核对已存在的安装记录；补充失败路径、日志关联和关键判断变异，更新验收记录后关闭 EB06。
+- [x] EB06d 安全复核：测试引导在清理前复用正式安装身份核验；错误实例 ID 的 Flyway 回调确认未执行。修复携带会话 Cookie 且连接池失效时 health 提前报 500 的问题，仅精确 GET health 不读取会话 Cookie，其他路径及 Cookie 安全属性不变。关键角色判断变异触发失败，恢复后 96 单元 + 23 真实 PostgreSQL/HTTP IT 全部通过；原组装 46 项、脚本组合 14 项通过。实际 JAR 启停结果及限制见验收记录。
 
 ### C-EB02 · 可安全连接自己的数据库
 
-- [ ] EB04–EB06 单元/脚本/真实 PostgreSQL 测试通过，检查配置误用在写入前失败；记录实际配置位置但不记录内容。人工审阅数据库护栏后继续。
+- [x] 技术验收：EB04–EB06 单元/脚本/真实 PostgreSQL 测试通过；配置/安装身份误用在迁移或测试清理前失败；私有配置位置与复现命令已记录，未记录凭据。
+- [ ] 人工审阅数据库护栏后继续 EB07；本轮不将自审等同于人工批准。
 
 ### EB07 · 独立 API 错误与入口限制（M）
 
