@@ -4,7 +4,7 @@
 
 ## 当前交付边界
 
-EB01/EB02 的纯内存工程组装及边界校验已实现且通过后端完整回归。没有下载 HTTP API、工作台按钮、真实模板装载器、构建执行器或托管实例，不宣称完整工程已可导出运行。线上服务、原平台源码/迁移及原交付文档没有改动。
+EB01/EB02 的纯内存工程组装及边界校验已实现且通过后端完整回归；EB03 的独立后端模板骨架通过 Java 17 编译。已到达 C-EB01 检查点。没有下载 HTTP API、工作台按钮、真实模板装载器、独立数据接口、构建执行器或托管实例，不宣称完整工程已可导出运行。线上服务、原平台源码/迁移及原交付文档没有改动。
 
 `BundleSource` 冻结来源 UUID、原内容 hash 和 Artifact；调用方必须先完成版本所有者授权。组装器再次调用原 `ArtifactValidator`，并且只读取传入的代码快照及固定模板快照；没有数据库、环境变量、网络、文件系统或进程操作。`TemplateSnapshot` 构造入口限定于 engineering 包，后续只有固定目录的 TemplateCatalog 提供真实模板。
 
@@ -35,6 +35,10 @@ EB01/EB02 的纯内存工程组装及边界校验已实现且通过后端完整�
 | 首次原后端单元回归 | 沙箱阻止本地端口及 Mockito JVM 附加，14 项环境错误，不能计为通过 |
 | 环境问题定向复核 | 经权限流程在沙箱外重跑 HealthControllerTest + DeepSeekGatewayTest，14 项通过；未改旧测试/调用真实模型 |
 | 原后端完整 verify | `./mvnw -B verify`：72 单元 + 50 真实 PostgreSQL 集成测试全部通过，无失败/跳过；JAR 构建成功，约 63 秒 |
+| EB03 模板编译 | 模板后端执行 `./mvnw -B compile`，成功；javap 显示 class major version=61，即 Java 17 |
+| EB03 测试质量门槛 | 模板 `./mvnw -B test` 因尚无测试明确退出 1（No tests to run）；这是预期门槛验证，不是测试通过 |
+| EB03 生效构建配置 | `./mvnw -B help:effective-pom -Doutput=target/effective-pom.xml` 成功；Java release=17，Surefire/Failsafe 均 failIfNoTests=true，finalName=app；生效 POM 仅为忽略的构建产物 |
+| Wrapper 与配置 | Wrapper 和平台已审核的 3.3.4 脚本逐字节一致，Maven 固定 3.9.11；sh -n 通过、保留可执行权限；模板配置无平台库名/角色、模型 Key 或 .env.local 导入 |
 
 以上 `DeepSeekGatewayTest` 使用本地模拟上游，不消耗真实模型额度。集成回归使用已有 `atoms_demo_test`，不迁移运行库或云端库。
 
@@ -43,6 +47,8 @@ EB01/EB02 的纯内存工程组装及边界校验已实现且通过后端完整�
 正确性：清单及 bundleId 由测试独立复算；输入/输出修改不污染快照；非法历史源码明确失败。架构：仅新增内部包，无公开路由和 Spring 自动扫描组件，不改变旧主流程。安全：模型字段只进入固定数据文件，无 shell/文件路径插值；错误不包含被拒绝的路径和文件内容。资源：输入模板及最终输出均有限额；没有无上限的磁盘扫描。
 
 EB01 提前引入 TemplateSnapshot（仍在 5 个主要文件内），因为不可变模板是纯组装契约的一部分。EB01/EB02 作为同一个有限、安全的组装切片验收，不让下游接触未设限入口。真实模板白名单、物理链接校验、独立工程数据库/浏览器/重启验收均保留为未完成项。
+
+EB03 模板是未公开的编译骨架：只扫描 `dev.atoms.standalone`，沿用最小所需后端依赖，不依赖平台工程；配置要求独立数据库变量、默认 loopback:8088、独立 schema、显式实例 ID，禁止自动 SQL 初始化和 Flyway clean。配置初始化/Java 入口校验（含本地 HTTP Cookie 切换）仍在 EB04，会话与业务数据接口仍在后续任务，因此没有尝试把骨架称为可用服务。真正导出目录的构建和重启验收仍需 EB18–EB23。
 
 原前端源码未变，本轮尚未重跑其 UI/E2E；不复用旧结果冒充本轮通过。没有推送、合并或部署。
 

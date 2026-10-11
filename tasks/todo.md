@@ -1,6 +1,6 @@
 # engineering-bundle · 开发任务
 
-状态：2026-10-11 用户已批准计划与任务；EB01–EB02 已验证，EB03 开始实施，其余未开始。
+状态：2026-10-11 用户已批准计划与任务；EB01–EB03 已验证，到达第一检查点 C-EB01，后续任务未开始。
 依据：[计划及验证命令](plan.md)、[已批准规格](../SPEC-engineering-bundle.md)。本清单只负责 `engineering-bundle`；原平台任务清单不变。
 
 路径缩写：`P/` = `backend/src/main/java/dev/atoms/demo/engineering/`；`PT/` = 对应平台 `src/test/java/dev/atoms/demo/engineering/`；`T/` = `templates/standalone-v1/`；`B/` = `T/backend/src/main/java/dev/atoms/standalone/`；`BT/` = 对应模板 `src/test/java/dev/atoms/standalone/`；`R/` = `T/backend/src/main/resources/`；`F/` = `T/frontend/src/`。下列路径尚未实现。
@@ -26,14 +26,15 @@
 
 ### EB03 · 独立后端编译骨架（M）
 
-- [ ] 完成 EB03。依赖：EB02。
+- [x] 完成 EB03。依赖：EB02。
 - 文件：`T/backend/pom.xml`、`T/backend/mvnw`、`T/backend/.mvn/wrapper/maven-wrapper.properties`、`B/StandaloneApplication.java`、`R/application.yml`。
 - 验收：① Java 17/Boot 与必要依赖锁定，不依赖平台 Java 包；② 配置无平台地址/密码，单元及集成测试插件都禁止空跑成功；③ Wrapper 来源及版本可审阅，默认监听 loopback，测试和运行配置不互相 fallback。
 - 验证：模板 `backend/` 执行 `./mvnw -B compile`；检查 effective POM 的版本与测试插件。此时没有足够测试，不能宣称 V-B 通过。
 
 ### C-EB01 · 边界检查点
 
-- [ ] EB01–EB03 定向测试与编译通过，评审不可变性、配额及文件列表；新增记录 `docs/engineering-bundle-verification.md` 并汇报。尚无可运行完整应用。
+- [x] EB01–EB03 定向测试与编译通过，评审不可变性、配额及文件列表；新增记录 `docs/engineering-bundle-verification.md` 并汇报。尚无可运行完整应用。
+- 检查点交付：组装/路径 46 项通过；原后端 72 单元 + 50 PostgreSQL 集成通过；模板 Java 17 编译通过，空测试集按预期失败。下一步 EB04 配置初始化与 Java 入口校验。
 
 ## B · 独立启动与身份
 

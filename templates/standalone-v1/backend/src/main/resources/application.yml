@@ -1,0 +1,45 @@
+spring:
+  application:
+    name: standalone-app
+  datasource:
+    url: ${STANDALONE_DB_URL}
+    username: ${STANDALONE_DB_USER}
+    password: ${STANDALONE_DB_PASSWORD}
+    hikari:
+      maximum-pool-size: 5
+      connection-timeout: 3000
+      validation-timeout: 2000
+  flyway:
+    schemas: standalone_app
+    default-schema: standalone_app
+    create-schemas: false
+    clean-disabled: true
+    validate-migration-naming: true
+  sql:
+    init:
+      mode: never
+  session:
+    timeout: 7d
+    jdbc:
+      initialize-schema: never
+      table-name: standalone_app.spring_session
+server:
+  address: 127.0.0.1
+  port: 8088
+  servlet:
+    session:
+      cookie:
+        name: STANDALONE_${APP_INSTANCE_ID}
+        http-only: true
+        secure: true
+        same-site: lax
+        max-age: 7d
+  error:
+    include-message: never
+    include-stacktrace: never
+    include-binding-errors: never
+    whitelabel:
+      enabled: false
+standalone:
+  instance-id: ${APP_INSTANCE_ID}
+  origin: http://127.0.0.1:8088
