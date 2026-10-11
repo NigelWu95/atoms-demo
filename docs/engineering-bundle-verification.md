@@ -4,7 +4,7 @@
 
 ## 当前交付边界
 
-EB01/EB02 的纯内存工程组装及边界校验已实现且通过后端完整回归；EB03 的独立后端模板骨架通过 Java 17 编译；EB04 的配置初始化与 Java 启动校验已完成。下一步 EB05 专用测试库引导。没有下载 HTTP API、工作台按钮、真实模板装载器、独立数据接口、构建执行器或托管实例，不宣称完整工程已可导出运行。线上服务、原平台源码/迁移及原交付文档没有改动。
+EB01/EB02 的纯内存工程组装及边界校验已实现且通过后端完整回归；EB03 的独立后端模板骨架通过 Java 17 编译；EB04 的配置初始化与 Java 启动校验、EB05 的专用测试数据库与测试引导已完成。下一步 EB06 安装身份、迁移与健康检查。没有下载 HTTP API、工作台按钮、真实模板装载器、独立数据接口、构建执行器或托管实例，不宣称完整工程已可导出运行。本轮 EB05 没有改动线上服务、原平台源码/迁移或原交付文档。
 
 `BundleSource` 冻结来源 UUID、原内容 hash 和 Artifact；调用方必须先完成版本所有者授权。组装器再次调用原 `ArtifactValidator`，并且只读取传入的代码快照及固定模板快照；没有数据库、环境变量、网络、文件系统或进程操作。`TemplateSnapshot` 构造入口限定于 engineering 包，后续只有固定目录的 TemplateCatalog 提供真实模板。
 
@@ -81,6 +81,68 @@ EB04 评审：正确性覆盖拒绝路径和实际 Spring 绑定；架构中不�
 
 本轮没有创建数据库，没有调用模型、修改平台运行配置、推送或部署。**这些配置检查不是数据库隔离证明**：实际角色权限、schema、安装 ID、测试/运行库误用校验仍需 EB05/EB06，后续会话 API/CSRF/浏览器流程也尚未实现。模板完整 `verify` 与独立应用构建/保存/重启验收保持未完成；原平台完整集成/UI 测试未在本轮重跑。
 
+## EB05 · 专用测试数据库与测试引导
+
+本节记录 EB05 本轮结果，不把前文 EB04 的阶段性限制或历史回归当成本轮结论。
+
+### 本地准备与使用
+
+管理员脚本仅在仓库开发环境使用，不进入导出工程。经权限流程在现有 `atoms-demo-postgres` 容器（PostgreSQL 17.11，loopback:5432）新增以下资源；没有改平台数据库、已有应用角色或云端服务：
+
+| 用途 | 数据库及受限角色 | 私有配置 | 预留应用端口 |
+|---|---|---|---|
+| Java 集成测试 | `atoms_standalone_it` | `.local/standalone/test.properties` | 18088 |
+| 后续浏览器实例 A | `atoms_standalone_a` | `.local/standalone/runtime-a.properties` | 18089 |
+| 后续浏览器实例 B | `atoms_standalone_b` | `.local/standalone/runtime-b.properties` | 18090 |
+
+配置和 `provisioning.json` 均为 0600，目录为 0700，已被 Git 忽略。三套密码和 UUID 分别生成且互不相同；重复执行不会重置或覆盖。端口只是配置预留，目前没有三个独立应用服务在运行。不要打印或提交这些配置，也不要复制到工程导出包。
+
+仓库根初始化命令（必须明确容器、管理员和本地映射端口；不读取平台 `.env.local`）：
+
+```sh
+node scripts/provision-standalone-db.mjs \
+  --container atoms-demo-postgres --admin-user postgres --port 5432 \
+  --config-dir .local/standalone
+```
+
+模板后端目录使用 Java 17 执行完整验证，`STANDALONE_TEST_CONFIG` 必须是绝对路径：
+
+```sh
+env JAVA_HOME=/Users/wubingheng/.sdkman/candidates/java/17.0.5-oracle \
+  STANDALONE_TEST_CONFIG=/Users/wubingheng/atoms-demo/.local/standalone/test.properties \
+  ./mvnw -B clean verify
+```
+
+以上路径是本机复现示例，其他安装应替换为自己的绝对路径。单元测试可以单独运行 `./mvnw -B test`；完整 `verify` 未提供专用配置会失败，不会自动跳过 IT 或使用平台连接兜底。
+
+### 数据库与测试边界
+
+管理员拥有数据库，应用角色仅拥有自己的 `standalone_app` schema；新库撤销 PUBLIC 的数据库权限及 public schema 权限，仅授予对应角色 CONNECT。角色没有超级用户、建库、建角色、复制、绕过 RLS 权限或角色成员关系。固定 SQL 标识符经过校验，SQL 从 stdin 传给固定 `docker exec … psql` 参数，不经过 shell；密码只保存到私有配置，SQL 使用 SCRAM verifier，不携带明文密码。错误不回显 SQL、底层 stderr 或配置内容。
+
+脚本先检查既有角色/数据库的管理员标记，再创建缺失对象；不删除数据库、不重置密码。私有文件锁拒绝同目录并发，数据库 advisory lock 保护初始对象准备。`CREATE DATABASE` 不能与后续 COMMENT 放入同一事务，所以它不是原子部署：中断后若遗留未标记对象或锁文件，脚本会拒绝接管，必须先人工确认，不会自动删库或抢锁。不要删除 `provisioning.json` 来“修复”失败，它保存重试需要的稳定身份与凭据。
+
+`TestDatabase` 仅位于测试类路径。先要求显式测试配置与 `standalone.test-database=true`，共享正式入口的凭据/origin 校验，再用有连接/语句超时的只读事务查询 PostgreSQL 系统目录。它核对实际库名、实际角色、角色/数据库标记、权限、schema 归属及服务器确认的只读状态，拒绝平台 `atoms` schema 或可访问的其他业务 schema。校验通过才加载固定测试 YAML、允许 Spring 上下文刷新；正式 Java 入口仍拒绝测试配置，没有新增生产绕过开关。
+
+EB05 校验的是准备好的测试数据库与连接身份，**不是 EB06 的运行库安装身份/并发认领证明**。当前 IT 不运行 Flyway、不建立业务/会话表，也不启动完整 Web 服务。运行 A/B 配置拒绝和不安全身份组合已做单元测试；真实 IT 验证专用库及错误 UUID 拒绝，没有对平台运行库实施负面写入试验。数据库管理员后续变更权限的竞态，以及正式实例迁移前的身份锁定仍由 EB06 处理。
+
+### 红绿、回归与产物检查
+
+| 检查 | 本轮实际结果 |
+|---|---|
+| 建库脚本 RED → GREEN | 先因缺少实现模块失败；实现后 6 项通过，覆盖显式参数、私有文件、稳定身份、错误脱敏、拒绝覆盖/链接及并发 |
+| 实际本地准备 | 创建三套库/角色成功；再次运行成功，4 个私有文件逐字节不变，没有重置密码 |
+| Java RED → GREEN | 新测试先因缺少 TestDatabase/共享解析入口编译失败；实现后 StartupConfig 62 项 + TestDatabase 24 项全部通过 |
+| 关键判断变异 | 暂时反转 safeRole 判断，9 项反例中 1 项失败；恢复后 86 项全部通过 |
+| 测试分层修复 | 最初 `TestDatabaseIT` 同时匹配 Surefire 的 Test 前缀和 Failsafe 的 IT 后缀，导致重复运行；重命名为 `DedicatedDatabaseIT`，没有跳过用例或放宽发现规则 |
+| 无测试配置的完整构建 | 86 项单元通过；Failsafe 因 TEST_DATABASE_CONFIG 退出 1，按预期拒绝“未验库也通过” |
+| 最终模板完整构建 | `clean verify`：86 项单元 + 6 项真实 PostgreSQL IT，0 失败/跳过，JAR 构建成功；两组各运行一次 |
+| 实际数据库 IT | SCRAM 凭据认证、重复只读检查不新增表、错误 UUID 拒绝、连接失败脱敏、上下文刷新前拦截及正式入口拒绝真实测试配置 |
+| 脚本组合回归 | 建库脚本 6 + 原发布脚本 3 + 模板配置初始化 5 = 14 项全部通过，无跳过 |
+| 平台工程组装回归 | EngineeringBundleTest 8 + TemplatePolicyTest 38 = 46 项通过，无跳过 |
+| JAR 检查 | 包含正式 StartupConfig，不含 TestDatabase、DedicatedDatabaseIT、application-test.yml 或私有 properties 配置 |
+
+EB05 评审未发现需阻塞本切片交付的问题：没有新增依赖、平台公开接口、生产测试开关或质量门槛削弱；实际连接失败保留稳定错误语义。脚本假 SQL 单元测试不冒充真实权限验证，真实数据库证据单独列出。原平台完整 IT、UI/E2E 未在本轮重跑；没有真实模型调用、GitHub 推送、合并或部署。原 README/交付/部署文档继续保持不变，待整项功能实现后统一更新。
+
 ## 已核对的官方依据
 
 - [Java 17 Record](https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/Record.html)：可变组件需要防御性复制，复制后仍需保持值语义。
@@ -91,3 +153,8 @@ EB04 评审：正确性覆盖拒绝路径和实际 Spring 绑定；架构中不�
 - [Spring Boot 3.5 SpringApplication](https://docs.spring.io/spring-boot/3.5/api/java/org/springframework/boot/SpringApplication.html)：自定义 Environment 与禁止命令行属性重新覆盖；本实现的预检发生在其 run 之前。
 - [Spring Framework StandardEnvironment](https://docs.spring.io/spring-framework/docs/6.2.x/javadoc-api/org/springframework/core/env/StandardEnvironment.html)：默认系统属性/环境属性源可以显式移除。
 - [Java 17 Properties.load](https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/util/Properties.html#load(java.io.InputStream))：遵循标准 ISO-8859-1 和 Unicode 转义，避免重复解析产生不同配置值。
+- [PostgreSQL 17 psql](https://www.postgresql.org/docs/17/app-psql.html)、[CREATE DATABASE](https://www.postgresql.org/docs/17/sql-createdatabase.html)：固定非交互输入、错误即停及建库不能位于事务块的限制。
+- [PostgreSQL 17 角色目录](https://www.postgresql.org/docs/17/catalog-pg-authid.html)、[角色创建](https://www.postgresql.org/docs/17/sql-createrole.html)、[权限查询](https://www.postgresql.org/docs/17/functions-info.html)：SCRAM verifier 格式、角色权限和实际权限核对。
+- [pgJDBC 连接参数](https://jdbc.postgresql.org/documentation/use/)、[Java 17 Connection](https://docs.oracle.com/en/java/javase/17/docs/api/java.sql/java/sql/Connection.html#setReadOnly(boolean))：显式超时与只读事务；实际服务器只读状态另行查询确认。
+- [Spring 测试上下文初始化器](https://docs.spring.io/spring-framework/reference/testing/testcontext-framework/ctx-management/initializers.html)、[Boot 3.5 ConfigDataEnvironmentPostProcessor](https://docs.spring.io/spring-boot/3.5/api/java/org/springframework/boot/context/config/ConfigDataEnvironmentPostProcessor.html)：测试环境在上下文刷新前校验并装载固定默认配置。
+- [Surefire 用例发现](https://maven.apache.org/surefire/maven-surefire-plugin/examples/inclusion-exclusion.html)、[Failsafe 用例发现](https://maven.apache.org/surefire/maven-failsafe-plugin/examples/inclusion-exclusion.html)：避免 Test 前缀和 IT 后缀交叉命中；仓库锁定的 3.5.6 已实际验证，不升级插件。
