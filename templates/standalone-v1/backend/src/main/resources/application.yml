@@ -2,9 +2,7 @@ spring:
   application:
     name: standalone-app
   datasource:
-    url: ${STANDALONE_DB_URL}
-    username: ${STANDALONE_DB_USER}
-    password: ${STANDALONE_DB_PASSWORD}
+    # Connection credentials are supplied only by StartupConfig, before Spring starts.
     hikari:
       maximum-pool-size: 5
       connection-timeout: 3000
@@ -29,7 +27,7 @@ server:
   servlet:
     session:
       cookie:
-        name: STANDALONE_${APP_INSTANCE_ID}
+        # StartupConfig supplies the stable name and HTTPS/local HTTP policy.
         http-only: true
         secure: true
         same-site: lax
@@ -40,6 +38,3 @@ server:
     include-binding-errors: never
     whitelabel:
       enabled: false
-standalone:
-  instance-id: ${APP_INSTANCE_ID}
-  origin: http://127.0.0.1:8088
