@@ -1,9 +1,9 @@
 # engineering-bundle · 开发任务
 
-状态：2026-10-12 用户确认继续后，EB01–EB10 已实现并验证；当前交付 C-EB04，下一步 EB11–EB12。
+状态：2026-10-12 用户确认继续后，EB01–EB12 已实现并验证；当前交付 C-EB05，下一步 EB13–EB14。
 依据：[计划及验证命令](plan.md)、[已批准规格](../SPEC-engineering-bundle.md)。本清单只负责 `engineering-bundle`；原平台任务清单不变。
 
-路径缩写：`P/` = `backend/src/main/java/dev/atoms/demo/engineering/`；`PT/` = 对应平台 `src/test/java/dev/atoms/demo/engineering/`；`T/` = `templates/standalone-v1/`；`B/` = `T/backend/src/main/java/dev/atoms/standalone/`；`BT/` = 对应模板 `src/test/java/dev/atoms/standalone/`；`R/` = `T/backend/src/main/resources/`；`F/` = `T/frontend/src/`。下列路径尚未实现。
+路径缩写：`P/` = `backend/src/main/java/dev/atoms/demo/engineering/`；`PT/` = 对应平台 `src/test/java/dev/atoms/demo/engineering/`；`T/` = `templates/standalone-v1/`；`B/` = `T/backend/src/main/java/dev/atoms/standalone/`；`BT/` = 对应模板 `src/test/java/dev/atoms/standalone/`；`R/` = `T/backend/src/main/resources/`；`F/` = `T/frontend/src/`。各路径的实现进度以下列任务勾选及切片记录为准。
 
 每项列出最多 5 个主要文件（包含测试），S=1–2，M=3–5。实际超出时先拆子任务，不把额外逻辑塞进巨型文件。清单勾选和统一验收记录随每次检查点更新，不计入业务文件数量。脚手架中未接通的模板不被平台公开使用；严禁为了中间切片通过而增加空接口/空测试或跳过最终检查。
 
@@ -128,25 +128,30 @@
 ### C-EB04 · 内容边界检查点
 
 - [x] 技术验收及自审：模板 121 单元 + 44 PostgreSQL/HTTP IT；Node 20 项、原平台组装 46 项、原 SDK 单元 4 项、真实 Chrome 2 项通过，无跳过。文档专用 CSP 与原平台语义一致，新增最终响应提交检查；测试进程已停止，未推送/部署。
-- [ ] 人工审阅本检查点交付；仍无 Vue 产品外壳、独立状态保存或全新目录完整构建。最终前端/受控运行层构建输入指纹与打包接线归 EB18，不能把当前六资源指纹当成整个工程身份。
+- [x] 已向用户交付本检查点，用户回复“继续”，批准推进 EB11–EB12；不等同于代码合并或部署授权。最终前端/受控运行层构建输入指纹与打包接线仍归 EB18，不能把当前六资源指纹当成整个工程身份。
 
 ### EB11 · 最小 Vue 构建配置（M）
 
-- [ ] 完成 EB11。依赖：EB10。
+- [x] 完成 EB11。依赖：EB10。
 - 文件：`T/frontend/package.json`、`T/frontend/package-lock.json`、`T/frontend/vite.config.ts`、`T/frontend/tsconfig.json`、`T/frontend/index.html`。
 - 验收：① Vue/TS/Vite 和必要工具固定版本，有独立真实 lockfile，不手改锁文件；② Vite 仅 loopback、同源代理，无后端密钥进入前端；③ 配置 typecheck/lint/unit/build 入口，未有测试时明确失败，不创建空测试充数。
 - 验证：`npm --prefix templates/standalone-v1/frontend ci --ignore-scripts`；检查锁文件差异与开发安全头。完整 V-F 在 EB12 执行。
+- 实施拆分：EB11a 包清单、真实锁文件、TS、HTML、静态图标（5 文件）；EB11b Vite 配置、开发代理边界及测试（3 文件）。额外的代理边界负责在改写同源 Origin 前拒绝外站请求，不放宽后端策略。
+- 验收结果：独立锁文件与冻结安装通过；生产依赖仅 Vue，未升级原平台。开发/预览固定回环端口，精确 Host/Origin/Fetch Metadata 检查后才转译同源 Origin；无 CORS、无前端环境变量注入。8 项边界测试通过，关键条件反转使 2 项失败，恢复后全绿。
 
 ### EB12 · 可访问的启动外壳（M）
 
-- [ ] 完成 EB12。依赖：EB11。
+- [x] 完成 EB12。依赖：EB11。
 - 文件：`T/frontend/eslint.config.js`、`F/main.ts`、`F/App.vue`、`F/App.spec.ts`、`T/.gitignore`。
 - 验收：① 页面只展示真实启动/错误状态，无假的生成或保存结果；② 状态播报、键盘焦点和响应式布局可用；③ 初始化失败可重试、不丢错误，忽略真实配置/产物/依赖/测试输出。
 - 验证：V-F；组件测试先覆盖启动、错误与重试。完整浏览器尺寸与 axe 在 EB23 验收。
+- 实施拆分：EB12a lint/安装策略/忽略规则（3 文件）；EB12b 真实 health 客户端及测试（2 文件）；EB12c 启动组合函数/main/App/样式/组件测试（5 文件，组合函数由组件行为测试覆盖）；EB12d 仓库侧真实浏览器配置与验收（2 文件）。会话和沙箱仍归 EB13–EB14。
+- 验收结果：真实 health、5 秒超时、错误分类、重试保留故障/焦点、禁止重复请求与卸载取消完成；响应限制 1 KiB，不显示上游原文。25 项单元、typecheck/lint/build 全部通过；7 项 Chrome 覆盖 320/390/768/1024/1440、axe、键盘、断网重试及开发/构建预览代理。不会显示应用运行/保存成功。
 
 ### C-EB05 · 外壳可以构建
 
-- [ ] EB11–EB12 类型、lint、单元及实际构建通过；检查模板前端不包含平台管理页面与无用依赖。
+- [x] EB11–EB12 类型、lint、单元及实际构建通过；无平台管理页面、Pinia/Router、模型 Key 或平台 URL。真实浏览器和截图已核对，详细证据见新增验收记录。
+- [ ] 人工审阅 C-EB05；尚未连接前端会话、应用描述与 iframe，状态保存、新目录构建和完整工程导出仍待后续任务。本轮仅本地提交，未推送/部署。
 
 ### EB13 · 连接真实会话与应用描述（M）
 
