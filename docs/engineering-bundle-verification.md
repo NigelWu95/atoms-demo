@@ -1,10 +1,10 @@
 # engineering-bundle · 实施与验证记录
 
-日期：2026-10-11。分支：`feature/standalone-engineering`。依据：[规格](../SPEC-engineering-bundle.md)、[计划](../tasks/plan.md)、[执行清单](../tasks/todo.md)。
+日期：2026-10-12。分支：`feature/standalone-engineering`。依据：[规格](../SPEC-engineering-bundle.md)、[计划](../tasks/plan.md)、[执行清单](../tasks/todo.md)。
 
 ## 当前交付边界
 
-EB01–EB08 已实现并验证：纯内存工程组装及边界校验、独立后端配置/数据库/安装身份，以及统一 API 错误、访客初始化、CSRF 与 JDBC 持久会话。当前交付 C-EB03，下一步 EB09–EB10 应用资源和沙箱运行文档。没有下载 HTTP API、工作台按钮、真实模板装载器、独立业务状态接口、构建执行器或托管实例，不宣称完整工程已可导出运行。本轮未改动线上服务、原平台源码/迁移或原交付文档；下文各节保留当时阶段的证据，不代表后续能力也已完成。
+EB01–EB10 已实现并验证：纯内存工程组装、独立启动/数据库/安装身份、访客与持久会话，以及固定应用资源加载、内容指纹和受限运行文档接口。当前交付 C-EB04，下一步 EB11–EB12 独立 Vue 外壳。没有下载 HTTP API、工作台按钮、真实模板装载器、独立业务状态接口、完整工程构建执行器或托管实例，不宣称完整工程已可导出运行。本轮未改动线上服务、原平台生产源码/迁移或原交付文档；下文各节保留当时阶段的证据，不代表后续能力也已完成。
 
 `BundleSource` 冻结来源 UUID、原内容 hash 和 Artifact；调用方必须先完成版本所有者授权。组装器再次调用原 `ArtifactValidator`，并且只读取传入的代码快照及固定模板快照；没有数据库、环境变量、网络、文件系统或进程操作。`TemplateSnapshot` 构造入口限定于 engineering 包，后续只有固定目录的 TemplateCatalog 提供真实模板。
 
@@ -255,6 +255,75 @@ Origin 存在时必须唯一且精确匹配外部配置，拒绝 `null`/外站�
 
 本轮没有修改旧 README/提交说明/部署文档，没有真实模型调用、GitHub 推送、合并或云端部署。没有 UI 改动，未把 HTTP Cookie jar 验收称为浏览器验收；原平台完整 IT/UI、独立应用保存状态及全新目录构建仍未在此阶段完成。
 
+## EB09–EB10 · 应用资源与受限文档
+
+### 接口与实现边界
+
+新增两个已认证访客接口，仅服务安装的一个应用，不接受项目、版本或文件选择：
+
+| 接口 | 成功响应 |
+|---|---|
+| `GET /api/app` | `{ title, summary, runtime: "web-static-v1", stateSchemaVersion: 1, loadedRuntimeId }` |
+| `GET /api/app/document` | UTF-8 HTML、no-store；仅成功文档使用专门 sandbox CSP 与 SAMEORIGIN |
+
+描述不返回会话、配置、初始状态或历史来源信息。初始状态只保存在不可变加载模型中，未来通过每访客状态接口初始化。请求仍有认证、访客存在性校验与原有统一脱敏错误；错误响应不能获得文档的 iframe/inline 权限。
+
+ApplicationArtifactLoader 只解析 `application/manifest.json`、`view.html`、`styles.css`、`main.js`。源码合计 120 KiB，初始 JSON 对象 256 KiB，manifest 输入最多 272 KiB（为描述字段及编码留余量），容器深度 64；拒绝缺文件、额外文件、错误字段/类型、重复键、尾随 JSON、非法 UTF-8、源码 NUL、超限和危险 HTML。HTML 使用与平台完全相同的 jsoup 白名单，校验后再净化序列化。CSS/JS 以转义 `< > & U+2028 U+2029` 的 JSON 数据进入受控文档，不作为 HTML 模板片段拼接。
+
+打包器只读四个应用文件及 `runtime/bootstrap.js`、`runtime/document.html`；校验常规文件、符号链接、字节上限和 UTF-8，创建全新的临时输出目录，不覆盖已有工程，不执行生成源码。完整应用语义由 Java 加载器校验，不能把 Node 字节打包成功当成产物合法。构建假设项目树不会被另一个用户并发替换；O_NOFOLLOW 与有界描述符读取不宣称解决可写祖先目录的所有竞态。
+
+内容摘要格式：SHA-256，域前缀 `atoms-runtime-content-v1\0`，随后按固定路径排序连接 `path + NUL + 十进制字节数 + NUL + 原始字节`。打包写入 `runtime/content.sha256`，Java 加载同一批实际字节并核对该值；摘要不包含时间、绝对路径、部署身份或数据库密码。`sourceContentHash` 仍是 bundle manifest 的历史来源，不参与冒充修改后应用身份。**当前指纹覆盖六个资源，不是整个工程或整个 JAR 的 hash**；EB18 接入真实 Vue 产物及受控运行层完整构建输入时，必须扩展并冻结最终身份格式，补充“只改宿主/策略代码也改变运行身份”的验收后才能用于正式状态写入。
+
+TestApplication 仅在 test classpath：显式注入固定计数器，使用已验证的专用测试库，不提供 HTTP 夹具创建路由。生产 main 在 Spring/数据库启动之前读取实际打包资源，缺文件或指纹不符直接失败，不回退到测试数据。目前直接对模板执行 Maven 产生的是尚未嵌入应用的 JAR，不能作为完整导出成品；应用/前端与 Maven 的正式构建接线仍是 EB18 的工作。
+
+### 安全取舍与实际排错
+
+不可信文件/模型源码只能进入固定数据位置；受控运行层是可信构建代码，不由模型覆盖。浏览器中的生成代码仍为 opaque origin，保留 `sandbox allow-scripts`、禁止联网、worker、嵌套 frame、表单及宿主导航的策略，没有 allow-same-origin、unsafe-eval、外部脚本或 wildcard CORS。bootstrap 和 HTML 文档与原平台逐字节一致，继续使用 Atoms.ready/storage 与原有超时、未知保存结果、关闭清理协议。
+
+新增 RuntimeDocumentPolicy 在 JDBC Session 最终提交之后、缓冲响应发出之前判断方法/路径/200/HTML/准确 CSP；只有全部匹配才允许嵌入，其余返回严格头。这比只在 MVC 返回时检查更晚，可以覆盖最终会话提交变成 503 的情况；没有关闭 Spring Security 整套 headers。
+
+首版使用 ResponseEntity.header 追加文档 CSP，真实 HTTP 测试仍收到 DENY。检查 Spring 6.2.19 ServletServerHttpResponse 的 addHeader 行为及平台已有实现后，改为 response.setHeader 替换默认 CSP；两条 CSP 会取交集，单纯追加并不能开放文档。已加唯一 CSP、普通 API 不放宽及最终保存故障恢复严格策略的回归。代码评审还反转了 `status == 200` 条件，策略测试明确失败，恢复后完整验证通过。
+
+### 本轮验证与复现
+
+| 检查 | 结果 |
+|---|---|
+| 资源解析/打包红绿 | 新类/模块缺失时先失败，实现后通过；Java 与 Node 摘要向量相同，逐文件修改及失配拒绝通过 |
+| 文档 HTTP 红绿 | 已认证 app/document 最初 404，两项失败；接线后通过，未认证保持 401 |
+| 模板 `clean verify` | **121 单元 + 44 PostgreSQL/HTTP IT**，0 失败/跳过，JAR 构建成功，最终执行约 62 秒 |
+| 仓库 Node 组合 | **20 项**通过（新打包 4、一致性 2、既有脚本 14） |
+| 原平台组装回归 | **46 项**通过；未修改原平台生产实现 |
+| 原 SDK 单元 | **4 项**通过，覆盖来源握手、超时/关闭、队列与未知结果同意图重试 |
+| 独立文档真实 Chrome | **2 项**通过，约 24.5 秒；iframe 可执行、点击/空格计数、握手、opaque origin、直接访问沙箱及未认证拒绝 |
+| 前端检查 | 仓库 typecheck、新增浏览器测试/config 的 ESLint 与 Prettier 通过 |
+| JAR 排除 | 包含生产加载器/文档服务和受控 runtime，不含 TestApplication、资源测试、RuntimeDocumentIT 或测试应用文件 |
+
+浏览器测试使用隔离 Chrome，真实会话/文档请求连接模板后端。**宿主页面和 STATE_GET/SAVE 回复是浏览器内协议夹具，只证明 SDK 通道可用，不证明数据库保存或产品 Vue 外壳完成**。没有 trace/Cookie/CSRF 落盘；截图只包含测试计数器。reuseExistingServer=false，仅关闭测试创建的进程；完成后 18088 没有监听，专用测试库保留，平台服务未停用。首次定向 HTTP/浏览器启动受沙箱访问限制，按权限流程重试后通过，未修改数据库护栏绕过限制。
+
+模板后端执行（Java 17 已显式配置）：
+
+```sh
+STANDALONE_TEST_CONFIG=/absolute/path/test.properties ./mvnw -B clean verify
+```
+
+仓库根执行：
+
+```sh
+node --test scripts/standalone-runtime-parity.test.mjs scripts/provision-standalone-db.test.mjs scripts/release.test.mjs templates/standalone-v1/scripts/init-config.test.mjs templates/standalone-v1/scripts/package-application.test.mjs
+```
+
+仓库 frontend 执行（已安装锁定依赖，测试库配置需含明确的回环监听端口）：
+
+```sh
+STANDALONE_TEST_CONFIG=/absolute/path/test.properties ./node_modules/.bin/playwright test --config playwright.standalone-document.config.ts --project chromium
+./node_modules/.bin/vitest run src/runtime/bootstrap.spec.ts
+npm run typecheck
+./node_modules/.bin/eslint playwright.standalone-document.config.ts e2e-standalone-document/document.spec.ts
+./node_modules/.bin/prettier --check playwright.standalone-document.config.ts e2e-standalone-document/document.spec.ts
+```
+
+本切片只做本地提交，没有主分支合并、GitHub 推送、模型调用、SSH 部署或原交付文档更新。完整产品外壳、真实状态保存、新目录构建及最终工程导出仍待后续任务。
+
 ## 已核对的官方依据
 
 - [Java 17 Record](https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/Record.html)：可变组件需要防御性复制，复制后仍需保持值语义。
@@ -280,3 +349,7 @@ Origin 存在时必须唯一且精确匹配外部配置，拒绝 `null`/外站�
 - [Spring Session 3.5 JDBC](https://docs.spring.io/spring-session/reference/3.5/configuration/jdbc.html)：独立数据库持久会话；依赖版本仍由 Boot 3.5.16 锁定。
 - [Jackson 2.21 StreamReadConstraints](https://github.com/FasterXML/jackson-core/blob/2.21/src/main/java/com/fasterxml/jackson/core/StreamReadConstraints.java)、[Spring MVC 错误响应](https://docs.spring.io/spring-framework/reference/6.2/web/webmvc/mvc-ann-rest-exceptions.html)：专用解析器深度约束与异常处理边界，不改变全局 Jackson 默认值。
 - [Spring 6.2 ContentCachingResponseWrapper](https://docs.spring.io/spring-framework/docs/6.2.x/javadoc-api/org/springframework/web/util/ContentCachingResponseWrapper.html)、[安全响应头](https://docs.spring.io/spring-security/reference/6.5/servlet/exploits/headers.html)：缓冲完整响应直到会话过滤器完成，保留其他框架安全头；早期拒绝由外层过滤器提供同等响应保护。
+- [jsoup Cleaner](https://jsoup.org/apidocs/org/jsoup/safety/Cleaner)：通过 isValidBodyHtml 不免除 clean 规范化步骤，避免解析器差异。
+- [CSP3 sandbox](https://www.w3.org/TR/CSP3/#directive-sandbox)：受限文档的 HTTP sandbox 策略，在直接访问时也生效。
+- [Spring Boot 3.5 test-run](https://docs.spring.io/spring-boot/3.5/maven-plugin/run.html#run.examples.test-run)：使用测试 classpath 与测试入口，不把夹具放入正式 JAR。
+- [Playwright webServer](https://playwright.dev/docs/test-webserver)、[APIRequestContext](https://playwright.dev/docs/api/class-apirequestcontext)、[route.fulfill](https://playwright.dev/docs/api/class-route#route-fulfill)：管理自有测试进程、隔离会话及仅浏览器内的宿主协议夹具。

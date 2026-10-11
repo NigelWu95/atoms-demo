@@ -1,6 +1,6 @@
 # engineering-bundle · 开发任务
 
-状态：2026-10-11 用户已确认 C-EB02 后继续；EB01–EB08 已实现并验证；当前交付 C-EB03，后续任务未开始。
+状态：2026-10-12 用户确认继续后，EB01–EB10 已实现并验证；当前交付 C-EB04，下一步 EB11–EB12。
 依据：[计划及验证命令](plan.md)、[已批准规格](../SPEC-engineering-bundle.md)。本清单只负责 `engineering-bundle`；原平台任务清单不变。
 
 路径缩写：`P/` = `backend/src/main/java/dev/atoms/demo/engineering/`；`PT/` = 对应平台 `src/test/java/dev/atoms/demo/engineering/`；`T/` = `templates/standalone-v1/`；`B/` = `T/backend/src/main/java/dev/atoms/standalone/`；`BT/` = 对应模板 `src/test/java/dev/atoms/standalone/`；`R/` = `T/backend/src/main/resources/`；`F/` = `T/frontend/src/`。下列路径尚未实现。
@@ -104,23 +104,31 @@
 
 ### EB09 · 应用资源与内容运行标识（M）
 
-- [ ] 完成 EB09。依赖：EB08。
+- [x] 完成 EB09。依赖：EB08。
 - 文件：`B/ApplicationArtifactLoader.java`、`BT/ApplicationArtifactTest.java`、`BT/TestApplication.java`、`T/scripts/package-application.mjs`、`T/scripts/package-application.test.mjs`。
 - 验收：① 只读取四个固定 application 文件，校验 manifest/初始状态/源码，非法或缺失明确失败；② 打包脚本对实际应用与受控运行资源计算稳定 runtime ID，变化会更新，路径/时间不影响；③ 公开描述不泄露内部配置，sourceContentHash 仅标示历史来源。
 - 验证：V-BU；模板根 `node --test scripts/package-application.test.mjs`；TestApplication 提供独立工程自身检查需要的固定输入与 V-D 引导，不在正式包缺文件时 fallback 到夹具。实际应用不可变模型作为 loader 的嵌套 record，若扩散则拆子任务；构建接线在 EB18 完成。
 - 实施拆分（每组最多 5 个主要文件）：EB09a 应用校验及 HTML 白名单（loader、ApplicationHtml、单元测试）；EB09b 内容指纹、资源打包脚本及双语言一致性测试；EB09c 测试专用引导与现有 HTTP 测试接线。测试夹具只通过显式测试引导注入，不成为生产缺文件的后备。
+- [x] EB09a：固定四文件、严格 manifest/UTF-8/体积/深度校验、初始值防御性复制；HTML 白名单与平台一致。缺少实现的测试先失败，实现后通过。
+- [x] EB09b：进一步分为 Node 打包器/测试（2 文件）、RuntimeResources/测试（2 文件）；摘要覆盖实际四个应用文件与两个受控 runtime 文件，Java/Node 共享固定摘要向量，加载时重新核对打包指纹。修改任一文件会改变指纹，路径/时间/历史来源元数据不影响。
+- [x] EB09c：TestApplication 与夹具单元测试接线（3 文件），再接既有 HTTP IT（3 文件）；显式 test-run 已由真实 Chrome 验证，正式入口缺资源时拒绝启动。没有向正式 JAR 加入测试应用。
 
 ### EB10 · 受限运行文档端点（M）
 
-- [ ] 完成 EB10。依赖：EB09。
+- [x] 完成 EB10。依赖：EB09。
 - 文件：`B/RuntimeDocumentService.java`、`B/AppController.java`、`R/runtime/bootstrap.js`、`R/runtime/document.html`、`BT/RuntimeDocumentIT.java`。
 - 验收：① GET app/document 只服务当前独立应用并要求身份；② 复用净化与上下文编码语义，iframe 专用 CSP 不放宽宿主策略；③ 保持 Atoms.ready/storage 协议，恶意闭合 script、事件属性/导航/联网输入不能扩大权限。
 - 验证：V-B；测试与平台运行文档共用的攻击向量，核对 document 的 CSP/X-Frame-Options 组合，不能通过删除冲突头之外的所有保护来放行。
 - 实施拆分：EB10a 原样移植受控 runtime 资源及兼容校验；EB10b 渲染服务、端点、生产资源 Bean 和 HTTP 测试；EB10c 专用响应头策略与失败响应回归。先有 runtime 资源再完成 EB09b 指纹验收；最终前端构建产物纳入标识在 EB18 接线时补齐。
+- [x] EB10a：bootstrap.js/document.html 与平台逐字节一致；仓库级一致性测试同时核对 HTML 白名单。
+- [x] EB10b：GET app/document 先返回 404 的两项反例失败；接线后返回当前应用公开描述及安全编码 HTML，访客校验不允许选择平台项目/文件。
+- [x] EB10c：RuntimeDocumentPolicy、RequestBoundaryFilter、AppController、HTTP/单元测试（5 文件）；修复 CSP 追加造成的严格策略叠加，只在最终成功 HTML 上允许 SAMEORIGIN，会话最终保存失败恢复严格头。反转成功状态判断，策略测试失败，恢复后完整回归通过。
+- [x] EB10d：独立文档 Playwright 配置/测试（2 文件）；真实 Chrome 的 opaque iframe、SDK 握手/点击、直接访问和未认证拒绝通过。宿主和状态响应是浏览器测试夹具，不冒充 EB11–EB17 的产品实现。
 
 ### C-EB04 · 内容边界检查点
 
-- [ ] EB09–EB10 的内容标识及文档接口通过真实请求测试，审阅模板与原运行层的协议差异；尚不宣称浏览器保存功能完成。
+- [x] 技术验收及自审：模板 121 单元 + 44 PostgreSQL/HTTP IT；Node 20 项、原平台组装 46 项、原 SDK 单元 4 项、真实 Chrome 2 项通过，无跳过。文档专用 CSP 与原平台语义一致，新增最终响应提交检查；测试进程已停止，未推送/部署。
+- [ ] 人工审阅本检查点交付；仍无 Vue 产品外壳、独立状态保存或全新目录完整构建。最终前端/受控运行层构建输入指纹与打包接线归 EB18，不能把当前六资源指纹当成整个工程身份。
 
 ### EB11 · 最小 Vue 构建配置（M）
 
