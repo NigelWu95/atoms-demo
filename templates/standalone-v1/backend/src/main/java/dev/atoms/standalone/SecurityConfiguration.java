@@ -17,7 +17,7 @@ import org.springframework.session.web.http.DefaultCookieSerializer;
 @Configuration(proxyBeanMethods = false)
 class SecurityConfiguration {
     @Bean
-    SecurityFilterChain endpoints(HttpSecurity http) throws Exception {
+    SecurityFilterChain endpoints(HttpSecurity http, ApiExceptionHandler apiErrors) throws Exception {
         // Narrow deny-by-default surface until guest/CSRF endpoints land in EB08.
         // A health probe must not create a JDBC session when the database is unavailable.
         // https://docs.spring.io/spring-security/reference/6.5/servlet/authorization/authorize-http-requests.html
@@ -26,8 +26,11 @@ class SecurityConfiguration {
                 .sessionManagement(sessions -> sessions.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .requestCache(AbstractHttpConfigurer::disable)
                 .formLogin(AbstractHttpConfigurer::disable).httpBasic(AbstractHttpConfigurer::disable)
-                .exceptionHandling(errors -> errors.authenticationEntryPoint((request, response, failure) -> response.setStatus(401))
-                        .accessDeniedHandler((request, response, failure) -> response.setStatus(403)))
+                .exceptionHandling(errors -> errors.authenticationEntryPoint((request, response, failure) ->
+                                apiErrors.write(request, response, ApiException.Code.SESSION_REQUIRED))
+                        .accessDeniedHandler((request, response, failure) -> apiErrors.write(request, response,
+                                failure instanceof org.springframework.security.web.csrf.CsrfException
+                                        ? ApiException.Code.CSRF_REJECTED : ApiException.Code.FORBIDDEN)))
                 .headers(headers -> headers.contentSecurityPolicy(csp -> csp.policyDirectives("default-src 'none'; frame-ancestors 'none'")))
                 .build();
     }

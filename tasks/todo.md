@@ -77,12 +77,12 @@
 
 ### EB07 · 独立 API 错误与入口限制（M）
 
-- [ ] 完成 EB07。依赖：EB06。
+- [x] 完成 EB07。依赖：EB06。
 - 文件：`B/ApiError.java`、`B/ApiException.java`、`B/ApiExceptionHandler.java`、`B/RequestBoundaryFilter.java`、`BT/ApiBoundaryIT.java`。
 - 验收：① 错误含稳定 code/retryable/requestId，日志关联但不泄露 SQL/路径/配置；② JSON 大小/深度和非法请求明确拒绝，未知 API 返回 404 JSON 而非页面；③ 401/403/409/413/422/503 状态映射按新契约，不修改平台的错误映射。
 - 验证：V-B，覆盖超限、截断 JSON、未知路由、内部异常脱敏与 requestId 对应。
-- 切片 EB07a：ApiError、ApiException、ApiExceptionHandler、ApiErrorsTest、HealthController，统一可信错误码与脱敏响应。
-- 切片 EB07b：RequestBoundaryFilter、SecurityConfiguration、ApiBoundaryIT、HealthIT，入口字节/JSON 深度限制和安全链错误接线；每片单独验证提交。
+- [x] EB07a：ApiError、ApiException、ApiExceptionHandler、ApiErrorsTest、HealthController，统一可信错误码与脱敏响应；110 单元 + 23 IT 通过。
+- [x] EB07b：RequestBoundaryFilter、SecurityConfiguration、ApiBoundaryIT、HealthIT、ApiExceptionHandler，入口字节/JSON 深度限制、安全链错误接线及媒体协商拒绝；6 项真实 HTTP 反例先失败，修正测试专用故障路由装配后 110 单元 + 29 IT 全部通过。
 - 入口约束细化：请求体最多 320 KiB（为 256 KiB 状态及外层字段留余量），JSON 最大容器深度 64；拒绝重复键、尾随文档和非 JSON 写入。该上限不是业务状态上限，状态值仍单独限制 256 KiB。
 
 ### EB08 · 独立访客与 CSRF（M）
