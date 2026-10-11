@@ -87,7 +87,6 @@ button {
 .eyebrow,
 .detail,
 .intro,
-.implementation-note p,
 .app-footer {
   color: var(--muted);
 }
@@ -101,6 +100,15 @@ main {
 .startup {
   max-width: 640px;
   margin-inline: auto;
+}
+.startup.has-app {
+  max-width: 960px;
+}
+.intro,
+.detail,
+.error-message,
+h1 {
+  overflow-wrap: anywhere;
 }
 .eyebrow {
   font-size: 12px;
@@ -182,18 +190,30 @@ button[aria-disabled='true'] {
   border-color: var(--border);
   cursor: wait;
 }
-.implementation-note {
-  margin-top: 28px;
-  padding-left: 18px;
-  border-left: 2px solid var(--border);
-}
 h2 {
   font-size: 14px;
   font-weight: 600;
 }
-.implementation-note p {
-  font-size: 14px;
-  margin-top: 6px;
+.runtime-panel {
+  margin-top: 28px;
+}
+.runtime-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.runtime-container {
+  margin-top: 16px;
+}
+.runtime-container iframe {
+  display: block;
+  width: 100%;
+  height: 480px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color-scheme: light;
+  background: #fff;
 }
 .app-footer {
   border-top: 1px solid var(--border);
