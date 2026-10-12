@@ -35,11 +35,11 @@ public class BuildAdmissionService {
             builds.lockAdmission();
             projects.lock(owner, projectId);
             return idempotency.execute(owner,"POST","/api/projects/"+project.id()+"/builds",key,Map.of("versionId",version),() -> {
+                var source = snapshots.authorize(owner,projectId,version.toString());
                 if (preflight.failure()!=null) throw preflight.failure();
                 if (builds.unresolved()) throw BuildEnvironment.unavailable();
                 if (builds.activeProject(project.id())) throw new ApiException(409,"BUILD_ALREADY_ACTIVE","该项目已有构建任务，请等待或取消");
                 if (builds.activeCount()>=4) throw new ApiException(503,"BUILD_QUEUE_FULL","构建队列已满，请稍后重试");
-                var source = snapshots.authorize(owner,projectId,version.toString());
                 var build = builds.insert(owner,project.id(),version,source.contentHash(),preflight.digest());
                 return new IdempotencyService.Result(202,json.valueToTree(Map.of("buildId",build.id(),"projectId",project.id(),"versionId",version)));
             });

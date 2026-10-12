@@ -64,6 +64,14 @@ class BuildWorkerTest {
         worker.execute(job, () -> false);
         verify(lifecycle).finish(eq(job.summary().id()),eq(job.executionId()),eq(new NativeBuildProcess.Result(true,"BUILD_INPUT_CHANGED",null)),isNull());
     }
+    @Test void refusesCapacityBeforeCreatingDirectoriesOrInvokingTools() throws Exception {
+        var job=fixture(); BuildWorker.Runner runner=mock(BuildWorker.Runner.class);
+        doThrow(new java.io.IOException("PRIVATE_DISK_CANARY")).when(execution).verifyCapacity();
+        new BuildWorker(execution,snapshots,lifecycle,runner,config->{}).execute(job,()->false);
+        verifyNoInteractions(runner);
+        verify(lifecycle).finish(eq(job.summary().id()),eq(job.executionId()),eq(new NativeBuildProcess.Result(true,"BUILD_CAPACITY_EXCEEDED",null)),isNull());
+        assertThat(Files.exists(execution.settings().paths().task(job.summary().id()))).isFalse();
+    }
     private BuildRepository.Stored fixture() throws Exception {
         Path root = Files.createDirectory(temporary.toRealPath().resolve(UUID.randomUUID().toString()),PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rwx------")));
         Path config = temporary.toRealPath().resolve(UUID.randomUUID()+".properties"); WorkspaceStore.writeNew(config,"TEST_SECRET".getBytes());

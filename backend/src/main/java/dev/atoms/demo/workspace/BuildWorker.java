@@ -67,7 +67,8 @@ public final class BuildWorker {
             if (!job.sourceHash().equals(source.contentHash())) throw failure("BUILD_INPUT_CHANGED");
             var bundle=snapshots.assemble(source,job.summary().templateDigest()).bundle();
             var store=new WorkspaceStore(paths);
-            execution.verifyCapacity();
+            try { execution.verifyCapacity(); }
+            catch (IOException error) { throw failure("BUILD_CAPACITY_EXCEEDED"); }
             var prepared=store.prepare(id,bundle);
             String archiveHash=BuildArtifacts.hash(BuildArtifacts.read(prepared.archive(),EngineeringZip.MAX_ZIP_BYTES));
             lifecycle.snapshot(id,executionId,bundle.bundleId(),archiveHash);
@@ -103,7 +104,9 @@ public final class BuildWorker {
                         "buildId",id,"projectId",job.summary().projectId(),"versionId",job.summary().versionId(),
                         "templateDigest",job.summary().templateDigest(),"buildPolicyVersion",job.summary().buildPolicyVersion(),
                         "bundleId",bundle.bundleId(),"archiveSha256",archiveHash,"loadedRuntimeId",result.loadedRuntimeId(),"jarSha256",jarHash)));
-                execution.verifyUsage(); requireRunning(stopped,reason);
+                try { execution.verifyUsage(); }
+                catch (IOException error) { throw failure("BUILD_CAPACITY_EXCEEDED"); }
+                requireRunning(stopped,reason);
             }
         } catch (Exception error) {
             String code=error instanceof ApiException api && java.util.Set.of("BUILD_INPUT_CHANGED","BUILD_ENVIRONMENT_NOT_READY","INVALID_ENGINEERING_BUNDLE",
