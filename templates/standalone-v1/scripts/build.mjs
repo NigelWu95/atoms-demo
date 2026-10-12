@@ -6,7 +6,7 @@ import { readBounded } from './build-inputs.mjs';
 import { collectResources, packageApplication, RESOURCE_PATHS, runtimeId } from './package-application.mjs';
 import { runCli, runCommand, toolEnvironment } from './process.mjs';
 
-export async function build(projectRoot, { env = process.env, signal } = {}) {
+export async function build(projectRoot, { env = process.env, signal, run = runCommand, onStage = () => {} } = {}) {
   const root = await realpath(projectRoot);
   const config = env.STANDALONE_TEST_CONFIG;
   if (!config || !isAbsolute(config) || !config.endsWith('.properties')) throw new Error('Explicit test config required.');
@@ -18,15 +18,24 @@ export async function build(projectRoot, { env = process.env, signal } = {}) {
     path.startsWith('application/') ? path : `backend/src/main/resources/${path}`,
     path.endsWith('manifest.json') ? 272 * 1024 : 120 * 1024);
   const childEnv = toolEnvironment(env);
-  for (const args of [['ci', '--ignore-scripts'], ['run', 'typecheck'], ['run', 'lint'], ['run', 'test:unit'], ['run', 'build']]) {
-    await runCommand('npm', args, { cwd: join(root, 'frontend'), env: childEnv, signal });
+  let previousStage;
+  for (const [stage, args] of [
+    ['INSTALLING', ['ci', '--ignore-scripts']], ['CHECKING_FRONTEND', ['run', 'typecheck']],
+    ['CHECKING_FRONTEND', ['run', 'lint']], ['CHECKING_FRONTEND', ['run', 'test:unit']],
+    ['BUILDING_FRONTEND', ['run', 'build']],
+  ]) {
+    if (stage !== previousStage) onStage(stage);
+    previousStage = stage;
+    await run('npm', args, { cwd: join(root, 'frontend'), env: childEnv, signal });
   }
   // Outside backend/target: Maven clean cannot erase its own resource inputs. Never reuse an old stage.
   const stage = await mkdtemp(join(tmpdir(), 'standalone-build-'));
   const packaged = await packageApplication(root, stage);
-  await runCommand(join(root, 'backend/mvnw'), ['-B', 'clean', 'verify', '-Pstandalone-package',
+  onStage('CHECKING_BACKEND');
+  await run(join(root, 'backend/mvnw'), ['-B', 'clean', 'verify', '-Pstandalone-package',
     '-Dstandalone.resources=' + packaged.directory, '-Dstandalone.expected-runtime-id=' + packaged.loadedRuntimeId],
   { cwd: join(root, 'backend'), env: { ...childEnv, STANDALONE_TEST_CONFIG: config }, signal });
+  onStage('VERIFYING');
   if (signal?.aborted || runtimeId(await collectResources(root)) !== packaged.loadedRuntimeId)
     throw new Error('Inputs changed during the build.');
   const jar = await lstat(join(root, 'backend/target/app.jar'));

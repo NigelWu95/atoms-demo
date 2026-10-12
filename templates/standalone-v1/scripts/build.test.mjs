@@ -91,3 +91,23 @@ test('Maven failure and cancellation propagate, without promoting any build resu
   const aborted = new AbortController(); aborted.abort('SIGINT');
   await assert.rejects(build(f.root, { env: f.env, signal: aborted.signal }), error => error.signal === 'SIGINT');
 });
+
+test('trusted callers can supervise the same fixed commands and receive typed stages', async () => {
+  const f = await fixture(), commands = [], stages = [];
+  const result = await build(f.root, { env: f.env, onStage: stage => stages.push(stage),
+    run: async (command, args, options) => {
+      commands.push({ command, args, options });
+      if (command.endsWith('/backend/mvnw')) {
+        await mkdir(join(f.root, 'backend/target'));
+        await writeFile(join(f.root, 'backend/target/app.jar'), 'CONTROLLED_CALLBACK_FIXTURE_NOT_A_JAR');
+      }
+    },
+  });
+  assert.equal(commands.length, 6);
+  assert.deepEqual(stages, ['INSTALLING', 'CHECKING_FRONTEND', 'BUILDING_FRONTEND', 'CHECKING_BACKEND', 'VERIFYING']);
+  assert.deepEqual(commands[0].args, ['ci', '--ignore-scripts']);
+  assert.deepEqual(commands[5].args.slice(0, 4), ['-B', 'clean', 'verify', '-Pstandalone-package']);
+  assert.equal(commands[5].options.env.STANDALONE_TEST_CONFIG, f.config);
+  assert.match(result.loadedRuntimeId, /^[a-f0-9]{64}$/);
+  await assert.rejects(readFile(f.trace));
+});
