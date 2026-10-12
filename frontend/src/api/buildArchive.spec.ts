@@ -8,13 +8,11 @@ afterEach(() => vi.unstubAllGlobals())
 it('downloads by build ID, with bounded ZIP validation and no version reassembly', async () => {
   vi.stubGlobal(
     'fetch',
-    vi
-      .fn()
-      .mockResolvedValue(
-        new Response(new Uint8Array([80, 75, 3, 4]), {
-          headers: { 'Content-Type': 'application/zip' },
-        }),
-      ),
+    vi.fn().mockResolvedValue(
+      new Response(new Uint8Array([80, 75, 3, 4]), {
+        headers: { 'Content-Type': 'application/zip' },
+      }),
+    ),
   )
   expect((await downloadBuildArchive(target, new AbortController().signal)).size).toBe(4)
   expect(fetch).toHaveBeenCalledWith(
