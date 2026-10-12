@@ -80,15 +80,27 @@ public final class BuildRootLease implements AutoCloseable {
         }
         if (directories + (admission ? 1 : 0) > maxDirectories || Files.getFileStore(root).getUsableSpace() < minFreeBytes)
             throw new IOException("Build workspace capacity exceeded");
-        long total = 0;
         // Do not follow npm symlinks or count their targets outside the workspace.
-        try (var files = Files.walk(root)) {
-            for (var iterator = files.iterator(); iterator.hasNext();) {
-                var attributes = Files.readAttributes(iterator.next(), BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
-                if (!attributes.isDirectory()) total = Math.addExact(total, attributes.size());
-                if (total >= maxBytes) throw new IOException("Build workspace capacity exceeded");
+        Files.walkFileTree(root, budgetVisitor(maxBytes));
+        paths.root(); // A disappearing configured root is not a transient build child.
+    }
+    static java.nio.file.SimpleFileVisitor<Path> budgetVisitor(long maxBytes) {
+        return new java.nio.file.SimpleFileVisitor<>() {
+            private long total;
+            @Override public java.nio.file.FileVisitResult visitFile(Path file, BasicFileAttributes attributes) throws IOException {
+                total=Math.addExact(total,attributes.size());
+                if(total>=maxBytes) throw new IOException("Build workspace capacity exceeded");
+                return java.nio.file.FileVisitResult.CONTINUE;
             }
-        } catch (java.io.UncheckedIOException error) { throw new IOException("Build workspace scan failed"); }
+            @Override public java.nio.file.FileVisitResult visitFileFailed(Path file,IOException error) throws IOException {
+                if(error instanceof java.nio.file.NoSuchFileException) return java.nio.file.FileVisitResult.CONTINUE;
+                throw error;
+            }
+            @Override public java.nio.file.FileVisitResult postVisitDirectory(Path directory,IOException error) throws IOException {
+                if(error!=null && !(error instanceof java.nio.file.NoSuchFileException)) throw error;
+                return java.nio.file.FileVisitResult.CONTINUE;
+            }
+        };
     }
 
     @Override public void close() throws IOException {

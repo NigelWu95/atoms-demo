@@ -9,6 +9,18 @@ import org.junit.jupiter.api.io.TempDir;
 import static org.assertj.core.api.Assertions.*;
 
 class BuildRootLeaseTest {
+    @org.junit.jupiter.api.Test void toleratesOnlyDisappearingTransientChildrenDuringUsageScan() throws Exception {
+        var visitor=BuildRootLease.budgetVisitor(1024);
+        Path transientFile=Path.of("/private/tmp/build-transient-test");
+        assertThat(visitor.visitFileFailed(transientFile,new java.nio.file.NoSuchFileException("gone")))
+                .isEqualTo(java.nio.file.FileVisitResult.CONTINUE);
+        assertThat(visitor.postVisitDirectory(transientFile,new java.nio.file.NoSuchFileException("gone")))
+                .isEqualTo(java.nio.file.FileVisitResult.CONTINUE);
+        assertThatThrownBy(()->visitor.visitFileFailed(transientFile,new java.nio.file.AccessDeniedException("denied")))
+                .isInstanceOf(java.io.IOException.class);
+        assertThatThrownBy(()->visitor.postVisitDirectory(transientFile,new java.io.IOException("broken")))
+                .isInstanceOf(java.io.IOException.class);
+    }
     @TempDir Path temporary;
     private WorkspacePaths paths() throws Exception {
         Path root = temporary.toRealPath();
