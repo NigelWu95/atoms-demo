@@ -160,7 +160,7 @@ export function useEngineeringBuild(target: () => BuildTarget | null) {
       }
     }
   }
-  async function confirm() {
+  async function perform(initialAttempt: boolean) {
     if (!request || !pending.value || busy.value || loading.value) return
     const own = request,
       intent = pending.value
@@ -194,6 +194,7 @@ export function useEngineeringBuild(target: () => BuildTarget | null) {
     } catch (failure) {
       if (!current(own)) return
       if (
+        initialAttempt &&
         !acceptedWrite &&
         failure instanceof ApiFailure &&
         ((failure.status >= 400 && failure.status < 500) || definiteRejections.has(failure.code))
@@ -218,13 +219,17 @@ export function useEngineeringBuild(target: () => BuildTarget | null) {
     try {
       saveIntent(request.target, intent)
       pending.value = intent
-      await confirm()
+      await perform(true)
     } catch (failure) {
       error.value = errorMessage(failure)
     }
   }
   async function submit() {
     if (canSubmit.value) await begin({ kind: 'submit', key: randomId() })
+  }
+  async function confirm() {
+    // A rejected retry cannot establish whether an earlier, unobserved write committed.
+    await perform(false)
   }
   async function cancel() {
     if (canCancel.value && build.value)

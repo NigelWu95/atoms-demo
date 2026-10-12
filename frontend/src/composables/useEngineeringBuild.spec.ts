@@ -179,3 +179,51 @@ it('does not send a new intent when browser storage cannot preserve its key', as
     storage.mockRestore()
   }
 })
+
+it.each([401, 403, 429, 503])(
+  'keeps an unknown submit intent when confirmation is rejected with %s',
+  async (status) => {
+    vi.mocked(submitBuild).mockRejectedValueOnce(new ApiFailure('NETWORK_ERROR', '断网'))
+    const first = setup()
+    await flushPromises()
+    await first.state.submit()
+    const key = first.state.pending.value?.key
+    vi.mocked(submitBuild).mockRejectedValueOnce(
+      new ApiFailure('BUILD_ENVIRONMENT_NOT_READY', '确认暂不可用', status),
+    )
+    await first.state.confirm()
+    expect(first.state.pending.value?.key).toBe(key)
+    first.wrapper.unmount()
+    const second = setup()
+    await flushPromises()
+    expect(second.state.pending.value?.key).toBe(key)
+    expect(submitBuild).toHaveBeenCalledTimes(2)
+    await second.state.confirm()
+    expect(vi.mocked(submitBuild).mock.calls[2]![2]).toBe(key)
+    expect(second.state.pending.value).toBeNull()
+  },
+)
+
+it('keeps an unknown cancellation through a rejected confirmation', async () => {
+  vi.mocked(listBuilds).mockResolvedValue({ items: [queued], nextCursor: null })
+  vi.mocked(cancelBuild).mockRejectedValueOnce(new ApiFailure('NETWORK_ERROR', '断网'))
+  const { state } = setup()
+  await flushPromises()
+  await state.cancel()
+  const key = state.pending.value?.key
+  vi.mocked(cancelBuild).mockRejectedValueOnce(new ApiFailure('RATE_LIMITED', '稍后重试', 429))
+  await state.confirm()
+  expect(state.pending.value?.key).toBe(key)
+  await state.confirm()
+  expect(vi.mocked(cancelBuild).mock.calls[2]![2]).toBe(key)
+  expect(state.pending.value).toBeNull()
+})
+
+it('clears an initially rejected intent without labelling it unknown', async () => {
+  vi.mocked(submitBuild).mockRejectedValueOnce(new ApiFailure('BUILD_DISABLED', '尚未开启', 503))
+  const { state } = setup()
+  await flushPromises()
+  await state.submit()
+  expect(state.pending.value).toBeNull()
+  expect(state.error.value).toContain('尚未开启')
+})
