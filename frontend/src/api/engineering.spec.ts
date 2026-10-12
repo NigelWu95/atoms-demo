@@ -86,3 +86,24 @@ it('rejects an aborted result even if the transport ignores cancellation', async
   await expect(downloadEngineering(version, controller.signal)).rejects.toThrow()
   expect(fetch).not.toHaveBeenCalled()
 })
+
+it('does not invalidate a newer session when a stale error body is canceled', async () => {
+  const client = createApiClient()
+  const invalidated = vi.fn()
+  client.onSessionFailure(invalidated)
+  const controller = new AbortController()
+  let close!: () => void
+  const body = new ReadableStream({
+    start(stream) {
+      close = () => stream.close()
+    },
+  })
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(body, { status: 401 })))
+  const pending = client.binary('/api/test', controller.signal, 1024)
+  const result = expect(pending).rejects.toThrow()
+  await Promise.resolve()
+  controller.abort()
+  close()
+  await result
+  expect(invalidated).not.toHaveBeenCalled()
+})
