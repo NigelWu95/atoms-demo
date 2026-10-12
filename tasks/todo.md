@@ -266,6 +266,8 @@
 - 夹具设计：从 `webServer` 改为 worker 生命周期管理，保留等价的「端口占用即失败、不复用服务」约束，重启前等待自有进程退出并释放端口；JAR 不增加控制接口。每次启动重验实际 JAR hash 与显式配置。浏览器阻断一切非独立应用 origin；关闭原始 trace，改存不含请求头/正文的状态码诊断及截图，避免 Cookie/CSRF 泄漏。
 - [x] EB22a：可重启 worker 与显式 JAR/配置检查接线；缺少生命周期导出的 RED 后 Node 测试、类型检查、lint 及四尺寸真实 JAR 浏览器烟测通过。发现 Playwright `serviceWorkers: block` 初始化脚本在 opaque iframe 访问 getter 产生 SecurityError；取消该测试脚本注入，保留应用真实 CSP 和零页面错误断言，另断言新上下文中没有 service worker。正常同源响应不经测试代理改写。
 - [x] EB22b：6 项真实工程包浏览器用例通过：保存/勾选/刷新、真实 Java 进程重启后同访客恢复与第二访客隔离、已提交响应丢失/畸形/超时后同键确认、双标签冲突及显式读取最新数据。丢失响应场景在重试前另重启进程，仍只留下 revision=1；没有调用平台 API。测试 TypeScript、lint、格式检查通过。数据库故障与 SQL 层证据仍待 EB22c，不提前勾选 EB22。
+- EB22c 再拆：c1（3 文件）仓库侧专属 TCP 连接闸门、私有临时配置和受限角色只读证据查询（脚本/测试/类型）；c2（最多 4 文件）worker 接线、真实数据库断连浏览器用例、重试/重启的 SQL 证据。只支持已准备的 `atoms_standalone_a/b` 和本地容器；临时配置新建为 0600，不改变原配置/源文件；故障只销毁本次闸门的 socket，不执行数据库停机、权限变更或数据清理。证据查询以应用角色执行固定只读事务，只返回修订号/行数/安装身份匹配布尔值。
+- [x] EB22c1：3 项连接闸门/配置拒绝测试通过；实际受限角色只读查询可连接。库/角色匹配条件反向变异被正反例捕获，恢复后全绿；补充反例意外成功时也释放测试自有句柄，避免变异验收遗留进程。临时私有配置在闸门结束时移除，原配置逐字节不变。
 - 文件：`frontend/e2e-standalone/state.spec.ts`、`frontend/e2e-standalone/restart.spec.ts`、`frontend/e2e-standalone/retry.spec.ts`、`frontend/e2e-standalone/fixtures.ts`。
 - 验收：① 阻断平台所有 origin 后待办添加/保存/刷新仍成功，数据只写独立库；② 只重启本次独立进程，同一有效 Cookie 恢复，第二访客读不到首个访客数据；③ 丢失已提交响应可同键确认，DB 不可用/双标签冲突不产生假成功或覆盖。
 - 验证：V-X、V-E；追踪网络、数据库 revision 与幂等记录，保留失败 trace 且不泄露 Cookie/配置。
