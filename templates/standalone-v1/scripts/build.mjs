@@ -34,7 +34,7 @@ export async function build(projectRoot, { env = process.env, signal } = {}) {
   return packaged;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+if (process.argv[1] && import.meta.url === pathToFileURL(await realpath(resolve(process.argv[1]))).href) {
   await runCli(async signal => {
     if (process.argv.length !== 2) throw new Error('Build does not accept extra flags.');
     const result = await build(fileURLToPath(new URL('..', import.meta.url)), { signal });
