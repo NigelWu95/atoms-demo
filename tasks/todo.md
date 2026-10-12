@@ -343,7 +343,7 @@
 
 ### WB02 · 私有目录物化（M）
 
-- [ ] 完成 WB02。依赖：WB01。
+- [x] 完成 WB02。依赖：WB01。新目录物化、私有权限、根目录身份/符号链接校验和 CREATE_NEW 已实现；新增测试先失败，路径/物化/原 ZIP 定向 6 项通过。只新建任务目录，无清理操作。
 - 描述：将可信工程文件在服务端派生的新任务目录中物化，不接收浏览器路径。
 - 文件：`W/WorkspacePaths.java`、`W/WorkspaceStore.java`、`WT/WorkspacePathsTest.java`、`WT/WorkspaceStoreTest.java`。
 - 验收：① 拒绝系统/home/仓库根、符号链接祖先、非私有目录和已存在任务目标；② UUID 派生路径与固定文件白名单生效，目录/敏感文件权限正确；③ 失败不覆盖已有文件或递归删除未知内容。

@@ -9,11 +9,11 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
 /** In-memory source archive only; never reads the filesystem or executes application code. */
-final class EngineeringZip {
-    static final int MAX_ZIP_BYTES = 9 * 1024 * 1024;
+public final class EngineeringZip {
+    public static final int MAX_ZIP_BYTES = 9 * 1024 * 1024;
     private EngineeringZip() {}
 
-    static byte[] write(EngineeringBundle bundle) throws IOException {
+    public static byte[] write(EngineeringBundle bundle) throws IOException {
         TemplatePolicy.validateBundle(bundle.files());
         // ASCII paths, STORED data, no comments/extra fields: exact classic ZIP size, no ZIP64.
         long size = 22;
