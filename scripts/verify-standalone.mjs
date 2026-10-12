@@ -7,17 +7,20 @@ import { materializeBundle, validateBundle, verifyMaterialized } from './standal
 import { assertFree, listenerFromConfig, startOwned } from './standalone-process.mjs';
 import { collectResources, runtimeId } from '../templates/standalone-v1/scripts/package-application.mjs';
 import { runCli, runCommand, toolEnvironment } from '../templates/standalone-v1/scripts/process.mjs';
+import { extractDownloadedFixture } from './downloaded-fixture.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 export function verificationOptions(args) {
   const upgrade = args.length === 6 && args[4] === '--fixture' && args[5] === 'upgraded';
-  if ((!upgrade && args.length !== 4) || args[0] !== '--config-dir' || args[2] !== '--output-parent' || !args[1] || !args[3])
-    throw new Error('Usage: verify-standalone.mjs --config-dir <existing-directory> --output-parent <existing-directory> [--fixture upgraded]');
-  return { configDir: args[1], outputParent: args[3], ...(upgrade ? { fixture: 'upgraded' } : {}) };
+  const download = args.length === 6 && args[4] === '--downloaded-zip' && !!args[5];
+  if ((!upgrade && !download && args.length !== 4) || args[0] !== '--config-dir' || args[2] !== '--output-parent' || !args[1] || !args[3])
+    throw new Error('Usage: verify-standalone.mjs --config-dir <existing-directory> --output-parent <existing-directory> [--fixture upgraded | --downloaded-zip <reviewed-fixture.zip>]');
+  return { configDir: args[1], outputParent: args[3], ...(upgrade ? { fixture: 'upgraded' } : {}),
+    ...(download ? { downloadedZip: args[5] } : {}) };
 }
 
-export async function verifyStandalone({ configDir, outputParent, fixture = 'todo' }, signal) {
-  if (fixture !== 'todo' && fixture !== 'upgraded') throw new Error('Unknown reviewed fixture.');
+export async function verifyStandalone({ configDir, outputParent, fixture = 'todo', downloadedZip }, signal) {
+  if ((fixture !== 'todo' && fixture !== 'upgraded') || (downloadedZip && fixture !== 'todo')) throw new Error('Unknown reviewed fixture.');
   const config = await realpath(configDir);
   const parent = await realpath(outputParent);
   if (!(await lstat(config)).isDirectory() || !(await lstat(parent)).isDirectory()) throw new Error('Existing directories required.');
@@ -30,19 +33,29 @@ export async function verifyStandalone({ configDir, outputParent, fixture = 'tod
   const work = await mkdtemp(join(parent, 'verification-'));
   const env = toolEnvironment();
   const java = env.JAVA_HOME ? join(env.JAVA_HOME, 'bin/java') : 'java';
-  const platformJar = join(root, 'backend/target/atoms-demo-0.1.0-SNAPSHOT.jar');
-  // Bounded synchronous test-only assembly (<30s), not a server or an arbitrary command from bundle data.
-  // https://nodejs.org/download/release/v24.20.0/docs/api/child_process.html#child_processexecfilesyncfile-args-options
-  const transport = execFileSync(java, ['-Dloader.path=' + join(root, 'backend/target/test-classes'),
-    '-Dloader.main=dev.atoms.demo.engineering.BundleFixture', '-cp', platformJar,
-    'org.springframework.boot.loader.launch.PropertiesLauncher', ...(fixture === 'upgraded' ? ['upgraded'] : [])],
-  { cwd: work, env, timeout: 30000, maxBuffer: 16 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] });
-  signal?.throwIfAborted();
-  const bundle = JSON.parse(transport.toString('utf8'));
   const allowed = (await readFile(join(root, 'templates/standalone-v1.files'), 'utf8')).trimEnd().split('\n');
   allowed.push('application/main.js', 'application/manifest.json', 'application/styles.css', 'application/view.html');
-  const expected = validateBundle(bundle, allowed);
-  const result = await materializeBundle(bundle, allowed, work);
+  let expected, result, archiveEvidence = {};
+  if (downloadedZip) {
+    const extracted = await extractDownloadedFixture(downloadedZip, work);
+    ({ expected, result } = extracted);
+    archiveEvidence = { archiveSha256: extracted.archiveSha256, sourceVersionId: extracted.sourceVersionId };
+    if ((await lstat(join(result.directory, 'backend/mvnw'))).mode & 0o111) throw new Error('ZIP extraction unexpectedly granted execution.');
+    // Execute the explicit README prerequisite; do not reuse materializer's automatic chmod.
+    await runCommand('chmod', ['u+x', 'backend/mvnw'], { cwd: result.directory, env, signal });
+  } else {
+    const platformJar = join(root, 'backend/target/atoms-demo-0.1.0-SNAPSHOT.jar');
+    // Bounded synchronous test-only assembly (<30s), not a server or an arbitrary command from bundle data.
+    // https://nodejs.org/download/release/v24.20.0/docs/api/child_process.html#child_processexecfilesyncfile-args-options
+    const transport = execFileSync(java, ['-Dloader.path=' + join(root, 'backend/target/test-classes'),
+      '-Dloader.main=dev.atoms.demo.engineering.BundleFixture', '-cp', platformJar,
+      'org.springframework.boot.loader.launch.PropertiesLauncher', ...(fixture === 'upgraded' ? ['upgraded'] : [])],
+    { cwd: work, env, timeout: 30000, maxBuffer: 16 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] });
+    signal?.throwIfAborted();
+    const bundle = JSON.parse(transport.toString('utf8'));
+    expected = validateBundle(bundle, allowed);
+    result = await materializeBundle(bundle, allowed, work);
+  }
   console.log(`Assembled ${result.fileCount} files (${result.totalBytes} bytes) in ${result.directory}`);
   const scripts = allowed.filter(path => /^scripts\/[^/]+\.test\.mjs$/.test(path));
   await runCommand(process.execPath, ['--test', ...scripts], { cwd: result.directory, env, signal });
@@ -64,7 +77,7 @@ export async function verifyStandalone({ configDir, outputParent, fixture = 'tod
     } finally { await owned.stop(); }
   }
   signal?.throwIfAborted();
-  const report = { ...result, loadedRuntimeId, baseURL,
+  const report = { ...result, ...archiveEvidence, loadedRuntimeId, baseURL,
     jarSha256: createHash('sha256').update(await readFile(jar)).digest('hex'),
     checks: ['manifest-hashes', 'script-tests', 'frozen-install', 'frontend-checks', 'maven-verify', 'node-start', 'java-start', 'owned-stop'] };
   const reportPath = join(work, 'verification.json');
