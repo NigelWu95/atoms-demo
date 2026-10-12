@@ -1,6 +1,6 @@
 # 独立工程导出与运行 · 开发任务
 
-当前续作：`workspace-build` 规格已于 2026-10-13 获批；[WB01–WB21](#workspace-build-执行任务) 为待评审执行清单，均未实施。下方 EB/PE 历史记录和未完成的 C-EB11 保持原状。
+当前续作：2026-10-13，用户以“一次性实施”批准 [WB01–WB21](#workspace-build-执行任务)，正在连续实施；完成状态以下方勾选与验证记录为准。下方 EB/PE 历史记录和未完成的 C-EB11 保持原状。
 
 状态：2026-10-13，EB01–EB25、C-EB10 与新增 PE01–PE05 已实现并完成本地验证；工作台可以下载当前/历史版本工程。真实下载包的新目录构建和完整独立 Chrome 23 项通过，无重试；原平台全回归通过。C-EB11 用户人工验收仍未完成。仅本地功能分支提交，未合并、推送或部署。下文早期检查点保留当时状态，以此处和最后的 PE 记录为最新状态。
 依据：[计划及验证命令](plan.md)、[已批准工程规格](../SPEC-engineering-bundle.md)。本清单记录独立工程方向的 EB/PE/WB 模块；原平台任务清单不变。
@@ -329,13 +329,13 @@
 
 ## workspace-build 执行任务
 
-状态：规格已批准，以下细化任务待评审，尚未开发或执行 V011。依据：[扩展计划](plan.md#7-workspace-build-扩展计划)、[规格](../SPEC-workspace-build.md)。一次批准后连续推进，不要求逐任务批准；检查点用于提供证据及处理失败，不代表自动授权扩展范围。
+状态：规格与细化任务均已批准，开发中，尚未执行 V011。依据：[扩展计划](plan.md#7-workspace-build-扩展计划)、[规格](../SPEC-workspace-build.md)。用户要求一次性实施，不要求逐任务批准；检查点用于提供证据及处理失败，不代表自动授权扩展范围。
 
 新增缩写：`W/` = `backend/src/main/java/dev/atoms/demo/workspace/`；`WT/` = 对应 `backend/src/test/java/dev/atoms/demo/workspace/`；`WR/` = `backend/src/main/resources/workspace/`；`PF/` = `frontend/src/`。原 P/PT/T 缩写不变。验证命令 W-U/W-I/W-P/W-F/W-X/W-E/W-R 见计划 §7.4；新增类名和脚本名是拟定落点。每项至多五个主要文件，若实际超出先拆子任务，不省测试。所有完成框保持空白直到存在本轮证据。
 
 ### WB01 · 统一授权快照入口（M）
 
-- [ ] 完成 WB01。依赖：用户批准扩展计划。
+- [x] 完成 WB01。依赖：用户批准扩展计划。共享授权/组装入口与内容摘要已实现；新增测试先编译失败再通过，定向 51 项与全单元/原下载 HTTP 集成回归通过。首次 Mockito attach 被沙箱阻止，经授权在沙箱外复验成功，未修改测试机制。证据见 [构建验证记录](../docs/workspace-build-verification.md)。
 - 描述：让构建与原工程下载复用授权版本读取和模板内容摘要，避免分别组装。
 - 文件：`P/EngineeringSnapshotService.java`、`P/EngineeringExportService.java`、`P/TemplateSnapshot.java`、`PT/EngineeringSnapshotServiceTest.java`、`PT/EngineeringExportIT.java`。
 - 验收：① 同一来源与模板字节得到稳定标识，模板改一字节即变；② 越权在组装前失败，客户端不能选择模板；③ 原下载归档、错误与并发语义不变。

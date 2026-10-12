@@ -12,29 +12,25 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class EngineeringExportService {
-    private final ArtifactService artifacts;
-    private final EngineeringBundleAssembler assembler;
-    private final Supplier<TemplateSnapshot> templates;
+    private final EngineeringSnapshotService snapshots;
     private final Semaphore slots = new Semaphore(2);
 
     @Autowired
+    public EngineeringExportService(EngineeringSnapshotService snapshots) { this.snapshots = snapshots; }
     public EngineeringExportService(ArtifactService artifacts, ArtifactValidator validator) {
-        this(artifacts, validator, new TemplateCatalog()::load);
+        this(new EngineeringSnapshotService(artifacts, validator));
     }
     EngineeringExportService(ArtifactService artifacts, ArtifactValidator validator, Supplier<TemplateSnapshot> templates) {
-        this.artifacts = artifacts;
-        this.assembler = new EngineeringBundleAssembler(validator);
-        this.templates = templates;
+        this(new EngineeringSnapshotService(artifacts, validator, templates));
     }
     public record Download(String filename, byte[] bytes) {}
 
     public Download download(UUID owner, String projectId, String versionId) {
         // Keep authorization/database failures outside the packaging error boundary.
-        var version = artifacts.get(owner, projectId, versionId);
+        var version = snapshots.authorize(owner, projectId, versionId);
         if (!slots.tryAcquire()) throw new ApiException(503, "EXPORT_BUSY", "工程下载繁忙，请稍后重试。");
         try {
-            var source = new BundleSource(version.id(), version.contentHash(), version.artifact());
-            byte[] bytes = EngineeringZip.write(assembler.assemble(source, templates.get()));
+            byte[] bytes = EngineeringZip.write(snapshots.assemble(version, null).bundle());
             return new Download("atoms-" + version.projectId() + "-v" + version.versionNo() + "-engineering.zip", bytes);
         } catch (ApiException error) {
             throw EngineeringBundle.rejected();
