@@ -695,7 +695,37 @@ EB23d–e / C-EB10 保持未完成：下一步是真实源码修改重建、旧�
 - 新 bundle ID：`9e7a9df53f57fba688f9981e5b9a2a5134a3060443f2ceb9541273d069f9711f`；runtime ID：`a44d7fe0172900695c21c68ca5e7b43804a5b9db15929fe95dfeada810aa4f14`；JAR SHA-256：`1c4f3c24eb965719bd3daba6deb3a203cc723e10a6f8986a6e2655b306210db1`。
 - 原 `verification-4oZItT` 完整保留。复核两份清单的所有源文件 hash 和实际 JAR hash，原产物未变；同来源 UUID、新 runtime ID。一次性复核命令曾把 manifest 元数据误传给接收字节 Map 的函数；修正为逐文件摘要核对后通过，不涉及产品代码变更。
 
-五轴复核：固定变体、输入边界和构建检查均未扩权，复用既有组装器；没有新依赖、配置/迁移或生产接口。EB23d2 浏览器升级中的冲突/重放仍待完成，本节的构建结果不替代浏览器验收。
+五轴复核：固定变体、输入边界和构建检查均未扩权，复用既有组装器；没有新依赖、配置/迁移或生产接口。
+
+### 跨构建浏览器行为（EB23d2）
+
+`withBuild` 只切换测试持有的进程，先校验显式报告、JAR hash 和原监听地址，再使用**同一份外部配置、安装 ID 与运行数据库**启动新 JAR。嵌套切换被拒绝；正常结束或回调抛错均恢复原测试产物，worker 清理等待正在进行的切换后才移除私有代理配置。这是验收生命周期，不是平台部署接口，也不承诺任意 schema 变更的回滚。
+
+- 保留旧页面，升级后新意图得到实际 **409 / `STALE_APP_VERSION`**。旧标题和输入草稿保留，数据库仍是原 revision=1、1 行状态、1 行成功幂等记录。新标签页沿用同一访客，呈现升级标题和已有数据，可继续保存为 revision=2。
+- 原页面的首次保存先真实提交，再丢弃响应。切换新 JAR 后，新标签页先写入 revision=2，旧页面再显式重试。两次旧请求的 key/body 完全相同且仍携带旧 runtime ID；服务端两次均确认 revision=1。数据库保持新数据和 revision=2、1 行状态、2 行幂等记录，没有重复保存或回退。恢复原验收产物后再次确认相同访客和两条数据。
+- 两项定向 Chrome 用例通过（44.3 秒、retries=0）；最终完整 Chrome **15 项通过（3.0 分钟，retries=0，退出 0）**，新增页面未捕获异常为 0；TypeScript 严格检查、ESLint、Prettier 通过。包含四尺寸/axe、断库恢复、安装误配、同浏览器双实例、真实重启、三种未知结果重试、多标签页冲突及源码升级。
+- 红→绿：原 `readEvidence` 不支持第二份报告时，用例因 runtime ID 未改变而失败。首次真实 409 断言误读为顶层 `code`；核对 `ApiError` 后修正为 `error.code`，并把断言放到真实响应已交付后的测试控制流中。
+- 该异步断言失败还暴露了 worker 清理先删配置、切换仍尝试恢复进程的竞态。增加切换 Promise 的等待后，再注入一次异步路由失败探针：测试按预期失败，但无 `CONFIG_READ_FAILED`，自有子进程和代理配置正常收尾。探针已移除，未把失败标为通过。回调失败后的恢复、嵌套切换拒绝保留为常规断言。
+- 反转新增的单切换判断后，真实浏览器用例失败；已恢复。所有实验仅修改本次新增验收逻辑，不修改成品 JAR 或数据。
+- 已实际查看截图：`stale-page-draft.png`、`upgraded-preserved-data.png`、`newer-data-after-old-replay.png`，位于 `frontend/test-results/standalone/upgrade-*/`。旧页面显示版本冲突提示和草稿，新页面显示升级标题与持久待办。
+
+完整浏览器复验从仓库根目录开始，先设置上述 Java 17 / Node 24 工具路径：
+
+```sh
+atoms_repo="$(pwd)"
+cd "$atoms_repo/frontend"
+STANDALONE_VERIFICATION_REPORT="$atoms_repo/.local/standalone/verification-4oZItT/verification.json" \
+STANDALONE_UPGRADE_REPORT="$atoms_repo/.local/standalone/verification-rKkiBw/verification.json" \
+STANDALONE_RUNTIME_CONFIG="$atoms_repo/.local/standalone/runtime-a.properties" \
+STANDALONE_SECONDARY_RUNTIME_CONFIG="$atoms_repo/.local/standalone/runtime-b.properties" \
+./node_modules/.bin/playwright test --config playwright.standalone.config.ts --project=chromium
+```
+
+报告路径必须替换为本机真实完成全门禁构建的输出，不能伪造。缺少升级报告会明确失败，不静默跳过。现有数据库、稳定安装身份及原源码工程均不重置。
+
+收尾复核：两份原始工程源文件及 JAR hash 未变，18089/18090 无监听，自有数据库代理/错误安装临时配置目录剩余 0；共享 PostgreSQL 仍为 Up 5 days (healthy)。本轮只提交本地功能分支，未推送、部署或更新原平台交付文档。
+
+边界：本次仅证明同数据结构的固定应用源码升级，不包含数据库 schema 升降级或任意生成后端。EB23e 安全/错误态可访问性、EB24–EB25 及 C-EB10/C-EB11 仍待完成；下载 API/按钮和托管构建运行属于后续模块。
 
 ## 已核对的官方依据
 
