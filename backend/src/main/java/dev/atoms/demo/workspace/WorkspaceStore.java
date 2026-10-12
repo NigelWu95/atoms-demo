@@ -18,6 +18,19 @@ public final class WorkspaceStore {
     public WorkspaceStore(WorkspacePaths paths) { this.paths = paths; }
     public record Prepared(Path work, Path archive) {}
 
+    public byte[] archive(UUID id, String expectedHash) throws IOException {
+        byte[] bytes = BuildArtifacts.read(paths.checked(id, "snapshot/engineering.zip"), EngineeringZip.MAX_ZIP_BYTES);
+        if (!BuildArtifacts.hash(bytes).equals(expectedHash)) throw WorkspacePaths.rejected();
+        return bytes;
+    }
+
+    public void verifySources(UUID id, EngineeringBundle bundle) throws IOException {
+        for (var file : bundle.files()) {
+            byte[] actual = BuildArtifacts.read(paths.checked(id, "work/" + file.path()), EngineeringBundle.MAX_FILE_BYTES);
+            if (!java.util.Arrays.equals(actual, file.content())) throw WorkspacePaths.rejected();
+        }
+    }
+
     public Prepared prepare(UUID id, EngineeringBundle bundle) throws IOException {
         // Validate all names/collisions/quotas before creating any task directory.
         byte[] zip = EngineeringZip.write(bundle);
