@@ -7,5 +7,9 @@ export function verifiedProject(report: string | undefined): Promise<{ directory
 export function startVerifiedRuntime(
   report: string | undefined,
   config: string | undefined,
-  options?: { signal?: AbortSignal },
+  options?: {
+    signal?: AbortSignal;
+    /** Explicit second loopback instance; must exactly match config. Defaults to the report's URL. */
+    baseURL?: string;
+  },
 ): Promise<OwnedRuntime>;
