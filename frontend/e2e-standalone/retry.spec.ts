@@ -5,7 +5,7 @@ for (const fault of ['lost', 'invalid', 'slow'] as const) {
     page,
     runtime,
   }, info) => {
-    await ready(page)
+    const guest = await ready(page)
     const requests: { key: string | undefined; body: string | null }[] = []
     page.on('request', (request) => {
       if (request.method() === 'PUT' && request.url().endsWith('/api/state'))
@@ -48,6 +48,11 @@ for (const fault of ['lost', 'invalid', 'slow'] as const) {
       const committed = await state(page)
       expect(committed.revision).toBe(1)
       expect(committed.value.todos).toHaveLength(1)
+      expect(await runtime.evidence(guest)).toEqual({
+        revision: 1,
+        stateRows: 1,
+        idempotencyRows: 1,
+      })
       release()
       // Replay must survive losing process memory, not just an in-memory cache.
       if (fault === 'lost') {
@@ -60,6 +65,11 @@ for (const fault of ['lost', 'invalid', 'slow'] as const) {
       expect(requests[0]!.key).toMatch(/^[a-f0-9-]{36}:[a-f0-9-]{36}$/)
       expect(requests[1]).toEqual(requests[0])
       expect(await state(page)).toEqual(committed)
+      expect(await runtime.evidence(guest)).toEqual({
+        revision: 1,
+        stateRows: 1,
+        idempotencyRows: 1,
+      })
       await page.reload()
       await expect(frame.getByRole('listitem')).toHaveText('只提交一次')
     } finally {

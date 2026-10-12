@@ -13,6 +13,7 @@ test('real process restart restores the same visitor and keeps a second visitor 
   await runtime.restart()
   expect((await ready(page)) === visitor).toBe(true)
   expect(await state(page)).toEqual(before)
+  expect(await runtime.evidence(visitor)).toEqual({ revision: 1, stateRows: 1, idempotencyRows: 1 })
   await expect(page.frameLocator('iframe').getByRole('listitem')).toHaveText('重启后仍属于我')
 
   const other = await browser.newContext()
