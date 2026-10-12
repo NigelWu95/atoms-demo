@@ -1,12 +1,12 @@
 # engineering-bundle · 实施与验证记录
 
-日期：2026-10-12。分支：`feature/standalone-engineering`。依据：[规格](../SPEC-engineering-bundle.md)、[计划](../tasks/plan.md)、[执行清单](../tasks/todo.md)。
+更新日期：2026-10-13。分支：`feature/standalone-engineering`。依据：[规格](../SPEC-engineering-bundle.md)、[计划](../tasks/plan.md)、[执行清单](../tasks/todo.md)。
 
 ## 当前交付边界
 
-EB01–EB23 与 C-EB10 已实现并验证：工程组装与固定模板装载、全新目录构建/独立 JAR 启动、独立数据库/访客持久会话、原子幂等保存、双实例隔离、真实源码升级、浏览器沙箱和错误恢复。最终 Chrome 23 项通过（3.9 分钟、无重试），使用固定手工夹具、不调用模型。下一步 EB24 工程说明与配额固化、EB25 原平台完整回归及 C-EB11 人工模块验收。
+EB01–EB25、C-EB10 与新增 `project-export` PE01–PE05 已实现并完成本地验证：工作台可下载当前选中版本（包括历史版本）的完整工程 ZIP；实际下载包已解压到全新目录构建并独立运行。独立数据库/持久会话、原子幂等保存、双实例隔离、真实源码升级、浏览器沙箱和错误恢复共 23 项 Chrome 验收通过（3.9 分钟、无重试）。平台普通/运行时浏览器 14/20 项及完整前后端回归通过；不调用模型。
 
-目前可以通过仓库验收工具组装、构建并独立运行固定应用工程；没有用户下载 HTTP API、工作台下载按钮或平台托管构建/运行实例，也不是任意后端源码生成。本轮未改动线上服务、模板/JAR、原平台生产源码/迁移或原交付文档；下文保留各阶段当时的证据，最新状态以本节与任务清单为准。
+用户下载 HTTP API 和工作台按钮已接通；没有平台托管构建/运行实例，也不是任意后端源码生成。C-EB11 用户人工模块验收仍待完成。本轮新增平台下载接口与 UI、模板解压说明及验证工具，已更新原 README/交付说明；没有改动平台数据库迁移、依赖或线上服务，没有合并主分支、推送 GitHub、SSH 部署。下文早期段落保留各阶段当时的证据，“尚未完成”以当时为准；最新状态以本节及文末 PE01–PE05 记录为准。
 
 `BundleSource` 冻结来源 UUID、原内容 hash 和 Artifact；调用方必须先完成版本所有者授权。组装器再次调用原 `ArtifactValidator`，并且只读取传入的代码快照及固定模板快照；没有数据库、环境变量、网络、文件系统或进程操作。`TemplateSnapshot` 构造入口限定于 engineering 包，后续只有固定目录的 TemplateCatalog 提供真实模板。
 
@@ -19,7 +19,7 @@ EB01–EB23 与 C-EB10 已实现并验证：工程组装与固定模板装载、
 - 配额计入最终 manifest：128 文件、单文件 2 MiB、总量 8 MiB。原源码 120 KiB/初始状态 256 KiB 校验没有修改。
 - 模板逐文件白名单之外，再拒绝路径穿越、绝对/非便携路径、大小写冲突、目录被文件占位、构建缓存/真实配置/密钥文件及生成文件保留路径。
 
-目前文件模型只有常规文件名与字节，不接受链接目标或可变文件类型元数据。真实磁盘模板的符号链接/祖先目录链接检测属于 EB20 的模板装载边界，尚未实现，不能把内存测试当成已验证磁盘读取。平台工作树从未被递归打包。
+文件模型只有常规文件名与字节，不接受链接目标或可变文件类型元数据。早期纯内存阶段未覆盖的真实磁盘符号链接/祖先目录检查，已在下文 EB20 的模板装载边界实现并验证。平台工作树从未被递归打包。
 
 ## 红绿与回归证据
 
@@ -824,3 +824,79 @@ axe 4.13 保持现代跨 frame 扫描，WCAG 2 A/AA 与 2.1 A/AA **violations �
 - [CSP3 sandbox](https://www.w3.org/TR/CSP3/#directive-sandbox)：受限文档的 HTTP sandbox 策略，在直接访问时也生效。
 - [Spring Boot 3.5 test-run](https://docs.spring.io/spring-boot/3.5/maven-plugin/run.html#run.examples.test-run)：使用测试 classpath 与测试入口，不把夹具放入正式 JAR。
 - [Playwright webServer](https://playwright.dev/docs/test-webserver)、[APIRequestContext](https://playwright.dev/docs/api/class-apirequestcontext)、[route.fulfill](https://playwright.dev/docs/api/class-route#route-fulfill)：管理自有测试进程、隔离会话及仅浏览器内的宿主协议夹具。
+
+## PE01–PE05 / EB24–EB25 · 实际工程下载与交付（2026-10-13）
+
+用户确认“完成工程下载按钮”“一次完成”后，按 `SPEC-project-export.md` 连续实现；没有逐阶段停下要求再次授权，没有扩大到远程部署或托管执行器。下载使用保存后的不可变版本，不读取真实状态，不生成新版本，也不调用模型。
+
+### 实现及规格对照
+
+| 契约 | 实现与验证 |
+| --- | --- |
+| 确定性、有界 ZIP | `EngineeringZip` 使用 Java 标准库 STORED、固定时间/有序条目、大小和 CRC；路径重复/穿越、目录冲突及体积拒绝测试；写出前后核对 ZIP 精确长度 |
+| 先鉴权，当前/历史版本均可下载 | `EngineeringExportService` 调用现有 ArtifactService；真实 PostgreSQL HTTP 测试验证 401/404、不同项目版本混用、V1/V2 来源与内容、项目指针不变 |
+| 安全模板、有限并发和失败 | TemplatePolicy/TemplateCatalog 固定白名单；两槽位打包，503 繁忙；422 契约/500 打包错误脱敏，释放槽位；canary 不进入错误或 ZIP |
+| 有界二进制客户端 | 9 MiB 实读上限、Content-Length 核对、64 KiB 错误读取、ZIP MIME/签名、30 秒超时、拒绝重定向；API 单测验证超限/截断/异常响应 |
+| 工作台真实交互 | `EngineeringDownload.vue` 接入 ArtifactPanel；当前选中版本、禁用理由、重复点击保护、可重试失败、requestId；组件测试覆盖切换/卸载取消、晚到响应和 Blob URL 释放 |
+| 下载的是真实工程 | Chrome 键盘操作下载 V2/V1，检查文件名、111 条目、manifest/源码/初始数据和私有状态 canary 排除；不把浏览器 mock 的 ZIP 当成成功证据 |
+| 真正可构建和独立运行 | 实际网页 ZIP 解压到新目录；按 README 显式 chmod 后运行全构建，Node/Java 两个入口均从工程外启动；真实 JAR 的 23 项 Chrome 验收 |
+| 无平台回归 | 普通工作台 14 项、运行时工作台 20 项、平台完整 Maven 和前端门禁均通过；无平台迁移/依赖变化 |
+
+### 真实下载包与配额
+
+包来源是测试工作台已保存的手工待办 V2，非真实用户项目，也非额外模型调用。固定模板 106 文件，加应用 4 文件与 bundle manifest 共 111 文件；单文件最大 121072 bytes，总源文件 546106 bytes，ZIP 564274 bytes。相对 128 文件 / 2 MiB 单项 / 8 MiB 总源 / 9 MiB ZIP 的预算分别仍余 17 文件、1976080 / 7842502 / 8872910 bytes。TemplateCatalogTest 另将当前模板锁定为 106 文件、最大项低于 256 KiB、总量低于 600 KiB，维护时不能悄悄放宽。
+
+本轮模板只补充解压后的执行位说明，许可证/白名单和固定依赖均保留。正式平台 JAR 内加载模板，导出物不包含平台工程、配置、缓存或测试台资源。首次管理员建库 SQL 与现有专用库权限/安装契约一致，文档已复核；本轮复用先前准备的独立运行 A/B 和测试库，没有再次创建角色、重置密码或重演管理员建库操作。构建测试只清理其明确授权的专用测试表，运行 A/B 数据不被构建重置。
+
+留存的本地证据（均忽略提交，不上传测试会话或私有配置）：
+
+- `.local/standalone/verification-ctQhLN/downloaded-engineering.zip`
+- `.local/standalone/verification-ctQhLN/engineering-bundle-t5QA8D/`
+- `.local/standalone/verification-ctQhLN/verification.json`
+- 来源版本 `210acadc-e37a-4ffd-805b-346dbf139c85`
+- ZIP SHA-256 `b81894fa3034a54b9cd0fc77239041b2b19ddcc8ce29618de0b82194ebfc3cda`
+- bundleId `69602719f62fc4c21fe6c5f71f1cf9b456325393bd7ae4e5567464d41f72efd7`
+- loadedRuntimeId `7fd42cd3ae35dd48371eebe7cf90d1e6b82513e0dae1181201f7054dd5275fea`
+- JAR SHA-256 `faab357e072550b6cd1cbd9d80e5f7b4e966afdb1b56026a663271bd63a22dbb`
+
+完整浏览器回归后重新核对 ZIP SHA、全部源码字节、manifest 和 JAR SHA，均与报告相同，不使用旧包为变更后的模板背书。收尾检查 8080/8081/5173/5174/18089/18090 均无监听，自有测试服务已停止；共享 `atoms-demo-postgres` 仍为 Up 5 days (healthy)，没有停止 Docker 或删除数据库卷。
+
+### 命令与结果
+
+平台 `backend/` 运行 `./mvnw -B clean verify`：86 项单元测试 + 54 项真实 PostgreSQL 集成测试通过，无跳过；平台前端 typecheck、lint、format:check、build 及 132 项 Vitest 通过。独立浏览器目录另行执行 ESLint/Prettier，未因默认 glob 未包含该目录而遗漏检查。
+
+平台 `frontend/` 的 `npm run test:e2e:runtime -- --project=chromium`：20 项通过（1.5 分钟），含新增工程下载 2 项。普通 `npm run test:e2e -- --project=chromium`：14 项通过（41.4 秒），普通后端明确用专用测试 profile，关闭生成 Worker。下载按钮在 320/390/768/1024/1440px 检查布局和 axe，已查看 390/1440px 截图，控制台无错误/警告。503 后手动重试使用真实后端下载，原输入和预览不丢失。
+
+根目录验证真实下载 ZIP 的命令形态如下，路径替换为本机已有的隔离配置和实际下载文件；不用于导入、执行未知用户 ZIP：
+
+```sh
+node scripts/verify-standalone.mjs \
+  --config-dir /absolute/path/standalone-config \
+  --output-parent /absolute/path/verification-output \
+  --downloaded-zip /absolute/path/current-engineering.zip
+```
+
+`downloaded-fixture.mjs` 在执行任何文件前验证 ZIP 条目/CRC、全部源码 hash，以及所有模板字节与当前仓库、应用字节与经过审阅的手工待办夹具一致。只创建全新目录，拒绝归档链接/权限继承；不是生产 ZIP 导入能力，不因文件自报 hash 正确就允许运行任意程序。验证脚本及发布辅助测试共 11 项通过。
+
+下载包内的脚本 24 项、独立前端 68 项及其类型/lint/构建、独立后端 129 项单元 + 60 项 PostgreSQL 集成测试全部通过。冻结依赖安装遵循 ignore-scripts，不跳过检查；按 README 实际 `chmod u+x backend/mvnw`，再完整构建。Node 与直接 Java 均可从工程外启动、响应健康与页面，再停掉自有进程。
+
+下载包对应报告作为 `STANDALONE_VERIFICATION_REPORT`，配上原独立 A/B 配置和已验证升级包报告，执行：
+
+```sh
+npx --no-install playwright test --config playwright.standalone.config.ts --project=chromium
+```
+
+最终 **23/23 通过（3.9 分钟、retries=0、退出码 0）**。涵盖保存/刷新、真实进程重启、同浏览器双实例、访客隔离、数据库断连、安装 ID 误配、冲突、未知响应重试、升级与旧意图重放、沙箱和键盘/axe。除明确的双实例用例外仅允许独立应用 origin，平台和外网请求均被禁止并断言零越界。正常态新包 320px 截图已查看；它保留下载项目自己的标题，不替换成构建夹具标题。
+
+### 失败、修复和审阅
+
+- 新 ZIP/API/客户端/组件按失败用例后实现，阶段性提交；未删除、跳过旧测试或降低检查阈值。
+- 测试服务器最初无法选择主类：新增 BundleFixture 与 FixtureApplication 都有 main。运行时和发布浏览器配置明确指定 `dev.atoms.fixtures.FixtureApplication`，依据当前 Boot Maven 插件的 main-class 参数；没有把测试夹具放入正式产物。
+- sandbox 不能绑定测试端口时，按权限流程以原命令重跑；不复用个人 Chrome 资料。浏览器进程设置 loopback NO_PROXY，避免系统代理干扰本机测试。
+- 独立只读代码审阅发现：切换版本取消请求后，旧错误体可能晚到并触发 session-invalidated。新增用例先复现回调错误触发 1 次，在统一错误处理前检查 caller abort 后为 0 次；132 项前端完整回归通过。审阅未报告其他 Required/Critical 问题。
+- 临时反转二进制读取的超限判断，相关 13 项用例中 8 项实际失败；恢复后完整前端 132 项通过。没有留下变异或提高传输上限。
+- 实际 ZIP 首轮完整浏览器为 19 通过 / 4 失败，四个尺寸用例写死旧组装夹具的“独立工程待办”；新包正确显示“手工测试待办”。改成从已验证工程 manifest 读取期望标题，同时精确核对 API 与 H1，不放宽为任意 heading、不改工程数据；重跑 23 项全通过，类型/lint/格式检查通过。
+
+本次按增量实现、TDD、浏览器验证与安全审阅技能补齐了取消竞态、授权和真 ZIP 构建证据；Chrome DevTools MCP 不可用，使用已有隔离 Playwright + Chrome。未新增依赖或发起真实模型调用，没有推送、部署或变更线上计费额度。C-EB11 人工验收留待用户；`workspace-build`、`app-runtime`、`runtime-access` 仍未实现。
+
+新增实现依据：[Java 17 ZipOutputStream](https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/util/zip/ZipOutputStream.html)、[ZipEntry](https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/util/zip/ZipEntry.html)、[AbortSignal.any](https://developer.mozilla.org/en-US/docs/Web/API/AbortSignal/any_static)、[读取取消](https://developer.mozilla.org/en-US/docs/Web/API/ReadableStreamDefaultReader/cancel)、[Blob URL 释放](https://developer.mozilla.org/en-US/docs/Web/API/URL/revokeObjectURL_static)。

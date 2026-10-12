@@ -2,6 +2,8 @@
 
 实施基线更新：用户指定 Java 17.0.5-oracle；本地采用 Spring Boot 3.5.16 和已有 Node 24.20.0，见 [ADR-002](../decisions/002-local-java17-baseline.md)。后续功能和部署仍按任务清单逐项验收。
 
+2026-10-13 扩展：已在本地接入所有者授权的选定版本工程 ZIP 下载。固定模板从平台 JAR 白名单装载，导出时不构建/执行；用户在新目录自行构建 Vue + Spring Boot JAR，连接独立 PostgreSQL，不需要平台服务。平台内原预览、状态和路径发布不变。详情见[工程下载设计](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-export.md)和[模块能力地图](https://github.com/NigelWu95/atoms-demo/blob/main/CAPABILITY-MAP.md)；平台托管工作区、构建、实例与访问代理尚未实现，本轮没有云端更新。下文保留最初设计比较，实际云端原生部署以 ADR-011 为准。
+
 ## 1. 架构结论与边界
 
 推荐 **Java 17 + Spring Boot + Vue 3/TypeScript + PostgreSQL + Docker Compose**。采用模块化单体，后台有限并发执行生成任务，REST 提交指令、SSE 传递进度。
