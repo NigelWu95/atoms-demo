@@ -68,7 +68,10 @@ REVOKE ALL ON SCHEMA standalone_app FROM PUBLIC;
 
 在工程根目录执行，先确保 `JAVA_HOME` 指向 Java 17 且 PATH 使用上述 Node/npm：
 
+ZIP 不保留 Unix 可执行位，解压后先为 Maven Wrapper 恢复执行权限（Linux/macOS）：
+
 ```sh
+chmod u+x backend/mvnw
 node --test scripts/*.test.mjs
 STANDALONE_TEST_CONFIG=/absolute/path/test.properties node scripts/build.mjs
 ```

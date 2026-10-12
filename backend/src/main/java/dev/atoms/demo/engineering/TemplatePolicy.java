@@ -14,12 +14,20 @@ final class TemplatePolicy {
     private TemplatePolicy() {}
 
     static void validate(Set<String> allowedPaths, List<EngineeringBundle.File> files) {
+        validate(allowedPaths, files, false);
+    }
+
+    static void validateBundle(List<EngineeringBundle.File> files) {
+        validate(files.stream().map(EngineeringBundle.File::path).collect(java.util.stream.Collectors.toSet()), files, true);
+    }
+
+    private static void validate(Set<String> allowedPaths, List<EngineeringBundle.File> files, boolean bundle) {
         EngineeringBundle.checkSize(files);
         var actual = new HashSet<String>();
         var foldedFiles = new HashSet<String>();
         for (var file : files) {
             String path = file.path();
-            validatePath(path);
+            validatePath(path, bundle);
             if (!actual.add(path) || !foldedFiles.add(path.toLowerCase(Locale.ROOT))) throw EngineeringBundle.rejected();
         }
         if (files.isEmpty() || !actual.equals(allowedPaths)) throw EngineeringBundle.rejected();
@@ -38,8 +46,10 @@ final class TemplatePolicy {
         }
     }
 
-    private static void validatePath(String path) {
-        if (!path.matches("[A-Za-z0-9._/-]+")) throw EngineeringBundle.rejected();
+    private static void validatePath(String path, boolean bundle) {
+        if (path.length() > 65535 || !path.matches("[A-Za-z0-9._/-]+")) throw EngineeringBundle.rejected();
+        if (bundle && Set.of("application/main.js", "application/styles.css", "application/view.html",
+                "application/manifest.json", "bundle-manifest.json").contains(path)) return;
         String lower = path.toLowerCase(Locale.ROOT);
         if (lower.equals("application") || lower.startsWith("application/")
                 || lower.equals("bundle-manifest.json") || lower.startsWith("bundle-manifest.json/"))

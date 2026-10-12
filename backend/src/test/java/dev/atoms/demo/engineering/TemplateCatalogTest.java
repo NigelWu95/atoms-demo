@@ -68,6 +68,13 @@ class TemplateCatalogTest {
                 "backend/mvnw", "scripts/build.mjs", "scripts/start.test.mjs", "THIRD-PARTY-NOTICES.md",
                 "backend/src/test/java/dev/atoms/standalone/PackagedRuntimeIT.java");
         assertThat(files.stream().mapToLong(EngineeringBundle.File::size).sum()).isLessThan(EngineeringBundle.MAX_TOTAL_BYTES);
+        // Explicit maintenance budget: leave room for the application and its manifest.
+        assertThat(files).hasSize(106);
+        assertThat(files.stream().mapToLong(EngineeringBundle.File::size).max().orElseThrow()).isLessThan(256 * 1024);
+        assertThat(files.stream().mapToLong(EngineeringBundle.File::size).sum()).isLessThan(600 * 1024);
+        var readme = files.stream().filter(file -> file.path().equals("README.md")).findFirst().orElseThrow();
+        assertThat(new String(readme.content(), java.nio.charset.StandardCharsets.UTF_8))
+                .contains("chmod u+x backend/mvnw");
     }
 
     private Path fixture(String index) throws Exception {
