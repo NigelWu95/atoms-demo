@@ -64,7 +64,7 @@ export async function packageApplication(projectRoot, outputParent) {
   return { directory, loadedRuntimeId };
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+if (process.argv[1] && import.meta.url === pathToFileURL(await realpath(resolve(process.argv[1]))).href) {
   if (process.argv.length !== 4) {
     console.error('Usage: node scripts/package-application.mjs <project-root> <existing-output-parent>');
     process.exitCode = 1;
