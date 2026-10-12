@@ -379,6 +379,12 @@
 
 ### WB06 · 配置与工作根准入（M）
 
+实施拆片：WB06a 工作根锁与资源准入（锁类/测试/测试进程入口，3 个文件）；WB06b 默认关闭配置与工具链校验（配置类/测试/application.yml，3 个文件）；WB06c 专用测试库只读身份校验（校验类/测试/配置类/真实库测试，4 个文件）。保持已批准范围和预算，不在一个切片混写配置、SQL 与进程锁。
+
+- [x] WB06a：真实双 JVM 排他锁及目录/字节预算测试通过。测试捕获同 JVM 再次打开/关闭文件描述符会释放 POSIX 锁的问题；改为打开文件前先取得 JVM 内唯一持有权，保留 OS 锁负责跨进程互斥。无清理或解锁文件删除。
+- [ ] WB06b：执行开关与工具链。
+- [ ] WB06c：专用测试库前置只读核验。
+
 - [ ] 完成 WB06。依赖：WB03、WB05。
 - 描述：增加默认关闭的本机构建配置与工具、专用测试库配置、执行根资源检查。
 - 文件：`W/BuildEnvironment.java`、`W/BuildRootLease.java`、`WT/BuildEnvironmentTest.java`、`WT/BuildRootLeaseTest.java`、`backend/src/main/resources/application.yml`。
