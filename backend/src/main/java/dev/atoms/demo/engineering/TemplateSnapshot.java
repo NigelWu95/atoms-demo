@@ -14,4 +14,19 @@ public final class TemplateSnapshot {
         TemplatePolicy.validate(Set.copyOf(allowedPaths), this.files);
     }
     public List<EngineeringBundle.File> files() { return files; }
+
+    /** Length-prefixing separates file names and content, independent of input order. */
+    public String digest() {
+        try {
+            var hash = java.security.MessageDigest.getInstance("SHA-256");
+            for (var file : files.stream().sorted(java.util.Comparator.comparing(EngineeringBundle.File::path)).toList()) {
+                byte[] name = file.path().getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                hash.update(java.nio.ByteBuffer.allocate(4).putInt(name.length).array());
+                hash.update(name);
+                hash.update(java.nio.ByteBuffer.allocate(4).putInt(file.size()).array());
+                hash.update(file.content());
+            }
+            return java.util.HexFormat.of().formatHex(hash.digest());
+        } catch (java.security.NoSuchAlgorithmException error) { throw new IllegalStateException("SHA-256 unavailable"); }
+    }
 }
