@@ -21,4 +21,8 @@ standalone.origin=http://127.0.0.1:8088
 # origin, e.g. https://app.example.com. This enables Secure cookies, not server TLS.
 # Listen addresses supported by this template: 127.0.0.1, ::1, 0.0.0.0, ::.
 # Do not use test-database=true in a runtime configuration.
+# For builds, create a SEPARATE test.properties with a different database/role/ID,
+# set this flag to true, and ask the administrator to mark BOTH the test database
+# and test role as atoms-standalone:test:<that test APP_INSTANCE_ID>. See README.
+# Integration tests reset their fixed fixture tables only after actual DB checks.
 standalone.test-database=false

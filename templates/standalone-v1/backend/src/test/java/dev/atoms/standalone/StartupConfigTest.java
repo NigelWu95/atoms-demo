@@ -188,6 +188,19 @@ class StartupConfigTest {
                 .isInstanceOf(IllegalStateException.class).hasMessageStartingWith("CONFIG_INVALID:").hasNoCause();
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"test-database", "instance-id", "extra-argument"})
+    void directJavaEntryCannotBypassRuntimeGuardsWithTestModeBadIdentityOrOverrides(String reason) throws Exception {
+        var values = settings();
+        if (reason.equals("test-database")) values.put("standalone.test-database", "true");
+        if (reason.equals("instance-id")) values.put("APP_INSTANCE_ID", "invalid-private-canary");
+        var args = config(values);
+        String[] actual = reason.equals("extra-argument") ? new String[]{args[0], "--server.port=9999"} : args;
+        assertThatThrownBy(() -> StandaloneApplication.main(actual)).isInstanceOf(IllegalStateException.class)
+                .hasMessageStartingWith(reason.equals("extra-argument") ? "CONFIG_USAGE:" : "CONFIG_INVALID:")
+                .hasMessageNotContaining(PASSWORD).hasMessageNotContaining("private-canary").hasNoCause();
+    }
+
     @Test
     void sharedRuntimeValidationStillRejectsTestModeAndDoesNotMutateProperties() {
         var values = new Properties();
