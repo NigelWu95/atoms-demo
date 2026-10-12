@@ -36,8 +36,11 @@ for (const width of [320, 390, 768, 1024, 1440]) {
     await expect(frame.getByRole('button', { name: '本页计数：1' })).toBeVisible()
     await frame.getByRole('button', { name: '本页计数：1' }).press('Space')
     await expect(frame.getByRole('button', { name: '本页计数：2' })).toBeVisible()
-    await expect(frame.locator('#count')).toBeDisabled()
-    await expect(page.getByRole('alert')).toContainText('不能读取或保存')
+    await expect(frame.locator('#count')).toBeEnabled()
+    await frame.locator('#count').click()
+    await expect(frame.locator('#count')).toHaveText('1')
+    await expect(page.getByRole('status').filter({ hasText: '已保存到数据库' })).toBeVisible()
+    await expect(page.getByRole('alert')).toHaveCount(0)
     expect(await page.locator('iframe').getAttribute('sandbox')).toBe('allow-scripts')
     const child = page.frames().find((entry) => entry !== page.mainFrame())!
     expect(await child.evaluate(() => window.origin)).toBe('null')
@@ -94,7 +97,8 @@ for (const width of [320, 390, 768, 1024, 1440]) {
     ])
     expect(nextIdentity).toEqual(identity)
     await expect(frame.getByRole('button', { name: '本页计数：0' })).toBeVisible()
-    await expect(page.getByRole('alert')).toContainText('不能读取或保存')
+    await expect(frame.locator('#count')).toHaveText('1')
+    await expect(page.getByRole('alert')).toHaveCount(0)
     expect(await page.locator('iframe').getAttribute('src')).not.toBe(oldChannel)
     expect(await page.evaluate(() => performance.timeOrigin)).toBe(timeOrigin)
     await expect(button).toBeFocused()
@@ -138,8 +142,8 @@ test('offline error remains visible during keyboard retry, then returns to real 
   release()
   expect((await response).status()).toBe(200)
   await expect(page.getByRole('status', { name: '服务连接状态' })).toContainText('应用信息已就绪')
-  await expect(page.getByRole('alert')).toContainText('不能读取或保存')
-  await expect(page.getByRole('alert')).not.toContainText('无法连接应用服务')
+  await expect(page.frameLocator('iframe').locator('#count')).toBeEnabled()
+  await expect(page.getByRole('alert')).toHaveCount(0)
   await expect(page.getByRole('button', { name: '重新加载应用' })).toBeFocused()
 })
 
@@ -184,7 +188,8 @@ test('dev and built preview preserve origin and API security boundaries', async 
   await expect(
     page.frameLocator('iframe').getByRole('button', { name: '本页计数：1' }),
   ).toBeVisible()
-  await expect(page.getByRole('alert')).toContainText('不能读取或保存')
+  await expect(page.frameLocator('iframe').locator('#count')).toBeEnabled()
+  await expect(page.getByRole('alert')).toHaveCount(0)
   expect(errors).toEqual([])
 })
 
