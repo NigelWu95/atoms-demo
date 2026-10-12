@@ -41,3 +41,10 @@
 - 超时/取消发送固定 CANCEL 控制消息，待进程退出及可信完成帧后才返回已确认；停止期限届满或线程中断保留 unknown，不把发信号当作退出。持久 fence 和 JAR 复验留给 Worker/恢复切片。
 - RED：缺少桥接类导致测试编译失败；GREEN：3 项真实 Java→Node 测试通过（包含多个协议反例），再运行全部平台单元 **96 项通过，0 跳过**。正常启动测试 3 秒预算，专门总超时案例仍为 500ms，生产总期限 10 分钟不变。
 - 进程等待及管道语义依据 [Java 17 Process](https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/Process.html)。官方 ProcessBuilder 页面抓取失败，未将它记为已核验来源；本次启动/等待由实际 Java 17.0.5 运行验证。
+
+## WB06a · 执行根互斥与预算
+
+- 增加稳定 inode 的 `.scheduler.lock`，关闭后保留文件；同 JVM 注册表与 OS 文件锁配合。32 个任务目录、8 GiB 软件总量及准入最低 2 GiB 可用空间检查；只扫描元数据，不跟随 npm 链接、不删除旧目录。
+- 新测试最初因类缺失编译失败。实现后真实双 JVM 测试进一步捕获：第二次同 JVM 尝试获得锁时读取/关闭同 inode 的描述符，会释放第一个持有者的 POSIX 锁，外部 JVM 错误取得执行权。
+- 根因符合 [Java FileLock 平台依赖说明](https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/nio/channels/FileLock.html)。修复为打开任何同根锁文件描述符之前先原子取得 JVM 内持有权，外部互斥仍由 OS 锁执行；最终 2 项测试通过，含真实第二 JVM、关闭后重获和超量拒绝保留原文件。
+- WB06b/c 仍未完成，本地自动执行尚未启用。
