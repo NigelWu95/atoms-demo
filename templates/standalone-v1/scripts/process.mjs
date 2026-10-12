@@ -56,7 +56,11 @@ export async function runCli(action, failureMessage) {
   process.on('SIGTERM', terminate);
   let failure;
   try { await action(controller.signal); }
-  catch (error) { failure = error; console.error(failureMessage); }
+  catch (error) {
+    failure = error;
+    // An operator-requested stop is not a startup failure; retain its signal status below.
+    if (!controller.signal.aborted) console.error(failureMessage);
+  }
   finally { process.off('SIGINT', interrupt); process.off('SIGTERM', terminate); }
   const signal = controller.signal.aborted ? controller.signal.reason : failure?.signal;
   if (signal) process.kill(process.pid, signal);

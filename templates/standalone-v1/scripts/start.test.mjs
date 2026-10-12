@@ -60,6 +60,8 @@ test('real CLI preserves exit code and forwards SIGTERM/SIGINT rather than leavi
   await writeFile(join(f.root, 'wait'), 'yes');
   for (const signal of ['SIGTERM', 'SIGINT']) {
     const child = spawn(process.execPath, args, { env: f.env, stdio: ['ignore', 'pipe', 'pipe'] });
+    let stderr = '';
+    child.stderr.on('data', bytes => { stderr += bytes.toString(); });
     const closed = once(child, 'close');
     try {
       await new Promise((resolve, reject) => {
@@ -68,6 +70,7 @@ test('real CLI preserves exit code and forwards SIGTERM/SIGINT rather than leavi
       });
       child.kill(signal);
       assert.deepEqual(await closed, [null, signal]);
+      assert.doesNotMatch(stderr, /Start failed/);
     } finally { if (child.exitCode === null && child.signalCode === null) { child.kill('SIGTERM'); await closed; } }
   }
 });
