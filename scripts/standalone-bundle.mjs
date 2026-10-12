@@ -35,13 +35,14 @@ function validatePaths(paths) {
 export function validateBundle(bundle, allowedPaths) {
   if (!exactKeys(bundle, ['bundleId', 'files']) || !/^[a-f0-9]{64}$/.test(bundle.bundleId)
     || !Array.isArray(bundle.files) || bundle.files.length > 128) reject();
+  if (bundle.files.some(file => !exactKeys(file, ['path', 'content']) || typeof file.path !== 'string')) reject();
   const expected = [...allowedPaths, 'bundle-manifest.json'].sort();
   validatePaths(expected);
   if (JSON.stringify(bundle.files.map(file => file.path).sort()) !== JSON.stringify(expected)) reject();
   const files = new Map();
   let total = 0;
   for (const file of bundle.files) {
-    if (!exactKeys(file, ['path', 'content']) || typeof file.content !== 'string'
+    if (typeof file.content !== 'string'
       || file.content.length > Math.ceil(MAX_FILE / 3) * 4) reject();
     const bytes = Buffer.from(file.content, 'base64');
     if (bytes.toString('base64') !== file.content || bytes.length > MAX_FILE) reject();

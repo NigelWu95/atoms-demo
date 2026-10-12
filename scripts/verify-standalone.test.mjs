@@ -60,3 +60,16 @@ test('rejects unsafe or colliding paths even in an erroneous trusted allowlist a
   assert.throws(() => validateBundle(bundle, allowed), /Invalid engineering bundle/);
   assert.throws(() => validateBundle({ bundleId: '00'.repeat(32), files: Array(129).fill({}) }, allowed), /Invalid engineering bundle/);
 });
+
+test('rejects a coherently replaced manifest ID and malformed transport entries', () => {
+  const bundle = fixture();
+  const entry = bundle.files.at(-1);
+  const manifest = JSON.parse(Buffer.from(entry.content, 'base64'));
+  bundle.bundleId = manifest.bundleId = '00'.repeat(32);
+  entry.content = Buffer.from(JSON.stringify(manifest)).toString('base64');
+  assert.throws(() => validateBundle(bundle, allowed), /Invalid engineering bundle/);
+  for (const malformed of [null, 1, 'README.md']) {
+    const invalid = fixture(); invalid.files[0] = malformed;
+    assert.throws(() => validateBundle(invalid, allowed), /Invalid engineering bundle/);
+  }
+});
