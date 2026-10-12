@@ -289,6 +289,8 @@
 - [x] EB23b：同一 Chrome context 双端口分别创建访客/保存/交替刷新，两个数据库只含各自访客的记录；停止 B 不影响 A，重启 B 保留原身份和数据。文件：`frontend/e2e-standalone/isolation.spec.ts`、`fixtures.ts`、`restart.spec.ts`、`retry.spec.ts`。网络放行判断反向变异被真实浏览器捕获；恢复后 12 项完整 Chrome 回归通过（3.5 分钟，retries=0），类型/lint/格式通过。完整回归中真实重启用例曾耗尽默认 30 秒总预算；仅这两个用例的总预算对齐已有 JVM 120 秒启动边界 + 30 秒浏览器阶段，应用/断言超时、无重试和数据断言不变。
 - [x] EB23c：错误安装 ID 的最终 JAR 启动拒绝，原安装和数据不变。以私有临时配置测试，不改原运行配置。文件：`scripts/standalone-database.mjs`、对应 `.d.mts` / `.test.mjs`、`frontend/e2e-standalone/installation.spec.ts`。实际记录 `INSTALLATION_MISMATCH`，恢复正确配置后同一访客/数据保留且继续写入成功；完整 Chrome 13 项通过（3.6 分钟、无重试），配置注释边界修正后定向复验通过（1.0 分钟）。Node 数据库工具 4 项通过，原 ID 不变变异及注释同名值反例先失败再修正；111 源文件与 JAR hash 未变。详情见[验证记录](../docs/engineering-bundle-verification.md#eb23--同机双实例与安装误配部分验收)。
 - [ ] EB23d：真实源码变体重新构建，旧页面新写入冲突、旧成功请求仍能确认，原数据不被初始化覆盖。组装/构建夹具与浏览器用例分别提交。
+  - [x] EB23d1：固定 `upgraded` 夹具仅改变待办 HTML 标题；来源版本 UUID、初始数据和全部模板字节不变。文件：`PT/BundleFixture.java`、`PT/BundleFixtureTest.java`、`scripts/verify-standalone.mjs`、对应 `.test.mjs`。新增测试先红后绿，CLI 条件反转被捕获；平台 80 单元 + 52 集成、仓库 Node 19 项通过。新目录 `verification-rKkiBw` 完整构建：脚本 24、前端 68、后端 129 单元 + 60 集成通过；Node/Java 均从工程外启动并停止成功。实际新 runtime ID，原工程/JAR 字节未改。见[验证记录](../docs/engineering-bundle-verification.md#eb23d--真实源码升级验收)。
+  - [ ] EB23d2：真实升级替换由测试持有的 JAR 进程；相同配置/数据库保留会话和数据，旧页面新意图返回 `STALE_APP_VERSION`，旧成功意图重试不覆盖升级后新数据。文件：`frontend/e2e-standalone/fixtures.ts`、`upgrade.spec.ts`。切换前验证报告和 JAR，结束恢复原测试产物，不清库；记录真实浏览器截图、SQL 计数和完整回归。
 - [ ] EB23e：最终成品浏览器 sandbox/网络/宿主 DOM/导航、键盘与错误状态 axe 验收。
 
 ### C-EB10 · 独立运行验收

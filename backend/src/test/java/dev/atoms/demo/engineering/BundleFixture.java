@@ -12,10 +12,14 @@ import java.util.UUID;
 /** Repository-only deterministic source; no HTTP endpoint, platform context, model or database. */
 public final class BundleFixture {
     public static void main(String[] args) throws Exception {
-        if (args.length != 0) throw new IllegalArgumentException("Fixture accepts no arguments");
+        if (args.length != 0 && (args.length != 1 || !args[0].equals("upgraded")))
+            throw new IllegalArgumentException("Fixture accepts only the reviewed upgraded variant");
+        String html = resource("todo.html");
+        // Same provenance UUID, initial state and template; only real application bytes change.
+        if (args.length == 1) html = html.replace("<h1>把想法，一件件完成。</h1>", "<h1>把想法，一件件完成（升级版）。</h1>");
         var json = new ObjectMapper().enable(com.fasterxml.jackson.databind.SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS);
         var artifact = new Artifact(1, new Artifact.Manifest("独立工程待办", "手工验收夹具，不是 AI 生成", "web-static-v1", 1,
-                json.readTree("{\"todos\":[]}")), Map.of("view.html", resource("todo.html"),
+                json.readTree("{\"todos\":[]}")), Map.of("view.html", html,
                 "styles.css", resource("todo.css"), "main.js", resource("todo.js")));
         String hash = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(json.writeValueAsBytes(artifact)));
         var bundle = new EngineeringBundleAssembler(new ArtifactValidator()).assemble(new BundleSource(

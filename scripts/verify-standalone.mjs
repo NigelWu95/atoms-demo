@@ -10,12 +10,14 @@ import { runCli, runCommand, toolEnvironment } from '../templates/standalone-v1/
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 export function verificationOptions(args) {
-  if (args.length !== 4 || args[0] !== '--config-dir' || args[2] !== '--output-parent' || !args[1] || !args[3])
-    throw new Error('Usage: verify-standalone.mjs --config-dir <existing-directory> --output-parent <existing-directory>');
-  return { configDir: args[1], outputParent: args[3] };
+  const upgrade = args.length === 6 && args[4] === '--fixture' && args[5] === 'upgraded';
+  if ((!upgrade && args.length !== 4) || args[0] !== '--config-dir' || args[2] !== '--output-parent' || !args[1] || !args[3])
+    throw new Error('Usage: verify-standalone.mjs --config-dir <existing-directory> --output-parent <existing-directory> [--fixture upgraded]');
+  return { configDir: args[1], outputParent: args[3], ...(upgrade ? { fixture: 'upgraded' } : {}) };
 }
 
-export async function verifyStandalone({ configDir, outputParent }, signal) {
+export async function verifyStandalone({ configDir, outputParent, fixture = 'todo' }, signal) {
+  if (fixture !== 'todo' && fixture !== 'upgraded') throw new Error('Unknown reviewed fixture.');
   const config = await realpath(configDir);
   const parent = await realpath(outputParent);
   if (!(await lstat(config)).isDirectory() || !(await lstat(parent)).isDirectory()) throw new Error('Existing directories required.');
@@ -33,7 +35,7 @@ export async function verifyStandalone({ configDir, outputParent }, signal) {
   // https://nodejs.org/download/release/v24.20.0/docs/api/child_process.html#child_processexecfilesyncfile-args-options
   const transport = execFileSync(java, ['-Dloader.path=' + join(root, 'backend/target/test-classes'),
     '-Dloader.main=dev.atoms.demo.engineering.BundleFixture', '-cp', platformJar,
-    'org.springframework.boot.loader.launch.PropertiesLauncher'],
+    'org.springframework.boot.loader.launch.PropertiesLauncher', ...(fixture === 'upgraded' ? ['upgraded'] : [])],
   { cwd: work, env, timeout: 30000, maxBuffer: 16 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] });
   signal?.throwIfAborted();
   const bundle = JSON.parse(transport.toString('utf8'));
