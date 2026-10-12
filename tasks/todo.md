@@ -437,7 +437,7 @@
 
 实施拆片：WB11a 通用 JSON 请求可取消（client 与测试，2 文件）；WB11b 构建协议与严格解码（builds 与测试，2 文件）；WB11c 构建状态管理（composable 与测试，2 文件）。取消旧请求不得让晚到 401/403 破坏新的会话状态。
 
-- [ ] 完成 WB11。依赖：WB09、WB10。
+- [x] 完成 WB11。依赖：WB09、WB10。构建协议严格校验、取消旧请求、服务器状态轮询与 sessionStorage 原意图恢复完成；客户端 11 项、协议 3 项、状态管理 6 项定向测试通过，类型与 lint 通过。真实浏览器仍归 WB19。
 - 描述：实现强校验构建 API 客户端和可测试的任务状态管理。
 - 文件：`PF/api/builds.ts`、`PF/api/builds.spec.ts`、`PF/composables/useEngineeringBuild.ts`、`PF/composables/useEngineeringBuild.spec.ts`。
 - 验收：① 严格解析状态、摘要、时间和有界事件，不默认为成功；② 创建/取消未知结果保留幂等键，明确新意图才换键；③ 切换项目/版本、卸载或会话变化后旧响应不污染当前状态。
