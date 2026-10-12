@@ -2,6 +2,7 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import EngineeringBuild from './EngineeringBuild.vue'
+import BuildArchiveDownload from './BuildArchiveDownload.vue'
 import { useSessionStore } from '../stores/session'
 import {
   getBuild,
@@ -146,5 +147,9 @@ it('explicitly distinguishes a successful build from the old shared preview', as
   await flushPromises()
   expect(wrapper.text()).toContain('构建完成，实例预览尚未接入')
   expect(wrapper.find('iframe').exists()).toBe(false)
+  expect(wrapper.findComponent(BuildArchiveDownload).props('target')).toMatchObject({
+    id: done.id,
+    projectId: done.projectId,
+  })
   expect(submitBuild).not.toHaveBeenCalled()
 })
