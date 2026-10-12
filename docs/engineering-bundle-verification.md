@@ -682,6 +682,21 @@ STANDALONE_SECONDARY_RUNTIME_CONFIG="$atoms_repo/.local/standalone/runtime-b.pro
 
 EB23d–e / C-EB10 保持未完成：下一步是真实源码修改重建、旧页面新意图拒绝与旧成功意图确认，以及最终 JAR 的沙箱攻击/错误态键盘与可访问性。下载 API/工作台导出按钮、任意后端生成、托管构建运行仍不包含在基础工程模块中。本轮未推送、部署或更新原平台交付文档。
 
+## EB23d · 真实源码升级验收
+
+### 固定升级工程（EB23d1）
+
+只为仓库验收入口增加 `--fixture upgraded`：固定修改待办页面标题，不接受任意路径/源码/命令。沿用同一个来源版本 UUID、初始空待办和全部模板文件，变化仅为 `application/view.html` 与相应的 `bundle-manifest.json`。这样证明运行身份来自实际构建字节，不靠伪造版本标记。测试夹具仍不进入正式平台 JAR。
+
+- 红→绿：新增 Java 3 项中的升级用例先因不支持参数失败；新增 Node 用例先因 CLI 拒绝参数失败。实现后分别全通过。反转 CLI 的 `upgraded` 等值判断，新用例再次失败；恢复后仓库 Node **19 项**通过。
+- 平台 `backend/`：Java 17 `./mvnw -B clean verify`，**80 单元 + 52 集成**，无跳过，退出 0（1:38）。平台测试仍使用既有专用测试库和模型模拟服务，不调用真实模型。
+- 根目录 `node scripts/verify-standalone.mjs --config-dir .local/standalone --output-parent .local/standalone --fixture upgraded`：**24 脚本、68 前端、129 后端单元 + 60 集成**全通过；冻结安装、typecheck、lint、前端构建、Maven clean verify，以及工程目录外 Node/Java 两种启动与自有进程停止全部成功。
+- 报告：`.local/standalone/verification-rKkiBw/verification.json`；新工程 `engineering-bundle-3HzoM7`，111 文件、545,949 字节、最大 121,072 字节。
+- 新 bundle ID：`9e7a9df53f57fba688f9981e5b9a2a5134a3060443f2ceb9541273d069f9711f`；runtime ID：`a44d7fe0172900695c21c68ca5e7b43804a5b9db15929fe95dfeada810aa4f14`；JAR SHA-256：`1c4f3c24eb965719bd3daba6deb3a203cc723e10a6f8986a6e2655b306210db1`。
+- 原 `verification-4oZItT` 完整保留。复核两份清单的所有源文件 hash 和实际 JAR hash，原产物未变；同来源 UUID、新 runtime ID。一次性复核命令曾把 manifest 元数据误传给接收字节 Map 的函数；修正为逐文件摘要核对后通过，不涉及产品代码变更。
+
+五轴复核：固定变体、输入边界和构建检查均未扩权，复用既有组装器；没有新依赖、配置/迁移或生产接口。EB23d2 浏览器升级中的冲突/重放仍待完成，本节的构建结果不替代浏览器验收。
+
 ## 已核对的官方依据
 
 - [RFC 6265 §8.5](https://datatracker.ietf.org/doc/html/rfc6265#section-8.5)：Cookie 不按端口隔离，不能把双进程当作浏览器凭据隔离证明。
