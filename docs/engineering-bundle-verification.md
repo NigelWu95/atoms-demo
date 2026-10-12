@@ -727,7 +727,25 @@ STANDALONE_SECONDARY_RUNTIME_CONFIG="$atoms_repo/.local/standalone/runtime-b.pro
 
 边界：本次仅证明同数据结构的固定应用源码升级，不包含数据库 schema 升降级或任意生成后端。EB23e 安全/错误态可访问性、EB24–EB25 及 C-EB10/C-EB11 仍待完成；下载 API/按钮和托管构建运行属于后续模块。
 
+## EB23e1 · 最终 JAR 的真实沙箱边界
+
+仍使用 EB22 的 `verification-4oZItT` 成品，未修改工程、JAR、安全响应头或平台服务。仓库固定的 `sandbox-probe.js` 只在测试浏览器的真实 iframe 中执行；不读取凭据，URL 仅指向本机 `/security-probe/`，另有网络拦截护栏。探针不进入导出模板。
+
+- 真实文档 origin 为 `null`；读取父页面 DOM、导航宿主均被 `SecurityError` 拒绝；弹窗返回 `null`。
+- fetch、外部脚本、Blob worker 均被 CSP 阻断，观察到 `connect-src` / `script-src-elem` / `worker-src` 违规事件；护栏没有捕获任何漏出的请求。
+- 探针之后正常保存仍成功；应用自行导航到 `about:blank` 后旧 iframe/连接关闭，页面明确提示手动重载。接受真实确认弹窗后恢复应用和已保存待办；SQL 为 revision=1 / stateRows=1 / idempotencyRows=1。
+- 直接打开 `/api/app/document` 仍为 opaque origin、HTTP `sandbox allow-scripts`，没有宿主桥接就无法保存；外壳/API 保持无 inline 的 CSP 和 `X-Frame-Options: DENY`。
+
+测试调试记录：初版探针在 `addScriptTag` 完成前触发预期 CSP 拒绝，Playwright 将其归为脚本装载失败，改为脚本装载后点击按钮运行；worker 拒绝在 Chromium 中由异步 error 事件报告，不能用构造函数是否抛错判断；手动恢复需要显式接受确认弹窗，默认自动关闭会取消恢复。以上均修正测试方法，没有放宽产品策略。
+
+代码审查按正确性、可读性、边界、安全及有界等待检查；反转新增弹窗判定 `=== null` 后用例实际失败（收到 allowed），恢复后 `security.spec.ts` **2/2 通过（27.8 秒，retries=0）**；严格 TypeScript、ESLint、Prettier 均通过。截图 `frontend/test-results/standalone/security-real-sandbox-reje-9a2f1-avigation-closes-the-bridge-chromium/navigation-closed.png` 已实际查看：错误原因与重载入口清晰，保存内容恢复由实际浏览器/SQL 断言确认。EB23e2、C-EB10 尚未完成。
+
+复验沿用上一节完整浏览器命令并附加 `security.spec.ts`。本切片仅本地分支，不推送、不部署。
+
 ## 已核对的官方依据
+
+- [Playwright 脚本装载](https://playwright.dev/docs/api/class-frame#frame-add-script-tag)、[确认弹窗](https://playwright.dev/docs/dialogs)：真实文档内装载探针，恢复时显式接受确认；没有替换真实文档响应。
+- [CSP sandbox](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Content-Security-Policy/sandbox)、[CSP 违规事件](https://developer.mozilla.org/en-US/docs/Web/API/Element/securitypolicyviolation_event)、[Worker error](https://developer.mozilla.org/en-US/docs/Web/API/Worker/error_event)：分别核对 opaque origin、安全策略拒绝及 worker 异步失败观察方式。
 
 - [RFC 6265 §8.5](https://datatracker.ietf.org/doc/html/rfc6265#section-8.5)：Cookie 不按端口隔离，不能把双进程当作浏览器凭据隔离证明。
 - [Playwright 同 context 新页面](https://playwright.dev/docs/api/class-browsercontext#browser-context-new-page)、[WebError](https://playwright.dev/docs/api/class-weberror#web-error-error)、[用例总超时](https://playwright.dev/docs/test-timeouts#test-timeout)：在共享存储下观察多个页面，区分 context 错误事件与页面事件，以及基础设施总时长与业务断言的各自预算。
