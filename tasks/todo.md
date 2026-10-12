@@ -262,6 +262,9 @@
 ### EB22 · 脱离平台后的主流程（M）
 
 - [ ] 完成 EB22。依赖：EB21。
+- 实施拆分：EB22a（5 文件）仓库侧可重启进程夹具：`scripts/serve-standalone.mjs`、对应 Node 测试及 `.d.mts` 契约、`fixtures.ts`、Playwright 配置；EB22b（4 文件）真实产物保存/刷新、重启、响应丢失/双标签验收与共享页面动作；EB22c（最多 5 文件）独立进程专属数据库连接故障及只读数据库证据。所有进程只通过自有句柄结束，不关闭共享 PostgreSQL。
+- 夹具设计：从 `webServer` 改为 worker 生命周期管理，保留等价的「端口占用即失败、不复用服务」约束，重启前等待自有进程退出并释放端口；JAR 不增加控制接口。每次启动重验实际 JAR hash 与显式配置。浏览器阻断一切非独立应用 origin；关闭原始 trace，改存不含请求头/正文的状态码诊断及截图，避免 Cookie/CSRF 泄漏。
+- [x] EB22a：可重启 worker 与显式 JAR/配置检查接线；缺少生命周期导出的 RED 后 Node 测试、类型检查、lint 及四尺寸真实 JAR 浏览器烟测通过。发现 Playwright `serviceWorkers: block` 初始化脚本在 opaque iframe 访问 getter 产生 SecurityError；取消该测试脚本注入，保留应用真实 CSP 和零页面错误断言，另断言新上下文中没有 service worker。正常同源响应不经测试代理改写。
 - 文件：`frontend/e2e-standalone/state.spec.ts`、`frontend/e2e-standalone/restart.spec.ts`、`frontend/e2e-standalone/retry.spec.ts`、`frontend/e2e-standalone/fixtures.ts`。
 - 验收：① 阻断平台所有 origin 后待办添加/保存/刷新仍成功，数据只写独立库；② 只重启本次独立进程，同一有效 Cookie 恢复，第二访客读不到首个访客数据；③ 丢失已提交响应可同键确认，DB 不可用/双标签冲突不产生假成功或覆盖。
 - 验证：V-X、V-E；追踪网络、数据库 revision 与幂等记录，保留失败 trace 且不泄露 Cookie/配置。

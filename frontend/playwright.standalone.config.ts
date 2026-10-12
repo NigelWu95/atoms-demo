@@ -14,14 +14,10 @@ export default defineConfig({
   workers: 1,
   retries: 0,
   reporter: 'list',
+  // The opaque frame's CSP forbids workers; the reviewed host has no worker code.
+  // Playwright's block init script reads navigator.serviceWorker
+  // inside the opaque frame and throws SecurityError; do not inject that script or ignore errors.
   use: { baseURL, trace: 'off', screenshot: 'only-on-failure' },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'], channel: 'chrome' } }],
-  // https://playwright.dev/docs/test-webserver
-  webServer: {
-    command: 'node ../scripts/serve-standalone.mjs',
-    url: `${baseURL}/api/health`,
-    reuseExistingServer: false,
-    timeout: 120000,
-    gracefulShutdown: { signal: 'SIGTERM', timeout: 10000 },
-  },
+  // The worker fixture supports true process restarts while preserving no-reuse/occupied-port failure.
 })

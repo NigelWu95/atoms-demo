@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { verifiedProject } from './serve-standalone.mjs';
+import { verifiedProject, startVerifiedRuntime } from './serve-standalone.mjs';
 
 test('browser launcher accepts only the unchanged JAR belonging to its explicit verification run', async () => {
   const work = await mkdtemp(join(tmpdir(), 'browser-evidence-'));
@@ -17,6 +17,10 @@ test('browser launcher accepts only the unchanged JAR belonging to its explicit 
   const path = join(work, 'verification.json');
   await writeFile(path, JSON.stringify(report));
   assert.equal((await verifiedProject(path)).directory, directory);
+  const config = join(work, 'runtime.properties');
+  await writeFile(config, 'server.address=127.0.0.1\nserver.port=18090\nstandalone.test-database=false\n');
+  await assert.rejects(startVerifiedRuntime(path, config), /matching runtime config/);
+  await assert.rejects(startVerifiedRuntime(path, undefined), /matching runtime config/);
   await writeFile(jar, 'changed');
   await assert.rejects(verifiedProject(path), /verification/);
   await writeFile(path, JSON.stringify({ ...report, directory: work }));

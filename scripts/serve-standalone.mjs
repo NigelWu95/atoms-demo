@@ -3,9 +3,8 @@ import { createReadStream } from 'node:fs';
 import { lstat, readFile, realpath } from 'node:fs/promises';
 import { basename, dirname, isAbsolute, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { start } from '../templates/standalone-v1/scripts/start.mjs';
 import { runCli } from '../templates/standalone-v1/scripts/process.mjs';
-import { assertFree, listenerFromConfig } from './standalone-process.mjs';
+import { startOwned, listenerFromConfig } from './standalone-process.mjs';
 
 /** Local evidence is a consistency check, not a signature or permission to import arbitrary bundles. */
 export async function verifiedProject(path) {
@@ -27,13 +26,25 @@ export async function verifiedProject(path) {
   return { directory: report.directory, baseURL: report.baseURL };
 }
 
+/** Repository-only lifecycle: recheck the JAR on every start, own only the returned process. */
+export async function startVerifiedRuntime(report, config, { signal } = {}) {
+  const project = await verifiedProject(report);
+  if (!config || await listenerFromConfig(config) !== project.baseURL)
+    throw new Error('Explicit matching runtime config required.');
+  const java = process.env.JAVA_HOME ? join(process.env.JAVA_HOME, 'bin/java') : 'java';
+  return startOwned(java, ['-jar', join(project.directory, 'backend/target/app.jar'),
+    '--spring.config.location=classpath:/application.yml,file:' + config],
+  { baseURL: project.baseURL, cwd: dirname(project.directory), signal });
+}
+
 if (process.argv[1] && import.meta.url === pathToFileURL(await realpath(resolve(process.argv[1]))).href) {
   await runCli(async signal => {
     if (process.argv.length !== 2) throw new Error('No launcher flags supported.');
-    const project = await verifiedProject(process.env.STANDALONE_VERIFICATION_REPORT);
-    const config = process.env.STANDALONE_RUNTIME_CONFIG;
-    if (!config || await listenerFromConfig(config) !== project.baseURL) throw new Error('Explicit matching runtime config required.');
-    await assertFree(project.baseURL);
-    await start(project.directory, ['--config', config], { signal });
+    const runtime = await startVerifiedRuntime(process.env.STANDALONE_VERIFICATION_REPORT,
+      process.env.STANDALONE_RUNTIME_CONFIG, { signal });
+    try {
+      const failure = await runtime.done;
+      if (failure) throw failure;
+    } finally { await runtime.stop(); }
   }, 'Browser acceptance server failed; verify the explicit report and runtime configuration.');
 }
