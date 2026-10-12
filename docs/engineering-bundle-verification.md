@@ -639,7 +639,53 @@ SQL 证据使用 `atoms_standalone_a` 应用角色在固定本地容器内执行
 
 EB22 完成不等于 C-EB10 或完整工程导出产品完成。EB23 的 A/B 同主机跨端口隔离、错误安装 ID 的最终 JAR 验证、源码重建升级与旧意图重放、安全攻击及错误态可访问性仍待验收；下载 API/工作台按钮、任意后端生成和托管运行仍未接入。仅本地功能分支提交，未合并、推送、部署，也未更新原平台交付文档。
 
+## EB23 · 同机双实例与安装误配（部分验收）
+
+本阶段补齐 EB23a–c 的仓库验收能力；不修改应用模板、平台接口或既有运行配置。继续使用 EB22 的 `verification-4oZItT/verification.json` 和实际 JAR：源码 111 个文件与 JAR hash 再校验均未变化，因此没有重新生成或冒充一个新构建版本。
+
+### 实际验证的边界
+
+- 同一非持久化 Chrome context 同时访问 A（`127.0.0.1:18089`）与 B（`127.0.0.1:18090`），共享浏览器 Cookie 存储。两个实例运行相同 JAR/runtime ID，分别使用 `atoms_standalone_a`、`atoms_standalone_b` 和既有安装 ID。依次在 A/B 保存不同待办，再 A → B → A 刷新；两边访客身份稳定且不相同，状态仍是各自内容。没有用两个浏览器上下文掩盖 Cookie 同名覆盖问题。
+- 只读 SQL 核验：A 库中 A 访客为 revision/stateRows/idempotencyRows=`1/1/1`，B 访客为 `0/0/0`；B 库相反。停止本次 B 进程后，A 继续保存得到 `2/1/2`；重启 B 后仍恢复同一访客及 `1/1/1` 的原状态。
+- 安装误配：B 正确配置保存数据后停止，只把新建 0600 临时配置中的安装 ID 改为另一个 UUID。最终 JAR 记录 `installation_rejected` / `INSTALLATION_MISMATCH` 后退出。核对原安装标记和该访客计数不变；恢复正确配置，原会话与内容恢复并可继续保存。测试即使意外接受错误配置也停止它创建的进程，不遗留监听。
+- 浏览器仍拒绝全部平台和外部 origin；只有双实例场景显式放行固定 B 地址。新增启动参数只属于仓库验收工具：默认使用报告端口，显式第二地址必须与私有配置匹配；JAR 每次启动均校验，已占用端口拒绝，不寻找/停止外部进程。
+
+### 结果、修正与证据
+
+完整 Chrome 套件 13 项通过，3.6 分钟，`retries: 0`；覆盖本次两项及原保存、双标签冲突、真实重启、响应丢失/畸形/超时、数据库断连恢复与四尺寸 smoke/axe。完整沙箱攻击、升级和错误态可访问性仍不在此完成声明中。
+
+仓库 Node 检查 26 项通过（常规 18、进程 4、数据库验收工具 4）；浏览器测试严格 TypeScript、eslint、Prettier 通过。本轮未改平台/模板源文件，未重跑其编译，不把 EB22 的 Java/模板前端用例数列为本轮运行结果。
+
+增量、TDD 与审查流程发现并修正：
+
+1. 启动器最初只能匹配报告中的 A 地址；新增第二监听地址用例先失败，最小实现后通过。反转配置地址匹配判断使两项启动测试失败，恢复后通过。
+2. 反转第二 origin 放行判断使真实浏览器在 B 导航失败，证明双实例用例实际访问第二进程而非 A 的另一个标签。
+3. 首次完整回归为 11 通过 / 1 失败：真实重启占用了默认 30 秒用例总预算，重试点击阶段被测试框架中断。只为两个含 JVM 重启的既有用例设置 150 秒总预算（沿用启动器 120 秒边界并留浏览器阶段时间）；应用 8 秒保存确认、请求/断言超时、无自动重试和数据检查未放宽。后续完整 12 项与加入安装误配后的 13 项通过。
+4. 配置副本只允许改变有效安装 ID 行。保持原 ID 的变异、注释内同名字段反例均使测试失败；修正为锚定配置行替换，确认成功/失败都会清理副本、原配置内容保持不变。边界修正后安装误配定向复验 1 项通过（1.0 分钟），使用独立 `test-results/standalone-installation` 输出目录，不覆盖完整验收截图。
+
+安装拒绝包含应用脱敏事件；框架 `SpringApplication` 还记录一次由该固定拒绝异常构成的启动栈。本次检查不含 JDBC URL 或数据库密码，不宣称所有启动失败均无栈；EB22 中零原始数据库异常栈的结论仅对应其故障恢复运行场景。
+
+截图已查看，位置为 `frontend/test-results/standalone/isolation-same-host-instan-76e54-rate-in-one-browser-context-chromium/instance-a.png`、`instance-b.png`。截图仅含手工验收数据；不保存浏览器存储、Cookie、CSRF 或原始 trace。最终清理只结束自有 Java/Chrome/连接闸门和精确临时配置，不停止共享 PostgreSQL、不清空运行库。
+
+复验使用上节已验证的报告，另显式提供 B 配置（以下在仓库根执行，Java/Node 使用计划锁定版本；Docker CLI 需在 PATH 中）：
+
+```sh
+atoms_repo="$PWD"
+cd frontend
+STANDALONE_VERIFICATION_REPORT="$atoms_repo/.local/standalone/verification-4oZItT/verification.json" \
+STANDALONE_RUNTIME_CONFIG="$atoms_repo/.local/standalone/runtime-a.properties" \
+STANDALONE_SECONDARY_RUNTIME_CONFIG="$atoms_repo/.local/standalone/runtime-b.properties" \
+./node_modules/.bin/playwright test --config playwright.standalone.config.ts --project=chromium
+```
+
+五轴复核：共享浏览器存储而非两组隔离浏览器来验证隔离；启动目标、原配置、临时副本与数据库证据边界清晰；没有新增依赖、管理员 SQL 或生产控制接口；输入/文件大小/连接数量/启动时间均受既有约束限制。变更仅为仓库验收工具和对应证据。
+
+EB23d–e / C-EB10 保持未完成：下一步是真实源码修改重建、旧页面新意图拒绝与旧成功意图确认，以及最终 JAR 的沙箱攻击/错误态键盘与可访问性。下载 API/工作台导出按钮、任意后端生成、托管构建运行仍不包含在基础工程模块中。本轮未推送、部署或更新原平台交付文档。
+
 ## 已核对的官方依据
+
+- [RFC 6265 §8.5](https://datatracker.ietf.org/doc/html/rfc6265#section-8.5)：Cookie 不按端口隔离，不能把双进程当作浏览器凭据隔离证明。
+- [Playwright 同 context 新页面](https://playwright.dev/docs/api/class-browsercontext#browser-context-new-page)、[WebError](https://playwright.dev/docs/api/class-weberror#web-error-error)、[用例总超时](https://playwright.dev/docs/test-timeouts#test-timeout)：在共享存储下观察多个页面，区分 context 错误事件与页面事件，以及基础设施总时长与业务断言的各自预算。
 
 - [Playwright worker fixture](https://playwright.dev/docs/test-fixtures#worker-scoped-fixtures)、[Route.fetch](https://playwright.dev/docs/api/class-route#route-fetch)：自有测试生命周期与真实请求转发；项目使用 1.63.0，无自动重试。
 - [Node 24.20 socket.destroy](https://nodejs.org/download/release/v24.20.0/docs/api/net.html#socketdestroyerror)、[PostgreSQL 17 只读事务](https://www.postgresql.org/docs/17/sql-set-transaction.html)：仅中断自有连接与只读证据查询。

@@ -1,4 +1,5 @@
 import { constants } from 'node:fs';
+import { randomUUID } from 'node:crypto';
 import { open, mkdtemp, writeFile, unlink, rmdir } from 'node:fs/promises';
 import { dirname, isAbsolute, join } from 'node:path';
 import { createServer, createConnection } from 'node:net';
@@ -39,6 +40,23 @@ async function fixtureConfig(path) {
       || values.get('standalone.origin') !== `http://127.0.0.1:${values.get('server.port')}`) throw invalid();
     return { text, url, port: Number(target[1]), database: target[2], instance: values.get('APP_INSTANCE_ID') };
   } finally { await file.close(); }
+}
+
+/** Negative startup probe only; never edit the original configuration or the installation record. */
+export async function withMismatchedInstallation(config, verify) {
+  const source = await fixtureConfig(config);
+  const directory = await mkdtemp(join(dirname(config), 'wrong-installation-'));
+  const path = join(directory, 'runtime.properties');
+  let created = false;
+  try {
+    await writeFile(path, source.text.replace(/^APP_INSTANCE_ID=[a-f0-9-]+$/m, 'APP_INSTANCE_ID=' + randomUUID()),
+      { flag: 'wx', mode: 0o600 });
+    created = true;
+    return await verify(path);
+  } finally {
+    if (created) await unlink(path);
+    await rmdir(directory);
+  }
 }
 
 /** Only caller-owned loopback sockets are interrupted. No PostgreSQL control/admin operation. */

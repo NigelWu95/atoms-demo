@@ -1,6 +1,6 @@
 # engineering-bundle · 开发任务
 
-状态：2026-10-12 用户确认继续后，EB01–EB22 已实现并验证；C-EB10 尚未完成，下一步 EB23 跨实例、安全与升级验收。仅本地功能分支提交，未推送或部署。
+状态：2026-10-12 用户确认继续后，EB01–EB22、EB23a–c 已实现并验证；C-EB10 尚未完成。下一步 EB23d–e 源码升级、安全与错误态可访问性验收。仅本地功能分支提交，未推送或部署。
 依据：[计划及验证命令](plan.md)、[已批准规格](../SPEC-engineering-bundle.md)。本清单只负责 `engineering-bundle`；原平台任务清单不变。
 
 路径缩写：`P/` = `backend/src/main/java/dev/atoms/demo/engineering/`；`PT/` = 对应平台 `src/test/java/dev/atoms/demo/engineering/`；`T/` = `templates/standalone-v1/`；`B/` = `T/backend/src/main/java/dev/atoms/standalone/`；`BT/` = 对应模板 `src/test/java/dev/atoms/standalone/`；`R/` = `T/backend/src/main/resources/`；`F/` = `T/frontend/src/`。各路径的实现进度以下列任务勾选及切片记录为准。
@@ -287,7 +287,7 @@
 
 - [x] EB23a：同一已验证 JAR 可显式选择第二个回环监听地址；默认仍要求报告地址一致，拒绝占用端口且不复用进程。文件：`scripts/serve-standalone.mjs`、对应 `.d.mts` / `.test.mjs`。新增用例先红后绿；反转地址匹配判断，2 项均失败；恢复后仓库常规 Node 18 项通过。无 JAR/模板字节变更。
 - [x] EB23b：同一 Chrome context 双端口分别创建访客/保存/交替刷新，两个数据库只含各自访客的记录；停止 B 不影响 A，重启 B 保留原身份和数据。文件：`frontend/e2e-standalone/isolation.spec.ts`、`fixtures.ts`、`restart.spec.ts`、`retry.spec.ts`。网络放行判断反向变异被真实浏览器捕获；恢复后 12 项完整 Chrome 回归通过（3.5 分钟，retries=0），类型/lint/格式通过。完整回归中真实重启用例曾耗尽默认 30 秒总预算；仅这两个用例的总预算对齐已有 JVM 120 秒启动边界 + 30 秒浏览器阶段，应用/断言超时、无重试和数据断言不变。
-- [ ] EB23c：错误安装 ID 的最终 JAR 启动拒绝，原安装和数据不变。以私有临时配置测试，不改原运行配置。
+- [x] EB23c：错误安装 ID 的最终 JAR 启动拒绝，原安装和数据不变。以私有临时配置测试，不改原运行配置。文件：`scripts/standalone-database.mjs`、对应 `.d.mts` / `.test.mjs`、`frontend/e2e-standalone/installation.spec.ts`。实际记录 `INSTALLATION_MISMATCH`，恢复正确配置后同一访客/数据保留且继续写入成功；完整 Chrome 13 项通过（3.6 分钟、无重试），配置注释边界修正后定向复验通过（1.0 分钟）。Node 数据库工具 4 项通过，原 ID 不变变异及注释同名值反例先失败再修正；111 源文件与 JAR hash 未变。详情见[验证记录](../docs/engineering-bundle-verification.md#eb23--同机双实例与安装误配部分验收)。
 - [ ] EB23d：真实源码变体重新构建，旧页面新写入冲突、旧成功请求仍能确认，原数据不被初始化覆盖。组装/构建夹具与浏览器用例分别提交。
 - [ ] EB23e：最终成品浏览器 sandbox/网络/宿主 DOM/导航、键盘与错误状态 axe 验收。
 
