@@ -17,7 +17,8 @@ export default defineConfig({
     {
       // The test-only entry point never ships with the application JAR.
       // https://playwright.dev/docs/test-webserver
-      command: './mvnw -B spring-boot:test-run',
+      command:
+        './mvnw -B spring-boot:test-run -Dspring-boot.run.main-class=dev.atoms.fixtures.FixtureApplication',
       cwd: '../backend',
       url: 'http://127.0.0.1:8081/test-lab',
       reuseExistingServer: !process.env.CI,

@@ -16,7 +16,8 @@ export default defineConfig({
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'], channel: 'chrome' } }],
   webServer: {
-    command: './mvnw -B spring-boot:test-run',
+    command:
+      './mvnw -B spring-boot:test-run -Dspring-boot.run.main-class=dev.atoms.fixtures.FixtureApplication',
     cwd: '../backend',
     url: 'http://127.0.0.1:8081/test-lab',
     reuseExistingServer: !process.env.CI,
