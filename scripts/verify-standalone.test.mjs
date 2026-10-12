@@ -5,9 +5,16 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { materializeBundle, validateBundle } from './standalone-bundle.mjs';
+import { verificationOptions } from './verify-standalone.mjs';
 
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 const allowed = ['README.md', 'backend/mvnw'];
+test('verification CLI requires explicit config and output locations without override flags', () => {
+  assert.deepEqual(verificationOptions(['--config-dir', '/private/config', '--output-parent', '/private/output']),
+    { configDir: '/private/config', outputParent: '/private/output' });
+  for (const args of [[], ['--config-dir', 'x'], ['--config-dir', 'x', '--output-parent', 'y', '--skip-tests'],
+    ['--output-parent', 'x', '--config-dir', 'y']]) assert.throws(() => verificationOptions(args), /Usage/);
+});
 function fixture() {
   const files = allowed.map(path => ({ path, content: Buffer.from(path).toString('base64') }));
   const manifest = { bundleFormatVersion: 1, dataMode: 'INITIAL_ONLY', files: files.map(file => ({
