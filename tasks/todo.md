@@ -292,6 +292,8 @@
   - [x] EB23d1：固定 `upgraded` 夹具仅改变待办 HTML 标题；来源版本 UUID、初始数据和全部模板字节不变。文件：`PT/BundleFixture.java`、`PT/BundleFixtureTest.java`、`scripts/verify-standalone.mjs`、对应 `.test.mjs`。新增测试先红后绿，CLI 条件反转被捕获；平台 80 单元 + 52 集成、仓库 Node 19 项通过。新目录 `verification-rKkiBw` 完整构建：脚本 24、前端 68、后端 129 单元 + 60 集成通过；Node/Java 均从工程外启动并停止成功。实际新 runtime ID，原工程/JAR 字节未改。见[验证记录](../docs/engineering-bundle-verification.md#eb23d--真实源码升级验收)。
   - [x] EB23d2：真实升级替换由测试持有的 JAR 进程；相同配置/数据库保留会话和数据，旧页面新意图返回 `STALE_APP_VERSION`，旧成功意图重试不覆盖升级后新数据。文件：`frontend/e2e-standalone/fixtures.ts`、`upgrade.spec.ts`。切换前验证报告和 JAR，结束/回调失败恢复原测试产物，不清库。修正测试错误响应取值及异步中断清理竞态；反向变异捕获、故障探针无配置提前移除，最终完整 Chrome **15 项通过（3.0 分钟，retries=0）**，严格类型/lint/格式通过。截图已实际查看，SQL 证明重放后 revision=2 / stateRows=1 / idempotencyRows=2；原版/升级版源文件与 JAR hash 均未改，自有端口和临时配置已释放。见[验证记录](../docs/engineering-bundle-verification.md#eb23d--真实源码升级验收)。
 - [ ] EB23e：最终成品浏览器 sandbox/网络/宿主 DOM/导航、键盘与错误状态 axe 验收。
+  - [x] EB23e1：在已验证 JAR 的真实 iframe 中执行仓库固定探针，验证 opaque origin、宿主 DOM/导航、联网/脚本/worker/弹窗拒绝，以及自身导航后的连接关闭与手动恢复；直接文档仍受 HTTP sandbox 约束。文件：`frontend/e2e-standalone/sandbox-probe.js`、`security.spec.ts`。不读凭据；请求目标仅本机专用探针路径，另设拦截护栏，不改实际 JAR/CSP。弹窗判断反向变异被捕获，恢复后 Chrome 2 项通过（27.8 秒、无重试），类型/lint/格式通过；导航关闭截图已查看。完整回归和错误态可访问性仍归 EB23e2。
+  - [ ] EB23e2：真实冲突、未知保存结果和数据库不可用状态下，键盘焦点/按钮恢复、宿主与 iframe 的 axe、移动端布局通过；必要缺陷先红后绿修复。文件：`frontend/e2e-standalone/accessibility.spec.ts`、必要的审计辅助文件，最多 5 个主要文件；若需改模板，另拆切片并全量重建两个工程。最后完整浏览器回归并记录截图证据。
 
 ### C-EB10 · 独立运行验收
 
