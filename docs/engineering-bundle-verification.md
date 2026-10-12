@@ -526,7 +526,70 @@ EB20–EB21 必须补：真实 TemplateCatalog 白名单与许可证、正式平
 
 本轮按技能要求分为有限小片提交，并实际进行变异检查和独立浏览器核验；没有新增依赖、改变平台业务数据库或扩大身份模型。只本地提交，未推送 GitHub、合并主分支或部署服务器。
 
+## EB20–EB21 / C-EB09 · 白名单组装的独立工程
+
+### 已实现的边界
+
+平台 `TemplateCatalog` 仅从固定 classpath 资源流读取 `standalone-v1.files` 和清单中的 106 个文件；无工作目录扫描、用户自选模板路径或缺文件回退。装载前检查路径、顺序、重复/大小写冲突，按上限读取内容，拒绝文件和祖先符号链接；打包 IT 还检查原始仓库源文件，避免 Maven 复制阶段掩盖链接。Maven 的显式 includes 与文本清单有意保留两份，并通过严格相等测试阻止漂移，不引入新的执行插件。
+
+实际打包测试发现并修复 `.gitignore` 被 JAR 默认排除的问题：资源复制和归档两阶段均保留明确允许的文件。独立工程需要的 Java/Node/Vue 测试包含在源码模板内；平台浏览器夹具、开发凭据、真实业务数据不在清单中。Maven Wrapper 3.3.4 的完整 LICENSE/NOTICE 随模板保留；前后端依赖由已有锁文件/POM 下载，没有把依赖缓存打入源码工程。
+
+`BundleFixture` 只存在于平台 test-classes，通过 Boot PropertiesLauncher 加载正式平台 JAR 中的组装器和模板，在仓库外目录组装固定手工待办快照。它没有 HTTP 入口，不连接平台数据库、不调用模型；页面也明确标明不是 AI 生成。该测试入口及平台 fixtures 不进入正式平台 JAR。
+
+仓库侧 `verify-standalone.mjs` 验证 manifest 规范化摘要、每个文件大小/哈希和完整清单，使用 mkdtemp + 排他写入建立新工程目录；不覆盖、复用或删除旧目录。随后在该目录运行随包脚本测试、`npm ci --ignore-scripts`、类型检查、lint、前端单测/构建和 Maven `clean verify`。打包后再验所有源码 hash，分别通过 Node 与直接 `java -jar` 启停实际产物。`serve-standalone.mjs` 只管理验收产物，启动前校验 JAR 与明确报告匹配、端口空闲；没有按端口杀进程或复用已有服务的逻辑。
+
+### 实测结果
+
+| 验收项 | 结果 |
+| --- | --- |
+| 平台后端完整构建 | `./mvnw -B clean verify`：77 单元 + 52 集成通过，无跳过；正式 JAR 资源逐字节检查与仓库外装载通过 |
+| 真实独立工程 | 106 模板文件 + 4 应用文件 + 1 bundle manifest，共 111 文件、542,975 字节；最大文件 121,072 字节 |
+| 固定配额余量 | 文件剩余 17；单文件剩余 1,976,080 字节；总量剩余 7,845,633 字节。未提高 128 / 2 MiB / 8 MiB 上限 |
+| 新目录脚本 | 随包 24 项 Node 测试通过；冻结安装成功，npm 报告 0 漏洞 |
+| 新目录前端 | typecheck、lint、68 项单测和真实 Vite build 通过 |
+| 新目录后端 | 129 单元 + 59 专用 PostgreSQL/HTTP/打包集成测试通过；实际 JAR 无 TestApplication/TestDatabase 入口 |
+| 真实启动 | 同一成品通过 Node CLI 与直接 Java 17.0.5 启动，实际 health 与静态页面正常，分别退出后端口可重新绑定 |
+| 浏览器 | 隔离 Chrome、320/390/768/1440px 共 4 项通过；真实会话/应用描述/初始状态、内容指纹、opaque iframe、同源请求、键盘焦点、axe 无违规、console 无 error/warning |
+| 仓库脚本回归 | 17 项常规脚本 + 4 项端口/生命周期测试通过；已有发布、数据库配置和运行时一致性脚本均包含在回归内 |
+| 实际变异 | 将 manifest 摘要比较从 `!==` 改为 `===`，正常物化测试失败；恢复后通过。复查增加畸形条目拒绝测试，先捕获 null 导致的 TypeError，再修复为一致的拒绝结果 |
+| 最后核验 | 浏览器结束后用真实平台 JAR 重新组装并比对产物：bundleId 一致，111 个源文件字节均未变化；18089 无监听，自有浏览器退出 |
+
+源工程位于 `.local/standalone/verification-YzIPoQ/engineering-bundle-HNsK7G/`，报告为其父目录的 `verification.json`。源码目录和构建输出留存供检查，不自动删除；真实配置仍是既有、被忽略的外部文件。截图在 `frontend/test-results/standalone/`，已查看 320px 和 1440px 图像。浏览器只读取初始业务状态，本阶段没有把此烟测宣称为最终持久化/重启验收。
+
+- bundleId：`f758f09d65e24e56f258f58b3002fe1654bed15c74ab71f2d7b3da141b6e026f`
+- loadedRuntimeId：`6bc78d3e4b443eeb25b28e1dedb9dae3ff2db3afc11a442beafcb6a3fde16199`
+- JAR SHA-256：`1456b8c22adec78940ccbd02ab70be6787683d54e0d98c529b1f9896be72ef98`
+
+哈希证明本次文件一致性，不是来源签名。验收输出目录和报告是本机开发者控制的可信输入；此工具不是任意用户工程上传/运行接口，也不声称防御同一 OS 用户并发篡改目录。不要把它直接暴露为平台执行服务。
+
+### 复验命令与剩余范围
+
+先在平台 backend 运行 `./mvnw -B clean verify`，使用既有专用平台测试库配置。再在仓库根（Java 17.0.5、Node 24.20.x、npm 11.19.x 已选定）执行：
+
+```sh
+node scripts/verify-standalone.mjs --config-dir .local/standalone --output-parent .local/standalone
+```
+
+此命令每次建立不同目录，必须使用它本次输出的绝对报告路径。`config-dir` 应已有独立的 `test.properties` 与 `runtime-a.properties`；Java 在数据库操作前检查配置和实际数据库身份。配置文件内容、密码和会话令牌不写入报告。然后在平台 frontend 运行：
+
+```sh
+STANDALONE_VERIFICATION_REPORT=/absolute/path/to/verification.json \
+STANDALONE_RUNTIME_CONFIG=/absolute/path/to/runtime-a.properties \
+./node_modules/.bin/playwright test --config playwright.standalone.config.ts --project=chromium
+```
+
+Playwright 显式 `reuseExistingServer: false`，不启用 trace 或保存登录态；监听仅回环。当前浏览器工具无 DevTools MCP，按浏览器技能采用已有 Playwright + 隔离 Chrome，无新增工具依赖。沙箱拒绝监听时按权限审批重跑，没有降低测试标准或更换数据库。
+
+五轴复查：固定路径和预算/错误路径有测试；catalog、纯组装器、物化器、进程控制与浏览器验收边界分离；没有新增依赖/模型调用/生产业务库迁移；循环和输入有配额；原文件字节在实际构建后核验。只本地提交，未推送、合并或部署。技能促使本轮按小片提交并实际验证归档和浏览器，未把纯脚本测试当成成品运行证据。
+
+C-EB09 不等于整项完整工程导出交付：没有新增下载 API/按钮，也没有任意后端代码生成。EB22–EB23 继续覆盖最终成品待办保存、跨进程恢复、平台断开时独立运行、多访客/实例隔离、升级后幂等重放；EB24–EB25 覆盖配额回归、README 首次手工建库教程与原平台完整回归，再更新原项目设计/交付文档。
+
 ## 已核对的官方依据
+
+- [Maven 显式资源 includes](https://maven.apache.org/plugins/maven-resources-plugin/examples/include-exclude.html)、[JAR 默认排除开关](https://maven.apache.org/plugins/maven-jar-plugin/jar-mojo.html#addDefaultExcludes)：两阶段保留清单资源（项目实际 JAR Plugin 3.4.2，开关自 3.4.0 可用）。
+- [Java 17 ClassLoader.getResources](https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/ClassLoader.html#getResources(java.lang.String))、[Boot 3.5 PropertiesLauncher](https://docs.spring.io/spring-boot/3.5/specification/executable-jar/property-launcher.html)：检测重复 classpath 资源并从正式 Boot JAR 装载，测试入口保持在 test-classes。
+- [Maven Wrapper 3.3.4 原始声明](https://github.com/apache/maven-wrapper/tree/maven-wrapper-3.3.4)：模板保留上游 LICENSE/NOTICE。
+- [Node 24.20 监听选项](https://nodejs.org/download/release/v24.20.0/docs/api/net.html#serverlistenoptions-callback)：显式回环独占端口预检，只管理自有进程。
 
 - [Node 24.20 child_process](https://nodejs.org/download/release/v24.20.0/docs/api/child_process.html#optionsdetached)：固定 argv、无 shell、自有 POSIX 进程组及保持父子生命周期；实现不调用 unref。
 - [Maven 资源目录](https://maven.apache.org/plugins/maven-resources-plugin/examples/resource-directory.html)：用显式资源 profile 接入新暂存目录，禁用过滤以保留 hash 对应字节。

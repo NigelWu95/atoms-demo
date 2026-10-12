@@ -1,6 +1,6 @@
 # engineering-bundle · 开发任务
 
-状态：2026-10-12 用户确认继续后，EB01–EB19 已实现并验证；当前交付 C-EB08，下一步 EB20–EB21。
+状态：2026-10-12 用户确认继续后，EB01–EB21 已实现并验证；当前交付 C-EB09，下一步 EB22–EB23。仅本地功能分支提交，未推送或部署。
 依据：[计划及验证命令](plan.md)、[已批准规格](../SPEC-engineering-bundle.md)。本清单只负责 `engineering-bundle`；原平台任务清单不变。
 
 路径缩写：`P/` = `backend/src/main/java/dev/atoms/demo/engineering/`；`PT/` = 对应平台 `src/test/java/dev/atoms/demo/engineering/`；`T/` = `templates/standalone-v1/`；`B/` = `T/backend/src/main/java/dev/atoms/standalone/`；`BT/` = 对应模板 `src/test/java/dev/atoms/standalone/`；`R/` = `T/backend/src/main/resources/`；`F/` = `T/frontend/src/`。各路径的实现进度以下列任务勾选及切片记录为准。
@@ -236,23 +236,26 @@
 
 ### EB20 · 模板白名单进入平台产物（M）
 
-- [ ] 完成 EB20。依赖：EB02、EB19。
+- [x] 完成 EB20。依赖：EB02、EB19。
 - 实施拆分：EB20a 模板许可证（notice + Apache license/notice）；EB20b 显式清单、Classpath Catalog 及单元测试、Maven 资源接线（4 文件）；EB20c 仓库源文件/正式 JAR 一致性与非仓库工作目录验收（测试夹具与打包 IT，2 文件）。构建仍使用既有 Maven 插件，不新增依赖。
 - 文件：`templates/standalone-v1.files`、`P/TemplateCatalog.java`、`PT/TemplateCatalogTest.java`、`backend/pom.xml`、`T/THIRD-PARTY-NOTICES.md`。
 - 验收：① 逐文件审核白名单，仅模板源码/锁文件/必需测试/许可证，无平台夹具或凭据；② 平台正式 JAR 包含白名单模板资源，非仓库 cwd 下仍可装载组装；③ 实测文件数与字节符合硬预算，任一缺项/重复/符号链接拒绝，不在超限时自动加额。
 - 验证：平台 `backend/` 执行 `./mvnw -B verify`；`jar tf target/atoms-demo-0.1.0-SNAPSHOT.jar` 检查资源，扫描 canary 排除项，记录实际大小与许可证。
+- 结果：106 项显式模板清单与 POM/源文件/正式 JAR 逐字节一致；catalog 拒绝缺项、重复、路径/符号链接与配额问题。平台 77 单元 + 52 集成测试通过；测试入口在仓库外用真实 Boot JAR 完成组装，不启动平台。修复资源复制后 JAR 默认丢弃 `.gitignore` 的问题，保留 Maven Wrapper 完整许可证与上游 notice。
 
 ### EB21 · 从真实组装输出建立验收环境（M）
 
-- [ ] 完成 EB21。依赖：EB20。
+- [x] 完成 EB21。依赖：EB20。
 - 实施拆分：EB21a 测试态组装输出与新目录 hash 验证（BundleFixture、物化脚本及测试）；EB21b 真实构建/自有进程启停编排及测试；EB21c 仓库侧 Playwright 环境与浏览器烟测。不修改或重用平台服务/数据库，不把浏览器控制端点打进独立 JAR。
 - 文件：`PT/BundleFixture.java`、`scripts/verify-standalone.mjs`、`scripts/verify-standalone.test.mjs`、`frontend/playwright.standalone.config.ts`、`frontend/e2e-standalone/fixtures.ts`。
 - 验收：① 测试夹具通过真实组装器输出，脚本只在新目录物化并验证所有 hash，不引入下载 API；② 新目录内真实安装/检查/构建并检查 JAR 资源，分别用 Node 与直接 Java 启停，JAR 无测试后门；③ 浏览器环境控制只在仓库侧，记录本次进程/路径，端口冲突失败，不复用或停止平台进程。
 - 验证：仓库根 `node --test scripts/verify-standalone.test.mjs`；V-X，再由 V-E 使用其明确产物；测试导出文件 manifest 没有被浏览器夹具修改。
+- 结果：真实组装输出 111 文件 / 542,975 字节 / 最大文件 121,072 字节。新目录冻结安装、24 脚本测试、68 前端测试、129 后端单元 + 59 集成测试及实际 JAR 检查通过；Node 和直接 Java 启停、四尺寸 Chrome 同源/真实状态读取/沙箱/axe 通过。仓库侧验证脚本 21 项回归通过（17 项普通脚本 + 4 项自有端口测试）；指纹比较实际变异被捕获并恢复。所有源文件在构建及浏览器验收后重新验 hash，未改变；18089 已释放。
 
 ### C-EB09 · 真正的工程文件可构建
 
-- [ ] EB20–EB21 用全新目录而非模板开发目录完成真实构建；检查所有必需测试随包且通过，正式包无浏览器验收后门，配额实测可追溯。
+- [x] EB20–EB21 用全新目录而非模板开发目录完成真实构建；检查所有必需测试随包且通过，正式包无浏览器验收后门，配额实测可追溯。
+- 边界：尚无用户下载 API/按钮；当前是源码组装与独立构建/启动能力。最终成品上的待办保存/重启恢复/多实例隔离及升级重放归 EB22–EB23，配额回归、手工首次建库教程和原平台完整回归归 EB24–EB25。证据见 [验证记录](../docs/engineering-bundle-verification.md)。
 
 ## F · 独立性、重启与交付证据
 
