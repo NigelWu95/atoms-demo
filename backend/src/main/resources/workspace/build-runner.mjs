@@ -1,5 +1,5 @@
 // Private platform entry. Java verifies the frozen source before importing this fixed template.
-import { lstat, realpath, open, link, unlink } from 'node:fs/promises';
+import { lstat, realpath, open } from 'node:fs/promises';
 import { basename, isAbsolute, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { ToolSupervisor, toolEnvironment } from './supervisor.mjs';
@@ -13,28 +13,29 @@ process.stdout.on('error', () => supervisor?.cancel('BUILD_INTERRUPTED'));
 function emit(frame) { process.stdout.write(JSON.stringify(frame) + '\n'); }
 
 async function record(task, report) {
-  const pending = join(task, 'private/settlement.pending');
-  const handle = await open(pending, 'wx', 0o600);
+  // Exclusive single-link file. Readers retain the fence while JSON is incomplete.
+  // No tools can run by this point; a crash cannot leave a two-hardlink publication state.
+  const handle = await open(join(task, 'private/settlement.json'), 'wx', 0o600);
   try { await handle.writeFile(JSON.stringify(report)); await handle.sync(); }
   finally { await handle.close(); }
-  // Exclusive publication: an existing execution's proof must never be overwritten.
-  await link(pending, join(task, 'private/settlement.json'));
-  await unlink(pending);
   const directory = await open(join(task, 'private'), 'r');
   try { await directory.sync(); } finally { await directory.close(); }
 }
 
 try {
-  const [, , input, executionId, testConfig] = process.argv;
-  if (process.argv.length !== 5 || !isAbsolute(input) || !uuid.test(basename(input)) || !uuid.test(executionId)
-      || !isAbsolute(testConfig) || !testConfig.endsWith('.properties')) throw new Error();
+  const [, , input, executionId, testConfig, deadlineText] = process.argv;
+  const remaining = Number(deadlineText) - Date.now();
+  if (process.argv.length !== 6 || !isAbsolute(input) || !uuid.test(basename(input)) || !uuid.test(executionId)
+      || !isAbsolute(testConfig) || !testConfig.endsWith('.properties') || !/^\d{13}$/.test(deadlineText)
+      || !Number.isSafeInteger(remaining) || remaining > 600000) throw new Error();
   const task = await realpath(input);
   if (await realpath(fileURLToPath(import.meta.url)) !== join(task, 'private/build-runner.mjs')) throw new Error();
   for (const directory of [task, join(task, 'private'), join(task, 'work')]) {
     const info = await lstat(directory);
     if (!info.isDirectory() || info.isSymbolicLink() || (info.mode & 0o077) !== 0 || info.uid !== process.getuid()) throw new Error();
   }
-  supervisor = new ToolSupervisor({ parentInput: process.stdin });
+  supervisor = new ToolSupervisor({ parentInput: process.stdin, timeoutMs: Math.max(1, Number(deadlineText)-Date.now()) });
+  if (Date.now() >= Number(deadlineText)) supervisor.cancel('BUILD_TIMEOUT');
   let buffer = '';
   process.stdin.on('data', chunk => {
     buffer += chunk.toString('ascii');

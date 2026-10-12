@@ -42,7 +42,8 @@ public final class NativeBuildProcess {
     public Result run(Path node, Path entry, Path task, UUID executionId, Path testConfig, Map<String, String> environment,
             BooleanSupplier cancelled, Consumer<String> stages) {
         if (cancelled.getAsBoolean()) return new Result(true, "BUILD_CANCELLED", null);
-        var builder = new ProcessBuilder(node.toString(), entry.toString(), task.toString(), executionId.toString(), testConfig.toString());
+        var builder = new ProcessBuilder(node.toString(), entry.toString(), task.toString(), executionId.toString(), testConfig.toString(),
+                Long.toString(System.currentTimeMillis() + timeout.toMillis()));
         builder.directory(task.toFile()).redirectError(ProcessBuilder.Redirect.DISCARD);
         builder.environment().clear();
         for (String key : List.of("PATH", "JAVA_HOME", "HOME", "TMPDIR", "LANG", "LC_ALL", "TERM"))
