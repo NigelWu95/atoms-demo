@@ -363,7 +363,7 @@
 
 ### WB04 · 可信本机监督器（M）
 
-- [ ] 完成 WB04。依赖：C-WB01。
+- [x] 完成 WB04。依赖：C-WB01。可信监督模块与进程组 keeper、父连接丢失、取消/超时和有界排空已实现；8 项真实 Node 测试通过。审查发现的缓存 PID 误杀风险改为 keeper 仅向自身当前组发信号；初始化前取消的宽限竞态先失败再修正。正式 Java 接线与固定命令树审计仍由 WB05/WB13 承担。
 - 描述：实现随平台发布的固定进程监督入口，先使用无副作用仓库夹具验证生命周期。
 - 文件：`WR/supervisor.mjs`、`WR/protocol.mjs`、`scripts/workspace-supervisor.test.mjs`、`scripts/fixtures/workspace-child.mjs`。
 - 验收：① 固定 argv、受限环境、可信控制消息与不可信输出分离；② 取消、10 分钟策略的缩短测试时钟、父连接 EOF 能清理自有子孙进程，确认退出后完成；③ 超量输出持续排空且有界，外部对照进程不被终止。
