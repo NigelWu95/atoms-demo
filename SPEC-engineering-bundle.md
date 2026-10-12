@@ -1,6 +1,6 @@
 # Spec · engineering-bundle：可独立运行的固定工程
 
-状态：2026-10-11 用户已确认规格与[开发计划](tasks/plan.md)；开始逐项实施，功能尚未完成。
+状态：2026-10-11 用户确认规格与[开发计划](tasks/plan.md)；2026-10-13 EB01–EB25 已实现并完成本地验证，C-EB11 用户人工评审待完成。未合并、推送或部署，证据见[验证记录](docs/engineering-bundle-verification.md)。
 归属：[已确认能力地图](CAPABILITY-MAP.md)。本文件只定义基础工程模块，不代替下载、执行器、实例管理或平台预览模块的规格。
 
 ## 1. 目标与完成定义
@@ -28,7 +28,7 @@
 
 沿用当前仓库已锁定版本，不因为导出功能升级平台依赖：Java 17（本机 17.0.5-oracle）、Spring Boot 3.5.16、Vue 3.5.43、TypeScript 5.9.3、Vite 8.3.3、Node 24.20.x、npm 11.19.x、Maven Wrapper 3.9.11、PostgreSQL 17。具体前端依赖必须有独立且受版本控制的 lockfile；不能把整个管理平台的依赖复制进去充数。
 
-拟交付目录；本文件中的新增路径和命令是实现契约，当前尚不存在：
+已交付的目录契约（具体文件以模板白名单及 bundle manifest 为准）：
 
 ```text
 generated-app/
@@ -61,7 +61,7 @@ generated-app/
   .gitignore
 ```
 
-仓库中模板拟存于 `templates/standalone-v1/`，平台内的纯组装逻辑存于 `backend/.../engineering/`，测试放在对应 test 包；只打包显式允许的模板文件，不把模板测试目录、开发配置和产物缓存自动放入导出物。
+仓库模板位于 `templates/standalone-v1/`，平台内的纯组装逻辑位于 `backend/.../engineering/`，测试放在对应 test 包；只打包显式允许的模板文件（包括构建检查所需测试），不递归携带平台测试目录、开发配置和产物缓存。
 
 Vue 产物最终与应用资源一起进入 Spring Boot JAR，由一个端口提供页面与 API。开发时可用 Vite 同源代理；运行成品只需要 Java 17 和已配置的 PostgreSQL，不要求 Node、Maven、平台进程或模型 API。
 

@@ -1,12 +1,14 @@
 # Atoms Demo：挑战分析与设计文档
 
-研究日期：2026-10-07，部署方向更新于 2026-10-08。状态：实施中。代码位于本仓库 backend/frontend；已实现真实 DeepSeek 生成与一次修改、受限预览、应用状态保存、SSE 进度、版本检查报告，以及固定版本发布、LIVE 访客数据和独立应用页面。当前正式体验链接仅本地可用；用户改为单云服务器原生运行整套平台与 PostgreSQL，应用继续按路径发布，不接 ngrok（ADR-011）。详细任务进度以 tasks/todo.md 为唯一清单。
+研究日期：2026-10-07；本节实施状态更新至 2026-10-13。原平台已部署为单云服务器原生运行平台与 PostgreSQL，应用按路径发布，不接 ngrok（ADR-011）；最新云端记录为 10 月 11 日状态修复与历史恢复。本地新增完整固定工程下载、独立构建与数据库运行，尚未推送或部署，也未实现平台托管的独立实例。原设计的时间盒和任务历史保留；原平台进度见本目录 tasks/todo.md，独立工程进度见[模块清单](https://github.com/NigelWu95/atoms-demo/blob/main/tasks/todo.md)，使用方法见[工程下载说明](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-export.md)。
 
 ## 建议决策
 
 采用 **Spring Boot + Vue 3 + PostgreSQL**，实现一个通过自然语言生成、运行、修改和发布小型交互应用的平台。优先完成“创建项目 → 真实模型生成代码 → 浏览器预览 → 继续修改 → 数据持久化 → 在线访问”的完整流程。
 
 平台自身使用前后端分离架构；首版生成的应用使用 HTML/CSS/JavaScript，通过平台提供的受限数据接口保存业务状态。生成应用的技术栈与平台技术栈可以不同。后续再增加 Vue SFC 编译、独立后端生成和容器运行环境。
+
+新增固定工程导出保留上述生成契约，以 Vue 外壳和固定 Spring Boot 数据服务提供独立运行能力，不是自动生成 Vue SFC 或任意后端。架构边界和后续执行器模块见[能力地图](https://github.com/NigelWu95/atoms-demo/blob/main/CAPABILITY-MAP.md)。
 
 这是一项 6–8 小时原型交付建议，不是对完整商业平台工作量的估计。时间预算以开发者熟悉 Java/Vue、模型接口可用、部署环境可访问为前提。
 
