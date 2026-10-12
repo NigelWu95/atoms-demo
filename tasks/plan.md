@@ -186,8 +186,8 @@ npm --prefix frontend run build
 - **W-I**：`backend/` 执行 `./mvnw -B -Dit.test=<任务列出的集成测试类> verify`，使用现有平台专用测试库；不把模板测试库配置交给平台 Flyway。
 - **W-P**：仓库根执行 `node --test scripts/workspace-supervisor.test.mjs`，真实本机进程，记录退出和外部对照进程仍存活。
 - **W-F**：`frontend/` 执行 `npm run test:unit -- <任务测试文件>`，随后 `npm run typecheck`、`npm run lint`、`npm run format:check`、`npm run build`。
-- **W-X**：待新增 `node scripts/verify-workspace-build.mjs --config-dir .local/standalone --output-parent .local/standalone`。只在指定父目录新建验证子目录，用真实授权 API 构建，检查源 ZIP/JAR，按原完整流程从下载 ZIP 另行构建；临时启动两个已验证产物作身份和持久化对照，不增加正式平台实例 API。
-- **W-E**：`frontend/` 执行 `npm run test:e2e:runtime -- workspace-build.spec.ts`；浏览器套件串行使用 W-X 专用环境，固定测试产物，不依赖真实模型。
+- **W-X**：`node scripts/verify-workspace-build.mjs --config-dir .local/standalone --output-parent .local/standalone`。只在指定父目录新建验证子目录，用真实授权 API 构建，检查源 ZIP/JAR，按原完整流程从下载 ZIP 另行构建；临时启动两个已验证产物作身份和持久化对照，不增加正式平台实例 API。真实平台强制退出另用同参数的 `scripts/verify-workspace-recovery.mjs` 串行验证。
+- **W-E**：`frontend/` 执行 `npm run test:e2e:workspace`；专用 `playwright.workspace.config.ts` 对两项测试服务都禁用复用，串行独占 W-X 同一专用模板测试库，固定测试产物，不依赖真实模型。与普通/runtime 套件分别运行。
 - **W-R**：原 §4 V-R 的完整平台回归，加 W-P、原独立工程 Node 回归及本次真实下载工程构建/浏览器验收；已有测试不得删除或弱化。首次启用 V011 前先核对目标确为测试库。
 
 所有需要本机端口或联网的命令遵守环境权限机制。缺工具链/网络/数据库是应报告的验证前提，不能通过切换 H2、跳过后端测试或使用旧 JAR 补绿。
