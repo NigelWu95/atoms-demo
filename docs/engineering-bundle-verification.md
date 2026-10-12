@@ -476,7 +476,61 @@ V002 每访客一份状态，V003 保存按访客、方法、路径、key 唯一
 
 本轮只有本地提交，没有推送 GitHub、合并主分支或部署服务器。数据层的重启验证是同 JVM 重建 Spring 上下文，并非最终成品 JAR 的真正进程重启验收。全新目录构建、前端静态资源进入 JAR、最终运行层指纹、阻断平台的真正独立运行、工程下载入口/工作台接线仍归后续任务。下一步 EB18–EB19 构建与启动入口；原 README、架构/交付说明继续等整个功能完成后再统一更新。
 
+## EB18–EB19 · 自运行构建与启动契约
+
+### 本次实现与取舍
+
+新增单入口 `build.mjs`，固定顺序执行前端冻结安装（禁用依赖生命周期脚本）、类型、lint、单元、build，再组装资源并执行 Maven `clean verify`。外部专用测试配置缺失、任一命令失败、取消、构建中途修改输入或缺少最终 JAR 都不能输出成功。不提供任意命令透传，不把运行数据库/模型凭据、Node/JVM/Maven 覆盖环境传给工具；前端连测试配置的位置也不会收到。
+
+受控编译输入摘要覆盖 backend/src/main、后端 POM、前端 package 与 lock；最终 runtime v2 指纹包含原应用/沙箱资源、该摘要和实际 frontend/dist 字节。`runtime/build.txt` 明确记录受控输入摘要与排序后的静态文件路径。Node 与 Java 使用相同的固定 hash 向量；Java 启动重新读取并校验每份前端资源，缺失/篡改即失败，不回落到测试夹具。这是内容一致性标识，不是对任意手工修改 JAR 的二进制签名，也不证明整个供应链可信。
+
+静态资源只接受 index.html、favicon.svg 和 assets 下有限的 JS/CSS，拒绝 map、私有配置、链接、大小写冲突与越界路径；最多 64 个前端文件，单项 2 MiB、总运行资源 8 MiB。原应用源码/初始状态上限未变。资源放入新建系统临时子目录，Maven clean 不会删掉输入；没有递归删除用户目录。源树由本地操作者控制，不承诺抵御同用户恶意并发改写；构建后会重新核对内容。正式白名单导出预算仍由 EB20/EB24 实测，不以这些运行资源限额代替工程配额。
+
+POM 新增受控资源 profile；PackagedRuntimeIT 在 package 之后打开实际 Boot JAR，核对运行指纹、迁移与入口，确认测试启动类不在正式包。backend-only clean verify 仍可用于后端检查，但不冒充完整应用构建。实际页面由 MVC 的显式入口返回已验证的不可变静态快照，避免默认静态路径暴露未列出的文件；同端口 API 保持鉴权、CSRF、JSON 错误以及未知 API 404，不做 SPA 回退。外壳使用 self-only CSP，只有受限 document 保留沙箱专用策略。
+
+start 只启动已有 JAR，配置路径通过一个固定 argv 传给 Java；配置内容仍只由 Java 的同一预检解析。Node CLI 在 Linux/macOS 使用自有进程组，SIGINT/SIGTERM 连带转发给其工具后代，最多 5 秒宽限；保留退出码/信号，显式停止不误报“启动失败”。不按端口杀服务，不静默后台运行。SIGKILL 不能被包装脚本捕获，实际部署需服务管理器监管。
+
+新模板 README 说明了独立运行库和可清理测试库的管理员准备、双重测试标记、配置/构建/启动、修改与重建、初始数据、访客有效期及未知保存结果限制。没有更新原项目 README/架构/交付文档，也没有扩大为账号系统、任意工程生成或公网部署。
+
+### 验证及修正记录
+
+先有失败用例再实现：原打包器忽略前端修改/缺失；新增 Node 模块尚不存在；后端根页面返回 401；实际 JAR 缺应用资源时拒绝验证。实现后逐项变绿。额外发现并修正三个实际问题：进程启动失败的 Node 内部负码不能作为 CLI 退出码；macOS `/var` 与 `/private/var` 别名让入口判定静默不执行；ResponseEntity 追加第二份 CSP 导致策略交集仍禁用脚本。最后修正正常 SIGTERM 错报启动失败的文案，并以真实 CLI 子进程重验。未删断言或跳过失败检查。
+
+| 检查 | 本次证据 |
+|---|---|
+| 模板 Java 17.0.5-oracle clean verify（资源 profile） | 129 单元 + 59 PostgreSQL/HTTP/打包 IT，全通过、无跳过，完整 Maven 用时约 51 秒 |
+| 实际 JAR 资源 | 固定资源探针 + 已构建 Vue；最终指纹 `d12e862d6ef441f5ad9ac3797afd9214521ab41aed891c99f8d870e9d55175a3`；PackagedRuntimeIT 从 ZIP 条目读回验证，而非使用测试 classpath |
+| Node 组合回归 | 35 项通过：原发布/专用库/兼容性回归及模板初始化、打包、指纹、构建、子进程、启动；最终停止文案改动后 start/process 的 6 项再次通过 |
+| 原平台组装回归 | EngineeringBundleTest + TemplatePolicyTest 共 46 项通过，未修改原平台生成/发布实现 |
+| 实际变异实验 | 把 build 后的指纹不等比较 `!==` 改成 `===`，5 项编排测试中 2 项失败（正常输入被拒绝、变更输入未被拒绝）；恢复后 5 项全部通过 |
+| 单端口真实 Chrome | Node start 运行探针 JAR，连接专用运行库 A、监听 18089；320/390/768/1440、键盘、axe、CSP、沙箱、真实会话和初始状态读取通过；无 console error/warning、无跨站请求 |
+| 进程与配置 | Node 真实 CLI 验证 SIGINT/SIGTERM 和退出码 29；专用进程组后代退出；运行/测试/模型凭据没有继承给错误阶段；最终 18089 无监听，自有 Chrome 已退出 |
+
+初次从 Node 资源探针执行完整 verify 时，沙箱阻止数据库连接，返回 TEST_DATABASE_UNAVAILABLE；按权限审批在沙箱外重跑通过，没有换数据库、跳 IT 或重启共享 Docker。数据库故障/身份拒绝测试预期会产生脱敏告警，这些不是最终构建失败。
+
+本次探针辅助脚本位于被忽略的 `.local/standalone/check-package.mjs` 与 `shell-probe.mjs`，不进模板白名单。前者只为验证资源接线，物化最小固定应用并复用模板和现有 Vue dist；后者只管理本次创建的进程。截图在 `.local/standalone/shell-probe-results-GdkdAj/`，已查看 320 与 1440px。探针不是可重复导出验收器，下一任务必须由正式组装器生成全新目录，不能依赖这些本地辅助文件。
+
+可复验命令（模板根；真实成品 build 需先由 EB20/EB21 补齐组装 application 文件）：
+
+```sh
+node --test scripts/*.test.mjs
+STANDALONE_TEST_CONFIG=/absolute/path/test.properties node scripts/build.mjs
+node scripts/start.mjs --config /absolute/path/application.properties
+```
+
+### C-EB08 交付边界 / 下一步强制检查
+
+此处完成构建/启动契约，不宣称完整工程导出已经交付。单入口编排目前通过受控工具替身验证；资源 profile、真实 Java/数据库和实际 JAR 页面另有实测，但**尚未从正式工程白名单组装的全新目录完整执行 npm 安装到 Maven verify 的整条命令**。
+
+EB20–EB21 必须补：真实 TemplateCatalog 白名单与许可证、正式平台 JAR 内模板装载、真实快照组装/所有文件 hash、全新目录冻结安装和全部检查、分别用 Node 与直接 Java 启停真实导出包。EB22–EB25 继续完成最终待办保存、跨进程恢复、阻断平台的独立性/实例隔离、升级幂等重放及完整原平台回归。README 手工建库说明也要在最终新目录验收时核对，当前不是全流程部署教程已实测的声明。
+
+本轮按技能要求分为有限小片提交，并实际进行变异检查和独立浏览器核验；没有新增依赖、改变平台业务数据库或扩大身份模型。只本地提交，未推送 GitHub、合并主分支或部署服务器。
+
 ## 已核对的官方依据
+
+- [Node 24.20 child_process](https://nodejs.org/download/release/v24.20.0/docs/api/child_process.html#optionsdetached)：固定 argv、无 shell、自有 POSIX 进程组及保持父子生命周期；实现不调用 unref。
+- [Maven 资源目录](https://maven.apache.org/plugins/maven-resources-plugin/examples/resource-directory.html)：用显式资源 profile 接入新暂存目录，禁用过滤以保留 hash 对应字节。
+- [Boot 3.5 静态资源](https://docs.spring.io/spring-boot/3.5/reference/web/servlet.html#web.servlet.spring-mvc.static-content)：JAR classpath 静态内容；本项目显式 MVC 路由仅返回已校验的快照，没有全路径 SPA 回退。
 
 - [HTML Channel Messaging](https://html.spec.whatwg.org/multipage/web-messaging.html#channel-messaging)、[MDN postMessage](https://developer.mozilla.org/en-US/docs/Web/API/Window/postMessage)：MessageChannel 生命周期与 opaque origin 的目标限制；仅在验证来源后转移能力端口，不向通道发送宿主凭据。
 - [Vue onUnmounted](https://vuejs.org/api/composition-api-lifecycle.html#onunmounted)：组件销毁时清理副作用；本实现使用 onBeforeUnmount 先关闭连接。
