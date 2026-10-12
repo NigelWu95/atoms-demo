@@ -57,7 +57,7 @@ public final class BuildScheduler implements SmartLifecycle {
             LOG.warn("{\"event\":\"engineering_scheduler_interrupted\",\"entryPoint\":\"build_scheduler\",\"errorCode\":\"BUILD_INTERRUPTED\"}");
         }
     }
-    private void recoverSettled() throws java.io.IOException {
+    void recoverSettled() throws java.io.IOException {
         var paths=execution.settings().paths();
         for(var job:lifecycle.pending()) {
             try {
