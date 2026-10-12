@@ -6,6 +6,8 @@ test('real process restart restores the same visitor and keeps a second visitor 
   runtime,
   baseURL,
 }, info) => {
+  // Account for the owned process's 120s readiness bound without relaxing UI assertions.
+  test.setTimeout(150000)
   const visitor = await ready(page)
   await add(page, '重启后仍属于我')
   await saved(page)

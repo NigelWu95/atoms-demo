@@ -36,10 +36,15 @@ type Runtime = {
 // https://playwright.dev/docs/test-fixtures#worker-scoped-fixtures
 // A worker owns its child handles. There is no port lookup, process reuse or JAR control endpoint.
 export const test = base.extend<
-  { loadedRuntimeId: string; networkBoundary: void },
+  {
+    loadedRuntimeId: string
+    secondaryBaseURL: 'http://127.0.0.1:18090' | undefined
+    networkBoundary: void
+  },
   { runtime: Runtime }
 >({
   loadedRuntimeId: [readEvidence().loadedRuntimeId, { option: true }],
+  secondaryBaseURL: [undefined, { option: true }],
   runtime: [
     async ({}, use, info) => {
       if (info.config.workers !== 1 || info.config.fullyParallel)
@@ -69,12 +74,12 @@ export const test = base.extend<
     { scope: 'worker', auto: true, timeout: 120000 },
   ],
   networkBoundary: [
-    async ({ context, baseURL }, use, info) => {
+    async ({ context, baseURL, secondaryBaseURL }, use, info) => {
       const blocked: string[] = []
       const responses: { method: string; path: string; status: number }[] = []
-      // Block every other origin, including platform endpoints. Never serialize headers or bodies.
+      // Only the isolation test opts into B. All other origins, including the platform, stay blocked.
       await context.route(
-        (url) => url.origin !== baseURL,
+        (url) => url.origin !== baseURL && url.origin !== secondaryBaseURL,
         async (route) => {
           blocked.push(new URL(route.request().url()).origin)
           await route.abort('blockedbyclient')
@@ -103,13 +108,13 @@ export const test = base.extend<
 })
 export { expect }
 
-export async function ready(page: Page) {
+export async function ready(page: Page, baseURL = readEvidence().baseURL) {
   let userId: unknown
   // Capture the real upstream response while forwarding it unchanged. Chrome can discard a
   // previous document's Network.getResponseBody handle across restart/navigation.
   // https://playwright.dev/docs/api/class-route#route-fetch
   await page.route(
-    readEvidence().baseURL + '/api/session',
+    baseURL + '/api/session',
     async (route) => {
       const response = await route.fetch({ maxRetries: 0, maxRedirects: 0 })
       expect(response.status()).toBe(200)
@@ -120,7 +125,7 @@ export async function ready(page: Page) {
     },
     { times: 1 },
   )
-  await page.goto(readEvidence().baseURL + '/')
+  await page.goto(baseURL + '/')
   const frame = page.frameLocator('iframe')
   await expect(frame.locator('#status')).toHaveText('数据已读取。')
   await expect(frame.getByRole('button', { name: '添加待办', exact: true })).toBeEnabled()
@@ -145,8 +150,8 @@ export async function saved(page: Page) {
   )
 }
 
-export async function state(page: Page) {
-  const response = await page.context().request.get(readEvidence().baseURL + '/api/state')
+export async function state(page: Page, baseURL = readEvidence().baseURL) {
+  const response = await page.context().request.get(baseURL + '/api/state')
   expect(response.status()).toBe(200)
   return response.json()
 }
