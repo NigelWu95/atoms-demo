@@ -67,7 +67,7 @@ public final class BuildWorker {
             if (!job.sourceHash().equals(source.contentHash())) throw failure("BUILD_INPUT_CHANGED");
             var bundle=snapshots.assemble(source,job.summary().templateDigest()).bundle();
             var store=new WorkspaceStore(paths);
-            execution.verifyUsage();
+            execution.verifyCapacity();
             var prepared=store.prepare(id,bundle);
             String archiveHash=BuildArtifacts.hash(BuildArtifacts.read(prepared.archive(),EngineeringZip.MAX_ZIP_BYTES));
             lifecycle.snapshot(id,executionId,bundle.bundleId(),archiveHash);
