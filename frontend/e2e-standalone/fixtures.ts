@@ -1,12 +1,11 @@
 import { lstatSync, readFileSync } from 'node:fs'
 import { isAbsolute } from 'node:path'
 import { test as base, expect, type Page } from '@playwright/test'
-import { startVerifiedRuntime } from '../../scripts/serve-standalone.mjs'
+import { startVerifiedRuntime, verifiedProject } from '../../scripts/serve-standalone.mjs'
 import { createDatabaseGate, databaseEvidence } from '../../scripts/standalone-database.mjs'
 
 // Explicit, local verification output only. No credentials or browser storage are serialized.
-export function readEvidence() {
-  const path = process.env.STANDALONE_VERIFICATION_REPORT
+export function readEvidence(path = process.env.STANDALONE_VERIFICATION_REPORT) {
   if (!path || !isAbsolute(path)) throw new Error('Explicit verification report required.')
   const stat = lstatSync(path)
   if (!stat.isFile() || stat.isSymbolicLink() || stat.size > 4096)
@@ -28,6 +27,7 @@ export function readEvidence() {
 
 type Runtime = {
   restart(): Promise<void>
+  withBuild(report: string, verify: () => Promise<void>): Promise<void>
   disconnectDatabase(): void
   reconnectDatabase(): void
   evidence(guest: string): ReturnType<typeof databaseEvidence>
@@ -54,18 +54,46 @@ export const test = base.extend<
         startVerifiedRuntime(process.env.STANDALONE_VERIFICATION_REPORT, gate.configPath)
       try {
         let owned = await start()
+        let switching: Promise<void> | undefined
         try {
           await use({
             restart: async () => {
               await owned.stop()
               owned = await start()
             },
+            withBuild: async (report, verify) => {
+              if (switching) throw new Error('Only one owned build transition is allowed.')
+              switching = (async () => {
+                if (readEvidence(report).baseURL !== readEvidence().baseURL)
+                  throw new Error('Upgrade must keep the original listener and configuration.')
+                await verifiedProject(report) // Validate before stopping the old child.
+                await owned.stop()
+                try {
+                  owned = await startVerifiedRuntime(report, gate.configPath)
+                  await verify()
+                } finally {
+                  await owned.stop()
+                  owned = await start()
+                }
+              })()
+              try {
+                await switching
+              } finally {
+                switching = undefined
+              }
+            },
             disconnectDatabase: gate.disconnect,
             reconnectDatabase: gate.reconnect,
             evidence: (guest) => databaseEvidence(process.env.STANDALONE_RUNTIME_CONFIG, guest),
           })
         } finally {
-          await owned.stop()
+          // A test can abort during an async route callback; do not remove the private
+          // database gate/config while an in-flight transition is restoring its child.
+          try {
+            await switching
+          } finally {
+            await owned.stop()
+          }
         }
       } finally {
         await gate.close()
