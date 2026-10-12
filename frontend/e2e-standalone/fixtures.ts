@@ -1,6 +1,6 @@
 import { lstatSync, readFileSync } from 'node:fs'
 import { isAbsolute } from 'node:path'
-import { test as base, expect } from '@playwright/test'
+import { test as base, expect, type Page } from '@playwright/test'
 import { startVerifiedRuntime } from '../../scripts/serve-standalone.mjs'
 
 // Explicit, local verification output only. No credentials or browser storage are serialized.
@@ -91,3 +91,40 @@ export const test = base.extend<
   ],
 })
 export { expect }
+
+export async function ready(page: Page) {
+  const [session] = await Promise.all([
+    page
+      .waitForResponse(
+        (response) =>
+          response.url().endsWith('/api/session') && response.request().method() === 'POST',
+      )
+      .then((response) => response.json()),
+    page.goto(readEvidence().baseURL + '/'),
+  ])
+  expect(session.isGuest).toBe(true)
+  expect(typeof session.userId).toBe('string')
+  const frame = page.frameLocator('iframe')
+  await expect(frame.locator('#status')).toHaveText('数据已读取。')
+  await expect(frame.getByRole('button', { name: '添加待办', exact: true })).toBeEnabled()
+  return session.userId as string
+}
+
+export async function add(page: Page, title: string) {
+  const frame = page.frameLocator('iframe')
+  await frame.getByLabel('新待办', { exact: true }).fill(title)
+  await frame.getByRole('button', { name: '添加待办', exact: true }).click()
+}
+
+export async function saved(page: Page) {
+  await expect(page.getByRole('status').filter({ hasText: '已保存到数据库' })).toBeVisible()
+  await expect(page.frameLocator('iframe').locator('#status')).toHaveText(
+    '已保存。刷新后数据仍在。',
+  )
+}
+
+export async function state(page: Page) {
+  const response = await page.context().request.get(readEvidence().baseURL + '/api/state')
+  expect(response.status()).toBe(200)
+  return response.json()
+}
