@@ -371,7 +371,7 @@
 
 ### WB05 · Java 与监督器生命周期契约（M）
 
-- [ ] 完成 WB05。依赖：WB04。
+- [x] 完成 WB05。依赖：WB04。Java worker 专用桥接器通过真实 Node 进程验证，严格有界帧/执行 UUID/阶段顺序校验，取消与总超时走控制管道并等待退出，未知结果不可回收槽位。新增测试先编译失败再通过，平台全单元 96 项通过；正式 runner/持久恢复接线分别归 WB13/WB16。
 - 描述：Java 持有自己启动的监督器句柄，校验消息并等待退出，不依赖旧 PID 恢复。
 - 文件：`W/NativeBuildProcess.java`、`W/BuildProcessResult.java`、`WT/NativeBuildProcessTest.java`、`scripts/workspace-supervisor.test.mjs`。
 - 验收：① 参数/资源入口不可由用户修改，协议帧有界且状态顺序合法；② stdout 假成功、提前退出、监督器被强杀均不产生成功或已取消假象；③ 退出未知会返回明确中断/需要核查状态，不能立即复用槽位。
