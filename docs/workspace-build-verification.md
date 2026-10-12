@@ -101,3 +101,23 @@
 - 固定命令树审计：npm ci 使用锁文件和 ignore-scripts；package.json 无 pre/post 脚本，typecheck/lint/build 为有限 CLI，vitest 明确 run；Maven wrapper 执行常规 Maven（非 mvnd），插件仅固定 Boot/Surefire/Failsafe 与标准生命周期，无 spring-boot:start 或 exec daemon。测试 Java/Node 子进程均在工具组内。[npm ci](https://docs.npmjs.com/cli/v11/commands/npm-ci/)、[Surefire fork](https://maven.apache.org/surefire/maven-surefire-plugin/examples/fork-options-and-parallel-execution.html)、[Vitest CLI](https://vitest.dev/guide/cli.html) 支持这些入口语义；具体未脱组仍须 WB18 真实执行检验。
 - 原生模式信任本机管理员及其 npm/Maven 配置和已安装工具，不读取/输出这些配置，不支持恶意本机同用户、任意依赖/插件或后台 daemon；不是 OS 沙箱。启动环境不传模型 Key/平台数据库密码，专用测试配置路径只传 Maven。
 - 可观测性问题：当前任务在哪一阶段、为何失败、旧进程是否收尾。持久受控事件回答前两项，执行 fence/settlement 回答第三项；后续调度日志只允许 buildId、executionId、entryPoint 和有限结果字段，禁止源码、凭据与原始工具输出。
+
+## WB14–WB17 · 执行闭环与边界修正（真实工程验收仍待 WB18）
+
+- JAR 验证器 2 项、真实 PG 生命周期 4 项、Worker 3 项和 Java→Node 控制 4 项通过；Worker 使用明确标注的小 JAR 夹具验证分支，不冒充 Maven 实际构建。
+- 调度生命周期 2 项、真实数据库协调租约 1 项、环境生命周期 2 项通过。只有取得根 OS 锁、数据库 session advisory lock 并完成旧任务中断处理后才开放准入；跨根共享同一平台 DB 也不能有两个协调器。
+- 构建归档 HTTP 2 项从缺少路由 RED 到 GREEN；冻结字节一致、陌生访客拒绝、未就绪/篡改均明确失败。新下载客户端/控件 6 项、工作台组件 4 项通过，类型/lint 通过。历史与当前构建按 buildId 下载，不重新组装。
+- 重启恢复真实 PG 1 项通过：缺失/不完整/错误执行 ID/未收尾/伪造错误码/硬链接报告均保留 fence；有效报告只解除占位，任务仍为 INTERRUPTED，不变成成功或重跑。实际父进程退出证据由现有监督套件及 WB18/WB19 补验。
+- 只读独立审查的 3 项发现全部接受：运行目录正常删除临时文件不再误判磁盘超限（仅容忍 NoSuchFile，3 项根锁/容量测试通过）；Node 接受 Java 传入的剩余绝对期限，不重置十分钟（独立截止测试 RED→GREEN，runner 总计 5 项通过）；退出报告改为独占创建单链接文件，读取未完整 JSON 时保持 fence，完成帧前 fsync，消除 hardlink/unlink 中断窗。不放宽链接检查或资源门槛。
+- 跨模型复核已询问，未获授权，未调用外部 CLI。当前为单模型只读审查与实际测试证据。
+- 一次平台完整回归因同时在同一 target 编译新测试导致 FixtureIT 的 TodoFixture 类暂时缺失（NoClassDefFoundError）；已停止这种并发方式，串行 FixtureIT 复验通过。该次完整回归不算通过，最终必须重新完整执行。
+
+- 后续串行完整 `./mvnw -B -DargLine=-Xmx256m verify` 已通过：**115 单元 + 77 集成，0 跳过**，耗时 3 分 02 秒；包含新增授权优先/容量错误分类的 RED→GREEN、真实恢复/归档/跨根租约，以及原生成/版本/发布/状态/导出回归。模型测试使用原有 stub，不是真实模型调用。
+
+## WB18 · 真实 API 构建与下载重建
+
+- `verify-workspace-build.mjs --config-dir .local/standalone --output-parent .local/standalone` 退出 0。本机证据保存在已忽略的 `.local/standalone/workspace-verification-TF0paR/verification.json`；buildId `e9c4ae02-f044-4568-9612-d946812b3db2`，实际 Worker 151,893 ms，所有阶段到 SUCCEEDED/COMPLETE，退出已确认。
+- 按 buildId 下载冻结 ZIP，111 文件 / 547,486 源码字节，在另一新目录冻结安装并完成脚本测试、前端检查、Maven verify、实际 JAR 资源检查。归档摘要 `ce3d6644ca6a415f2064fe5d5ee6e1c306ed3135a1e946fa35c06c3076cf7003` 与持久任务一致。
+- 原构建与 ZIP 重建实际运行身份同为 `7fd42cd3ae35dd48371eebe7cf90d1e6b82513e0dae1181201f7054dd5275fea`；JAR 二进制 hash 不同是构建时间等元数据差异，不冒充字节可复现构建。
+- 两个 JAR 在各自现有专用运行库启动，同一 Chrome context 中分别添加不同待办、刷新、逐一真实进程重启，数据和访客保持且互不串用。控制台 warning/error 与页面错误为空，人工查看两张截图确认 UI 和独立数据。Node 入口与直接 Java 启动都通过，测试只停止自有进程。
+- 验证器参数/成功合同与双实例 helper 的 3 项守卫测试通过。本次临时启动仅为验收，不是正式的实例管理或替换平台 iframe；未修改凭据、创建数据库、调用模型、推送或部署。
