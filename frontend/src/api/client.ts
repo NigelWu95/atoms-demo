@@ -26,6 +26,7 @@ type RequestOptions = {
   method?: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE'
   body?: unknown
   idempotencyKey?: string
+  signal?: AbortSignal
 }
 export type Csrf = { token: string; headerName: string }
 
@@ -92,6 +93,7 @@ export function createApiClient() {
     decode: (value: unknown) => T,
     options: RequestOptions = {},
   ): Promise<T> {
+    options.signal?.throwIfAborted()
     const method = options.method ?? 'GET'
     const headers: Record<string, string> = { Accept: 'application/json' }
     if (method !== 'GET') {
@@ -107,10 +109,13 @@ export function createApiClient() {
         headers,
         credentials: 'same-origin',
         cache: 'no-store',
-        signal: AbortSignal.timeout(10000),
+        signal: options.signal
+          ? AbortSignal.any([options.signal, AbortSignal.timeout(10000)])
+          : AbortSignal.timeout(10000),
         body: options.body === undefined ? undefined : JSON.stringify(options.body),
       })
     } catch {
+      options.signal?.throwIfAborted()
       throw new ApiFailure(
         'NETWORK_ERROR',
         '连接中断，操作结果尚不确定。请保留输入并重试。',
@@ -119,14 +124,17 @@ export function createApiClient() {
         true,
       )
     }
+    options.signal?.throwIfAborted()
     if (response.status === 204) return decode(undefined)
     let body: unknown
     try {
       body = await response.json()
     } catch {
+      options.signal?.throwIfAborted()
       if (response.ok) return protocolFailure()
       body = null
     }
+    options.signal?.throwIfAborted()
     if (!response.ok) return failHttp(response, body)
     return decode(body)
   }

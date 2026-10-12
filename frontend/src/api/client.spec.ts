@@ -5,6 +5,41 @@ afterEach(() => vi.unstubAllGlobals())
 const decode = (value: unknown) => value
 
 describe('HTTP boundary', () => {
+  it('does not apply an old session error after its caller aborts', async () => {
+    let finish!: (response: Response) => void
+    const fetch = vi
+      .fn()
+      .mockImplementationOnce(
+        () =>
+          new Promise<Response>((resolve) => {
+            finish = resolve
+          }),
+      )
+      .mockResolvedValue(Response.json({ ok: true }))
+    vi.stubGlobal('fetch', fetch)
+    const client = createApiClient()
+    const invalidated = vi.fn()
+    client.onSessionFailure(invalidated)
+    const controller = new AbortController()
+    const request = client.request('/api/old-project', decode, { signal: controller.signal })
+    controller.abort()
+    client.setCsrf({ token: 'new-test-token', headerName: 'X-CSRF-TOKEN' })
+    finish(Response.json({ error: { code: 'SESSION_REQUIRED' } }, { status: 403 }))
+    await expect(request).rejects.toMatchObject({ name: 'AbortError' })
+    expect(invalidated).not.toHaveBeenCalled()
+    await client.request('/api/new-project', decode, { method: 'POST', body: {} })
+    expect(fetch.mock.calls[1]![1].headers['X-CSRF-TOKEN']).toBe('new-test-token')
+  })
+  it('refuses an already-aborted JSON request without starting network work', async () => {
+    const fetch = vi.fn()
+    vi.stubGlobal('fetch', fetch)
+    const controller = new AbortController()
+    controller.abort()
+    await expect(
+      createApiClient().request('/api/builds', decode, { signal: controller.signal }),
+    ).rejects.toMatchObject({ name: 'AbortError' })
+    expect(fetch).not.toHaveBeenCalled()
+  })
   it('decodes an empty 204 DELETE response without weakening JSON response validation', async () => {
     const fetch = vi.fn().mockResolvedValue(new Response(null, { status: 204 }))
     vi.stubGlobal('fetch', fetch)
