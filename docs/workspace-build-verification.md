@@ -92,3 +92,12 @@
 - ArtifactPanel 接入独立构建区：选中版本、提交/取消/刷新、原意图确认、受控阶段与近期历史；成功明确“构建完成，实例预览尚未接入”。没有变更 PreviewFrame、生成输入或发布状态。
 - 新组件 4 项由缺失模块失败转通过，连同旧恢复组件 4 项通过；全前端单元 **147 项通过（单 worker，109 秒）**，lint、格式、生产构建通过。实际浏览器、键盘/axe 与真实构建仍待后续闭环，不把组件夹具当作成功 JAR。
 - 磁盘可用空间在约 0.4–3.6 GiB 之间波动；没有清理用户文件、降低门槛或扩大预算。真实工程执行前会重新核验。
+
+## WB13 · 固定流程与可信入口
+
+- 平台通过内部 `run/onStage` 回调复用 ZIP 中的同一 build.mjs；6 项模板脚本测试通过。新入口只读取 Java 物化/验证过的固定脚本，工具输出丢弃，仅输出受控阶段/错误码；不存在用户命令参数。
+- 真实 Node runner 4 项由文件缺失 RED 到 GREEN：正常子进程、取消、父管道 EOF、错误原文排除与伪造运行指纹拒绝。结束前独占写入并同步本次 executionId 的 settlement，只有全部工具组收尾后才可标记 settled。此证据不是实际工程 JAR 构建。
+- 清单仍为 106 文件，实测 526,400 字节，最大文件 121,072 字节；现有 128 文件/2 MiB 单文件/8 MiB 总量及 600 KiB 模板维护预算不变。
+- 固定命令树审计：npm ci 使用锁文件和 ignore-scripts；package.json 无 pre/post 脚本，typecheck/lint/build 为有限 CLI，vitest 明确 run；Maven wrapper 执行常规 Maven（非 mvnd），插件仅固定 Boot/Surefire/Failsafe 与标准生命周期，无 spring-boot:start 或 exec daemon。测试 Java/Node 子进程均在工具组内。[npm ci](https://docs.npmjs.com/cli/v11/commands/npm-ci/)、[Surefire fork](https://maven.apache.org/surefire/maven-surefire-plugin/examples/fork-options-and-parallel-execution.html)、[Vitest CLI](https://vitest.dev/guide/cli.html) 支持这些入口语义；具体未脱组仍须 WB18 真实执行检验。
+- 原生模式信任本机管理员及其 npm/Maven 配置和已安装工具，不读取/输出这些配置，不支持恶意本机同用户、任意依赖/插件或后台 daemon；不是 OS 沙箱。启动环境不传模型 Key/平台数据库密码，专用测试配置路径只传 Maven。
+- 可观测性问题：当前任务在哪一阶段、为何失败、旧进程是否收尾。持久受控事件回答前两项，执行 fence/settlement 回答第三项；后续调度日志只允许 buildId、executionId、entryPoint 和有限结果字段，禁止源码、凭据与原始工具输出。

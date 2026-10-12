@@ -467,6 +467,8 @@
 
 ### WB14 · 队列到真实构建产物（M）
 
+实施拆片：WB14a JAR 实际资源与报告校验（验证器/测试，2 文件）；WB14b 持久领取/阶段/完成（生命周期服务/真实 PG 测试，2 文件）；WB14c Worker 与进程启动前取消（Worker/测试/NativeBuildProcess/测试，4 文件）；WB14d 生命周期调度、跨根 DB 租约与准入就绪（Scheduler/租约/环境/测试，最多 5 文件）。恢复证明解析与报告边界和 WB16 共用，不扩展到应用实例启动。
+
 - [ ] 完成 WB14。依赖：WB13、WB03、WB08–WB10。
 - 描述：领取任务、准备冻结快照、监督执行并验证 JAR，写入真实结果。
 - 文件：`W/BuildWorker.java`、`W/BuildScheduler.java`、`W/BuildRepository.java`、`W/BuildArtifacts.java`、`WT/BuildWorkerTest.java`。
