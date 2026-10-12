@@ -1,61 +1,59 @@
 import { createHash } from 'node:crypto';
-import { constants } from 'node:fs';
-import { lstat, open, realpath, mkdtemp, mkdir, writeFile } from 'node:fs/promises';
+import { realpath, mkdtemp, mkdir, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { buildInputsHash, listFiles, readBounded } from './build-inputs.mjs';
 
 export const RESOURCE_PATHS = Object.freeze([
   'application/main.js', 'application/manifest.json', 'application/styles.css', 'application/view.html',
   'runtime/bootstrap.js', 'runtime/document.html',
 ]);
 
-// Format v1: domain prefix, then sorted UTF-8 path + NUL + decimal byte length + NUL + bytes.
+// Format v2 adds the actual frontend outputs and a digest of controlled compilation inputs.
+// Domain prefix, then sorted UTF-8 path + NUL + decimal byte length + NUL + bytes.
 // Hash actual packaged bytes, never mtimes, absolute paths, instance IDs or source-version metadata.
 export function runtimeId(files) {
-  if (Object.keys(files).sort().join('\n') !== RESOURCE_PATHS.join('\n')) throw new Error('Invalid resource set.');
-  const hash = createHash('sha256').update('atoms-runtime-content-v1\0');
-  for (const path of RESOURCE_PATHS) {
+  const paths = [...RESOURCE_PATHS, 'runtime/build.txt', ...staticPaths(files['runtime/build.txt'])].sort();
+  if (Object.keys(files).sort().join('\n') !== paths.join('\n')) throw new Error('Invalid resource set.');
+  const hash = createHash('sha256').update('atoms-runtime-content-v2\0');
+  let total = 0;
+  for (const path of paths) {
     if (!Buffer.isBuffer(files[path])) throw new Error('Expected resource bytes.');
+    total += files[path].length;
+    if (files[path].length > 2 * 1024 * 1024 || total > 8 * 1024 * 1024) throw new Error('Runtime resources exceed limits.');
     hash.update(`${path}\0${files[path].length}\0`).update(files[path]);
   }
   return hash.digest('hex');
 }
 
-async function readResource(root, path) {
-  const relative = path.startsWith('application/') ? path : `backend/src/main/resources/${path}`;
-  let current = root;
-  for (const segment of relative.split('/')) {
-    current = join(current, segment);
-    if ((await lstat(current)).isSymbolicLink()) throw new Error('Symbolic links are not application resources.');
-  }
-  const limit = path.endsWith('manifest.json') ? 272 * 1024 : 120 * 1024;
-  // Local builds assume the project tree is not concurrently rewritten by another user.
-  // O_NOFOLLOW + bounded descriptor reads also reject final-component links and growing files.
-  // https://nodejs.org/docs/latest-v24.x/api/fs.html#fspromisesopenpath-flags-mode
-  const file = await open(current, constants.O_RDONLY | constants.O_NOFOLLOW);
-  try {
-    const stat = await file.stat();
-    if (!stat.isFile() || stat.size > limit) throw new Error('Invalid resource size or type.');
-    const buffer = Buffer.alloc(limit + 1);
-    let size = 0;
-    while (size < buffer.length) {
-      const { bytesRead } = await file.read(buffer, size, buffer.length - size, null);
-      if (!bytesRead) break;
-      size += bytesRead;
-    }
-    if (size > limit) throw new Error('Resource exceeds size limit.');
-    const bytes = buffer.subarray(0, size);
-    if (new TextDecoder('utf-8', { fatal: true }).decode(bytes).includes('\0')) throw new Error('Invalid resource text.');
-    return bytes;
-  } finally { await file.close(); }
+export function staticPaths(index) {
+  if (!Buffer.isBuffer(index) || index.length > 8192) throw new Error('Missing runtime build index.');
+  const [inputsHash, ...paths] = new TextDecoder('utf-8', { fatal: true }).decode(index).split('\n');
+  if (paths.pop() !== '' || !/^[a-f0-9]{64}$/.test(inputsHash) || paths.length > 64
+      || !paths.includes('static/index.html') || !paths.some(path => /^static\/assets\/[^/]+\.js$/.test(path))
+      || paths.some(path => !/^static\/(?:index\.html|favicon\.svg|assets\/[a-zA-Z0-9_-]+\.(?:js|css))$/.test(path))
+      || new Set(paths.map(path => path.toLowerCase())).size !== paths.length
+      || [...paths].sort().join('\n') !== paths.join('\n')) throw new Error('Invalid static resource index.');
+  return paths;
+}
+
+export async function collectResources(root) {
+  const files = {};
+  for (const path of RESOURCE_PATHS) files[path] = await readBounded(root,
+    path.startsWith('application/') ? path : `backend/src/main/resources/${path}`,
+    path.endsWith('manifest.json') ? 272 * 1024 : 120 * 1024);
+  if (['main.js', 'styles.css', 'view.html'].reduce((size, name) => size + files[`application/${name}`].length, 0) > 120 * 1024)
+    throw new Error('Application source exceeds size limit.');
+  const paths = (await listFiles(root, 'frontend/dist', 64)).map(path => path.replace('frontend/dist/', 'static/'));
+  files['runtime/build.txt'] = Buffer.from(await buildInputsHash(root) + '\n' + paths.join('\n') + '\n');
+  for (const path of staticPaths(files['runtime/build.txt']))
+    files[path] = await readBounded(root, path.replace('static/', 'frontend/dist/'));
+  return files;
 }
 
 export async function packageApplication(projectRoot, outputParent) {
   const root = await realpath(resolve(projectRoot));
-  const files = {};
-  for (const path of RESOURCE_PATHS) files[path] = await readResource(root, path);
-  if (['main.js', 'styles.css', 'view.html'].reduce((size, name) => size + files[`application/${name}`].length, 0) > 120 * 1024)
-    throw new Error('Application source exceeds size limit.');
+  const files = await collectResources(root);
   const loadedRuntimeId = runtimeId(files);
   // Never overwrite an existing build or delete a caller-selected directory.
   const directory = await mkdtemp(join(await realpath(resolve(outputParent)), 'application-resources-'));

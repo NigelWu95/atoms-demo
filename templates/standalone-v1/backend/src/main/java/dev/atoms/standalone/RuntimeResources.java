@@ -9,7 +9,8 @@ import java.util.HashMap;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
+import java.util.Arrays;
+import java.util.TreeSet;
 import java.util.function.Function;
 
 /** Bounded immutable classpath inputs. The build fingerprint is checked against the loaded bytes. */
@@ -24,6 +25,14 @@ record RuntimeResources(ApplicationArtifactLoader.Artifact artifact, String boot
         var files = new HashMap<String, byte[]>();
         for (String path : PATHS) files.put(path, read(resources, path,
                 path.endsWith("manifest.json") ? 272 * 1024 : 120 * 1024));
+        files.put("runtime/build.txt", read(resources, "runtime/build.txt", 8192));
+        int total = files.values().stream().mapToInt(bytes -> bytes.length).sum();
+        for (String path : staticPaths(files.get("runtime/build.txt"))) {
+            byte[] bytes = read(resources, path, 2 * 1024 * 1024);
+            total += bytes.length;
+            if (total > 8 * 1024 * 1024) throw ApplicationArtifactLoader.invalid();
+            files.put(path, bytes);
+        }
         String expected = ApplicationArtifactLoader.utf8(read(resources, "runtime/content.sha256", 65));
         String actual = contentId(files);
         if (!(actual + "\n").equals(expected)) throw ApplicationArtifactLoader.invalid();
@@ -35,18 +44,37 @@ record RuntimeResources(ApplicationArtifactLoader.Artifact artifact, String boot
     }
 
     static String contentId(Map<String, byte[]> files) {
-        if (!files.keySet().equals(Set.copyOf(PATHS))) throw ApplicationArtifactLoader.invalid();
+        var paths = new TreeSet<>(PATHS);
+        paths.add("runtime/build.txt");
+        paths.addAll(staticPaths(files.get("runtime/build.txt")));
+        if (!files.keySet().equals(paths)) throw ApplicationArtifactLoader.invalid();
         try {
             var hash = MessageDigest.getInstance("SHA-256");
-            hash.update("atoms-runtime-content-v1\0".getBytes(StandardCharsets.UTF_8));
-            for (String path : PATHS) {
+            hash.update("atoms-runtime-content-v2\0".getBytes(StandardCharsets.UTF_8));
+            int total = 0;
+            for (String path : paths) {
                 byte[] bytes = files.get(path);
-                if (bytes == null) throw ApplicationArtifactLoader.invalid();
+                if (bytes == null || bytes.length > 2 * 1024 * 1024) throw ApplicationArtifactLoader.invalid();
+                total += bytes.length;
+                if (total > 8 * 1024 * 1024) throw ApplicationArtifactLoader.invalid();
                 hash.update((path + "\0" + bytes.length + "\0").getBytes(StandardCharsets.UTF_8));
                 hash.update(bytes);
             }
             return HexFormat.of().formatHex(hash.digest());
         } catch (NoSuchAlgorithmException error) { throw new IllegalStateException("SHA-256 is unavailable."); }
+    }
+
+    static List<String> staticPaths(byte[] index) {
+        if (index == null || index.length > 8192) throw ApplicationArtifactLoader.invalid();
+        String[] lines = ApplicationArtifactLoader.utf8(index).split("\n", -1);
+        if (lines.length < 4 || lines.length > 66 || !lines[0].matches("[a-f0-9]{64}")
+                || !lines[lines.length - 1].isEmpty()) throw ApplicationArtifactLoader.invalid();
+        var paths = Arrays.asList(lines).subList(1, lines.length - 1);
+        if (!paths.contains("static/index.html") || paths.stream().noneMatch(path -> path.matches("static/assets/[^/]+\\.js"))
+                || paths.stream().anyMatch(path -> !path.matches("static/(index\\.html|favicon\\.svg|assets/[a-zA-Z0-9_-]+\\.(js|css))"))
+                || paths.stream().map(path -> path.toLowerCase(java.util.Locale.ROOT)).distinct().count() != paths.size()
+                || !paths.equals(paths.stream().sorted().toList())) throw ApplicationArtifactLoader.invalid();
+        return List.copyOf(paths);
     }
 
     private static byte[] read(Function<String, InputStream> resources, String path, int max) {

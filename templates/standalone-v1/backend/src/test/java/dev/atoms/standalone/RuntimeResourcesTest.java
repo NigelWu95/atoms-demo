@@ -16,7 +16,10 @@ class RuntimeResourcesTest {
     @Test void matchesTheNodePackagingVector() {
         var files = new HashMap<String, byte[]>();
         for (String path : RuntimeResources.PATHS) files.put(path, ApplicationArtifactTest.bytes("content:" + path));
-        assertThat(RuntimeResources.contentId(files)).isEqualTo("f9eda96f9b15e0936f229edf0b5aebfc0d198f26adeb150e67155bd900eef69d");
+        files.put("runtime/build.txt", ApplicationArtifactTest.bytes("0".repeat(64) + "\nstatic/assets/app.js\nstatic/index.html\n"));
+        files.put("static/assets/app.js", ApplicationArtifactTest.bytes("content:static/assets/app.js"));
+        files.put("static/index.html", ApplicationArtifactTest.bytes("content:static/index.html"));
+        assertThat(RuntimeResources.contentId(files)).isEqualTo("0fa33afd622b8bc672fff7d64aff4a41a67fdebf016bfca4fa4cc04d3c324fbf");
     }
     @Test void loadsPackagedBytesAndRejectsMissingOrStaleFingerprint() throws Exception {
         var files = fixture();
@@ -39,5 +42,17 @@ class RuntimeResourcesTest {
         var files = fixture();
         files.put("application/main.js", new byte[400 * 1024]);
         assertThatThrownBy(() -> load(files)).isInstanceOf(IllegalArgumentException.class);
+    }
+    @Test void rejectsInvalidStaticIndexesAndRechecksEveryPackagedFrontendByte() throws Exception {
+        var original = fixture();
+        for (String index : new String[]{"0".repeat(64) + "\n../escape\n", "0".repeat(64) + "\nstatic/index.html\n",
+                "0".repeat(64) + "\nstatic/assets/app.js\nstatic/index.html\nstatic/index.html\n", "bad hash\n"}) {
+            var files = new HashMap<>(original);
+            files.put("runtime/build.txt", ApplicationArtifactTest.bytes(index));
+            assertThatThrownBy(() -> load(files)).isInstanceOf(IllegalArgumentException.class);
+        }
+        var changed = new HashMap<>(original);
+        changed.put("static/index.html", ApplicationArtifactTest.bytes("changed shell"));
+        assertThatThrownBy(() -> load(changed)).isInstanceOf(IllegalArgumentException.class);
     }
 }
