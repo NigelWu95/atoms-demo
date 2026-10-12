@@ -71,6 +71,7 @@ export function createApiClient() {
         } catch {
           // HTML, invalid JSON or oversized errors still retain HTTP/session semantics.
         }
+        callerSignal.throwIfAborted()
         return failHttp(response, body)
       }
       return {
