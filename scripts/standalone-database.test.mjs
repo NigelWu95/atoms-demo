@@ -5,7 +5,7 @@ import { createServer, createConnection } from 'node:net';
 import { mkdtemp, writeFile, readFile, stat, symlink, readdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createDatabaseGate, databaseEvidence } from './standalone-database.mjs';
+import { createDatabaseGate, databaseEvidence, withMismatchedInstallation } from './standalone-database.mjs';
 
 function config(port) {
   return `STANDALONE_DB_URL=jdbc:postgresql://127.0.0.1:${port}/atoms_standalone_a
@@ -86,4 +86,29 @@ test('read-only evidence refuses application input and non-fixture targets befor
   const path = join(work, 'runtime.properties');
   await writeFile(path, config(5432).replaceAll('atoms_standalone_a', 'atoms_demo'), { mode: 0o600 });
   await assert.rejects(databaseEvidence(path, '12345678-1234-4234-9234-123456789abc'), /private fixture/);
+});
+
+test('installation mismatch changes only an owned private copy and cleans it after failure', async () => {
+  const work = await mkdtemp(join(tmpdir(), 'installation-config-'));
+  const path = join(work, 'runtime.properties');
+  const original = '# Keep APP_INSTANCE_ID=12345678-1234-4234-9234-123456789abc in comments unchanged\n' + config(5432);
+  await writeFile(path, original, { mode: 0o600 });
+  let temporary;
+  await assert.rejects(withMismatchedInstallation(path, async copy => {
+    temporary = copy;
+    const text = await readFile(copy, 'utf8');
+    const instance = text.match(/^APP_INSTANCE_ID=(.*)$/m)[1];
+    assert.match(instance, /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/);
+    assert.notEqual(instance, '12345678-1234-4234-9234-123456789abc');
+    assert.equal(text.replace(instance, '12345678-1234-4234-9234-123456789abc'), original);
+    assert.equal((await stat(copy)).mode & 0o777, 0o600);
+    throw new Error('expected verification failure');
+  }), /expected verification failure/);
+  await assert.rejects(stat(temporary), { code: 'ENOENT' });
+  assert.deepEqual(await readdir(work), ['runtime.properties']);
+  assert.equal(await readFile(path, 'utf8'), original);
+  assert.equal(await withMismatchedInstallation(path, async () => 'verified'), 'verified');
+  assert.deepEqual(await readdir(work), ['runtime.properties']);
+  await writeFile(path, original.replaceAll('atoms_standalone_a', 'atoms_demo'), { mode: 0o600 });
+  await assert.rejects(withMismatchedInstallation(path, () => assert.fail('must reject before action')), /private fixture/);
 });
