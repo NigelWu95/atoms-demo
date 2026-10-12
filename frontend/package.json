@@ -15,12 +15,13 @@
     "test:unit": "vitest run",
     "test:e2e": "playwright test",
     "test:e2e:runtime": "playwright test --config playwright.runtime.config.ts",
+    "test:e2e:workspace": "playwright test --config playwright.workspace.config.ts",
     "test:e2e:live": "playwright test --config playwright.live.config.ts",
     "test:e2e:release": "playwright test --config playwright.release.config.ts",
     "build": "vite build",
     "preview": "vite preview --host 127.0.0.1",
-    "lint": "eslint src vite.config.ts playwright*.config.ts e2e e2e-runtime e2e-live e2e-release",
-    "format:check": "prettier --check src *.ts *.json *.js index.html e2e e2e-runtime e2e-live e2e-release",
+    "lint": "eslint src vite.config.ts playwright*.config.ts e2e e2e-runtime e2e-live e2e-release e2e-workspace",
+    "format:check": "prettier --check src *.ts *.json *.js index.html e2e e2e-runtime e2e-live e2e-release e2e-workspace",
     "format": "prettier --write src *.ts *.json *.js index.html e2e e2e-runtime e2e-live e2e-release"
   },
   "dependencies": {
