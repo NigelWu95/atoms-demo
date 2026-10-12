@@ -415,7 +415,7 @@
 
 ### WB09 · 状态与有界事件读取（M）
 
-- [ ] 完成 WB09。依赖：WB08。
+- [x] 完成 WB09。依赖：WB08。详情、稳定游标列表和有界事件接口完成；2 项真实 HTTP/PG 测试由缺 GET 路由失败转通过，覆盖陌生会话、混项目、字段排除和分页边界。
 - 描述：提供持久化列表、详情和事件游标读取，供刷新恢复和排查使用。
 - 文件：`W/BuildQueryService.java`、`W/BuildController.java`、`W/BuildRepository.java`、`WT/BuildQueryIT.java`。
 - 验收：① 列表分页稳定，事件 seq 单调且限额执行，不由客户端推断终态；② 陌生访客与混用项目/buildId 均 404；③ DTO 不返回文件路径/PID/命令/raw 输出，错误含 requestId。
