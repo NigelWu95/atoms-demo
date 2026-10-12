@@ -134,6 +134,10 @@ public final class TestApplication {
                 resources.put(path, stream.readAllBytes());
             } catch (IOException error) { throw new IllegalStateException("Test runtime resource could not be read."); }
         }
+        // Minimal shell bytes for backend contract tests, not a production fallback or Vue build.
+        resources.put("runtime/build.txt", bytes("0".repeat(64) + "\nstatic/assets/app.js\nstatic/index.html\n"));
+        resources.put("static/assets/app.js", bytes("console.log('test shell');"));
+        resources.put("static/index.html", bytes("<!doctype html><html><head><title>Test shell</title></head><body>Shell fixture</body></html>"));
         resources.put("runtime/content.sha256", bytes(RuntimeResources.contentId(resources) + "\n"));
         return resources;
     }

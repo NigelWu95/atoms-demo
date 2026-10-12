@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, readFile, writeFile, symlink, utimes } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, writeFile, symlink, utimes, unlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import test from 'node:test';
 import { packageApplication, runtimeId, RESOURCE_PATHS } from './package-application.mjs';
 
@@ -10,6 +10,12 @@ async function fixture() {
   await mkdir(join(root, 'application'));
   await mkdir(join(root, 'backend/src/main/resources/runtime'), { recursive: true });
   for (const path of RESOURCE_PATHS) await writeFile(source(root, path), `content:${path}`);
+  for (const path of ['backend/pom.xml', 'frontend/package.json', 'frontend/package-lock.json',
+    'backend/src/main/java/dev/atoms/standalone/StandaloneApplication.java',
+    'backend/src/main/resources/application.yml', 'frontend/dist/index.html', 'frontend/dist/assets/app.js']) {
+    await mkdir(dirname(join(root, path)), { recursive: true });
+    await writeFile(join(root, path), `content:${path}`);
+  }
   return root;
 }
 const source = (root, path) => join(root, path.startsWith('application/') ? path : `backend/src/main/resources/${path}`);
@@ -51,7 +57,41 @@ test('missing, symlinked, oversized and malformed UTF-8 resources fail closed', 
 
 test('runtime identity has a fixed cross-language framing, order and input allowlist', () => {
   const files = Object.fromEntries(RESOURCE_PATHS.map(path => [path, Buffer.from(`content:${path}`)]));
-  assert.equal(runtimeId(files), 'f9eda96f9b15e0936f229edf0b5aebfc0d198f26adeb150e67155bd900eef69d');
+  files['runtime/build.txt'] = Buffer.from('0'.repeat(64) + '\nstatic/assets/app.js\nstatic/index.html\n');
+  files['static/assets/app.js'] = Buffer.from('content:static/assets/app.js');
+  files['static/index.html'] = Buffer.from('content:static/index.html');
+  assert.equal(runtimeId(files), '0fa33afd622b8bc672fff7d64aff4a41a67fdebf016bfca4fa4cc04d3c324fbf');
   assert.equal(runtimeId(Object.fromEntries(Object.entries(files).reverse())), runtimeId(files));
   assert.throws(() => runtimeId({ ...files, '../escape': Buffer.from('x') }));
+});
+
+test('frontend bytes and controlled source inputs participate in the final identity', async () => {
+  const root = await fixture();
+  const first = await packageApplication(root, tmpdir());
+  for (const path of ['frontend/dist/assets/app.js', 'frontend/dist/index.html', 'backend/pom.xml']) {
+    await writeFile(join(root, path), 'changed');
+    assert.notEqual((await packageApplication(root, tmpdir())).loadedRuntimeId, first.loadedRuntimeId);
+    await writeFile(join(root, path), `content:${path}`);
+  }
+  const files = {};
+  for (const path of [...RESOURCE_PATHS, 'runtime/build.txt', 'static/assets/app.js', 'static/index.html'])
+    files[path] = await readFile(join(first.directory, path));
+  assert.equal(runtimeId(files), first.loadedRuntimeId);
+  assert.throws(() => runtimeId({ ...files, 'static/unlisted.js': Buffer.from('unlisted') }));
+  const malformed = { ...files, 'runtime/build.txt': Buffer.from('0'.repeat(64) + '\n../escape\n') };
+  assert.throws(() => runtimeId(malformed));
+});
+
+test('missing or unexpected frontend outputs cannot become successful packages', async () => {
+  for (const path of ['frontend/dist/index.html', 'frontend/dist/assets/app.js']) {
+    const root = await fixture(); await unlink(join(root, path));
+    await assert.rejects(packageApplication(root, tmpdir()));
+  }
+  for (const path of ['frontend/dist/.env', 'frontend/dist/assets/app.js.map', 'frontend/dist/secrets.properties']) {
+    const root = await fixture(); await writeFile(join(root, path), 'SECRET_CANARY');
+    await assert.rejects(packageApplication(root, tmpdir()));
+  }
+  const root = await fixture();
+  await symlink(join(root, 'frontend/package.json'), join(root, 'frontend/dist/assets/link.js'));
+  await assert.rejects(packageApplication(root, tmpdir()));
 });
