@@ -1,7 +1,9 @@
-# engineering-bundle · 开发任务
+# 独立工程导出与运行 · 开发任务
+
+当前续作：`workspace-build` 规格已于 2026-10-13 获批；[WB01–WB21](#workspace-build-执行任务) 为待评审执行清单，均未实施。下方 EB/PE 历史记录和未完成的 C-EB11 保持原状。
 
 状态：2026-10-13，EB01–EB25、C-EB10 与新增 PE01–PE05 已实现并完成本地验证；工作台可以下载当前/历史版本工程。真实下载包的新目录构建和完整独立 Chrome 23 项通过，无重试；原平台全回归通过。C-EB11 用户人工验收仍未完成。仅本地功能分支提交，未合并、推送或部署。下文早期检查点保留当时状态，以此处和最后的 PE 记录为最新状态。
-依据：[计划及验证命令](plan.md)、[已批准规格](../SPEC-engineering-bundle.md)。本清单只负责 `engineering-bundle`；原平台任务清单不变。
+依据：[计划及验证命令](plan.md)、[已批准工程规格](../SPEC-engineering-bundle.md)。本清单记录独立工程方向的 EB/PE/WB 模块；原平台任务清单不变。
 
 路径缩写：`P/` = `backend/src/main/java/dev/atoms/demo/engineering/`；`PT/` = 对应平台 `src/test/java/dev/atoms/demo/engineering/`；`T/` = `templates/standalone-v1/`；`B/` = `T/backend/src/main/java/dev/atoms/standalone/`；`BT/` = 对应模板 `src/test/java/dev/atoms/standalone/`；`R/` = `T/backend/src/main/resources/`；`F/` = `T/frontend/src/`。各路径的实现进度以下列任务勾选及切片记录为准。
 
@@ -324,3 +326,205 @@
 ### C-EB11 · 人工模块验收
 
 - [ ] 审阅规格对照、工程样例、独立运行证据与原平台回归。用户于 2026-10-12 另行授权 `project-export` 一次完成，不再以此项阻塞下载开发；人工评审本身仍未完成。合并/推送/部署不包含在自动操作中。
+
+## workspace-build 执行任务
+
+状态：规格已批准，以下细化任务待评审，尚未开发或执行 V011。依据：[扩展计划](plan.md#7-workspace-build-扩展计划)、[规格](../SPEC-workspace-build.md)。一次批准后连续推进，不要求逐任务批准；检查点用于提供证据及处理失败，不代表自动授权扩展范围。
+
+新增缩写：`W/` = `backend/src/main/java/dev/atoms/demo/workspace/`；`WT/` = 对应 `backend/src/test/java/dev/atoms/demo/workspace/`；`WR/` = `backend/src/main/resources/workspace/`；`PF/` = `frontend/src/`。原 P/PT/T 缩写不变。验证命令 W-U/W-I/W-P/W-F/W-X/W-E/W-R 见计划 §7.4；新增类名和脚本名是拟定落点。每项至多五个主要文件，若实际超出先拆子任务，不省测试。所有完成框保持空白直到存在本轮证据。
+
+### WB01 · 统一授权快照入口（M）
+
+- [ ] 完成 WB01。依赖：用户批准扩展计划。
+- 描述：让构建与原工程下载复用授权版本读取和模板内容摘要，避免分别组装。
+- 文件：`P/EngineeringSnapshotService.java`、`P/EngineeringExportService.java`、`P/TemplateSnapshot.java`、`PT/EngineeringSnapshotServiceTest.java`、`PT/EngineeringExportIT.java`。
+- 验收：① 同一来源与模板字节得到稳定标识，模板改一字节即变；② 越权在组装前失败，客户端不能选择模板；③ 原下载归档、错误与并发语义不变。
+- 验证：W-U `EngineeringSnapshotServiceTest`，W-I `EngineeringExportIT`；先写摘要漂移与越权失败测试。
+
+### WB02 · 私有目录物化（M）
+
+- [ ] 完成 WB02。依赖：WB01。
+- 描述：将可信工程文件在服务端派生的新任务目录中物化，不接收浏览器路径。
+- 文件：`W/WorkspacePaths.java`、`W/WorkspaceStore.java`、`WT/WorkspacePathsTest.java`、`WT/WorkspaceStoreTest.java`。
+- 验收：① 拒绝系统/home/仓库根、符号链接祖先、非私有目录和已存在任务目标；② UUID 派生路径与固定文件白名单生效，目录/敏感文件权限正确；③ 失败不覆盖已有文件或递归删除未知内容。
+- 验证：W-U `WorkspacePathsTest,WorkspaceStoreTest`；临时目录检查穿越、祖先替换、同 ID 并发和外部 canary 文件未变。
+
+### WB03 · 冻结 ZIP 与源文件复验（M）
+
+- [ ] 完成 WB03。依赖：WB02。
+- 描述：保存一次生成的源 ZIP，支持按已知摘要读取与构建前后核验。
+- 文件：`W/WorkspaceStore.java`、`W/BuildArtifacts.java`、`WT/WorkspaceStoreTest.java`、`WT/BuildArtifactsTest.java`。
+- 验收：① 原始 ZIP 与物化源逐项对应，临时写入未完成时不能读成有效快照；② 128/2 MiB/8 MiB/9 MiB 配额及文件类型复验生效；③ 源文件篡改、归档被替换或缺失明确拒绝，不重新组装替代。
+- 验证：W-U `WorkspaceStoreTest,BuildArtifactsTest`；边界超出一字节、摘要篡改和构建输出目录排除测试。
+
+### C-WB01 · 快照边界
+
+- [ ] WB01–WB03 定向测试与平台构建通过；记录真实文件大小、权限、原下载回归及失败修复。向用户展示“冻结一次”的证据，不宣称已有自动构建。
+
+### WB04 · 可信本机监督器（M）
+
+- [ ] 完成 WB04。依赖：C-WB01。
+- 描述：实现随平台发布的固定进程监督入口，先使用无副作用仓库夹具验证生命周期。
+- 文件：`WR/supervisor.mjs`、`WR/protocol.mjs`、`scripts/workspace-supervisor.test.mjs`、`scripts/fixtures/workspace-child.mjs`。
+- 验收：① 固定 argv、受限环境、可信控制消息与不可信输出分离；② 取消、10 分钟策略的缩短测试时钟、父连接 EOF 能清理自有子孙进程，确认退出后完成；③ 超量输出持续排空且有界，外部对照进程不被终止。
+- 验证：W-P；取消宽限/超时用可注入测试时钟缩短，不改正式预算；正常及被强杀父进程均做真实进程测试。
+
+### WB05 · Java 与监督器生命周期契约（M）
+
+- [ ] 完成 WB05。依赖：WB04。
+- 描述：Java 持有自己启动的监督器句柄，校验消息并等待退出，不依赖旧 PID 恢复。
+- 文件：`W/NativeBuildProcess.java`、`W/BuildProcessResult.java`、`WT/NativeBuildProcessTest.java`、`scripts/workspace-supervisor.test.mjs`。
+- 验收：① 参数/资源入口不可由用户修改，协议帧有界且状态顺序合法；② stdout 假成功、提前退出、监督器被强杀均不产生成功或已取消假象；③ 退出未知会返回明确中断/需要核查状态，不能立即复用槽位。
+- 验证：W-U `NativeBuildProcessTest`、W-P；用真实节点进程覆盖管道断开与终止竞态，测试结束核对自有进程释放。
+
+### WB06 · 配置与工作根准入（M）
+
+- [ ] 完成 WB06。依赖：WB03、WB05。
+- 描述：增加默认关闭的本机构建配置与工具、专用测试库配置、执行根资源检查。
+- 文件：`W/BuildEnvironment.java`、`W/BuildRootLease.java`、`WT/BuildEnvironmentTest.java`、`WT/BuildRootLeaseTest.java`、`backend/src/main/resources/application.yml`。
+- 验收：① 非显式本地启用、工具不符、平台/运行测试配置混用均失败；② 同根 OS 锁互斥，保留目录数、磁盘预算与最低可用空间按规格检查；③ 环境不透传平台密码/模型 Key/执行覆盖变量，不改私有配置。
+- 验证：W-U `BuildEnvironmentTest,BuildRootLeaseTest`，真实双进程锁测试；记录检查仅是软资源预算而非 OS 沙箱。
+
+### C-WB02 · 执行安全前置验证
+
+- [ ] WB04–WB06 真实进程测试、工具校验与平台构建通过。外部服务/目录未受影响；无法确认子孙退出时停止后续执行并报告，不弱化验收要求。
+
+### WB07 · V011 构建记录（M）
+
+- [ ] 完成 WB07。依赖：C-WB02。
+- 描述：新增任务和事件表，建立状态转移、归属、来源与事件序号约束。
+- 文件：`backend/src/main/resources/db/migration/V011__engineering_builds.sql`、`W/EngineeringBuild.java`、`W/BuildRepository.java`、`WT/BuildRepositoryIT.java`。
+- 验收：① project/version/owner 不能交叉绑定，活动任务唯一约束和终态字段一致；② 状态与事件在同事务更新，事件上限与安全整数规则可验证；③ 不修改历史迁移、项目生成指针或业务状态表。
+- 验证：W-I `BuildRepositoryIT`；仅平台专用测试库执行新迁移，测试非法状态、并发活动记录、级联/外键行为及原迁移回归。
+
+### WB08 · 幂等提交与容量控制（M）
+
+- [ ] 完成 WB08。依赖：WB07、WB01、WB06。
+- 描述：创建只登记意图的 202 API，事务内冻结来源/模板摘要与幂等结果。
+- 文件：`W/BuildAdmissionService.java`、`W/BuildController.java`、`W/BuildRepository.java`、`WT/BuildAdmissionIT.java`。
+- 验收：① 仅接收 versionId，所有者/CSRF/规范 UUID/未知字段验证完整；② 同键同体只创建一次，同键异体 422，多线程不突破全局四项/项目一项；③ 事务不启动进程或长时间写文件，已接受意图重放不受新容量/开关变化影响。
+- 验证：W-I `BuildAdmissionIT`；多连接并发与提交响应丢失重放，检查数据库记录及模型网关零调用。
+
+### WB09 · 状态与有界事件读取（M）
+
+- [ ] 完成 WB09。依赖：WB08。
+- 描述：提供持久化列表、详情和事件游标读取，供刷新恢复和排查使用。
+- 文件：`W/BuildQueryService.java`、`W/BuildController.java`、`W/BuildRepository.java`、`WT/BuildQueryIT.java`。
+- 验收：① 列表分页稳定，事件 seq 单调且限额执行，不由客户端推断终态；② 陌生访客与混用项目/buildId 均 404；③ DTO 不返回文件路径/PID/命令/raw 输出，错误含 requestId。
+- 验证：W-I `BuildQueryIT`；非法/边界游标、并发新增、空列表与敏感 canary 测试。
+
+### C-WB03 · 持久任务 API
+
+- [ ] WB07–WB09 真实 PostgreSQL/HTTP 测试及平台构建通过；记录幂等与队列并发证据。正常配置仍关闭执行，未接通 Worker 不模拟产物。
+
+### WB10 · 取消状态机（M）
+
+- [ ] 完成 WB10。依赖：C-WB03。
+- 描述：实现幂等取消意图与数据库状态竞争规则，为 Worker 提供可信取消信号。
+- 文件：`W/BuildCancellationService.java`、`W/BuildController.java`、`W/BuildRepository.java`、`WT/BuildCancellationIT.java`。
+- 验收：① 排队任务取消后不会被领取，运行中变 CANCELLING，不立即释放活动约束；② 终态取消无副作用，完成/取消竞争只有一个合法结果；③ 同键重试稳定，未授权无法影响任务或查询其存在。
+- 验证：W-I `BuildCancellationIT`；真实数据库并发闩锁覆盖领取/取消/完成窗口。
+
+### WB11 · 前端构建协议与请求生命周期（M）
+
+- [ ] 完成 WB11。依赖：WB09、WB10。
+- 描述：实现强校验构建 API 客户端和可测试的任务状态管理。
+- 文件：`PF/api/builds.ts`、`PF/api/builds.spec.ts`、`PF/composables/useEngineeringBuild.ts`、`PF/composables/useEngineeringBuild.spec.ts`。
+- 验收：① 严格解析状态、摘要、时间和有界事件，不默认为成功；② 创建/取消未知结果保留幂等键，明确新意图才换键；③ 切换项目/版本、卸载或会话变化后旧响应不污染当前状态。
+- 验证：W-F 对应两个测试文件；假时钟检查轮询停止、断网、重放、终态与晚到响应。
+
+### WB12 · 工作台构建操作入口（M）
+
+- [ ] 完成 WB12。依赖：WB11。
+- 描述：接入选定版本的构建按钮、真实任务状态、取消/重试及恢复交互。
+- 文件：`PF/components/EngineeringBuild.vue`、`PF/components/EngineeringBuild.spec.ts`、`PF/components/ArtifactPanel.vue`、`PF/components/ArtifactPanel.spec.ts`。
+- 验收：① 目标 Vn 清晰，重复点击不产生新任务，刷新可查询原记录；② 失败保留当前版本/输入，关闭或环境缺失给可理解提示；③ 成功显示“构建完成，实例预览尚未接入”，旧预览不改为新实例状态。
+- 验证：W-F；组件键盘/焦点与窄宽度测试。此阶段只证明界面契约，实际按钮到 JAR 留待 WB14/WB19。
+
+### C-WB04 · 工作台任务流程
+
+- [ ] WB10–WB12 数据库、前端测试与构建通过；展示实际状态来源和未知结果处理，不以 fixture 结果宣称已完成真实构建。
+
+### WB13 · 固定模板构建阶段接入（M）
+
+- [ ] 完成 WB13。依赖：C-WB04、WB05。
+- 描述：让可信监督器调用已有完整构建流程，阶段通过内部接口传递而非解析普通日志。
+- 文件：`T/scripts/build.mjs`、`T/scripts/build.test.mjs`、`WR/build-runner.mjs`、`scripts/workspace-runner.test.mjs`、`templates/standalone-v1.files`。
+- 验收：① npm 安装禁用生命周期脚本，type/lint/unit/build 与 Maven clean verify 全部执行；② 平台构建与下载后手工构建共享同一固定流程，无跳测分支；③ 外部测试配置仅给必要子进程，阶段来自可信入口，日志不携带秘密或源码。
+- 验证：模板脚本测试、`node --test scripts/workspace-runner.test.mjs` 和 W-P；若白名单无需改变则不改，新增额外测试落点先拆 WB13 子任务。
+
+### WB14 · 队列到真实构建产物（M）
+
+- [ ] 完成 WB14。依赖：WB13、WB03、WB08–WB10。
+- 描述：领取任务、准备冻结快照、监督执行并验证 JAR，写入真实结果。
+- 文件：`W/BuildWorker.java`、`W/BuildScheduler.java`、`W/BuildRepository.java`、`W/BuildArtifacts.java`、`WT/BuildWorkerTest.java`。
+- 验收：① 在 DB 事务外物化/执行，模板摘要变化则失败，同项目/全局限制贯穿执行；② 仅在完整检查成功、源未变、真实新 JAR 指纹匹配后原子成功；③ 超时/取消直到自有进程退出才终结，失败保留快照和记录且不启动模型请求。
+- 验证：W-U `BuildWorkerTest`、W-P、runner 测试；先用可控执行器覆盖竞争，再在 WB18 以真实 API 构建验收，禁止将 mock 结果当真实产物。
+
+### WB15 · 下载本次构建工程（M）
+
+- [ ] 完成 WB15。依赖：WB14、WB12。
+- 描述：增加 buildId 绑定的快照下载 API 与工作台入口，复用已有有界二进制下载能力。
+- 文件：`W/BuildArchiveController.java`、`WT/BuildArchiveIT.java`、`PF/api/builds.ts`、`PF/components/EngineeringBuild.vue`、`PF/components/EngineeringBuild.spec.ts`。
+- 验收：① 每次授权后复验冻结 ZIP 类型/摘要，同一 buildId 字节不随版本/模板更新改变；② 尚无快照为 409，损坏明确错误而不回退当前模板；③ UI 下载准确目标任务，取消下载/切项目不影响新页面会话或泄漏对象 URL。
+- 验证：W-I `BuildArchiveIT`、W-F；真实 ZIP 内容对照来源，旧 versionId 下载 API 保持原义。
+
+### C-WB05 · 构建闭环接通
+
+- [ ] WB13–WB15 全部定向测试、前后端构建及旧导出回归通过；API、Worker 和快照下载接线完成。此处不以可控执行器测试宣称真实工程成功，实际 API 成品再构建/启动证明由 WB18 承担。
+
+### WB16 · 重启中断与执行槽恢复（M）
+
+- [ ] 完成 WB16。依赖：C-WB05。
+- 描述：处理平台正常关闭、强制退出及再次启动，保留任务和未知进程边界。
+- 文件：`W/BuildScheduler.java`、`W/BuildRootLease.java`、`W/BuildRepository.java`、`WT/BuildRecoveryIT.java`、`scripts/workspace-supervisor.test.mjs`。
+- 验收：① 重启不重放旧非终态任务，转 INTERRUPTED 并保留追踪身份；② 无法证明旧进程退出则拒绝继续调度，不能只因拿到根锁就认定子进程已死；③ 不按旧 PID/名称/端口终止未知进程，不删除旧目录。
+- 验证：W-I `BuildRecoveryIT`、W-P；实际终止测试所启动的平台/监督父进程，重新启动后检查不重复执行。
+
+### WB17 · 故障与敏感信息护栏（M）
+
+- [ ] 完成 WB17。依赖：WB16。
+- 描述：系统验证磁盘、构建失败、伪造输出和产物篡改，不通过 fallback 掩盖错误。
+- 文件：`WT/BuildFailureIT.java`、`WT/BuildArtifactsTest.java`、`WT/BuildEnvironmentTest.java`、`scripts/workspace-runner.test.mjs`、`scripts/workspace-supervisor.test.mjs`。
+- 验收：① 缺工具/测试配置、依赖失败、源码失败、磁盘与数量超限均产生正确失败或准入拒绝；② 超量/伪造输出、链接、旧 JAR、坏报告不能制造成功；③ API/事件/日志 canary 排除凭据和源码，原平台数据及外部进程不变。
+- 验证：W-U 相关单测、W-I `BuildFailureIT` 与两个 Node 套件；故障注入限定临时目录与本次进程，不真实填满用户磁盘或停数据库。
+
+### WB18 · 真实 API 与 ZIP 二次构建验收（M）
+
+- [ ] 完成 WB18。依赖：WB17。
+- 描述：通过真实所有者会话提交固定应用，下载该构建 ZIP，在另一新目录完整构建对照。
+- 文件：`scripts/verify-workspace-build.mjs`、`scripts/verify-workspace-build.test.mjs`、`scripts/verify-workspace-build.d.mts`、`WT/BuildFixture.java`、`WT/BuildFixtureTest.java`。
+- 验收：① 实际 API 任务成功，保存归档/source/template/JAR 摘要及命令退出码，不打印配置；② 新 ZIP 全流程构建和两份成品临时启动后 loadedRuntimeId 对应一致，不要求非确定性 JAR 元数据 hash 相同；③ 各自专用运行库可保存/刷新/重启恢复，测试停止自有进程，正式平台仍没有实例 API。
+- 验证：W-X，Node helper 单测与 W-U `BuildFixtureTest`；串行独占专用模板测试库，保留失败证据，不复用旧产物证明新代码。
+
+### C-WB06 · 成品与恢复验收
+
+- [ ] WB16–WB18 完成，实际来源、冻结 ZIP、JAR 和运行身份对照可审阅；中断不重发、失败不假成功，测试进程已退出。提供可复查本地证据，不冒充云端已更新。
+
+### WB19 · 真实浏览器工作台验收（M）
+
+- [ ] 完成 WB19。依赖：C-WB06。
+- 描述：Chrome 操作真实构建入口，验证刷新/取消/失败/下载及无障碍布局。
+- 文件：`frontend/e2e-runtime/workspace-build.spec.ts`、`frontend/e2e-runtime/fixtures.ts`、`frontend/playwright.runtime.config.ts`、`PF/components/EngineeringBuild.spec.ts`。
+- 验收：① 真实 API 构建、刷新恢复、未知结果同键确认、取消和下载与 W-X 产物匹配；② 多访客/项目/版本切换不串任务，失败保留旧预览/输入；③ 320/390/768/1440px、键盘、axe 与清晰状态标识通过。
+- 验证：W-E，浏览器网络/控制台/截图实际检查；新增 fixture 按现有测试应用约定接入，此构建验收禁止 reuseExistingServer，不复用未知后台或并发占用同一模板测试库，不开启真实模型或线上端口。
+
+### WB20 · 完整回归与代码审阅（S）
+
+- [ ] 完成 WB20。依赖：WB19。
+- 描述：回归平台原功能及独立工程，审查安全/并发/生命周期边界并记录真实证据。
+- 文件：`docs/workspace-build-verification.md`；发现修复按独立小切片列出实际文件。
+- 验收：① W-R、W-X、W-E 完整通过，保留首次失败及修复信息，不把历史计数当本轮结果；② 关键判断做反向变异，恢复后重跑，无禁用/删除断言；③ 审阅全部 Required/Critical 发现得到处理或明确阻塞，测试库和已有服务未损坏。
+- 验证：W-R、W-X、W-E、`git diff --check`；核对无密钥、运行数据、缓存或构建输出进入提交。
+
+### WB21 · 更新原文档与模块交接（M）
+
+- [ ] 完成 WB21。依赖：WB20。
+- 描述：按实现后的事实更新本地使用方式、完成程度和下游依赖，保留线上与后续模块边界。
+- 文件：`README.md`、`CAPABILITY-MAP.md`、`SPEC-workspace-build.md`、`docs/workspace-build-verification.md`、`docs/project-summary.md`。
+- 验收：① 配置/启动/构建/取消/下载命令与错误恢复可复现，写明本机资源及独占测试库前提；② 如实列出 app-runtime/runtime-access 未完成、旧预览不变和未部署；③ 下游可凭 buildId 与验证后的不可变产物描述接入，不需要猜路径或重新组装。
+- 验证：文档链接及命令与实现对照，`git diff --check`，完成情况逐项映射规格 §8；不创建无证据的上线记录。
+
+### C-WB07 · 本地交付检查点
+
+- [ ] WB19–WB21 完成，提交可审阅的本地变更及验证证据。汇报构建模块完成与未完成的实例模块；GitHub 推送、合并、部署和人工验收仍单独记录，不自动勾选。
