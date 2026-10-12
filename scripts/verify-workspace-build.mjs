@@ -23,13 +23,16 @@ export function completedBuild(build,project,version) {
     throw new Error('Build evidence did not establish a verified artifact.');
   return build;
 }
-export async function startBuildFixture(workspace,config,signal) {
+export function buildFixtureInvocation(workspace,config) {
   const env=toolEnvironment(),java=join(env.JAVA_HOME,'bin/java');
   // The platform fixture uses its existing TEST_DB_PASSWORD, never the standalone DB config.
-  return startOwned(java,['-Xmx384m','-Dloader.path='+join(root,'backend/target/test-classes'),
+  return {command:java,args:['-Xmx384m','-Dloader.path='+join(root,'backend/target/test-classes'),
     '-Dloader.main=dev.atoms.demo.workspace.BuildFixture','-cp',join(root,'backend/target/atoms-demo-0.1.0-SNAPSHOT.jar'),
-    'org.springframework.boot.loader.launch.PropertiesLauncher',workspace,process.execPath,java,join(config,'test.properties')],
-  {baseURL:origin,cwd:join(root,'backend'),env,signal});
+    'org.springframework.boot.loader.launch.PropertiesLauncher',workspace,process.execPath,java,join(config,'test.properties')],cwd:join(root,'backend'),env};
+}
+export async function startBuildFixture(workspace,config,signal) {
+  const invocation=buildFixtureInvocation(workspace,config);
+  return startOwned(invocation.command,invocation.args,{...invocation,baseURL:origin,signal});
 }
 export async function verifyWorkspaceBuild({configDir,outputParent},signal) {
   const config=await realpath(configDir),parent=await realpath(outputParent);

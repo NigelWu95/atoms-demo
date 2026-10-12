@@ -491,6 +491,8 @@
 
 ### WB16 · 重启中断与执行槽恢复（M）
 
+补验拆片 WB16b：复用测试入口的固定启动参数、真实平台 SIGKILL/重启验收脚本及合同测试（3 文件）。只向本次持有的 ChildProcess 句柄发信号，不按记录的 PID/端口查杀；不修改数据库中的任务状态或恢复证明。
+
 - [ ] 完成 WB16。依赖：C-WB05。
 - 描述：处理平台正常关闭、强制退出及再次启动，保留任务和未知进程边界。
 - 文件：`W/BuildScheduler.java`、`W/BuildRootLease.java`、`W/BuildRepository.java`、`WT/BuildRecoveryIT.java`、`scripts/workspace-supervisor.test.mjs`。
@@ -530,6 +532,8 @@
 - 验证：W-E，浏览器网络/控制台/截图实际检查；新增 fixture 按现有测试应用约定接入，此构建验收禁止 reuseExistingServer，不复用未知后台或并发占用同一模板测试库，不开启真实模型或线上端口。
 
 ### WB20 · 完整回归与代码审阅（S）
+
+修复切片 WB20a：`useEngineeringBuild.ts` 与测试（2 文件）。只读审阅发现原提交结果未知后，再次确认遇到 4xx/准入失败会丢弃原 nonce；修复为仅第一次明确拒绝可清除意图，已未知的意图保留到成功确认。先补失败测试，不弱化原断言。
 
 - [ ] 完成 WB20。依赖：WB19。
 - 描述：回归平台原功能及独立工程，审查安全/并发/生命周期边界并记录真实证据。

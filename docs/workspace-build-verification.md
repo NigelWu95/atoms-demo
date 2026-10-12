@@ -121,3 +121,12 @@
 - 原构建与 ZIP 重建实际运行身份同为 `7fd42cd3ae35dd48371eebe7cf90d1e6b82513e0dae1181201f7054dd5275fea`；JAR 二进制 hash 不同是构建时间等元数据差异，不冒充字节可复现构建。
 - 两个 JAR 在各自现有专用运行库启动，同一 Chrome context 中分别添加不同待办、刷新、逐一真实进程重启，数据和访客保持且互不串用。控制台 warning/error 与页面错误为空，人工查看两张截图确认 UI 和独立数据。Node 入口与直接 Java 启动都通过，测试只停止自有进程。
 - 验证器参数/成功合同与双实例 helper 的 3 项守卫测试通过。本次临时启动仅为验收，不是正式的实例管理或替换平台 iframe；未修改凭据、创建数据库、调用模型、推送或部署。
+
+## WB16/17 · 故障与真实重启补验
+
+- 平台 SIGKILL 联合验证 `verify-workspace-recovery.mjs` 退出 0，证据 `.local/standalone/workspace-recovery-W0dLjN/verification.json`。执行中任务 `255e9739-a8b2-4653-9a86-c4dcab34e260` 和排队任务均中断；原 startedAt/事件状态未重发，真实 runner 写出 settled 证明后新任务可领取并取消。测试只使用本次 ChildProcess 句柄，不按旧 PID/端口查杀。
+- 首次重启验收错误地把 HTTP health UP 当作 SmartLifecycle 恢复完成，过早断言并停止平台；改为轮询持久任务中断状态。同一原根重新启动已让正式恢复逻辑收尾，没有手改任务表或伪造证明。
+- 进程监督 8 项 + runner 5 项在沙箱外全部通过。沙箱内组合首轮超时用例得到 unsettled，未降低判断或宽限门槛；真实进程组检查经权限流程后复验。合计 13 项覆盖退出/父连接断开/独立期限、超量输出、错误身份、伪造成功、外部进程存活。
+- 故障验证实际分布于 `BuildEnvironmentTest`、`BuildExecutionEnvironmentTest`、`BuildRootLeaseTest`、`WorkspacePathsTest`、`WorkspaceStoreTest`、`BuildJarTest`、`BuildWorkerTest`、`BuildArchiveIT`、`BuildRecoveryIT` 及 Node 套件，没有另设重复的 BuildFailureIT。各自验证工具/配置/容量拒绝、链接/源文件/JAR/归档篡改、未确认进程占位及敏感正文排除。
+- 工作台首轮真实浏览器构建因可用空间降至 1.7 GiB 触发 BUILD_CAPACITY_EXCEEDED，界面明确失败，旧预览保留。没有降低 2 GiB 门槛或清理用户文件；该轮中止，不计为完成验收。后续观察到磁盘恢复约 8.9 GiB，继续完整复验。
+- JAR 身份关键判断由 `||` 临时变成 `&&` 后，`BuildJarTest` 精确在篡改资源应拒绝处失败；恢复后 2 项全部通过。变异未打包、未提交或部署。
