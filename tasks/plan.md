@@ -1,6 +1,6 @@
 # 独立工程导出与运行 · 实施计划
 
-当前续作：2026-10-13，用户以“一次性实施”批准 [§7 执行计划](#7-workspace-build-扩展计划)及 WB01–WB21，正在实施。下文 §1–§6 保留已完成工程基础与下载模块的原计划，不重新打开或覆盖历史任务。
+当前续作：2026-10-13，用户以“一次性实施”批准的 [§7 执行计划](#7-workspace-build-扩展计划)及 WB01–WB21 已实现并完成本地自动验收；实例管理/实例预览不在本轮范围。下文 §1–§6 保留已完成工程基础与下载模块的原计划，不重新打开或覆盖历史任务。
 
 状态：2026-10-13，EB01–EB25 与追加的 PE01–PE05 已实现并完成本地验证；C-EB11 用户人工评审待完成。仅本地功能分支提交，没有合并、推送或部署。完成情况及证据见任务清单。
 依据：[已批准规格](../SPEC-engineering-bundle.md)、[能力地图](../CAPABILITY-MAP.md)。代码基线 `109bcb5`，工作分支 `feature/standalone-engineering`。
@@ -141,7 +141,7 @@ npm --prefix frontend run build
 
 ## 7. workspace-build 扩展计划
 
-状态：2026-10-13，规格、本节及 WB01–WB21 已获用户批准，一次性连续实施。依据：[构建规格](../SPEC-workspace-build.md)、[ADR-013](../docs/decisions/013-native-process-engineering-preview.md)。代码基线 `21571cd`，沿用现有功能分支。本节是同一独立工程方向的续作；旧 EB/PE 记录和 C-EB11 人工验收不改写。
+状态：2026-10-13，规格、本节及 WB01–WB21 已获用户批准并完成本地实现/自动验收。依据：[构建规格](../SPEC-workspace-build.md)、[ADR-013](../docs/decisions/013-native-process-engineering-preview.md)；实际证据见[验证记录](../docs/workspace-build-verification.md)。代码基线 `21571cd`，沿用现有功能分支。本节是同一独立工程方向的续作；旧 EB/PE 记录和 C-EB11 人工验收不改写。
 
 ### 7.1 交付范围与结构
 
