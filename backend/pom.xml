@@ -179,6 +179,12 @@
     <plugins>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jar-plugin</artifactId>
+        <!-- The allowlisted template .gitignore must survive the archive phase as well. -->
+        <configuration><addDefaultExcludes>false</addDefaultExcludes></configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-resources-plugin</artifactId>
         <configuration><addDefaultExcludes>false</addDefaultExcludes></configuration>
       </plugin>
