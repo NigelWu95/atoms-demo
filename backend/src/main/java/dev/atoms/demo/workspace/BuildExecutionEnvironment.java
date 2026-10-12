@@ -15,6 +15,7 @@ public class BuildExecutionEnvironment implements AutoCloseable {
     private BuildEnvironment.Settings settings;
     private BuildRootLease lease;
     private boolean closed;
+    private boolean schedulerReady;
     @Autowired public BuildExecutionEnvironment(BuildEnvironment configuration) { this(configuration, BuildTestDatabase::verify); }
     BuildExecutionEnvironment(BuildEnvironment configuration, Consumer<Path> databaseVerifier) {
         this.configuration = configuration; this.databaseVerifier = databaseVerifier;
@@ -34,6 +35,7 @@ public class BuildExecutionEnvironment implements AutoCloseable {
     public synchronized ApiException admissionFailure() {
         try {
             settings();
+            if (!schedulerReady) throw BuildEnvironment.unavailable();
             lease.checkCapacity();
             return null;
         } catch (ApiException error) { return error; }
@@ -43,6 +45,8 @@ public class BuildExecutionEnvironment implements AutoCloseable {
         settings();
         lease.checkUsage();
     }
+    synchronized void schedulerReady(boolean ready) { schedulerReady = ready && !closed; }
+    public synchronized void verifyCapacity() throws java.io.IOException { settings(); lease.checkCapacity(); }
     @PreDestroy @Override public synchronized void close() throws java.io.IOException {
         closed = true;
         if (lease != null) lease.close();

@@ -20,6 +20,8 @@ class BuildExecutionEnvironmentTest {
         var environment = new BuildExecutionEnvironment(configuration, ignored -> {});
         assertThat(java.nio.file.Files.getFileStore(root).getUsableSpace()).isGreaterThanOrEqualTo(2L << 30);
         environment.verifyUsage();
+        assertThat(environment.admissionFailure().code()).isEqualTo("BUILD_ENVIRONMENT_NOT_READY");
+        environment.schedulerReady(true);
         assertThat(environment.admissionFailure()).isNull();
         assertThat(environment.settings()).isSameAs(settings);
         assertThatThrownBy(() -> new BuildRootLease(paths)).isInstanceOf(java.io.IOException.class);
