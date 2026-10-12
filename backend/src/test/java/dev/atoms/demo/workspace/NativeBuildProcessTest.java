@@ -55,12 +55,20 @@ class NativeBuildProcessTest {
     @Test void cancellationAndDeadlineUseControlPipeAndWaitForExit() throws Exception {
         String script = "process.stdin.once('data',()=>{console.log(JSON.stringify({type:'complete',executionId:process.argv[3],"
                 + "settled:true,errorCode:'BUILD_CANCELLED',loadedRuntimeId:null}));process.stdin.destroy();});process.stdin.resume();";
-        var cancelled = new AtomicBoolean(true);
-        var result = execute(fixture(script), cancelled::get, stage -> {});
+        var polls = new java.util.concurrent.atomic.AtomicInteger();
+        var result = execute(fixture(script), () -> polls.incrementAndGet() >= 3, stage -> {});
         assertThat(result.settled()).isTrue();
         assertThat(result.errorCode()).isEqualTo("BUILD_CANCELLED");
         var timeout = execute(fixture(script), () -> false, stage -> {}, Duration.ofMillis(500));
         assertThat(timeout.settled()).isTrue();
         assertThat(timeout.errorCode()).isEqualTo("BUILD_TIMEOUT");
+    }
+    @Test void alreadyCancelledWorkDoesNotSpawnAtAll() throws Exception {
+        Path marker = temporary.toRealPath().resolve("unexpected-child");
+        Path entry = fixture("import {writeFileSync} from 'node:fs'; writeFileSync(" + new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(marker.toString()) + ", 'started');");
+        var result = execute(entry, () -> true, stage -> {});
+        assertThat(result.errorCode()).isEqualTo("BUILD_CANCELLED");
+        assertThat(result.settled()).isTrue();
+        assertThat(Files.exists(marker)).isFalse();
     }
 }
