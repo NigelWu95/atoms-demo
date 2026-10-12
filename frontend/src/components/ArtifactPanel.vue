@@ -6,6 +6,7 @@ import { errorMessage } from '../api/client'
 import PreviewFrame from './PreviewFrame.vue'
 import SourceViewer from './SourceViewer.vue'
 import RestorationPanel from './RestorationPanel.vue'
+import EngineeringDownload from './EngineeringDownload.vue'
 
 const props = defineProps<{ project: Project | null }>()
 const emit = defineEmits<{ changed: [Project] }>()
@@ -112,6 +113,7 @@ watch(
         >独立预览 ↗</RouterLink
       >
     </div>
+    <EngineeringDownload :project-id="project?.id ?? null" :version="version" :loading="loading" />
     <RestorationPanel
       v-if="project?.currentVersionId"
       :key="project.id"
