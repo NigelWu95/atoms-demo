@@ -578,13 +578,72 @@ STANDALONE_RUNTIME_CONFIG=/absolute/path/to/runtime-a.properties \
 ./node_modules/.bin/playwright test --config playwright.standalone.config.ts --project=chromium
 ```
 
-Playwright 显式 `reuseExistingServer: false`，不启用 trace 或保存登录态；监听仅回环。当前浏览器工具无 DevTools MCP，按浏览器技能采用已有 Playwright + 隔离 Chrome，无新增工具依赖。沙箱拒绝监听时按权限审批重跑，没有降低测试标准或更换数据库。
+Playwright 由 worker 持有独立进程句柄，保留与 `reuseExistingServer: false` 等价的端口占用即失败约束，支持真实重启；不启用原始 trace 或保存登录态，监听仅回环。当前浏览器工具无 DevTools MCP，按浏览器技能采用已有 Playwright + 隔离 Chrome，无新增工具依赖。沙箱拒绝监听时按权限审批重跑，没有降低测试标准或更换数据库。
 
 五轴复查：固定路径和预算/错误路径有测试；catalog、纯组装器、物化器、进程控制与浏览器验收边界分离；没有新增依赖/模型调用/生产业务库迁移；循环和输入有配额；原文件字节在实际构建后核验。只本地提交，未推送、合并或部署。技能促使本轮按小片提交并实际验证归档和浏览器，未把纯脚本测试当成成品运行证据。
 
 C-EB09 不等于整项完整工程导出交付：没有新增下载 API/按钮，也没有任意后端代码生成。EB22–EB23 继续覆盖最终成品待办保存、跨进程恢复、平台断开时独立运行、多访客/实例隔离、升级后幂等重放；EB24–EB25 覆盖配额回归、README 首次手工建库教程与原平台完整回归，再更新原项目设计/交付文档。
 
+## EB22 · 脱离平台后的持久化、故障恢复与真实重启
+
+### 实现与边界
+
+独立工程的最终 JAR 通过浏览器执行真实会话、数据读取及写入；除独立应用自身外的全部 origin 被阻断，包括平台。测试不是对 `/api/state` 返回模拟成功：响应丢失、畸形和超时场景先把请求送至真实后端，确认提交后才破坏传输。手动重试沿用原意图键及请求体，且丢失响应场景在重试前真正结束、重新启动 Java 进程。
+
+仓库侧 worker 只管理它创建的进程。数据库连接通过该 worker 专属的回环 TCP 闸门；故障只关闭这些 socket，不停止 PostgreSQL、不修改数据库权限、不删除运行数据。闸门只接受既有引导工具生成的私有 A/B 运行配置，拒绝平台库、测试库、公网目标及重复/越界配置。临时配置排他创建为 0600，结束时移除；原配置和工程源文件不变。此限制属于验收工具，不是独立工程运行配置的额外产品限制。
+
+SQL 证据使用 `atoms_standalone_a` 应用角色在固定本地容器内执行只读事务，核对安装 ID/数据库标记，只返回 revision、状态行数和幂等行数。不输出 Cookie、CSRF、密码、业务正文或原始 SQL 结果。失败浏览器诊断只记录固定 API 路径/状态码和截图，不保存含凭据的原始 trace。会话采集通过单次真实请求转发取响应体，避开导航时 CDP 响应缓存失效；不增加初始化请求或重试。
+
+### 实际结果
+
+| 验收场景 | 数据与行为证据 |
+| --- | --- |
+| 独立保存/刷新/勾选 | 无平台请求；revision 从 0 到 1、2，刷新保留待办和完成状态 |
+| 真正进程重启 | 同浏览器仍是原访客，状态完全相同；第二个独立浏览器上下文为空且只能写自己的数据 |
+| 已提交响应丢失/畸形/超时 | 不显示成功，保留输入和重试入口；重试前后 SQL 均为 revision=1、状态行=1、幂等行=1 |
+| 双标签并发修改 | 后提交者返回 409，保留输入且不覆盖首个版本；明确读取最新数据后才继续保存 |
+| 数据库连接中断 | PUT 和 health 返回真实 503；SQL 保持 1/1/1；恢复连接并手动重试后为 2/1/2 |
+
+新产物使用 Java 17.0.5-oracle、Node 24.20.0、npm 11.19.0，从全新目录完成冻结安装、构建和以下验证，无测试跳过：
+
+- 随工程交付的 Node 脚本：24 项；独立前端：68 项，类型/lint/真实 Vite 构建通过；安装审计 0 漏洞。
+- 独立后端：129 单元 + 60 真实 PostgreSQL/HTTP/打包集成测试通过，包含新增的事务回滚日志回归。
+- 新 JAR：Node CLI 和直接 Java 启停通过；Chrome 11 项通过，54.9 秒，`retries: 0`。四尺寸 320/390/768/1440px 的烟测、键盘入口、axe 与同源检查也在此次运行内通过；尚不替代 EB23 全部安全/错误态验收。
+- 原平台后端 `clean verify`：77 单元 + 52 IT 通过；仓库 Node 回归 24 项（17 常规 + 4 进程 + 3 数据库闸门）；新增浏览器测试独立 TypeScript 检查、eslint、Prettier 通过。
+- 结束后从正式平台 JAR 再取真实组装输出，逐一核验 111 个源码文件，bundleId 与实际 JAR SHA-256 未变；自有 18089 服务已退出。
+
+新工程与报告位于仓库忽略目录：
+
+```text
+.local/standalone/verification-4oZItT/verification.json
+.local/standalone/verification-4oZItT/engineering-bundle-HOJltI/
+```
+
+- bundleId：`25c6fd4e01b3b18fda76380b31d77a91486fef7fcd09e9042e08036ac2b70e23`
+- loadedRuntimeId：`dfe54b3e7f40d84e771ecf4760d9cb4d18bf287f00156f70a881dcefa2c513d4`
+- JAR SHA-256：`a6361f3de5216156c7a80e0145526a848b38ebe3ba86463b51d7364f81c13c2c`
+- 文件数 111，总量 545,934 字节，最大文件 121,072 字节；未提高既有配额。
+
+截图已实际查看，位于 `frontend/test-results/standalone/` 下对应测试目录：`assembled-320.png`、`assembled-1440.png`、`persisted-todo.png`、`restored-after-restart.png`、`unknown-save.png`、`database-disconnected.png`。这些是本机验收产物，不进入源码包或 Git。
+
+### 本轮发现与修正
+
+1. 实际断连导致业务操作和 rollback 同时失败，Spring `TransactionTemplate` 先记录原始数据库异常，虽不影响前端正确返回 503，仍不符合日志边界。新增 HTTP canary 回归先失败；仅关闭该框架 logger 的原始异常输出，保留应用自身关联 requestId/code/status 事件。新包最终运行记录到 503 和 409，原始 `stack_trace` 数为 0。
+2. Playwright 的 `serviceWorkers: block` 初始化脚本访问 opaque iframe 的 `navigator.serviceWorker`，引发 SecurityError。取消该测试脚本注入，保留应用实际 CSP、零页面错误和无 service worker 断言；没有降低沙箱策略。
+3. 导航/重启时调试协议读取会话响应体偶发失效，实际页面已经恢复数据。夹具改为一次真实请求转发并保留响应，修复后整套 11 项通过，不增加自动重试或删除断言。
+4. 库名/角色一致性条件做了反向变异，正反例均捕获，恢复后全绿；反例如果意外成功也清理自有连接，避免测试错误遗留监听。
+
+复验沿用上一节的新目录构建命令，再把 `STANDALONE_VERIFICATION_REPORT` 指向本次报告运行浏览器套件。当前 SQL 证据需要 Docker CLI 在 PATH 中及已启动的 `atoms-demo-postgres`，只用已创建的独立数据库角色。不要把运行配置换成平台配置，也不要为断连测试停止整个数据库。
+
+五轴复核结论：真实持久化/重试与错误路径可追溯；进程、连接闸门、固定只读证据各自有明确边界；凭据不进入生成工程或浏览器报告；连接数量/输入/执行时间有上限；未新增依赖或生产控制接口。技能促使本轮先补反例、修正日志并重新构建实际产物，而非仅记录开发目录测试通过。
+
+EB22 完成不等于 C-EB10 或完整工程导出产品完成。EB23 的 A/B 同主机跨端口隔离、错误安装 ID 的最终 JAR 验证、源码重建升级与旧意图重放、安全攻击及错误态可访问性仍待验收；下载 API/工作台按钮、任意后端生成和托管运行仍未接入。仅本地功能分支提交，未合并、推送、部署，也未更新原平台交付文档。
+
 ## 已核对的官方依据
+
+- [Playwright worker fixture](https://playwright.dev/docs/test-fixtures#worker-scoped-fixtures)、[Route.fetch](https://playwright.dev/docs/api/class-route#route-fetch)：自有测试生命周期与真实请求转发；项目使用 1.63.0，无自动重试。
+- [Node 24.20 socket.destroy](https://nodejs.org/download/release/v24.20.0/docs/api/net.html#socketdestroyerror)、[PostgreSQL 17 只读事务](https://www.postgresql.org/docs/17/sql-set-transaction.html)：仅中断自有连接与只读证据查询。
+- [Spring 6.2.19 TransactionTemplate](https://github.com/spring-projects/spring-framework/blob/v6.2.19/spring-tx/src/main/java/org/springframework/transaction/support/TransactionTemplate.java)、[Boot 3.5 日志级别](https://docs.spring.io/spring-boot/3.5/reference/features/logging.html#features.logging.log-levels)：核对 rollback 失败的原始异常日志来源，使用精确 logger 配置且保留脱敏应用事件。
 
 - [Maven 显式资源 includes](https://maven.apache.org/plugins/maven-resources-plugin/examples/include-exclude.html)、[JAR 默认排除开关](https://maven.apache.org/plugins/maven-jar-plugin/jar-mojo.html#addDefaultExcludes)：两阶段保留清单资源（项目实际 JAR Plugin 3.4.2，开关自 3.4.0 可用）。
 - [Java 17 ClassLoader.getResources](https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/ClassLoader.html#getResources(java.lang.String))、[Boot 3.5 PropertiesLauncher](https://docs.spring.io/spring-boot/3.5/specification/executable-jar/property-launcher.html)：检测重复 classpath 资源并从正式 Boot JAR 装载，测试入口保持在 test-classes。
