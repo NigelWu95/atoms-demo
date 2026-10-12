@@ -77,4 +77,17 @@
       </plugin>
     </plugins>
   </build>
+  <profiles>
+    <profile>
+      <id>standalone-package</id>
+      <build>
+        <!-- Fresh explicit stage; no filtering of source bytes or scan of external configuration.
+             https://maven.apache.org/plugins/maven-resources-plugin/examples/resource-directory.html -->
+        <resources>
+          <resource><directory>src/main/resources</directory><filtering>false</filtering></resource>
+          <resource><directory>${standalone.resources}</directory><filtering>false</filtering></resource>
+        </resources>
+      </build>
+    </profile>
+  </profiles>
 </project>
