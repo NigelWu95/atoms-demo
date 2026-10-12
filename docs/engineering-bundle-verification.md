@@ -4,7 +4,9 @@
 
 ## 当前交付边界
 
-EB01–EB17 已实现并验证：纯内存工程组装、独立启动/数据库/安装身份、访客与持久会话、固定应用资源/内容指纹/受限运行文档、连接真实会话/API/沙箱的独立 Vue 外壳，以及独立访客状态读取、原子幂等保存和未知结果重试。当前交付 C-EB07，下一步 EB18–EB19 构建/启动入口。没有下载 HTTP API、工作台按钮、真实模板装载器、完整工程构建执行器或托管实例，不宣称完整工程已可导出运行。本轮未改动线上服务、原平台生产源码/迁移或原交付文档；下文各节保留当时阶段的证据，不代表后续能力也已完成。
+EB01–EB23 与 C-EB10 已实现并验证：工程组装与固定模板装载、全新目录构建/独立 JAR 启动、独立数据库/访客持久会话、原子幂等保存、双实例隔离、真实源码升级、浏览器沙箱和错误恢复。最终 Chrome 23 项通过（3.9 分钟、无重试），使用固定手工夹具、不调用模型。下一步 EB24 工程说明与配额固化、EB25 原平台完整回归及 C-EB11 人工模块验收。
+
+目前可以通过仓库验收工具组装、构建并独立运行固定应用工程；没有用户下载 HTTP API、工作台下载按钮或平台托管构建/运行实例，也不是任意后端源码生成。本轮未改动线上服务、模板/JAR、原平台生产源码/迁移或原交付文档；下文保留各阶段当时的证据，最新状态以本节与任务清单为准。
 
 `BundleSource` 冻结来源 UUID、原内容 hash 和 Artifact；调用方必须先完成版本所有者授权。组装器再次调用原 `ArtifactValidator`，并且只读取传入的代码快照及固定模板快照；没有数据库、环境变量、网络、文件系统或进程操作。`TemplateSnapshot` 构造入口限定于 engineering 包，后续只有固定目录的 TemplateCatalog 提供真实模板。
 
@@ -742,7 +744,31 @@ STANDALONE_SECONDARY_RUNTIME_CONFIG="$atoms_repo/.local/standalone/runtime-b.pro
 
 复验沿用上一节完整浏览器命令并附加 `security.spec.ts`。本切片仅本地分支，不推送、不部署。
 
+## EB23e2 · 错误态键盘恢复与可访问性验收
+
+新增 `accessibility.spec.ts` 与 `accessibility.ts`，在 **320 / 1440px** 各执行三条真实错误路径，不变更模板、依赖或安全策略：
+
+| 场景 | 实际恢复与数据证据 |
+|---|---|
+| 同访客双标签冲突 | 保留输入，Tab 到“读取最新数据”、Enter 确认后再保存；原待办与草稿均存在，SQL revision=2 / stateRows=1 / idempotencyRows=2 |
+| 已提交但响应丢失 | 真实 PUT 已返回 200 后阻断响应交付；未知提示和草稿保留，键盘重试复用相同 key/body，SQL 仍为 1 / 1 / 1，无重复写入 |
+| 数据库不可用时启动 | 仅断开测试自有 JDBC 代理，实际 health 503；页面显示原因和重试入口，无 iframe；恢复连接后 Enter 重试成功，焦点保留，新访客 revision=0 |
+
+每条恢复路径使用真实 Tab / Shift+Tab / Enter，检查焦点、轮廓、视口内可见性与宿主/iframe 无横向溢出；不使用 JS focus 跳过键盘路径。读取草稿/重试后，Shift+Tab 可从沙箱返回宿主重载按钮。初版试图用正向 Tab 绕过页面末尾返回顶部，失败于宿主按钮失焦；改为直接验证向前进入、向后退出沙箱的用户路径，没有增加重试、等待预算或修改产品焦点行为。
+
+axe 4.13 保持现代跨 frame 扫描，WCAG 2 A/AA 与 2.1 A/AA **violations 为 0**；通过 `label/#title`、`button-name/#latest或#retry` 的嵌套 selector 证明确实扫描到 opaque iframe。扫描结果仅附加规则 ID/目标节点，不导出凭据。自动化检查不代表完整 WCAG 认证或读屏器人工验收。
+
+首次额外检查全部 incomplete 时失败：连接成功的 `.status-marker` 字符 `✓` 被 axe 标为 `color-contrast/nonBmp`，需人工复核而非已确定的违规。已核对实际截图、`aria-hidden=true`、相邻的“应用信息已就绪”文字，以及前景 `#d9f47e` / 背景 `#1a1e1b`（对比度 **13.8037:1**）。测试严格锁定这一节点/原因/颜色；其他 incomplete 仍失败，数据库离线页面要求 incomplete=0，没有 exclude 或 disableRules。未把“无违规”写成“没有人工复核项”。
+
+五维自审未发现需修改产品的缺陷。反转新增的 iframe selector 深度判断后，用例实际失败于“必须审计 frame 内 #title”；恢复后完整 Chrome **23/23 通过（3.9 分钟，retries=0，退出码 0）**，新增 8 项 = 沙箱 2 + 错误恢复 6。原四尺寸正常态、故障/重试、安装误配、同机双实例、进程重启和真实升级全部复验。严格 TypeScript、ESLint、Prettier、git diff 检查通过；本轮没有修改生产代码，不重复宣称已重跑平台 Maven 全门禁（留待 EB25）。
+
+已实际查看六张错误态截图，位于 `frontend/test-results/standalone/accessibility-*/` 下的 `conflict-keyboard.png`、`unknown-keyboard.png`、`offline-keyboard.png`；窄屏文案可换行，键盘恢复按钮滚入视口且轮廓可见。复验沿用 EB23d 的完整浏览器命令；只检查新增错误路径时追加 `accessibility.spec.ts`。截图与临时报告不提交仓库。
+
+收尾：原版/升级版 111 个源文件及 JAR hash 与原报告一致；18089/18090 无监听，`db-link-*` / `wrong-installation-*` 临时配置剩余 0；共享 PostgreSQL 仍为 Up 5 days (healthy)。EB23/C-EB10 完成，EB24–EB25/C-EB11 和下载/托管运行保持未完成；仅本地功能分支提交，没有推送、部署或更新原平台交付文档。
+
 ## 已核对的官方依据
+
+- [Playwright 无障碍检查](https://playwright.dev/docs/accessibility-testing)、[axe 对比度规则](https://dequeuniversity.com/rules/axe/4.13/color-contrast)、[WCAG 对比度说明](https://www.w3.org/WAI/WCAG21/Understanding/contrast-minimum.html)：扫描显露出的错误 UI、保留人工复核项并核对实际色值；不能用自动检测结果代替完整人工可访问性验收。
 
 - [Playwright 脚本装载](https://playwright.dev/docs/api/class-frame#frame-add-script-tag)、[确认弹窗](https://playwright.dev/docs/dialogs)：真实文档内装载探针，恢复时显式接受确认；没有替换真实文档响应。
 - [CSP sandbox](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Content-Security-Policy/sandbox)、[CSP 违规事件](https://developer.mozilla.org/en-US/docs/Web/API/Element/securitypolicyviolation_event)、[Worker error](https://developer.mozilla.org/en-US/docs/Web/API/Worker/error_event)：分别核对 opaque origin、安全策略拒绝及 worker 异步失败观察方式。
