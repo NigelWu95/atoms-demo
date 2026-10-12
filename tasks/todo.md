@@ -215,6 +215,7 @@
 ### EB18 · 不跳检查的单入口构建（M）
 
 - [ ] 完成 EB18。依赖：EB17。
+- 实施拆分（每片不超过 5 个主文件）：EB18a 受控构建输入摘要（`build-inputs.mjs` 及测试）；EB18b 最终资源指纹（打包器/测试、RuntimeResources/测试、TestApplication）；EB18c 固定命令与子进程生命周期（`process.mjs` 及测试）；EB18d 构建编排（build/测试、POM、打包后校验 IT）；EB18e 同源静态页面入口（安全配置、静态路由及 HTTP 测试）。源码输入摘要不是 JAR 二进制签名；实际前端字节在启动时重新校验。新目录完整组装证据仍归 EB21。
 - 文件：`T/scripts/build.mjs`、`T/scripts/build.test.mjs`、`T/scripts/package-application.mjs`、`T/scripts/package-application.test.mjs`、`T/backend/pom.xml`。
 - 验收：① 固定 argv 依次执行冻结安装/type/lint/unit/build、资源打包及 Maven clean verify；② frontend dist/应用/运行资源进入 JAR，build 前后 runtime hash 一致，缺资源失败；③ 缺专用测试配置、任一步失败/取消均非零退出，不读运行凭据、不静默跳集成测试。
 - 验证：V-S；用受控子进程验证固定执行顺序/argv、信号与失败退出，缺源码/测试配置时必须拒绝。白名单装配尚未完成，本任务不宣称实际导出 JAR 已构建；完整 build.mjs 与 JAR 资源检查是 EB21 的强制验收。
@@ -222,6 +223,7 @@
 ### EB19 · 显式启动与首次运行说明（M）
 
 - [ ] 完成 EB19。依赖：EB18。
+- 实施拆分：EB19a start/测试复用 EB18c 的退出与信号契约；EB19b 模板 README、配置示例和 Java 启动拒绝测试。仅本地构建/启动契约，不改变平台鉴权或公网策略。
 - 文件：`T/scripts/start.mjs`、`T/scripts/start.test.mjs`、`T/README.md`、`T/config/application.properties.example`、`BT/StartupConfigTest.java`。
 - 验收：① 只启动已有 JAR、配置必须显式给定，保留退出码/信号，不后台遗留进程；② Node 启动与直接 Java 启动都受 Java 配置/安装身份护栏保护；③ 模板 README 从数据库/测试库准备写到修改源码/构建/启动，明确初始数据与访客限制。
 - 验证：V-S、V-B；用受控子进程验证信号/退出、缺配置/非法身份与不下载依赖；Java 校验由后端真实测试覆盖。EB21 必须再用真实产物分别通过 Node 与 `java -jar` 启停，不能把本任务的脚本测试当成 JAR 实测。
