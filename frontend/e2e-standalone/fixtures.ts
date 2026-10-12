@@ -2,6 +2,7 @@ import { lstatSync, readFileSync } from 'node:fs'
 import { isAbsolute } from 'node:path'
 import { test as base, expect, type Page } from '@playwright/test'
 import { startVerifiedRuntime } from '../../scripts/serve-standalone.mjs'
+import { createDatabaseGate, databaseEvidence } from '../../scripts/standalone-database.mjs'
 
 // Explicit, local verification output only. No credentials or browser storage are serialized.
 export function readEvidence() {
@@ -25,7 +26,12 @@ export function readEvidence() {
   return { baseURL: report.baseURL, loadedRuntimeId: report.loadedRuntimeId }
 }
 
-type Runtime = { restart(): Promise<void> }
+type Runtime = {
+  restart(): Promise<void>
+  disconnectDatabase(): void
+  reconnectDatabase(): void
+  evidence(guest: string): ReturnType<typeof databaseEvidence>
+}
 
 // https://playwright.dev/docs/test-fixtures#worker-scoped-fixtures
 // A worker owns its child handles. There is no port lookup, process reuse or JAR control endpoint.
@@ -38,21 +44,26 @@ export const test = base.extend<
     async ({}, use, info) => {
       if (info.config.workers !== 1 || info.config.fullyParallel)
         throw new Error('Standalone acceptance requires one sequential worker.')
+      const gate = await createDatabaseGate(process.env.STANDALONE_RUNTIME_CONFIG)
       const start = () =>
-        startVerifiedRuntime(
-          process.env.STANDALONE_VERIFICATION_REPORT,
-          process.env.STANDALONE_RUNTIME_CONFIG,
-        )
-      let owned = await start()
+        startVerifiedRuntime(process.env.STANDALONE_VERIFICATION_REPORT, gate.configPath)
       try {
-        await use({
-          restart: async () => {
-            await owned.stop()
-            owned = await start()
-          },
-        })
+        let owned = await start()
+        try {
+          await use({
+            restart: async () => {
+              await owned.stop()
+              owned = await start()
+            },
+            disconnectDatabase: gate.disconnect,
+            reconnectDatabase: gate.reconnect,
+            evidence: (guest) => databaseEvidence(process.env.STANDALONE_RUNTIME_CONFIG, guest),
+          })
+        } finally {
+          await owned.stop()
+        }
       } finally {
-        await owned.stop()
+        await gate.close()
       }
     },
     { scope: 'worker', auto: true, timeout: 120000 },
