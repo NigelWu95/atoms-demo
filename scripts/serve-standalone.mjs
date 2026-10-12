@@ -27,14 +27,15 @@ export async function verifiedProject(path) {
 }
 
 /** Repository-only lifecycle: recheck the JAR on every start, own only the returned process. */
-export async function startVerifiedRuntime(report, config, { signal } = {}) {
+export async function startVerifiedRuntime(report, config, { signal, baseURL } = {}) {
   const project = await verifiedProject(report);
-  if (!config || await listenerFromConfig(config) !== project.baseURL)
+  const listener = baseURL ?? project.baseURL;
+  if (!config || await listenerFromConfig(config) !== listener)
     throw new Error('Explicit matching runtime config required.');
   const java = process.env.JAVA_HOME ? join(process.env.JAVA_HOME, 'bin/java') : 'java';
   return startOwned(java, ['-jar', join(project.directory, 'backend/target/app.jar'),
     '--spring.config.location=classpath:/application.yml,file:' + config],
-  { baseURL: project.baseURL, cwd: dirname(project.directory), signal });
+  { baseURL: listener, cwd: dirname(project.directory), signal });
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(await realpath(resolve(process.argv[1]))).href) {
