@@ -14,9 +14,22 @@ import java.util.TreeSet;
 import java.util.function.Function;
 
 /** Bounded immutable classpath inputs. The build fingerprint is checked against the loaded bytes. */
-record RuntimeResources(ApplicationArtifactLoader.Artifact artifact, String bootstrap, String document) {
+record RuntimeResources(ApplicationArtifactLoader.Artifact artifact, String bootstrap, String document,
+                        Map<String, byte[]> shellFiles) {
     static final List<String> PATHS = List.of("application/main.js", "application/manifest.json",
             "application/styles.css", "application/view.html", "runtime/bootstrap.js", "runtime/document.html");
+
+    RuntimeResources { shellFiles = copy(shellFiles); }
+    @Override public Map<String, byte[]> shellFiles() { return copy(shellFiles); }
+    byte[] shellResource(String path) {
+        byte[] bytes = shellFiles.get(path);
+        return bytes == null ? null : bytes.clone();
+    }
+    private static Map<String, byte[]> copy(Map<String, byte[]> files) {
+        var copied = new HashMap<String, byte[]>();
+        files.forEach((path, bytes) -> copied.put(path, bytes.clone()));
+        return Map.copyOf(copied);
+    }
 
     static RuntimeResources fromClasspath() { return fromClasspath(RuntimeResources.class.getClassLoader()); }
     static RuntimeResources fromClasspath(ClassLoader loader) { return load(loader::getResourceAsStream); }
@@ -38,9 +51,11 @@ record RuntimeResources(ApplicationArtifactLoader.Artifact artifact, String boot
         if (!(actual + "\n").equals(expected)) throw ApplicationArtifactLoader.invalid();
         var sources = new HashMap<String, byte[]>();
         for (String path : ApplicationArtifactLoader.FILES) sources.put(path, files.get(path));
+        var shell = new HashMap<String, byte[]>();
+        for (String path : staticPaths(files.get("runtime/build.txt"))) shell.put(path, files.get(path));
         return new RuntimeResources(ApplicationArtifactLoader.parse(sources, actual),
                 ApplicationArtifactLoader.utf8(files.get("runtime/bootstrap.js")),
-                ApplicationArtifactLoader.utf8(files.get("runtime/document.html")));
+                ApplicationArtifactLoader.utf8(files.get("runtime/document.html")), shell);
     }
 
     static String contentId(Map<String, byte[]> files) {

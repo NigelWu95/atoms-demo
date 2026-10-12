@@ -55,4 +55,12 @@ class RuntimeResourcesTest {
         changed.put("static/index.html", ApplicationArtifactTest.bytes("changed shell"));
         assertThatThrownBy(() -> load(changed)).isInstanceOf(IllegalArgumentException.class);
     }
+    @Test void verifiedShellResourcesDoNotExposeMutableBackingBytes() throws Exception {
+        var loaded = load(fixture());
+        byte[] index = loaded.shellResource("static/index.html");
+        index[0] = 0;
+        loaded.shellFiles().get("static/index.html")[0] = 0;
+        assertThat(loaded.shellResource("static/index.html")[0]).isEqualTo((byte) '<');
+        assertThat(loaded.shellResource("application/main.js")).isNull();
+    }
 }
