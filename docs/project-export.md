@@ -63,4 +63,6 @@ Accept: application/zip
 
 已验证真实所有者下载当前/历史版本、越权拒绝、错误重试、取消与资源释放、键盘和窄屏使用。实际从网页下载的 ZIP 解压到新目录，完成冻结依赖安装、前后端检查与构建、独立 JAR 启动、保存/刷新/进程重启恢复；浏览器阻止访问平台服务。详细命令、失败修复与产物摘要见[验证记录](https://github.com/NigelWu95/atoms-demo/blob/main/docs/engineering-bundle-verification.md)。
 
-后续平台内的专用工作区、受限构建执行器、独立实例启停/资源配额，以及对应实例的预览接入，仍是独立模块，不能用“工程下载完成”代替。GitHub 授权/同步、真实业务数据导入导出、任意后端生成，也未包含在此功能中。模块关系见[能力地图](https://github.com/NigelWu95/atoms-demo/blob/main/CAPABILITY-MAP.md)。
+平台内的专用工作区与固定模板本机构建执行器已由独立的 `workspace-build` 模块实现。它先冻结版本和模板，再构建 JAR；“下载本次构建工程 ZIP”按 buildId 返回原始冻结包，不同于本页按版本与当前模板组装的下载接口。使用方式见[本机构建说明](https://github.com/NigelWu95/atoms-demo/blob/main/README.md#在平台本机构建工程)，实际构建与下载重建结果见[验收记录](https://github.com/NigelWu95/atoms-demo/blob/main/docs/workspace-build-verification.md)。
+
+独立实例启停、运行数据库/端口分配和对应实例预览仍未实现，不能用“工程下载/构建完成”代替。GitHub 授权/同步、真实业务数据导入导出、任意后端生成，也未包含在此功能中。模块关系见[能力地图](https://github.com/NigelWu95/atoms-demo/blob/main/CAPABILITY-MAP.md)。
