@@ -423,11 +423,11 @@
 
 ### C-WB03 · 持久任务 API
 
-- [ ] WB07–WB09 真实 PostgreSQL/HTTP 测试及平台构建通过；记录幂等与队列并发证据。正常配置仍关闭执行，未接通 Worker 不模拟产物。
+- [x] WB07–WB09 真实 PostgreSQL/HTTP 测试及平台构建通过；2026-10-13 串行完整 verify 115 单元 + 77 集成通过，补齐此前容量/并行编译导致的未完成检查点。正常配置仍关闭执行。
 
 ### WB10 · 取消状态机（M）
 
-- [x] 完成 WB10（C-WB03 完整回归仍待环境容量恢复）。取消 API 与状态机完成：4 项真实 HTTP/PG 测试通过，覆盖同键/终态重放、并发取消、取消与领取/完成竞争；CANCELLING 保留执行 fence。没有模拟成真实进程退出。
+- [x] 完成 WB10（C-WB03 完整回归已补验）。取消 API 与状态机完成：4 项真实 HTTP/PG 测试通过，覆盖同键/终态重放、并发取消、取消与领取/完成竞争；CANCELLING 保留执行 fence。没有模拟成真实进程退出。
 - 描述：实现幂等取消意图与数据库状态竞争规则，为 Worker 提供可信取消信号。
 - 文件：`W/BuildCancellationService.java`、`W/BuildController.java`、`W/BuildRepository.java`、`WT/BuildCancellationIT.java`。
 - 验收：① 排队任务取消后不会被领取，运行中变 CANCELLING，不立即释放活动约束；② 终态取消无副作用，完成/取消竞争只有一个合法结果；③ 同键重试稳定，未授权无法影响任务或查询其存在。
@@ -453,13 +453,13 @@
 
 ### C-WB04 · 工作台任务流程
 
-- [ ] WB10–WB12 数据库、前端测试与构建通过；展示实际状态来源和未知结果处理，不以 fixture 结果宣称已完成真实构建。
+- [x] WB10–WB12 数据库、前端测试与构建通过；平台后端完整复验通过，前端 147 单元与构建证据见 WB12。不以 fixture 结果宣称已完成真实工程构建；最终新增下载/浏览器仍需 WB20 全回归。
 
 ### WB13 · 固定模板构建阶段接入（M）
 
 实施拆片：WB13a 模板固定流程监督回调（build.mjs/测试，2 文件）；WB13b 平台可信 runner 与 settlement 报告（runner/测试，2 文件）；WB13c 模板字节预算精确更新及命令树审计记录。白名单数量不变，不跳过检查。
 
-- [ ] 完成 WB13。依赖：C-WB04、WB05。
+- [x] 完成 WB13。共享流水线回调、可信 runner 与剩余截止期限接线完成；脚本 6 项、runner 5 项及平台完整 verify 通过。真实 JAR 留 WB18 验收。
 - 描述：让可信监督器调用已有完整构建流程，阶段通过内部接口传递而非解析普通日志。
 - 文件：`T/scripts/build.mjs`、`T/scripts/build.test.mjs`、`WR/build-runner.mjs`、`scripts/workspace-runner.test.mjs`、`templates/standalone-v1.files`。
 - 验收：① npm 安装禁用生命周期脚本，type/lint/unit/build 与 Maven clean verify 全部执行；② 平台构建与下载后手工构建共享同一固定流程，无跳测分支；③ 外部测试配置仅给必要子进程，阶段来自可信入口，日志不携带秘密或源码。
@@ -469,7 +469,7 @@
 
 实施拆片：WB14a JAR 实际资源与报告校验（验证器/测试，2 文件）；WB14b 持久领取/阶段/完成（生命周期服务/真实 PG 测试，2 文件）；WB14c Worker 与进程启动前取消（Worker/测试/NativeBuildProcess/测试，4 文件）；WB14d1 跨根 DB 租约（租约/真实 PG 测试，2 文件）；WB14d2 生命周期调度与准入就绪（Scheduler/环境/两项测试/Worker 容量接线，5 文件）。恢复证明解析与报告边界和 WB16 共用，不扩展到应用实例启动。
 
-- [ ] 完成 WB14。依赖：WB13、WB03、WB08–WB10。
+- [x] 完成 WB14。队列/Worker/调度/租约/JAR 实际资源校验接线完成；定向测试及完整 verify 通过。成功构建与重建的真实产物证明仍归 WB18，不能由 Worker 小 JAR 测试代替。
 - 描述：领取任务、准备冻结快照、监督执行并验证 JAR，写入真实结果。
 - 文件：`W/BuildWorker.java`、`W/BuildScheduler.java`、`W/BuildRepository.java`、`W/BuildArtifacts.java`、`WT/BuildWorkerTest.java`。
 - 验收：① 在 DB 事务外物化/执行，模板摘要变化则失败，同项目/全局限制贯穿执行；② 仅在完整检查成功、源未变、真实新 JAR 指纹匹配后原子成功；③ 超时/取消直到自有进程退出才终结，失败保留快照和记录且不启动模型请求。
@@ -479,7 +479,7 @@
 
 实施拆片：WB15a 冻结归档 HTTP 与真实 PG/HTTP 测试（2 文件）；WB15b 二进制客户端与独立下载控件/测试（最多 5 文件）；WB15c 工作台当前/历史构建下载接线与组件回归（2 文件）。不复用按版本重新组装的旧下载语义。
 
-- [ ] 完成 WB15。依赖：WB14、WB12。
+- [x] 完成 WB15。按 buildId 授权复验冻结 ZIP，当前及历史构建下载控件完成；真实 HTTP 2 项、新客户端下载 6 项及工作台 4 项通过，typecheck/lint 通过。实际浏览器下载仍归 WB19。
 - 描述：增加 buildId 绑定的快照下载 API 与工作台入口，复用已有有界二进制下载能力。
 - 文件：`W/BuildArchiveController.java`、`WT/BuildArchiveIT.java`、`PF/api/builds.ts`、`PF/components/EngineeringBuild.vue`、`PF/components/EngineeringBuild.spec.ts`。
 - 验收：① 每次授权后复验冻结 ZIP 类型/摘要，同一 buildId 字节不随版本/模板更新改变；② 尚无快照为 409，损坏明确错误而不回退当前模板；③ UI 下载准确目标任务，取消下载/切项目不影响新页面会话或泄漏对象 URL。
@@ -507,7 +507,9 @@
 
 ### WB18 · 真实 API 与 ZIP 二次构建验收（M）
 
-- [ ] 完成 WB18。依赖：WB17。
+实施拆片：WB18a 专用测试入口及参数测试（2 文件）；WB18b API/目录/构建证据编排与参数/合同单测（脚本/测试/类型，3 文件）；WB18c 两份真实成品临时启动与持久化对照（必要时独立 helper/测试，2 文件）。均复用现有固定待办夹具与专用数据库，不引入正式实例 API。
+
+- [x] 完成 WB18。真实 API 构建、下载 ZIP 新目录完整构建、运行身份一致与双实例保存/刷新/重启通过；WB16/17 的故障验收仍单独记录。
 - 描述：通过真实所有者会话提交固定应用，下载该构建 ZIP，在另一新目录完整构建对照。
 - 文件：`scripts/verify-workspace-build.mjs`、`scripts/verify-workspace-build.test.mjs`、`scripts/verify-workspace-build.d.mts`、`WT/BuildFixture.java`、`WT/BuildFixtureTest.java`。
 - 验收：① 实际 API 任务成功，保存归档/source/template/JAR 摘要及命令退出码，不打印配置；② 新 ZIP 全流程构建和两份成品临时启动后 loadedRuntimeId 对应一致，不要求非确定性 JAR 元数据 hash 相同；③ 各自专用运行库可保存/刷新/重启恢复，测试停止自有进程，正式平台仍没有实例 API。
@@ -518,6 +520,8 @@
 - [ ] WB16–WB18 完成，实际来源、冻结 ZIP、JAR 和运行身份对照可审阅；中断不重发、失败不假成功，测试进程已退出。提供可复查本地证据，不冒充云端已更新。
 
 ### WB19 · 真实浏览器工作台验收（M）
+
+实施拆片：WB19a 独立 Chrome 配置、专有测试服务入口及守卫测试、工作台场景、npm 命令（5 文件）。使用单独 `e2e-workspace` 和配置文件，避免改变原 runtime 套件的环境语义；两项 webServer 都禁止复用，串行独占模板测试库。WB19b 仅在真实浏览器暴露产品问题时增加修复/回归切片。
 
 - [ ] 完成 WB19。依赖：C-WB06。
 - 描述：Chrome 操作真实构建入口，验证刷新/取消/失败/下载及无障碍布局。
