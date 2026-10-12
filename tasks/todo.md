@@ -383,9 +383,9 @@
 
 - [x] WB06a：真实双 JVM 排他锁及目录/字节预算测试通过。测试捕获同 JVM 再次打开/关闭文件描述符会释放 POSIX 锁的问题；改为打开文件前先取得 JVM 内唯一持有权，保留 OS 锁负责跨进程互斥。无清理或解锁文件删除。
 - [x] WB06b：默认关闭、loopback/本地 profile、显式工具路径与版本、私有配置检查完成；2 项新测试先编译失败再通过，子进程环境不带平台凭据或启动覆盖变量。
-- [ ] WB06c：专用测试库前置只读核验。
+- [x] WB06c：专用配置、实际库/角色用途标记、权限、schema 和已有 installation 身份只读核验完成；非法配置单测及现有专用库真实只读探针通过，无配置改写或数据库写入。
 
-- [ ] 完成 WB06。依赖：WB03、WB05。
+- [x] 完成 WB06。依赖：WB03、WB05。
 - 描述：增加默认关闭的本机构建配置与工具、专用测试库配置、执行根资源检查。
 - 文件：`W/BuildEnvironment.java`、`W/BuildRootLease.java`、`WT/BuildEnvironmentTest.java`、`WT/BuildRootLeaseTest.java`、`backend/src/main/resources/application.yml`。
 - 验收：① 非显式本地启用、工具不符、平台/运行测试配置混用均失败；② 同根 OS 锁互斥，保留目录数、磁盘预算与最低可用空间按规格检查；③ 环境不透传平台密码/模型 Key/执行覆盖变量，不改私有配置。

@@ -47,4 +47,10 @@
 - 增加稳定 inode 的 `.scheduler.lock`，关闭后保留文件；同 JVM 注册表与 OS 文件锁配合。32 个任务目录、8 GiB 软件总量及准入最低 2 GiB 可用空间检查；只扫描元数据，不跟随 npm 链接、不删除旧目录。
 - 新测试最初因类缺失编译失败。实现后真实双 JVM 测试进一步捕获：第二次同 JVM 尝试获得锁时读取/关闭同 inode 的描述符，会释放第一个持有者的 POSIX 锁，外部 JVM 错误取得执行权。
 - 根因符合 [Java FileLock 平台依赖说明](https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/nio/channels/FileLock.html)。修复为打开任何同根锁文件描述符之前先原子取得 JVM 内持有权，外部互斥仍由 OS 锁执行；最终 2 项测试通过，含真实第二 JVM、关闭后重获和超量拒绝保留原文件。
-- WB06b/c 仍未完成，本地自动执行尚未启用。
+- 此时 WB06b/c 未完成，本地自动执行尚未启用。
+
+## WB06b/c · 显式配置与专用测试库
+
+- 默认关闭执行；只允许 local/fixtures/test 和 loopback，管理员显式指定私有根、Node 24.20.x/npm 11.19.x/Java 17 及私有测试配置。版本探针有 3 秒期限，环境不继承平台密钥与解释器覆盖变量。2 项测试 RED 后 GREEN。
+- 只读连接验证服务端 transaction_read_only、数据库/角色用途标记、非管理角色权限、独立 schema 与 installation 身份。非法配置测试 RED 后 GREEN；现有 `.local/standalone/test.properties` 的实际只读探针通过。沙箱阻止本机连接，授权后复验成功；没有修改文件或数据库。
+- 进程套件回归发现测试 PID 报告的读取与未完成写入竞态（JSON 意外结束），改为测试夹具先写私有临时报告再 rename 发布，保留所有进程退出断言。生产协议不使用这份测试文件。
