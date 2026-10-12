@@ -4,6 +4,7 @@ import type { VersionSummary } from '../api/artifacts'
 import type { BuildStage, BuildStatus } from '../api/builds'
 import { useEngineeringBuild } from '../composables/useEngineeringBuild'
 import { useSessionStore } from '../stores/session'
+import BuildArchiveDownload from './BuildArchiveDownload.vue'
 
 const props = defineProps<{
   projectId: string | null
@@ -113,6 +114,11 @@ function date(value: string) {
         {{ build.errorMessage }}（{{ build.errorCode }}）
       </p>
       <p class="muted">构建 {{ build.id.slice(0, 8) }} · {{ date(build.createdAt) }}</p>
+      <BuildArchiveDownload
+        v-if="build.archiveSha256"
+        :key="build.id"
+        :target="{ id: build.id, projectId: build.projectId }"
+      />
     </template>
     <div v-if="pending && !busy" class="pending-build">
       <p role="status">上次操作结果尚未确认，请使用原操作标识确认，不会创建新的提交意图。</p>
@@ -140,6 +146,10 @@ function date(value: string) {
       <ul>
         <li v-for="item in history" :key="item.id">
           {{ date(item.createdAt) }} · {{ statuses[item.status] }} · {{ item.id.slice(0, 8) }}
+          <BuildArchiveDownload
+            v-if="item.archiveSha256 && item.id !== build?.id"
+            :target="{ id: item.id, projectId: item.projectId }"
+          />
         </li>
       </ul>
     </details>
