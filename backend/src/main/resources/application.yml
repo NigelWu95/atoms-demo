@@ -23,6 +23,13 @@ spring:
   sql:
     init:
       mode: never
+atoms:
+  build:
+    enabled: ${WORKSPACE_BUILD_ENABLED:false}
+    root: ${WORKSPACE_BUILD_ROOT:}
+    node: ${WORKSPACE_BUILD_NODE:}
+    java: ${WORKSPACE_BUILD_JAVA:}
+    test-config: ${WORKSPACE_BUILD_TEST_CONFIG:}
 server:
   servlet:
     session:
