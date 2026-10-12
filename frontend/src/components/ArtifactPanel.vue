@@ -7,6 +7,7 @@ import PreviewFrame from './PreviewFrame.vue'
 import SourceViewer from './SourceViewer.vue'
 import RestorationPanel from './RestorationPanel.vue'
 import EngineeringDownload from './EngineeringDownload.vue'
+import EngineeringBuild from './EngineeringBuild.vue'
 
 const props = defineProps<{ project: Project | null }>()
 const emit = defineEmits<{ changed: [Project] }>()
@@ -114,6 +115,7 @@ watch(
       >
     </div>
     <EngineeringDownload :project-id="project?.id ?? null" :version="version" :loading="loading" />
+    <EngineeringBuild :project-id="project?.id ?? null" :version="version" :loading="loading" />
     <RestorationPanel
       v-if="project?.currentVersionId"
       :key="project.id"
