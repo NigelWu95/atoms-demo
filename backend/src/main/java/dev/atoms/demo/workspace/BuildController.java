@@ -11,7 +11,10 @@ import org.springframework.web.bind.annotation.*;
 public class BuildController {
     private final BuildAdmissionService admission;
     private final BuildQueryService queries;
-    public BuildController(BuildAdmissionService admission, BuildQueryService queries) { this.admission=admission; this.queries=queries; }
+    private final BuildCancellationService cancellation;
+    public BuildController(BuildAdmissionService admission, BuildQueryService queries, BuildCancellationService cancellation) {
+        this.admission=admission; this.queries=queries; this.cancellation=cancellation;
+    }
     @PostMapping
     ResponseEntity<JsonNode> submit(Principal principal, @PathVariable String projectId, @RequestBody JsonNode body,
             @RequestHeader(value="Idempotency-Key",required=false) String key) {
@@ -31,5 +34,11 @@ public class BuildController {
     BuildQueryService.Events events(Principal principal,@PathVariable String projectId,@PathVariable String buildId,
             @RequestParam(defaultValue="0") long after,@RequestParam(defaultValue="100") int limit) {
         return queries.events(UUID.fromString(principal.getName()),projectId,buildId,after,limit);
+    }
+    @PostMapping("/{buildId}/cancellations")
+    ResponseEntity<JsonNode> cancel(Principal principal,@PathVariable String projectId,@PathVariable String buildId,
+            @RequestBody JsonNode body,@RequestHeader(value="Idempotency-Key",required=false) String key) {
+        var result=cancellation.cancel(UUID.fromString(principal.getName()),projectId,buildId,body,key);
+        return ResponseEntity.status(result.status()).body(result.body());
     }
 }

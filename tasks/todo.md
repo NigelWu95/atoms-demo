@@ -427,13 +427,15 @@
 
 ### WB10 · 取消状态机（M）
 
-- [ ] 完成 WB10。依赖：C-WB03。
+- [x] 完成 WB10（C-WB03 完整回归仍待环境容量恢复）。取消 API 与状态机完成：4 项真实 HTTP/PG 测试通过，覆盖同键/终态重放、并发取消、取消与领取/完成竞争；CANCELLING 保留执行 fence。没有模拟成真实进程退出。
 - 描述：实现幂等取消意图与数据库状态竞争规则，为 Worker 提供可信取消信号。
 - 文件：`W/BuildCancellationService.java`、`W/BuildController.java`、`W/BuildRepository.java`、`WT/BuildCancellationIT.java`。
 - 验收：① 排队任务取消后不会被领取，运行中变 CANCELLING，不立即释放活动约束；② 终态取消无副作用，完成/取消竞争只有一个合法结果；③ 同键重试稳定，未授权无法影响任务或查询其存在。
 - 验证：W-I `BuildCancellationIT`；真实数据库并发闩锁覆盖领取/取消/完成窗口。
 
 ### WB11 · 前端构建协议与请求生命周期（M）
+
+实施拆片：WB11a 通用 JSON 请求可取消（client 与测试，2 文件）；WB11b 构建协议与严格解码（builds 与测试，2 文件）；WB11c 构建状态管理（composable 与测试，2 文件）。取消旧请求不得让晚到 401/403 破坏新的会话状态。
 
 - [ ] 完成 WB11。依赖：WB09、WB10。
 - 描述：实现强校验构建 API 客户端和可测试的任务状态管理。

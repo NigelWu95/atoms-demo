@@ -51,6 +51,16 @@ public class BuildRepository {
         return jdbc.queryForObject("SELECT EXISTS(SELECT FROM engineering_builds WHERE execution_pending AND status='INTERRUPTED')", Boolean.class);
     }
     @Transactional(propagation = Propagation.MANDATORY)
+    public void requestCancellation(EngineeringBuild build) {
+        if (build.status().equals("QUEUED")) {
+            int changed=jdbc.update("UPDATE engineering_builds SET status='CANCELLED',error_code='BUILD_CANCELLED',finished_at=now() WHERE id=? AND status='QUEUED'",build.id());
+            if(changed==1) event(build.id(),"build.completed");
+        } else if (build.status().equals("BUILDING")) {
+            int changed=jdbc.update("UPDATE engineering_builds SET status='CANCELLING' WHERE id=? AND status='BUILDING'",build.id());
+            if(changed==1) event(build.id(),"build.cancelling");
+        }
+    }
+    @Transactional(propagation = Propagation.MANDATORY)
     public void event(UUID id, String type) {
         int seq = jdbc.queryForObject("UPDATE engineering_builds SET last_event_seq=last_event_seq+1 WHERE id=? RETURNING last_event_seq", Integer.class, id);
         jdbc.update("""
