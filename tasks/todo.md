@@ -237,6 +237,7 @@
 ### EB20 · 模板白名单进入平台产物（M）
 
 - [ ] 完成 EB20。依赖：EB02、EB19。
+- 实施拆分：EB20a 模板许可证（notice + Apache license/notice）；EB20b 显式清单、Classpath Catalog 及单元测试、Maven 资源接线（4 文件）；EB20c 仓库源文件/正式 JAR 一致性与非仓库工作目录验收（测试夹具与打包 IT，2 文件）。构建仍使用既有 Maven 插件，不新增依赖。
 - 文件：`templates/standalone-v1.files`、`P/TemplateCatalog.java`、`PT/TemplateCatalogTest.java`、`backend/pom.xml`、`T/THIRD-PARTY-NOTICES.md`。
 - 验收：① 逐文件审核白名单，仅模板源码/锁文件/必需测试/许可证，无平台夹具或凭据；② 平台正式 JAR 包含白名单模板资源，非仓库 cwd 下仍可装载组装；③ 实测文件数与字节符合硬预算，任一缺项/重复/符号链接拒绝，不在超限时自动加额。
 - 验证：平台 `backend/` 执行 `./mvnw -B verify`；`jar tf target/atoms-demo-0.1.0-SNAPSHOT.jar` 检查资源，扫描 canary 排除项，记录实际大小与许可证。
@@ -244,6 +245,7 @@
 ### EB21 · 从真实组装输出建立验收环境（M）
 
 - [ ] 完成 EB21。依赖：EB20。
+- 实施拆分：EB21a 测试态组装输出与新目录 hash 验证（BundleFixture、物化脚本及测试）；EB21b 真实构建/自有进程启停编排及测试；EB21c 仓库侧 Playwright 环境与浏览器烟测。不修改或重用平台服务/数据库，不把浏览器控制端点打进独立 JAR。
 - 文件：`PT/BundleFixture.java`、`scripts/verify-standalone.mjs`、`scripts/verify-standalone.test.mjs`、`frontend/playwright.standalone.config.ts`、`frontend/e2e-standalone/fixtures.ts`。
 - 验收：① 测试夹具通过真实组装器输出，脚本只在新目录物化并验证所有 hash，不引入下载 API；② 新目录内真实安装/检查/构建并检查 JAR 资源，分别用 Node 与直接 Java 启停，JAR 无测试后门；③ 浏览器环境控制只在仓库侧，记录本次进程/路径，端口冲突失败，不复用或停止平台进程。
 - 验证：仓库根 `node --test scripts/verify-standalone.test.mjs`；V-X，再由 V-E 使用其明确产物；测试导出文件 manifest 没有被浏览器夹具修改。
