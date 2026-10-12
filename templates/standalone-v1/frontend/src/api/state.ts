@@ -31,6 +31,7 @@ export function createStateHandler(loadedRuntimeId: string, lifetime: AbortSigna
     try {
       controller.signal.throwIfAborted()
       const writing = request.type === 'STATE_SAVE'
+      const expectedAcknowledgement = writing ? request.payload.expectedRevision + 1 : null
       // Snapshot synchronously, before awaiting CSRF. Never read mutable application input again.
       const body = writing
         ? JSON.stringify({ loadedRuntimeId, ...request.payload, stateSchemaVersion: 1 })
@@ -57,7 +58,7 @@ export function createStateHandler(loadedRuntimeId: string, lifetime: AbortSigna
       if (response.status >= 400) throw responseFailure(result, response.status)
       if (response.status !== 200) throw new InvalidResponse()
       const document = stateDocument(result)
-      if (writing && document.revision !== request.payload.expectedRevision + 1)
+      if (expectedAcknowledgement !== null && document.revision !== expectedAcknowledgement)
         throw new InvalidResponse()
       return document
     } catch (failure) {
