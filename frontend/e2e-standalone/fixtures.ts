@@ -104,21 +104,32 @@ export const test = base.extend<
 export { expect }
 
 export async function ready(page: Page) {
-  const [session] = await Promise.all([
-    page
-      .waitForResponse(
-        (response) =>
-          response.url().endsWith('/api/session') && response.request().method() === 'POST',
-      )
-      .then((response) => response.json()),
-    page.goto(readEvidence().baseURL + '/'),
-  ])
-  expect(session.isGuest).toBe(true)
-  expect(typeof session.userId).toBe('string')
+  let userId: unknown
+  // Capture the real upstream response while forwarding it unchanged. Chrome can discard a
+  // previous document's Network.getResponseBody handle across restart/navigation.
+  // https://playwright.dev/docs/api/class-route#route-fetch
+  await page.route(
+    readEvidence().baseURL + '/api/session',
+    async (route) => {
+      const response = await route.fetch({ maxRetries: 0, maxRedirects: 0 })
+      expect(response.status()).toBe(200)
+      const session = await response.json()
+      expect(session.isGuest).toBe(true)
+      userId = session.userId
+      await route.fulfill({ response })
+    },
+    { times: 1 },
+  )
+  await page.goto(readEvidence().baseURL + '/')
   const frame = page.frameLocator('iframe')
   await expect(frame.locator('#status')).toHaveText('数据已读取。')
   await expect(frame.getByRole('button', { name: '添加待办', exact: true })).toBeEnabled()
-  return session.userId as string
+  if (
+    typeof userId !== 'string' ||
+    !/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/.test(userId)
+  )
+    throw new Error('Expected a real standalone visitor identity.')
+  return userId
 }
 
 export async function add(page: Page, title: string) {
