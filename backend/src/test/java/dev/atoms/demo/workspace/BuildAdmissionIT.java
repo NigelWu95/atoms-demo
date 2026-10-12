@@ -53,6 +53,13 @@ class BuildAdmissionIT {
         assertThat(f.browser.request("POST",f.path,f.body,null).status()).isEqualTo(422);
         verify(execution,never()).settings();
     }
+    @Test void foreignVersionIsStill404WhenTheBuildEnvironmentIsDisabled() throws Exception {
+        var own=fixture();var foreign=fixture();
+        when(execution.admissionFailure()).thenReturn(new ApiException(503,"BUILD_DISABLED","未启用"));
+        var denied=own.browser.request("POST",own.path,foreign.body,UUID.randomUUID().toString());
+        assertThat(denied.status()).isEqualTo(404);
+        assertThat(denied.body().path("error").path("code").asText()).isEqualTo("VERSION_NOT_FOUND");
+    }
     @Test void concurrentSameIntentReturnsOneIdAndDifferentIntentHitsProjectLimit() throws Exception {
         var f = fixture(); String key = UUID.randomUUID().toString();
         var pool = Executors.newFixedThreadPool(6);
