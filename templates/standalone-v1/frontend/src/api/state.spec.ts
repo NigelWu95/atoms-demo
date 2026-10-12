@@ -77,6 +77,16 @@ describe('standalone state transport', () => {
     })
     expect(s.fetcher).toHaveBeenCalledTimes(2)
   })
+
+  it('validates the acknowledgement against the captured revision, not a later mutation', async () => {
+    const s = setup()
+    s.fetcher.mockResolvedValueOnce(reply(csrf)).mockResolvedValueOnce(reply(saved))
+    const original = structuredClone(save)
+    const pending = s.handle(original, key)
+    original.payload.expectedRevision = 40
+    expect(await pending).toEqual(saved)
+    expect(JSON.parse(s.fetcher.mock.calls[1]![1].body).expectedRevision).toBe(0)
+  })
   it.each([
     [409, 'STATE_CONFLICT'],
     [409, 'STALE_APP_VERSION'],
