@@ -174,6 +174,40 @@ class SessionIT {
         TestDatabase.load();
     }
 
+    @Test
+    @org.junit.jupiter.api.extension.ExtendWith(org.springframework.boot.test.system.OutputCaptureExtension.class)
+    void rollbackFailureDoesNotLogTheOriginalDatabaseException(org.springframework.boot.test.system.CapturedOutput output) throws Exception {
+        var browser = new Browser();
+        browser.csrf();
+        var mappings = context.getBean(org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping.class);
+        var info = org.springframework.web.servlet.mvc.method.RequestMappingInfo.paths("/api/csrf")
+                .methods(org.springframework.web.bind.annotation.RequestMethod.GET).params("failRollback=true")
+                .options(mappings.getBuilderConfiguration()).build();
+        mappings.registerMapping(info, new RollbackFailure(), RollbackFailure.class.getDeclaredMethod("fail"));
+        var response = browser.send("GET", "/api/csrf?failRollback=true", null, null);
+        error(response, 503, "SERVICE_UNAVAILABLE");
+        assertThat(output.getOut()).contains("\"code\":\"SERVICE_UNAVAILABLE\"", "\"requestId\":\""
+                        + response.headers().firstValue("x-request-id").orElseThrow() + "\"")
+                .doesNotContain("stack_trace", "SQLException", "private-query-canary", "rollback-canary");
+    }
+
+    // A deterministic rollback failure; actual socket-loss coverage lives in the repository browser suite.
+    @org.springframework.web.bind.annotation.RestController
+    @org.springframework.context.annotation.Profile("rollback-failure-fixture")
+    static class RollbackFailure {
+        Map<String, String> fail() {
+            var manager = org.mockito.Mockito.mock(org.springframework.transaction.PlatformTransactionManager.class);
+            org.mockito.Mockito.when(manager.getTransaction(org.mockito.ArgumentMatchers.any()))
+                    .thenReturn(new org.springframework.transaction.support.SimpleTransactionStatus());
+            org.mockito.Mockito.doThrow(new org.springframework.transaction.TransactionSystemException("rollback-canary",
+                    new java.sql.SQLException("rollback-canary"))).when(manager).rollback(org.mockito.ArgumentMatchers.any());
+            return new org.springframework.transaction.support.TransactionTemplate(manager).execute(status -> {
+                throw new org.springframework.jdbc.UncategorizedSQLException("private-query-canary", "SELECT private-query-canary",
+                        new java.sql.SQLException("private-query-canary"));
+            });
+        }
+    }
+
     // Installed explicitly in one test only, never component-scanned or shipped in the JAR.
     @org.springframework.web.bind.annotation.RestController
     @org.springframework.context.annotation.Profile("session-save-failure-fixture")

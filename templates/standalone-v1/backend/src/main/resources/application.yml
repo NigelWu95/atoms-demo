@@ -56,3 +56,7 @@ logging:
     # A JDBC session failure during error-response flush is caught by RequestBoundaryFilter.
     # MVC otherwise logs the raw nested database exception before that sanitized boundary.
     org.springframework.web.servlet.mvc.method.annotation.ExceptionHandlerExceptionResolver: 'OFF'
+    # A broken connection can also fail rollback. TransactionTemplate logs the original SQL
+    # exception before our boundary returns a correlated, sanitized 503. Keep only that event.
+    # https://github.com/spring-projects/spring-framework/blob/v6.2.19/spring-tx/src/main/java/org/springframework/transaction/support/TransactionTemplate.java
+    org.springframework.transaction.support.TransactionTemplate: 'OFF'
