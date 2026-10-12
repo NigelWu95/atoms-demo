@@ -37,6 +37,20 @@ public class BuildRepository {
         return rows.isEmpty() ? null : rows.get(0);
     }
     @Transactional(propagation = Propagation.MANDATORY)
+    public void lockAdmission() {
+        jdbc.execute("SET LOCAL lock_timeout='3s'");
+        // Transaction lock, unrelated to model budget. Also used by claim/recovery/cancellation.
+        // https://www.postgresql.org/docs/17/explicit-locking.html#ADVISORY-LOCKS
+        jdbc.execute("SELECT pg_catalog.pg_advisory_xact_lock(1748392063)");
+    }
+    int activeCount() { return jdbc.queryForObject("SELECT count(*) FROM engineering_builds WHERE status IN ('QUEUED','BUILDING','CANCELLING')", Integer.class); }
+    boolean activeProject(UUID project) {
+        return jdbc.queryForObject("SELECT EXISTS(SELECT FROM engineering_builds WHERE project_id=? AND status IN ('QUEUED','BUILDING','CANCELLING'))", Boolean.class, project);
+    }
+    boolean unresolved() {
+        return jdbc.queryForObject("SELECT EXISTS(SELECT FROM engineering_builds WHERE execution_pending AND status='INTERRUPTED')", Boolean.class);
+    }
+    @Transactional(propagation = Propagation.MANDATORY)
     public void event(UUID id, String type) {
         int seq = jdbc.queryForObject("UPDATE engineering_builds SET last_event_seq=last_event_seq+1 WHERE id=? RETURNING last_event_seq", Integer.class, id);
         jdbc.update("""

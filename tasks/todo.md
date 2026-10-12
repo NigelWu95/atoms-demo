@@ -407,7 +407,7 @@
 
 实施拆片：WB08a 准入资源持有器（BuildExecutionEnvironment/测试，2 文件）；WB08b HTTP/事务准入（Admission/Controller/Repository/IT，4 文件）。环境与文件扫描发生在事务外；短事务只使用核验结果并冻结来源。
 
-- [ ] 完成 WB08。依赖：WB07、WB01、WB06。
+- [x] 完成 WB08。依赖：WB07、WB01、WB06。准入 API 的 4 项真实 HTTP/PG 测试先 404 失败后通过；同键并发返回同一 buildId、同项目冲突、8 项并发恰好接收 4 项、开关变更后旧意图仍重放。环境生命周期另有 2 项通过；一次后续容量检查失败已保留，完整回归需复验，不降低磁盘门槛。
 - 描述：创建只登记意图的 202 API，事务内冻结来源/模板摘要与幂等结果。
 - 文件：`W/BuildAdmissionService.java`、`W/BuildController.java`、`W/BuildRepository.java`、`WT/BuildAdmissionIT.java`。
 - 验收：① 仅接收 versionId，所有者/CSRF/规范 UUID/未知字段验证完整；② 同键同体只创建一次，同键异体 422，多线程不突破全局四项/项目一项；③ 事务不启动进程或长时间写文件，已接受意图重放不受新容量/开关变化影响。
