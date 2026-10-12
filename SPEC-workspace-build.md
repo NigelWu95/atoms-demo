@@ -1,6 +1,6 @@
 # workspace-build · 本机工程快照与自动构建规格
 
-状态：2026-10-13 用户已确认，包括 V011、单执行槽及 10 分钟构建预算，并批准详细计划一次性实施。当前开发中，不表示已经可以在工作台启动独立实例。
+状态：2026-10-13 用户已确认，包括 V011、单执行槽及 10 分钟构建预算，并批准详细计划一次性实施。构建模块已实现，自动验收与失败记录见 [验证文档](docs/workspace-build-verification.md)；不表示已经可以在工作台启动独立实例。
 归属：[能力地图](CAPABILITY-MAP.md)。执行取舍：[ADR-013](docs/decisions/013-native-process-engineering-preview.md)。代码基线：`21571cd`，沿用 `feature/standalone-engineering`，不合并/推送/部署。
 
 ## 1. 目标与模块边界
@@ -59,7 +59,7 @@
 
 ## 5. 数据持久化与 HTTP 契约
 
-已批准新增 **V011 增量迁移**记录构建任务和有界阶段事件，目前尚未编写或应用。使用新表 `engineering_builds` / `engineering_build_events`，包含 owner/project/version 外键、来源/模板摘要、状态/阶段、相对 workspaceKey、结果摘要、错误码、时间戳及事件序号。不改 V000–V010，不修改 versions/app_states/publications，不把源文件或真实数据库密码保存到事件表。
+已批准新增 **V011 增量迁移**记录构建任务和有界阶段事件，已实现并仅应用于本地专用平台测试库，未应用云端。使用新表 `engineering_builds` / `engineering_build_events`，包含 owner/project/version 外键、来源/模板摘要、状态/阶段、相对 workspaceKey、结果摘要、错误码、时间戳及事件序号。不改 V000–V010，不修改 versions/app_states/publications，不把源文件或真实数据库密码保存到事件表。
 
 任务创建与幂等结果在现有 PostgreSQL 事务内提交；使用现有 IdempotencyService 原子唯一约束，不在此事务里安装依赖、写长时间文件或启动进程。项目级活动任务约束和全局调度容量必须由事务/唯一约束保护，不能靠先查后写。
 
@@ -72,7 +72,7 @@
 | `GET /api/projects/{projectId}/builds/{buildId}` | 下述 BuildSummary；未知执行状态不能只由前端计时推断 |
 | `GET /api/projects/{projectId}/builds/{buildId}/events?after=0&limit=100` | `{items, nextCursor}`，递增 seq；每次最多 100 条，只给有限类型的阶段事件与脱敏错误 |
 | `POST /api/projects/{projectId}/builds/{buildId}/cancellations` | 仅 `{}`；202 `{buildId}`。未完成则请求取消，已终态为无副作用确认；相同意图安全重放，详情接口提供最终状态 |
-| `GET /api/projects/{projectId}/builds/{buildId}/engineering.zip` | 从冻结归档读取；同一 buildId 的字节固定，未形成有效快照为 409 `BUILD_SNAPSHOT_NOT_READY`；沿用有界下载及不缓存响应头 |
+| `GET /api/projects/{projectId}/builds/{buildId}/engineering.zip` | 从冻结归档读取；同一 buildId 的字节固定，未形成有效快照为 409 `BUILD_ARTIFACT_NOT_READY`；沿用有界下载及不缓存响应头 |
 
 `BuildSummary` 字段：`id, projectId, versionId, status, stage, templateDigest, buildPolicyVersion, bundleId, archiveSha256, loadedRuntimeId, jarSha256, errorCode, errorMessage, createdAt, startedAt, finishedAt, lastEventSeq`。尚未产生的结果/时间为 null；ID 使用标准 UUID，摘要为小写 64 位 hex，时间为 UTC ISO-8601，事件序号受 JavaScript 安全整数范围约束。
 
@@ -93,7 +93,7 @@
 - 全局一个正在执行的构建，活动队列总量最多 4（包含执行中），同项目最多一个活动任务；超过容量立即拒绝。
 - 总构建最长 10 分钟；取消先终止自有进程组，5 秒宽限后处理仍存活的自有子进程，等待退出后才释放执行槽。平台退出时也执行此流程。
 - 父级连接丢失时监督器终止所管任务；正常退出、平台强制退出、任务取消均需真实子孙进程测试。监督器自身遭 SIGKILL 等无法证明退出的情况标记中断并阻止不确定任务被自动接管；不凭旧 PID 或进程名杀进程。
-- 同一执行根只允许一个调度器持有 OS 文件锁。重启后不自动重跑非终态任务、不删除未知目录；处理可证实的自有任务后保留中断记录。
+- 同一执行根只允许一个调度器持有 OS 文件锁；数据库 session advisory lock 同时阻止不同根共享同一数据库的调度器竞争。重启后不自动重跑非终态任务、不删除未知目录；有效私有退出证明只能释放占位，不能把中断任务变成成功。
 - 归档沿用 128 文件 / 单项 2 MiB / 总源 8 MiB / ZIP 9 MiB；JAR 上限 128 MiB；任务事件最多 1000 条、单条 2 KiB；内部诊断输出最多 1 MiB，超限持续排空但不继续保存，不因管道写满卡死。
 - 专用工作根最多保留 32 个任务目录，软件磁盘预算 8 GiB、启动准入要求至少 2 GiB 可用空间；达到上限拒绝新构建，不自动递归删旧工程。运行时监测不能作为严格磁盘隔离承诺；管理员显式清理契约另行设计。
 
@@ -101,7 +101,7 @@
 
 ## 7. 文件归属与代码风格
 
-拟新增 `backend/.../workspace/` 的任务/快照/调度接口和对应单元、PostgreSQL HTTP 集成测试；受控监督入口位于平台打包资源而非用户可上传目录，仓库侧生命周期测试仍在 `scripts/`。构建 UI 放入独立组件及 `api/`，接入现有 ArtifactPanel，不把生成、发布和构建状态混成一个字段。
+已新增 `backend/.../workspace/` 的任务/快照/调度接口和对应单元、PostgreSQL HTTP 集成测试；受控监督入口位于平台打包资源而非用户可上传目录，仓库侧生命周期测试仍在 `scripts/`。构建 UI 放入独立组件及 `api/`，接入现有 ArtifactPanel，不把生成、发布和构建状态混成一个字段。
 
 沿用 Java record、构造器注入、JdbcTemplate 参数化 SQL，TypeScript 严格模式、判别联合和现有格式化规则。接口示例（契约示意，非已存在代码）：
 
@@ -115,7 +115,7 @@ public record BuildAccepted(UUID buildId, UUID projectId, UUID versionId) {}
 
 ## 8. 验证与完成条件
 
-先写失败测试，按小切片实施；不删除断言、不静默跳过浏览器或 PostgreSQL 检查。以下命令是实现后的验收要求，本轮仅规格审查，未运行新功能测试：
+先写失败测试，按小切片实施；不删除断言、不静默跳过浏览器或 PostgreSQL 检查。以下是复现命令；实际结果与首次失败保存在验证记录中。所有专用库构建及浏览器套件按顺序运行，不复用未知服务：
 
 ```sh
 # 平台 backend/，使用已配置的专用平台测试库
@@ -128,9 +128,13 @@ npm run format:check
 npm run test:unit
 npm run build
 npm run test:e2e:runtime -- --project=chromium
+npm run test:e2e:workspace
 
 # 根目录：保留已有运行层一致性与工程工具回归
 node --test scripts/standalone-runtime-parity.test.mjs scripts/verify-standalone.test.mjs
+node --test scripts/workspace-supervisor.test.mjs scripts/workspace-runner.test.mjs
+node scripts/verify-workspace-recovery.mjs --config-dir .local/standalone --output-parent .local/standalone
+node scripts/verify-workspace-build.mjs --config-dir .local/standalone --output-parent .local/standalone
 ```
 
 成功标准：
@@ -154,4 +158,4 @@ node --test scripts/standalone-runtime-parity.test.mjs scripts/verify-standalone
 
 用户于 2026-10-13 回复“好的可以”，确认本模块的固定模板本机构建范围、V011 构建记录，以及上述单执行槽/10 分钟/有限存储默认预算。确认不代表批准未来任意后端执行、数据库管理员供给或远程部署。对应小步执行计划与待办追加于 [tasks/plan.md](tasks/plan.md#7-workspace-build-扩展计划) 和 [tasks/todo.md](tasks/todo.md#workspace-build-执行任务)，保留前两模块的完成记录和未完成的人工验收项。
 
-规格确认后再细化小步任务并实现。后续 `app-runtime` 规格将解决每项目的运行配置/数据库分配、端口与进程监督、升级保数据；`runtime-access` 将解决私有预览鉴权、嵌入策略与 Cookie 隔离、历史只读语义及 UI 切换。只有这些完成，才能宣称“平台预览运行的就是下载工程对应实例”。
+本规格的实现和下游产物契约已接通，当前仍默认关闭执行且未部署。后续 `app-runtime` 规格将解决每项目的运行配置/数据库分配、端口与进程监督、升级保数据；`runtime-access` 将解决私有预览鉴权、嵌入策略与 Cookie 隔离、历史只读语义及 UI 切换。只有这些完成，才能宣称“平台预览运行的就是下载工程对应实例”。

@@ -1,6 +1,6 @@
 # 独立工程导出与运行 · 能力地图
 
-状态：2026-10-13，`engineering-bundle` 与 `project-export` 已实现并完成本地自动验收；C-EB11 用户人工评审待完成。用户已确认继续向同工程预览推进，并明确使用本机进程。`workspace-build` 规格与执行计划已批准、正在实施；后续实例与访问模块尚未实现。
+状态：2026-10-13，`engineering-bundle` 与 `project-export` 已实现并完成本地自动验收；C-EB11 用户人工评审待完成。`workspace-build` 已实现固定模板的本机异步构建、快照下载和重启恢复，并完成本地自动验收；后续实例与访问模块尚未实现。
 边界确认日期：2026-10-11。基线：`109bcb5`。当前在 `feature/standalone-engineering`；已同步原 README/交付说明的本地功能状态，没有合并、推送或部署。
 
 ## 已确认目标
@@ -13,7 +13,7 @@
 |---|---|---|---|
 | `engineering-bundle` | 工程格式、固定模板、兼容运行层、独立数据服务与启动契约 | 现有不可变代码版本契约 | [规格](SPEC-engineering-bundle.md)；EB01–EB25 本地实现/验证完成，人工评审待完成 |
 | `project-export` | 所有者下载选定版本的工程 ZIP；界面说明和下载失败处理 | `engineering-bundle` | [规格](SPEC-project-export.md)；PE01–PE05 本地实现/验证完成 |
-| `workspace-build` | 不可变工程快照、专用目录、本机固定构建/测试、构建状态与产物 | `engineering-bundle` | [已批准规格](SPEC-workspace-build.md)；[执行计划](tasks/plan.md#7-workspace-build-扩展计划)实施中 |
+| `workspace-build` | 不可变工程快照、专用目录、本机固定构建/测试、构建状态与产物 | `engineering-bundle` | [已实现规格](SPEC-workspace-build.md)；[验收记录](docs/workspace-build-verification.md)与 [WB 任务状态](tasks/todo.md#workspace-build-执行任务) |
 | `app-runtime` | 本机独立进程的启动/停止、健康、独立数据配置、资源控制与回收 | `workspace-build` | 后续单独编写 |
 | `runtime-access` | 平台预览接入对应实例、来源隔离与授权访问 | `app-runtime` | 后续单独编写 |
 
@@ -35,6 +35,7 @@
 
 1. 基础工程：从全新目录构建、启动；断开平台后仍能操作、保存、刷新及重启恢复。
 2. 工程导出：在现有工作台下载真实已保存版本，产物满足基础工程契约，所有者权限正确。
-3. 独立运行：同一工程在平台管理的专用工作区本机构建并启动；实例可观察、可停止，归属、会话和数据权限隔离。进程模式不宣称具备容器级文件系统、网络或资源隔离。
+3. 本机构建：从已保存版本冻结工程，异步完整检查与打包，按 buildId 下载原始快照；下载重建后的运行身份与原成品一致。默认关闭，原共享预览不变。
+4. 独立运行（未实现）：启动构建成品，实例可观察、可停止，归属、会话和数据权限隔离；随后把平台预览接到该实例。进程模式不宣称具备容器级文件系统、网络或资源隔离。
 
 这些是能力依赖和验收边界，不是已批准的实现任务清单。每个模块先评审规格，再制定小步开发任务。
