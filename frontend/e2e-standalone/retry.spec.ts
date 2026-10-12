@@ -5,6 +5,9 @@ for (const fault of ['lost', 'invalid', 'slow'] as const) {
     page,
     runtime,
   }, info) => {
+    // A real JVM restart has its own 120s readiness bound; keep 30s for browser assertions.
+    // SDK/request/expect timeouts and retries stay unchanged.
+    if (fault === 'lost') test.setTimeout(150000)
     const guest = await ready(page)
     const requests: { key: string | undefined; body: string | null }[] = []
     page.on('request', (request) => {
