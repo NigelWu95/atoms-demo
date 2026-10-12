@@ -33,3 +33,11 @@
 - 真实测试覆盖超量输出、非零退出、工具父进程退出但孙进程持有 stdout、取消、超时、拥有者 SIGKILL 导致 stdin EOF、无关进程存活、停止后拒绝再启动。使用临时夹具，不运行生成代码。
 - 只读 fresh-context 设计审查：缓存 PID 风险、永久停止状态、初始化/重复停止竞态为有效发现并已处理；执行身份/持久 fence 归 WB05/WB16；固定工具链不得脱离任务组的前提归 WB13 实际流程审计。没有调用外部跨模型 CLI。
 - **边界**：进程组消失不证明任意 daemon/setsid 程序退出。本模块只用于平台固定、需审计为不自行脱离任务组的构建流程；不支持任意命令、任意插件或不可信后端，不宣称操作系统级隔离。依据 [Node 24 子进程文档](https://nodejs.org/download/release/v24.20.0/docs/api/child_process.html#optionsdetached)；`killed` 标记不能作为退出证明。
+
+## WB05 · Java 控制桥接
+
+- `NativeBuildProcess` 只供 Worker 使用，清空并白名单恢复子进程环境，参数按数组传递；不提供 HTTP 命令入口。
+- 控制消息限 2048 字节/1000 帧，匹配本次 executionId，阶段不得倒退；错误执行 ID、超长/伪造输出、缺失完成帧、监督器 SIGKILL、成功帧后非零退出均报告未确认中断。
+- 超时/取消发送固定 CANCEL 控制消息，待进程退出及可信完成帧后才返回已确认；停止期限届满或线程中断保留 unknown，不把发信号当作退出。持久 fence 和 JAR 复验留给 Worker/恢复切片。
+- RED：缺少桥接类导致测试编译失败；GREEN：3 项真实 Java→Node 测试通过（包含多个协议反例），再运行全部平台单元 **96 项通过，0 跳过**。正常启动测试 3 秒预算，专门总超时案例仍为 500ms，生产总期限 10 分钟不变。
+- 进程等待及管道语义依据 [Java 17 Process](https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/Process.html)。官方 ProcessBuilder 页面抓取失败，未将它记为已核验来源；本次启动/等待由实际 Java 17.0.5 运行验证。
