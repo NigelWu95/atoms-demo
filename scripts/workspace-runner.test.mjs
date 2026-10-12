@@ -7,7 +7,7 @@ import { randomUUID } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 
-async function fixture(body) {
+async function fixture(body, timeoutMs = 600000) {
   const root = await mkdtemp(join(tmpdir(), 'workspace-runner-'));
   const task = join(root, randomUUID()), executionId = randomUUID();
   await mkdir(join(task, 'private'), { recursive: true, mode: 0o700 });
@@ -17,7 +17,7 @@ async function fixture(body) {
   await writeFile(join(task, 'work/scripts/build.mjs'), `export async function build(root, options) { ${body} }`, { mode: 0o600 });
   const config = join(task, 'private/test.properties');
   await writeFile(config, 'TEST_ONLY_CANARY', { mode: 0o600 });
-  const child = spawn(process.execPath, [join(task, 'private/build-runner.mjs'), task, executionId, config],
+  const child = spawn(process.execPath, [join(task, 'private/build-runner.mjs'), task, executionId, config, String(Date.now()+timeoutMs)],
     { stdio: ['pipe', 'pipe', 'pipe'] });
   let output = '', errors = '';
   child.stdout.on('data', chunk => { output += chunk; });
@@ -44,6 +44,7 @@ test('trusted runner shares the pipeline and writes a private execution-bound se
   assert.equal(result.report.settled, true);
   assert.equal(result.report.loadedRuntimeId, 'a'.repeat(64));
   assert.equal((await stat(join(f.task, 'private/settlement.json'))).mode & 0o777, 0o600);
+  assert.equal((await stat(join(f.task, 'private/settlement.json'))).nlink, 1);
 });
 
 for (const lost of [false, true]) test(`runner settles a live tool after ${lost ? 'parent EOF' : 'cancellation'}`, async () => {
@@ -67,4 +68,13 @@ test('runner sanitizes thrown errors and rejects forged runtime identity', async
     assert.equal(report.errorCode, 'BUILD_FAILED');
     assert.equal(report.settled, true);
   }
+});
+
+test('runner enforces the owners remaining deadline without waiting for Java cancellation', async () => {
+  const began=Date.now();
+  const f=await fixture(`await options.run(process.execPath, ['-e', 'setInterval(()=>{},1000)'], {cwd:root,env:options.env});
+    return {loadedRuntimeId:'${'a'.repeat(64)}'};`,500);
+  const {report}=await f.result();
+  assert.equal(report.settled,true); assert.equal(report.errorCode,'BUILD_TIMEOUT');
+  assert.ok(Date.now()-began<15000);
 });
