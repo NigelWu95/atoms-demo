@@ -1,11 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, readdir, stat } from 'node:fs/promises';
+import { mkdtemp, readFile, readdir, stat, writeFile, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { materializeBundle, validateBundle } from './standalone-bundle.mjs';
 import { verificationOptions, verifyStandalone } from './verify-standalone.mjs';
+import { extractDownloadedFixture } from './downloaded-fixture.mjs';
 
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 const allowed = ['README.md', 'backend/mvnw'];
@@ -25,6 +26,29 @@ test('upgrade CLI selects only the reviewed source variant and still requires al
   }
   await assert.rejects(verifyStandalone({ configDir: '/nonexistent', outputParent: '/nonexistent', fixture: '../source' }),
     /Unknown reviewed fixture/);
+});
+
+test('download verification accepts only an explicit ZIP option and never combines source modes', () => {
+  const base = ['--config-dir', '/private/config', '--output-parent', '/private/output'];
+  assert.deepEqual(verificationOptions([...base, '--downloaded-zip', '/private/current-engineering.zip']),
+    { configDir: '/private/config', outputParent: '/private/output', downloadedZip: '/private/current-engineering.zip' });
+  for (const extra of [['--downloaded-zip'], ['--downloaded-zip', ''],
+    ['--downloaded-zip', '/private/current-engineering.zip', '--fixture', 'upgraded']])
+    assert.throws(() => verificationOptions([...base, ...extra]), /Usage/);
+});
+
+test('download verifier rejects short, oversized and symlink inputs without extracting files', async () => {
+  const parent = await mkdtemp(join(tmpdir(), 'download-guard-'));
+  const work = await mkdtemp(join(tmpdir(), 'download-output-'));
+  const short = join(parent, 'short.zip');
+  const large = join(parent, 'large.zip');
+  const link = join(parent, 'link.zip');
+  await writeFile(short, Buffer.from('PK'));
+  await writeFile(large, Buffer.alloc(9 * 1024 * 1024 + 1));
+  await symlink(short, link);
+  for (const path of [short, large, link])
+    await assert.rejects(extractDownloadedFixture(path, work), /Only the current reviewed todo fixture ZIP/);
+  assert.deepEqual(await readdir(work), []);
 });
 function fixture() {
   const files = allowed.map(path => ({ path, content: Buffer.from(path).toString('base64') }));
