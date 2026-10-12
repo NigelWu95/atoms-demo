@@ -4,7 +4,7 @@
 
 ## 当前交付边界
 
-EB01–EB14 已实现并验证：纯内存工程组装、独立启动/数据库/安装身份、访客与持久会话、固定应用资源/内容指纹/受限运行文档，以及连接真实会话/API/沙箱的独立 Vue 外壳。当前交付 C-EB06，下一步 EB15–EB17 独立访客数据读写与幂等保存。没有下载 HTTP API、工作台按钮、真实模板装载器、独立业务状态接口、完整工程构建执行器或托管实例，不宣称完整工程已可导出运行。本轮未改动线上服务、原平台生产源码/迁移或原交付文档；下文各节保留当时阶段的证据，不代表后续能力也已完成。
+EB01–EB17 已实现并验证：纯内存工程组装、独立启动/数据库/安装身份、访客与持久会话、固定应用资源/内容指纹/受限运行文档、连接真实会话/API/沙箱的独立 Vue 外壳，以及独立访客状态读取、原子幂等保存和未知结果重试。当前交付 C-EB07，下一步 EB18–EB19 构建/启动入口。没有下载 HTTP API、工作台按钮、真实模板装载器、完整工程构建执行器或托管实例，不宣称完整工程已可导出运行。本轮未改动线上服务、原平台生产源码/迁移或原交付文档；下文各节保留当时阶段的证据，不代表后续能力也已完成。
 
 `BundleSource` 冻结来源 UUID、原内容 hash 和 Artifact；调用方必须先完成版本所有者授权。组装器再次调用原 `ArtifactValidator`，并且只读取传入的代码快照及固定模板快照；没有数据库、环境变量、网络、文件系统或进程操作。`TemplateSnapshot` 构造入口限定于 engineering 包，后续只有固定目录的 TemplateCatalog 提供真实模板。
 
@@ -421,6 +421,60 @@ STANDALONE_TEST_CONFIG=/absolute/path/test.properties ./node_modules/.bin/playwr
 按五轴复核：边界输入严格校验、异步销毁与错误状态有反例；启动、解析、消息协议和 Vue 展示各自独立；无新增第三方依赖、网络权限或原平台生产改动。所有字符串由 Vue 文本渲染，没有宿主 v-html/eval；生成代码只在既有受控 iframe 执行。当前前端存储拒绝属于明确的未完成状态，不是假实现成功。
 
 本轮只本地提交，不合并/推送/部署。按增量计划先交付本检查点；下一步 EB15–EB17 接真实状态读取、原子幂等保存与未知结果处理，再做新目录工程构建/启动和独立性验收。正式 JAR 的 Vue 静态资源及最终 runtime 指纹仍待 EB18。原 README、方案/交付说明继续留待完整功能完成后统一更新。
+
+## EB15–EB17 · 独立应用的数据闭环
+
+### 接口与数据库决策
+
+`GET /api/state` 只读取当前已认证访客；未保存时返回 manifest 初始值、revision 0、schema 1，但不创建状态行。已有值从独立 schema 读取，不因 GET 或重启被初始值覆盖。访客不来自请求体或查询参数；身份无效为 401，数据库故障为 503，不伪装成空数据。
+
+`PUT /api/state` 接受规格中的四个字段，拒绝多余字段、非对象 value、非整数/越界 revision、非 schema 1、非法运行指纹。value 独立限制为紧凑 JSON 的 256 KiB UTF-8 字节及 63 层容器，入口仍限制 320 KiB/64 层；没有提高原平台限额。Idempotency-Key 沿用 `[A-Za-z0-9._:-]{1,128}`；对象键递归排序后连同运行指纹/修订号/schema 做 SHA-256，数组顺序保留。该规范化不是跨语言 RFC 8785 数字规范。
+
+V002 每访客一份状态，V003 保存按访客、方法、路径、key 唯一的成功结果。选择 `json` 而不是 `jsonb`：当前读写整个文档，无字段索引需求，同时保留 JSON 转义的 U+0000；数据库约束限制对象类型、字节数、schema 和修订号，真实 HTTP 已验证包含引号和 U+0000 的值往返。此选择依据 [PostgreSQL 17 JSON 类型说明](https://www.postgresql.org/docs/17/datatype-json.html)。
+
+保存事务使用 `TransactionTemplate`（READ COMMITTED，5 秒预算），先设置 3 秒锁等待，再锁当前 guest_users 行。这样初次尚无状态行时也能串行化同访客写入，另一个访客不持有这把行锁。持锁后先查成功重放；匹配则返回原响应，即使应用已升级；同键异体 409。只有新意图才检查 loadedRuntimeId 和 expectedRevision，并把状态及完整成功响应在一个事务内提交。数据库唯一键作为额外一致性约束，没有 JVM 锁或可遗留的“处理中”占位行。依据 [Spring 6.2 编程式事务](https://docs.spring.io/spring-framework/reference/6.2/data-access/transaction/programmatic.html)及 [PostgreSQL 17 行锁](https://www.postgresql.org/docs/17/explicit-locking.html#LOCKING-ROWS)。
+
+代价是同一访客写入串行化，适合当前单文档模型，不适合高吞吐的协作数据库。重放结果目前不自动清理，因此不会因重启/短 TTL 破坏 7 天有效会话的重试链，但存储会增长；删除访客时状态和重放表有 FK 级联，尚未提供用户删除 API 或周期回收任务。对外规模化使用前必须补留存/回收策略，不能直接按请求年龄删掉仍可能重试的结果。V001 未编辑；专用测试清理只扩展固定表白名单，迁移拒绝身份不匹配的保护不变。
+
+### 前端行为
+
+- SDK get/save 接真实 API；每次保存先取新 CSRF，令牌只留调用内存，不交给 iframe。宿主补充当前运行指纹，不让生成代码选择访客/平台项目。
+- 一次显式调用最多 8 秒，响应流有字节上限和严格状态/字段校验。请求体与期望响应修订号都在 await 前快照；组件卸载取消网络等待，但不宣称回滚服务端事务。
+- 显示 saving/saved/unknown/conflict/offline。网络中断、超时、5xx、坏 2xx 等已发送但未确认结果保持 unknown；SDK 保留原 requestId 和内容，应用内“重试原操作”用相同 key/body，不自动重放或重新建立访客。
+- 重载确认明确说明会丢失输入和重试信息，但不会撤销服务器可能完成的保存。未知意图仅在当前沙箱内存保留，不承诺关闭页面后继续重试。
+- 显式测试应用增加待办添加/完成切换、读取最新状态及原意图重试；与 Vue 外壳、真实 Spring API 和 PostgreSQL 联调。它仅在测试 classpath，正式工程仍必须携带自己的应用资源，不会缺文件时变成待办 Demo。
+
+### 验证证据
+
+读取接口先以 404 失败，保存接口先以 405/缺表失败，随后实现；输入类型缺失、前端 transport 缺失、unknown 状态未接线以及待办控件缺失也分别记录了 RED。沙箱阻止数据库/监听端口时按权限流程重试，该环境失败不算业务 RED。没有跳过测试或降低断言。
+
+| 检查 | 结果与范围 |
+|---|---|
+| 模板 `./mvnw -B clean verify` | Java 17.0.5-oracle：124 单元 + 56 真实 PostgreSQL/HTTP IT，全通过、无跳过 |
+| StateWriteRequestTest / StateReadIT / StateWriteIT | 新增 3 + 3 + 9 项；大小/深度/修订号边界，读取隔离，并发同键同体/异体、异键抢写、事务回滚、锁等待及重启后旧结果重放 |
+| 独立前端 | 68 单元，typecheck/lint/build 通过；保存响应修订号改为快照的反例先失败后修复 |
+| 外壳 Chrome | 14 项通过；320/390/768/1024/1440、axe、键盘、真实保存刷新、两访客隔离、双标签冲突；修订号快照修复后五项真实数据链路再次全部通过 |
+| 未知结果 | 浏览器先让真实 PUT 提交，再注入响应丢失、畸形 2xx、8 秒以上延迟；三种情形都保持 unknown，显式同键同体重试后数据库 revision 仍为 1 |
+| 文档 Chrome | 2 项通过，opaque-origin/SDK、直接导航和未授权拒绝不回归 |
+| 原平台定向回归 | 组装/路径 46、原 SDK/桥 9、Node 脚本组合 20 项通过；平台前端类型/lint/格式检查及新增浏览器文件检查通过 |
+
+代码复核按正确性、可读性、架构、安全和性能五轴进行：没有新增依赖/平台写入，SQL 使用参数绑定，写入有数据库边界和超时，错误日志沿用 requestId 与固定错误码且不写状态内容。实际把输入修订号的 `>= MAX_SAFE_INTEGER` 改成 `>`，边界测试失败；恢复后完整后端回归通过。复核另发现前端响应校验读取可变修订号的问题，已通过新增反例修复，不带入下一任务。
+
+浏览器截图在忽略的 `frontend/test-results/standalone-shell/`，已人工查看 320px 与未知结果页面；关键操作需在 iframe 内滚动时仍可键盘访问。运行期页面正常路径无 console error/warning；终端 NO_COLOR/FORCE_COLOR 提示是测试进程环境提示，不是浏览器应用错误。
+
+复现新增浏览器检查（在仓库 `frontend/`；先完成模板前端 build，并设置 Java 17/Node 24.20 的路径及 `STANDALONE_TEST_CONFIG`）：
+
+```sh
+./node_modules/.bin/playwright test --config playwright.standalone-shell.config.ts --project=chromium
+# 只复验五项数据链路
+./node_modules/.bin/playwright test --config playwright.standalone-shell.config.ts --project=chromium state.spec.ts
+```
+
+后端 verify、文档浏览器和外壳浏览器共用专用 IT 库，必须顺序执行；不得边运行浏览器边迁移清理、变异代码或重建其依赖。测试程序只管理自己的本地服务，不停止共享 PostgreSQL。
+
+### 尚未完成的边界
+
+本轮只有本地提交，没有推送 GitHub、合并主分支或部署服务器。数据层的重启验证是同 JVM 重建 Spring 上下文，并非最终成品 JAR 的真正进程重启验收。全新目录构建、前端静态资源进入 JAR、最终运行层指纹、阻断平台的真正独立运行、工程下载入口/工作台接线仍归后续任务。下一步 EB18–EB19 构建与启动入口；原 README、架构/交付说明继续等整个功能完成后再统一更新。
 
 ## 已核对的官方依据
 

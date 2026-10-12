@@ -1,6 +1,6 @@
 # engineering-bundle · 开发任务
 
-状态：2026-10-12 用户确认继续后，EB01–EB14 已实现并验证；当前交付 C-EB06，下一步 EB15–EB17。
+状态：2026-10-12 用户确认继续后，EB01–EB17 已实现并验证；当前交付 C-EB07，下一步 EB18–EB19。
 依据：[计划及验证命令](plan.md)、[已批准规格](../SPEC-engineering-bundle.md)。本清单只负责 `engineering-bundle`；原平台任务清单不变。
 
 路径缩写：`P/` = `backend/src/main/java/dev/atoms/demo/engineering/`；`PT/` = 对应平台 `src/test/java/dev/atoms/demo/engineering/`；`T/` = `templates/standalone-v1/`；`B/` = `T/backend/src/main/java/dev/atoms/standalone/`；`BT/` = 对应模板 `src/test/java/dev/atoms/standalone/`；`R/` = `T/backend/src/main/resources/`；`F/` = `T/frontend/src/`。各路径的实现进度以下列任务勾选及切片记录为准。
@@ -180,31 +180,35 @@
 
 ### EB15 · 访客读取自己的状态（M）
 
-- [ ] 完成 EB15。依赖：EB14。
+- [x] 完成 EB15。依赖：EB14。
 - 文件：`R/db/migration/V002__app_state.sql`、`B/AppStateService.java`、`B/StateController.java`、`BT/StateReadIT.java`、`F/api/client.ts`。
 - 验收：① 首次 GET 返回 manifest 初始值、revision=0、schema=1，不修改平台数据；② 每个有效访客读取自己的状态，初始对象不会被共享引用污染；③ SDK get 通过真实 API 返回，并保持登录/数据库错误语义。
 - 验证：V-B、V-F；两个会话读取与缺省初始值边界，GET 不意外重置已有数据。
 - 实施拆分：EB15a（3 文件）V002、专用测试清理白名单、迁移断言；EB15b（5 文件）状态文档/服务/控制器、HTTP 测试助手、读取 IT；EB15c 与 EB17 客户端接线一起验证真实 SDK，避免中间界面宣称可保存。
+- 验收结果：首次 GET 不建状态行、不重置已保存值；访客只来自有效会话，查询参数不能选择他人。3 项真实 HTTP 读取/隔离/数据库故障场景通过，SDK get 已接真实接口。
 
 ### EB16 · 原子保存与幂等重放（M）
 
-- [ ] 完成 EB16。依赖：EB15。
+- [x] 完成 EB16。依赖：EB15。
 - 文件：`R/db/migration/V003__idempotency.sql`、`B/IdempotencyService.java`、`B/AppStateService.java`、`B/StateController.java`、`BT/StateWriteIT.java`。
 - 验收：① 严格 value/大小/revision/schema/runtime ID 校验，旧版本和修订冲突 409；② 同键相同请求只提交一次，同键异体 409，并发由数据库约束与事务保证；③ 成功重放优先于当前 runtime ID 检查，事务失败不留下占位结果，记录保留不短于允许重试期。
 - 验证：V-B；并发同键/异键、初始并发、事务回滚、更新 runtime 后旧成功请求重放、上限输入；不得用内存锁代替数据库测试。
 - 实施拆分：EB16a（5 文件）V003、专用清理/迁移断言、输入规范化及单元测试；EB16b（4 文件）幂等服务、状态保存/控制器、写入 IT。事务按当前访客行锁串行化写入，3 秒锁等待和 5 秒事务预算；状态与成功响应同一事务提交，先重放再核验运行版本。键沿用平台的 1–128 位 ASCII 标识约束；仅收集访客 UUID、请求摘要和必要重放响应，不记录内容日志。当前不自动清理重放记录（至少覆盖 7 天会话重试窗口）；访客删除级联清除状态/重放，定期回收留后续。
+- 验收结果：3 项输入单元及 9 项真实 PostgreSQL/HTTP 写入测试通过；同键同体/异体、异键抢写、初次建状态、结果写入失败回滚、锁等待超时/另一访客不受阻、服务上下文重启后旧版本成功重放均有证据。JSON 值精确 256 KiB 和最大安全修订号边界通过；反转上限判断使测试失败，恢复后完整后端 124 单元 + 56 IT 全绿。
 
 ### EB17 · 保存状态与未知结果重试（M）
 
-- [ ] 完成 EB17。依赖：EB16。
+- [x] 完成 EB17。依赖：EB16。
 - 文件：`F/api/client.ts`、`F/api/client.spec.ts`、`F/runtime/bridge.spec.ts`、`F/App.vue`、`F/App.spec.ts`。
 - 验收：① 待办可保存并刷新恢复，UI 明确 saving/saved/unknown/conflict/offline；② 超时/5xx/坏 2xx 不视为事务失败，只用相同 key/body 重试原意图；③ 冲突/版本变化不覆盖已存状态，不把重新加载称为失败请求已经取消。
 - 验证：V-F、V-B、V-D；注入响应丢失/坏响应/慢请求，并观察真实待办保存和刷新；端到端故障验证由 EB22 固化。
 - 实施拆分：EB17a（最多 5 文件）通用响应边界/错误码、状态客户端及测试；EB17b（最多 5 文件）桥状态/测试、RuntimeFrame/测试、App 重载提示；EB17c（最多 5 文件）真实待办测试应用、外壳浏览器/文档浏览器回归及必要组件断言。未知结果由 SDK 保留原意图，应用内显式重试；宿主不偷偷改键、重放或重建访客。
+- 验收结果：独立前端 68 单元、类型/lint/build 通过；外壳 Chrome 14 项验证真实保存/刷新/访客隔离、同访客双标签冲突，以及实际提交后丢响应/坏 2xx/超时的同键同体重放。重载提示不承诺撤销已提交写入；复核发现并修复响应校验读取可变修订号的问题，新增反例先失败后通过。待办仍只在显式测试 classpath，不成为正式入口的默认应用。
 
 ### C-EB07 · 独立数据主流程
 
-- [ ] EB15–EB17 从真实浏览器保存至专用 PostgreSQL、刷新恢复，两个访客隔离；审阅并发与未知结果测试，报告尚缺的新目录构建/重启证据。
+- [x] EB15–EB17 从真实浏览器保存至专用 PostgreSQL、刷新恢复，两个访客隔离；审阅并发与未知结果测试，报告尚缺的新目录构建/重启证据。
+- [x] 本轮交付 C-EB07：180 项模板后端、68 项独立前端、14 项外壳/2 项文档浏览器通过；原组装 46、原 SDK/桥 9、脚本 20 项回归通过。当前只本地提交，未合并/推送/部署；完整工程导出、全新目录构建及真正进程重启验收仍未完成，下一步 EB18–EB19。
 
 ## E · 全新目录完整构建
 
