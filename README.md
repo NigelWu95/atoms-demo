@@ -14,7 +14,7 @@ Java 17 + Spring Boot + Vue 工程。已实现访客与项目持久化、代码�
 
 2026-10-13 已实现并随当前版本部署：在工作台的代码版本区域选择当前或历史 Vn，点击“下载工程 ZIP”，即可获得 Vue + Spring Boot 17 + PostgreSQL 完整固定工程。包内 README 提供独立配置、数据库准备、构建和启动步骤；成品不依赖平台服务或模型 Key。本地已使用网页实际下载的 ZIP 完成新目录构建和独立运行验收。
 
-只携带所选源码与初始数据，不携带平台会话、对话、PREVIEW/LIVE 真实数据或密钥。生成业务代码仍受 HTML/CSS/JS 与 SDK 契约约束。平台已增加固定工程的本机工作区与异步构建；独立应用实例管理和对应 iframe 预览尚未实现。详见[工程下载说明](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-export.md)与[能力地图](https://github.com/NigelWu95/atoms-demo/blob/main/CAPABILITY-MAP.md)。功能分支程序已部署云端，尚未推送 GitHub；新增文档链接将在推送后可用。云端未开启本机构建，按版本下载工程 ZIP 不依赖此开关。
+只携带所选源码与初始数据，不携带平台会话、对话、PREVIEW/LIVE 真实数据或密钥。生成业务代码仍受 HTML/CSS/JS 与 SDK 契约约束。平台支持固定工程的本机工作区、异步构建；2026-10-14 本地新增独立实例启停和对应 iframe 预览。详见[工程下载说明](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-export.md)与[能力地图](https://github.com/NigelWu95/atoms-demo/blob/main/CAPABILITY-MAP.md)。云端仍为 10 月 13 日版本，未更新此次实例功能；新代码及文档未推送 GitHub。云端未开启本机构建，按版本下载 ZIP 不依赖此开关。
 
 ## 在平台本机构建工程
 
@@ -43,7 +43,7 @@ cd backend
 - `BUILD_INPUT_CHANGED` / `BUILD_ARTIFACT_UNAVAILABLE`：来源或产物完整性失败；旧记录保留，不用当前模板替换历史归档。
 - `INTERRUPTED`：重启不重跑旧任务；若不能核验匹配的进程退出证明，执行槽继续保留。不要手工清空数据库占位或按旧 PID 查杀；保留原工作根，核实原因后再处理。关闭开关仍可查询记录，但冻结包下载也需要原工作根和有效执行配置。
 
-**构建完成不等于已启动应用。** 当前页面明确提示“实例预览尚未接入”，旧共享预览和 `/a/:slug` 发布保持原状。本轮真实 API 构建、下载 ZIP 新目录重建及两份 JAR 的独立持久化已验证；后续 `app-runtime` / `runtime-access` 才负责启动、停止、运行数据库、端口和实例预览。见[构建规格](https://github.com/NigelWu95/atoms-demo/blob/main/SPEC-workspace-build.md)与[验收证据](https://github.com/NigelWu95/atoms-demo/blob/main/docs/workspace-build-verification.md)。
+**构建完成不等于已启动应用。** 构建成功后点击“启动独立实例”，就绪后显示该 JAR 的真实页面，保存到专用运行库。停止后再次启动保留数据，运行区域的下载指向相同 buildId 的冻结 ZIP。原共享预览和 `/a/:slug` 发布保持原状。实例功能需显式启用并配置专用运行库池，不会给平台账号数据库管理权限；默认关闭，未自动改写日常开发配置或部署云端。步骤、限制见[独立实例说明](https://github.com/NigelWu95/atoms-demo/blob/main/docs/app-runtime.md)，证据见[验收记录](https://github.com/NigelWu95/atoms-demo/blob/main/docs/app-runtime-verification.md)。
 
 ## 打包到服务器
 

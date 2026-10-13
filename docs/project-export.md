@@ -65,4 +65,4 @@ Accept: application/zip
 
 平台内的专用工作区与固定模板本机构建执行器已由独立的 `workspace-build` 模块实现。它先冻结版本和模板，再构建 JAR；“下载本次构建工程 ZIP”按 buildId 返回原始冻结包，不同于本页按版本与当前模板组装的下载接口。使用方式见[本机构建说明](https://github.com/NigelWu95/atoms-demo/blob/main/README.md#在平台本机构建工程)，实际构建与下载重建结果见[验收记录](https://github.com/NigelWu95/atoms-demo/blob/main/docs/workspace-build-verification.md)。
 
-独立实例启停、运行数据库/端口分配和对应实例预览仍未实现，不能用“工程下载/构建完成”代替。GitHub 授权/同步、真实业务数据导入导出、任意后端生成，也未包含在此功能中。模块关系见[能力地图](https://github.com/NigelWu95/atoms-demo/blob/main/CAPABILITY-MAP.md)。
+2026-10-14 本地已接入独立实例启停、永久项目运行库绑定和实际 JAR 预览；运行区下载绑定同一个 buildId。维护者须预备专用配置池，平台不自动建库，实例不直接发布公网。见[实例说明](https://github.com/NigelWu95/atoms-demo/blob/main/docs/app-runtime.md)。GitHub 授权/同步、真实业务数据导入导出、任意后端生成仍未包含在内。模块关系见[能力地图](https://github.com/NigelWu95/atoms-demo/blob/main/CAPABILITY-MAP.md)。
