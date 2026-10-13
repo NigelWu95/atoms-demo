@@ -33,6 +33,18 @@ class StartupConfigTest {
     @TempDir Path directory;
 
     @Test
+    void managedExecutionIdentityIsOptionalCanonicalAndSeparateFromInstallation() {
+        var values = new Properties();
+        values.putAll(settings());
+        assertThat(StartupConfig.runtimeEnvironment(values).getProperty("standalone.execution-id")).isNull();
+        values.setProperty("RUNTIME_EXECUTION_ID", "e1cd3215-95ea-4b90-b111-21ff677c80bc");
+        assertThat(StartupConfig.runtimeEnvironment(values).getProperty("standalone.execution-id"))
+                .isEqualTo("e1cd3215-95ea-4b90-b111-21ff677c80bc");
+        values.setProperty("RUNTIME_EXECUTION_ID", "bad-header\r\ncanary");
+        assertThatThrownBy(() -> StartupConfig.runtimeEnvironment(values)).hasMessageContaining("CONFIG_INVALID");
+    }
+
+    @Test
     void localHttpUsesStableInstanceCookieAndOnlyTheExplicitDatabase() throws Exception {
         var args = config(settings());
         var first = StartupConfig.load(args);
