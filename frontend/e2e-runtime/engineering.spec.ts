@@ -10,7 +10,7 @@ async function openHistory(page: Page) {
   await page.getByRole('link', { name: '打开测试工作台' }).click()
   await expect(page.getByText('应用已启动', { exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: '下载预览工程 ZIP', exact: true })).toBeDisabled()
-  await page.getByText('其他导出：版本源码（未绑定运行预览）', { exact: true }).click()
+  await expect(page.getByRole('button', { name: '导出版本源码 ZIP', exact: true })).toBeVisible()
   return page.getByRole('region', { name: '版本源码导出' })
 }
 

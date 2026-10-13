@@ -179,14 +179,11 @@ watch(
         请先构建并启动应用，等待本机运行预览就绪后下载。共享预览不作为工程一致性验收。
       </p>
     </section>
-    <details class="source-export">
-      <summary>其他导出：版本源码（未绑定运行预览）</summary>
-      <EngineeringDownload
-        :project-id="project?.id ?? null"
-        :version="version"
-        :loading="loading"
-      />
-    </details>
+    <EngineeringDownload
+      :project-id="project?.id ?? null"
+      :version="version"
+      :loading="loading"
+    />
     <EngineeringBuild
       :project-id="project?.id ?? null"
       :version="version"
@@ -280,8 +277,7 @@ watch(
 </template>
 
 <style scoped>
-.preview-download,
-.source-export {
+.preview-download {
   padding: 0.75rem 1rem;
   border-bottom: 1px solid var(--border);
   font-size: 0.8125rem;
@@ -290,9 +286,5 @@ watch(
 }
 .preview-download p {
   margin: 0.5rem 0 0;
-}
-.source-export summary {
-  cursor: pointer;
-  padding-block: 0.5rem;
 }
 </style>
