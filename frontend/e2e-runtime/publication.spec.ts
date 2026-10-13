@@ -30,14 +30,6 @@ test('publishes a local app, isolates visitors and preview data, takes offline a
   const link = panel.getByLabel('本地访问链接（尚未接入公网）')
   await expect(link).toHaveValue(/http:\/\/127\.0\.0\.1:5174\/a\/[a-f0-9]{32}$/)
   const url = await link.inputValue()
-  for (const width of [320, 768, 1024, 1440]) {
-    await page.setViewportSize({ width, height: 900 })
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
-    expect(
-      (await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze())
-        .violations,
-    ).toEqual([])
-  }
   await page.getByRole('button', { name: '发布应用 ↗' }).focus()
   await page.screenshot({ path: testInfo.outputPath('publication-panel.png'), fullPage: true })
   const first = await browser.newContext()
@@ -71,19 +63,6 @@ test('publishes a local app, isolates visitors and preview data, takes offline a
     await expect(other.getByText('应用已启动', { exact: true })).toBeVisible()
     await expect(other.frameLocator('iframe').getByRole('checkbox')).toHaveCount(0)
     await expect(preview.getByText('访客甲的任务', { exact: true })).toHaveCount(0)
-    for (const width of [320, 768, 1024, 1440]) {
-      await visitor.setViewportSize({ width, height: 900 })
-      expect(await visitor.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
-        true,
-      )
-      expect(
-        (
-          await new AxeBuilder({ page: visitor })
-            .withTags(['wcag2a', 'wcag2aa', 'wcag21aa'])
-            .analyze()
-        ).violations,
-      ).toEqual([])
-    }
     await frame.getByLabel('新待办').fill('待保存输入')
     await visitor.screenshot({
       path: testInfo.outputPath('public-app-desktop.png'),
@@ -114,6 +93,54 @@ test('publishes a local app, isolates visitors and preview data, takes offline a
     await second.close()
   }
 })
+
+// Keep each responsive audit independent of the full publish/offline lifecycle.
+// Eight axe scans and that lifecycle together exhausted the 30s test budget;
+// all widths, rules and the original assertion timeout remain unchanged.
+for (const width of [320, 768, 1024, 1440]) {
+  test(`publication panel and populated public app remain accessible at ${width}px`, async ({
+    page,
+    browser,
+  }) => {
+    const panel = await prepare(page)
+    const preview = page.frameLocator('iframe')
+    await preview.getByLabel('新待办').fill('发布面板检查')
+    await preview.getByRole('button', { name: '添加待办' }).click()
+    await expect(page.getByText('已保存到数据库', { exact: true })).toBeVisible()
+    await panel.getByRole('button', { name: '确认发布当前版本' }).click()
+    const link = panel.getByLabel('本地访问链接（尚未接入公网）')
+    await expect(link).toHaveValue(/http:\/\/127\.0\.0\.1:5174\/a\/[a-f0-9]{32}$/)
+    const url = await link.inputValue()
+    await page.setViewportSize({ width, height: 900 })
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+    expect(
+      (await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze())
+        .violations,
+    ).toEqual([])
+    const context = await browser.newContext({ viewport: { width, height: 900 } })
+    try {
+      const visitor = await context.newPage()
+      await visitor.goto(url)
+      await expect(visitor.getByText('应用已启动', { exact: true })).toBeVisible()
+      const frame = visitor.frameLocator('iframe')
+      await frame.getByLabel('新待办').fill('公开应用检查')
+      await frame.getByRole('button', { name: '添加待办' }).click()
+      await expect(visitor.getByText('已保存到数据库', { exact: true })).toBeVisible()
+      expect(await visitor.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+        true,
+      )
+      expect(
+        (
+          await new AxeBuilder({ page: visitor })
+            .withTags(['wcag2a', 'wcag2aa', 'wcag21aa'])
+            .analyze()
+        ).violations,
+      ).toEqual([])
+    } finally {
+      await context.close()
+    }
+  })
+}
 
 test('unknown publish and downline responses reuse original intents without duplicating revisions', async ({
   page,

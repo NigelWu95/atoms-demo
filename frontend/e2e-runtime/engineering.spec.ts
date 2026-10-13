@@ -12,7 +12,7 @@ async function openHistory(page: Page) {
   return page.getByRole('region', { name: '工程下载' })
 }
 
-test('downloads real current and historical engineering ZIPs with keyboard and mobile access', async ({
+test('downloads real current and historical engineering ZIPs with keyboard access', async ({
   page,
 }, info) => {
   const errors: string[] = []
@@ -67,7 +67,26 @@ test('downloads real current and historical engineering ZIPs with keyboard and m
     await expect(panel.getByRole('status')).toContainText(`V${number} 工程已交给浏览器下载`)
   }
   expect(await (await page.request.get(projectPath)).json()).toEqual(before)
-  for (const width of [320, 390, 768, 1024, 1440]) {
+  expect(errors).toEqual([])
+})
+
+// Audit each width separately: download integrity and five complete axe scans
+// should not share one 30s lifecycle budget. No timeout or rule is relaxed.
+for (const width of [320, 390, 768, 1024, 1440]) {
+  test(`historical engineering download remains accessible at ${width}px`, async ({
+    page,
+  }, info) => {
+    const errors: string[] = []
+    page.on('pageerror', (error) => errors.push(error.message))
+    page.on('console', (message) => {
+      if (['warning', 'error'].includes(message.type())) errors.push(message.text())
+    })
+    const panel = await openHistory(page)
+    await page.getByLabel('代码版本', { exact: true }).selectOption({ label: 'V1 · 历史只读' })
+    const event = page.waitForEvent('download')
+    await panel.getByRole('button', { name: '下载工程 ZIP', exact: true }).click()
+    expect(await (await event).failure()).toBeNull()
+    await expect(panel.getByRole('status')).toContainText('V1 工程已交给浏览器下载')
     await page.setViewportSize({ width, height: 1000 })
     if (width < 768)
       await page
@@ -81,9 +100,9 @@ test('downloads real current and historical engineering ZIPs with keyboard and m
         .violations,
     ).toEqual([])
     await page.screenshot({ path: info.outputPath(`engineering-${width}.png`), fullPage: true })
-  }
-  expect(errors).toEqual([])
-})
+    expect(errors).toEqual([])
+  })
+}
 
 test('download errors retain the draft and preview and allow an explicit retry', async ({
   page,

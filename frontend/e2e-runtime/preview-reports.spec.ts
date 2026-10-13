@@ -70,20 +70,6 @@ test('saves a version report, replays an unknown response and restores it after 
   await page.reload()
   await expect(checks).toContainText('本次观察：检查通过')
   await expect(checks).toContainText('已保存报告：检查通过')
-  for (const width of [320, 768, 1024, 1440]) {
-    await page.setViewportSize({ width, height: 900 })
-    if (width === 320) {
-      await page
-        .getByRole('group', { name: '工作台区域' })
-        .getByRole('button', { name: '预览', exact: true })
-        .click()
-    }
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
-    expect(
-      (await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze())
-        .violations,
-    ).toEqual([])
-  }
   const input = page.frameLocator('iframe').getByLabel('新待办')
   await input.fill('检查报告浏览器验收')
   await expect(input).toHaveValue('检查报告浏览器验收')
@@ -92,6 +78,30 @@ test('saves a version report, replays an unknown response and restores it after 
   await page.screenshot({ path: testInfo.outputPath('preview-report-mobile.png'), fullPage: true })
   expect(errors).toEqual([])
 })
+
+// Responsive scans have their own unchanged 30s budgets, independent of
+// response-loss/reload testing. All original widths and axe rules are retained.
+for (const width of [320, 768, 1024, 1440]) {
+  test(`saved preview report remains accessible at ${width}px`, async ({ page }) => {
+    const checks = await openTodo(page)
+    await expect(checks).toContainText('本次观察：检查通过')
+    await checks.getByRole('button', { name: '保存检查结果' }).click()
+    await expect(checks).toContainText('已保存报告：检查通过')
+    await page.reload()
+    await expect(checks).toContainText('已保存报告：检查通过')
+    await page.setViewportSize({ width, height: 900 })
+    if (width === 320)
+      await page
+        .getByRole('group', { name: '工作台区域' })
+        .getByRole('button', { name: '预览', exact: true })
+        .click()
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+    expect(
+      (await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze())
+        .violations,
+    ).toEqual([])
+  })
+}
 
 test('blocks malformed scripts before fetching a runtime document and persists the failure', async ({
   page,
