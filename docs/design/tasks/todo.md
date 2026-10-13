@@ -324,7 +324,7 @@ T10–T15 使用固定手工计数器/待办检验源码落库、执行隔离、
 ### T22 · 加入生成资源边界
 
 - [ ] 完成 T22（P0，M）
-- 进度：已实现单 Worker/活动队列 8、整轮 6 分钟、prompt/output/响应限制、持久累计请求次数预留，未知结果不退回。次数不是货币预算；身份频率、并发预算争抢及队列满完整验收尚待补齐。
+- 进度：已实现单 Worker/活动队列 8、整轮默认 15 分钟（2026-10-13 调整）、prompt/output/响应限制、持久累计请求次数预留，未知结果不退回。次数不是货币预算；身份频率、并发预算争抢及队列满完整验收尚待补齐。
 - 说明：在准备开放线上生成前，限制队列、并发、输出与整体预算。
 - 依赖：T19、T21。
 - 主要文件：`B/run/GenerationLimits.java`、`B/run/GenerationBudgetService.java`、`B/run/RunAdmissionService.java`、`R/db/migration/V007__generation_budget.sql`、`BT/run/GenerationLimitsIT.java`。
