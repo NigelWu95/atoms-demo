@@ -111,6 +111,11 @@ afterEach(() => {
   vi.unstubAllGlobals()
   vi.restoreAllMocks()
 })
+it('keeps the existing version export directly visible, outside any disclosure', async () => {
+  const { wrapper } = open()
+  await flushPromises()
+  expect(wrapper.get('engineering-download-stub').element.closest('details')).toBeNull()
+})
 it('downloads running build A, never the newly selected build B or a version re-export', async () => {
   const { wrapper } = open()
   await ready(wrapper)
