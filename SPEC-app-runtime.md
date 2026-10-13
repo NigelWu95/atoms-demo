@@ -1,6 +1,6 @@
 # app-runtime · 本机独立实例
 
-状态：2026-10-13，用户要求一次完成独立运行与真实预览；在既有能力地图上连续实施、验证，不自动推送或部署。Java 17 / Spring Boot / PostgreSQL，不增加依赖。
+状态：2026-10-14，已按用户要求一次完成本地实现与自动验收，见[验收记录](docs/app-runtime-verification.md)；未自动推送或部署。Java 17 / Spring Boot / PostgreSQL，不增加依赖。
 
 ## 目标与边界
 
@@ -10,8 +10,8 @@
 
 ## 生命周期与契约
 
-- 新增 V012：运行安装映射与实例记录，只增表，不修改已有业务表。状态 QUEUED → STARTING → RUNNING → STOPPING → STOPPED；失败 FAILED，中断 INTERRUPTED。未知退出保留占位，不按旧 PID 杀进程。
-- POST `/api/projects/{projectId}/instances`：仅 `{buildId}`，CSRF + Idempotency-Key，202 `{instanceId}`。先授权，再检查成功构建及运行环境；相同意图重放不重复启动。
+- 新增 V012：运行安装映射与实例表，并为 engineering_builds 增加 `(id, project_id)` 唯一约束供归属外键引用，不改写已有业务数据。状态 QUEUED → STARTING → RUNNING → STOPPING → STOPPED；失败 FAILED，中断 INTERRUPTED。未知退出保留占位，不按旧 PID 杀进程。
+- POST `/api/projects/{projectId}/instances`：仅 `{buildId}`，CSRF + Idempotency-Key，202 `{instanceId}`。先授权，再检查成功构建、当前版本及运行环境；历史版本须先恢复后重建，相同意图重放不重复启动。
 - GET 同一路径：项目最新 20 条实例，响应 `{items}`，历史列表有界。GET `/{instanceId}` 返回详情。
 - POST `/{instanceId}/stops`：仅 `{}`，CSRF + 幂等；202，确认退出后才报告 STOPPED。重启使用新的实例记录、相同项目安装与运行库。
 - 对外描述仅 id/projectId/buildId/versionId/status/loadedRuntimeId/errorCode/createdAt/startedAt/finishedAt；不含 PID、端口、目录、数据库密码或 Cookie。
