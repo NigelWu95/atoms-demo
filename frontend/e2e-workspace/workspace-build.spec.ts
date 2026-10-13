@@ -52,7 +52,7 @@ test('real native build survives refresh; its frozen ZIP, history and responsive
     .not.toBe('ACTIVE')
   const build = await (await page.request.get(`${base}/${buildId}`)).json()
   expect(build.status, build.errorCode ?? 'verified completion').toBe('SUCCEEDED')
-  await expect(panel.getByRole('status').first()).toHaveText('构建完成，可启动独立实例。', {
+  await expect(panel.getByRole('status').first()).toHaveText('构建完成，可启动本机应用。', {
     timeout: 15000,
   })
   const event = page.waitForEvent('download')

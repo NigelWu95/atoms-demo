@@ -4,34 +4,42 @@ import { instancePath, instanceState, loadInstanceApp, type AppInstance } from '
 import { errorMessage } from '../api/client'
 import { mountFrame } from '../runtime/mountFrame'
 const props = defineProps<{ instance: AppInstance }>()
+const emit = defineEmits<{ availability: [executionId: string, ready: boolean] }>()
+const execution = props.instance
 const container = ref<HTMLElement | null>(null),
-  message = ref('正在连接独立实例…'),
+  message = ref('正在连接本机应用…'),
   failed = ref(false)
 const controller = new AbortController()
 let dispose: (() => void) | undefined
 onMounted(async () => {
   try {
-    await loadInstanceApp(props.instance, controller.signal)
+    await loadInstanceApp(execution, controller.signal)
     if (!container.value || controller.signal.aborted) return
     dispose = mountFrame(
       container.value,
-      instancePath(props.instance.projectId, props.instance.id) + '/document',
-      (request, key) => instanceState(props.instance, request, key, controller.signal),
+      instancePath(execution.projectId, execution.id) + '/document',
+      (request, key) => instanceState(execution, request, key, controller.signal),
       (status, text) => {
+        if (controller.signal.aborted) return
         message.value = text
         failed.value = status === 'error'
+        if (status === 'ready') emit('availability', execution.id, true)
+        else if (status === 'error' || status === 'connecting')
+          emit('availability', execution.id, false)
       },
-      '独立实例应用预览',
+      '本机应用预览',
     )
   } catch (error) {
     if (!controller.signal.aborted) {
       message.value = errorMessage(error)
       failed.value = true
+      emit('availability', execution.id, false)
     }
   }
 })
 onBeforeUnmount(() => {
   controller.abort()
+  emit('availability', execution.id, false)
   dispose?.()
 })
 </script>
@@ -42,7 +50,7 @@ onBeforeUnmount(() => {
       :role="failed ? 'alert' : 'status'"
       :class="{ 'inline-error': failed }"
     >
-      独立实例 · {{ message }}
+      本机应用 · {{ message }}
     </p>
     <div ref="container" class="runtime-container" />
   </div>

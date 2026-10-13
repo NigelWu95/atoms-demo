@@ -85,7 +85,7 @@ test('todo adds, completes, survives reload and shows real source in a private w
     path: testInfo.outputPath('workbench-preview-mobile.png'),
     fullPage: true,
   })
-  const href = await page.getByRole('link', { name: '独立预览' }).getAttribute('href')
+  const href = await page.getByRole('link', { name: '共享预览新窗口' }).getAttribute('href')
   const tab = await context.newPage()
   await tab.goto(`http://127.0.0.1:5174${href}`)
   await expect(tab.frameLocator('iframe').getByRole('checkbox')).toBeChecked()

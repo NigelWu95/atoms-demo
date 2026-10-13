@@ -12,6 +12,8 @@ import type { EngineeringBuild as Build } from '../api/builds'
 import type { AppInstance } from '../api/instances'
 import InstancePanel from './InstancePanel.vue'
 import InstancePreviewFrame from './InstancePreviewFrame.vue'
+import BuildArchiveDownload from './BuildArchiveDownload.vue'
+import { useSessionStore } from '../stores/session'
 
 const props = defineProps<{ project: Project | null }>()
 const emit = defineEmits<{ changed: [Project] }>()
@@ -27,6 +29,35 @@ const error = ref('')
 const build = ref<Build | null>(null)
 const running = ref<AppInstance | null>(null)
 const previewKind = ref<'shared' | 'instance'>('shared')
+const session = useSessionStore()
+const readyExecutionId = ref<string | null>(null)
+// Both the frame and its download use this one validated execution, never the selected build.
+const previewRuntime = computed(() =>
+  previewKind.value === 'instance' &&
+  session.ready &&
+  session.identity?.userId === props.project?.ownerId &&
+  running.value?.status === 'RUNNING' &&
+  running.value.projectId === props.project?.id &&
+  running.value.versionId === version.value?.id &&
+  version.value?.id === props.project?.currentVersionId
+    ? running.value
+    : null,
+)
+const previewDownload = computed(() =>
+  previewRuntime.value && readyExecutionId.value === previewRuntime.value.id
+    ? { id: previewRuntime.value.buildId, projectId: previewRuntime.value.projectId }
+    : null,
+)
+watch(
+  () => previewRuntime.value?.id,
+  () => {
+    readyExecutionId.value = null
+  },
+  { flush: 'sync' },
+)
+function setAvailability(executionId: string, ready: boolean) {
+  if (executionId === previewRuntime.value?.id) readyExecutionId.value = ready ? executionId : null
+}
 function setRunning(value: AppInstance | null) {
   if (value && value.id !== running.value?.id) previewKind.value = 'instance'
   running.value = value
@@ -130,10 +161,32 @@ watch(
         :to="`/preview/${project.id}/${version.id}`"
         target="_blank"
         rel="noopener noreferrer"
-        >独立预览 ↗</RouterLink
+        >共享预览新窗口 ↗</RouterLink
       >
     </div>
-    <EngineeringDownload :project-id="project?.id ?? null" :version="version" :loading="loading" />
+    <section class="preview-download" aria-label="预览工程下载">
+      <BuildArchiveDownload
+        v-if="previewDownload"
+        :target="previewDownload"
+        label="下载预览工程 ZIP"
+      />
+      <button v-else type="button" class="button secondary" disabled>下载预览工程 ZIP</button>
+      <p v-if="previewDownload" role="status">
+        当前预览：V{{ version?.versionNo }} · 构建 {{ previewDownload.id.slice(0, 8) }}。
+        下载其冻结的完整工程源码；按包内说明构建启动。只带初始数据，不复制当前业务数据或凭据。
+      </p>
+      <p v-else class="muted">
+        请先构建并启动应用，等待本机运行预览就绪后下载。共享预览不作为工程一致性验收。
+      </p>
+    </section>
+    <details class="source-export">
+      <summary>其他导出：版本源码（未绑定运行预览）</summary>
+      <EngineeringDownload
+        :project-id="project?.id ?? null"
+        :version="version"
+        :loading="loading"
+      />
+    </details>
     <EngineeringBuild
       :project-id="project?.id ?? null"
       :version="version"
@@ -160,7 +213,7 @@ watch(
         :aria-pressed="previewKind === 'instance'"
         @click="previewKind = 'instance'"
       >
-        独立实例预览
+        本机运行预览
       </button>
     </div>
     <RestorationPanel
@@ -186,13 +239,14 @@ watch(
             :mode="mode"
           />
           <InstancePreviewFrame
-            v-else-if="running"
+            v-else-if="previewRuntime"
             v-show="view === 'preview'"
-            :key="running.id"
-            :instance="running"
+            :key="previewRuntime.id"
+            :instance="previewRuntime"
+            @availability="setAvailability"
           />
           <p v-else-if="view === 'preview'" role="status">
-            当前版本没有运行中的独立实例。请构建并启动，或手动切换至平台共享预览。
+            当前版本没有运行中的本机应用。请构建并启动，或手动切换至平台共享预览。
           </p>
           <SourceViewer v-if="view === 'code'" :artifact="version.artifact" />
         </template>
@@ -224,3 +278,21 @@ watch(
     </footer>
   </section>
 </template>
+
+<style scoped>
+.preview-download,
+.source-export {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.preview-download p {
+  margin: 0.5rem 0 0;
+}
+.source-export summary {
+  cursor: pointer;
+  padding-block: 0.5rem;
+}
+</style>

@@ -4,7 +4,6 @@ import type { EngineeringBuild } from '../api/builds'
 import type { AppInstance, InstanceStatus } from '../api/instances'
 import { useAppInstance } from '../composables/useAppInstance'
 import { useSessionStore } from '../stores/session'
-import BuildArchiveDownload from './BuildArchiveDownload.vue'
 const props = defineProps<{
   projectId: string | null
   versionId: string | null
@@ -58,7 +57,7 @@ watch(
   <section
     v-if="projectId && versionId"
     class="engineering-build"
-    aria-label="独立应用实例"
+    aria-label="本机应用进程"
     :aria-busy="busy || loading"
   >
     <div class="build-actions">
@@ -75,7 +74,7 @@ watch(
         :aria-describedby="descriptionId"
         @click="build && start(build.id)"
       >
-        启动独立实例
+        启动应用
       </button>
       <button
         v-if="instance && ['QUEUED', 'STARTING', 'RUNNING', 'STOPPING'].includes(instance.status)"
@@ -85,10 +84,10 @@ watch(
         :disabled="!canStop"
         @click="stop"
       >
-        {{ instance.status === 'STOPPING' ? '等待进程退出…' : '停止独立实例' }}
+        {{ instance.status === 'STOPPING' ? '等待进程退出…' : '停止应用' }}
       </button>
       <button class="button secondary" type="button" :disabled="busy || loading" @click="refresh">
-        刷新实例状态
+        刷新运行状态
       </button>
     </div>
     <p :id="descriptionId" class="muted">
@@ -99,22 +98,14 @@ watch(
       历史版本只读。如需运行该版本，请先恢复为当前版本并重新构建。
     </p>
     <p role="status">
-      {{ instance ? labels[instance.status] : '尚未启动独立实例'
+      {{ instance ? labels[instance.status] : '尚未启动应用'
       }}<template v-if="instance"> · {{ instance.id.slice(0, 8) }}</template>
     </p>
     <p v-if="instance && instance.versionId !== versionId" class="muted">
-      实例属于另一代码版本。请先停止旧实例，再启动当前版本。
+      运行进程属于另一代码版本。请先停止旧进程，再启动当前版本。
     </p>
     <p v-if="instance?.errorCode" class="inline-error">
       {{ instance.errorCode }} · 请检查运行环境后重试；无法确认退出时不会启动重复进程。
-    </p>
-    <BuildArchiveDownload
-      v-if="instance?.status === 'RUNNING'"
-      :key="instance.buildId"
-      :target="{ id: instance.buildId, projectId: instance.projectId }"
-    />
-    <p v-if="instance?.status === 'RUNNING'" class="muted">
-      此下载对应正在运行实例的冻结工程，不包含业务数据或数据库凭据。
     </p>
     <button
       v-if="pending"

@@ -83,7 +83,7 @@ async function download() {
 </script>
 
 <template>
-  <section class="engineering-download" aria-label="工程下载">
+  <section class="engineering-download" aria-label="版本源码导出">
     <div class="download-actions">
       <button
         class="button secondary"
@@ -93,13 +93,15 @@ async function download() {
         :aria-describedby="descriptionId"
         @click="download"
       >
-        {{ busy ? '正在准备工程…' : error ? '重试下载工程 ZIP' : '下载工程 ZIP' }}
+        {{ busy ? '正在准备源码…' : error ? '重试导出版本源码 ZIP' : '导出版本源码 ZIP' }}
       </button>
       <span v-if="version && !unavailable"
         >选中 V{{ version.versionNo }} · Vue + Spring Boot 17 + PostgreSQL</span
       >
     </div>
     <p :id="descriptionId" class="muted">
+      使用当前模板重新组装所选版本，不保证与正在预览的构建相同。如需预览同款，请使用「下载预览工程
+      ZIP」。
       包含源码与初始数据，不包含平台账号、对话、线上业务数据和密钥。需自行配置独立数据库并构建启动。
     </p>
     <p v-if="unavailable" class="muted">{{ unavailable }}</p>
