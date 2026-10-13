@@ -1,6 +1,6 @@
 # 云服务器部署记录
 
-2026-10-08 实际部署；这是 Demo 验收环境，不是完整生产上线签收。用户明确不等待域名，使用 IP + 端口访问。
+2026-10-08 首次部署，2026-10-13 更新当前程序与模型限制；这是 Demo 验收环境，不是完整生产上线签收。用户明确不等待域名，使用 IP + 端口访问。下方按日期保留历史操作，不将历史参数视为当前配置。
 
 ## 访问和当前边界
 
@@ -8,6 +8,7 @@
 - 这是显式的临时 Demo 例外，HTTP 流量未加密。独立 Cookie `ATOMS_HTTP_SESSION` 保留 HttpOnly / SameSite=Lax，但不含 Secure；旧 HTTPS 访客数据保留，不自动映射到新 HTTP 访客。
 - 原 HTTPS 自签证书仅为回退保留，有效期至 **2026-11-07 02:15:58（Asia/Shanghai）**，没有自动续期。SHA-256 指纹：`C5:4F:98:43:36:47:87:F5:AA:3F:01:C6:6B:5C:CD:69:4F:9E:AA:85:09:BE:B2:C7:D9:7F:A1:FF:97:34:4D:34`。
 - 使用全新数据库，没有上传本地项目、会话或整个 `.env.local`。已按用户授权单独同步 DeepSeek 密钥，并将云端累计模型请求上限设为 **100 次**，公网访客共用。启用时已预留 0、剩余 100；不是每日/每用户额度，也不是 100 次完整应用生成。配置验证没有发起生成或更改本地数据、模型记账。
+- 当前模型限制为 **163840 tokens / 单次 300 秒 / 整轮 900 秒**；2026-10-13 部署验收时累计已预留 18、剩余 82，本轮没有调用模型。未将本地 10000 次上限同步到公网。
 - 全站采用既有访客模式，项目按所有者隔离。身份频率限制、总存储配额、长期数据清理仍待完成；不适合无人监管地长期开放。侧栏个别“本地”字样仍是既有展示文案，不代表请求发往开发机。
 
 ## 实际安装
@@ -18,8 +19,8 @@
 
 | 项目 | 位置 / 状态 |
 |---|---|
-| 发布版本 | `atoms-demo-slKx1w`，源码 `ca4dac816345be8c05c180202703f21aa561b564`，打包时 dirty=false；2026-10-11 更新 |
-| 程序 | `/opt/atoms-demo/releases/atoms-demo-slKx1w`；`/opt/atoms-demo/current` 为其符号链接；旧 `atoms-demo-txj7Bn` 及此前发布包保留 |
+| 发布版本 | `atoms-demo-MImuq3`，源码 `b9aae45bc0addbaf350bfc93baf3896be572576e`，打包时 dirty=false；2026-10-13 更新 |
+| 程序 | `/opt/atoms-demo/releases/atoms-demo-MImuq3`；`/opt/atoms-demo/current` 为其符号链接；旧 `atoms-demo-slKx1w` 及此前发布包保留 |
 | 外部配置 | `/etc/atoms-demo/application.properties`，root:atoms / 0640，目录 0750 |
 | TLS（未启用） | `/etc/atoms-demo/tls/server.crt`、`server.key` 为回退保留；私钥 root / 0600，目录 0700 |
 | 后端服务 | `atoms-demo.service`，非 root 的 `atoms` 账号，单实例 |
@@ -45,7 +46,7 @@
 
 浏览器只对从 SSH 证书计算得到的 SPKI 放行；这证明应用在信任该证书后的表现，不等于普通浏览器已公信。验收脚本和截图在开发机临时目录 `/private/tmp/atoms-cloud-deploy.A3b2w7/`，不上传会话或 trace。
 
-## HTTP 切换验收（当前）
+## HTTP 切换验收（2026-10-08，协议仍沿用）
 
 - 原 400 正文为 `The plain HTTP request was sent to HTTPS port`，与 Nginx `listen 8443 ssl` 一致。现公网首页 200、`/api/health` 为 UP，三个服务 active，后端 NRestarts=0。
 - 本地打包测试 3 项、前端 106 项、后端单测 20 项和真实 PostgreSQL 集成测试 43 项通过；类型/格式/lint/构建通过；实际 Chrome runtime 回归 15 项通过，包含预览、保存、发布与下线。新增测试先失败后修复；反转 HTTP 同源判断时 4 项测试失败，恢复后 13 项发布解码测试通过。
@@ -100,11 +101,11 @@
 
 本机更新脚本位于 `/private/tmp/atoms-limit-upgrade.r05nQs/deploy.sh`，远端位于 `/var/tmp/atoms-limit-upgrade.ATQ9hP/`；脚本不含凭据。GNU tar 忽略 macOS provenance 扩展属性，所有载荷校验通过。
 
-## 单次额度提高至 168400（2026-10-08，参数仍沿用）
+## 单次额度提高至 168400（2026-10-08，历史参数）
 
 16840 配置下的新任务 `9e4dab9a-0f99-49d0-95b6-0b1fd2f559e0` 在 BUILDING 约 63 秒后返回 length：输入 1348、completion 16840、其中 reasoning 16266；规划成功，整轮共 2 次调用，没有新版本或自动重试。累计预留增至 6。这说明额度包含思考与最终内容，不能将其视为纯代码额度；不是超时或旧包未更新。
 
-按用户明确要求，当前云端 **DEEPSEEK_MAX_TOKENS=168400**，单次 300 秒、整轮 600 秒、thinking.enabled / high、累计 100 次均不变。代码校验上界由 32768 提高到 168400，保留有限上界和 2 MiB 响应/120 KiB 源码限制。本地私有配置、模型密钥、数据库、Nginx 和 HTTP 访问方式未改动。更高上限允许更高消耗，不保证所有需求均能完成；本次没有付费生成或浏览器闭环验收。
+按用户明确要求，当时云端 **DEEPSEEK_MAX_TOKENS=168400**，单次 300 秒、整轮 600 秒、thinking.enabled / high、累计 100 次均不变。代码校验上界由 32768 提高到 168400，保留有限上界和 2 MiB 响应/120 KiB 源码限制。本地私有配置、模型密钥、数据库、Nginx 和 HTTP 访问方式未改动。更高上限允许更高消耗，不保证所有需求均能完成；本次没有付费生成或浏览器闭环验收。
 
 验证：新增精确 168400 请求参数和思考设置回归，原实现下失败、修复后通过；将条件错误地改为拒绝 168400 时测试再次失败，恢复正确实现后完整构建通过。打包测试 3、前端 106、后端单测 26、PostgreSQL 集成 46 项通过，类型/lint/格式/构建通过；npm audit 为 0 已知漏洞，无新增依赖或数据库迁移。正式包与完整候选包 13 个载荷哈希一致，上传后逐项校验通过。
 
@@ -112,9 +113,9 @@
 
 回退：停后端，切回 `atoms-demo-RTV1eK`，同时恢复本次备份配置为 root:atoms / 0640（16840 / 300 / 600），启动后检查健康；旧包不接受 168400，不可只切包而保留新值。不恢复数据库、不删除项目、不重置记账。脚本保留于本机 `/private/tmp/atoms-token-168400.AFQH4c/`、远端 `/var/tmp/atoms-token-168400.N2kmjU/`；不含凭据。GNU tar 的 macOS provenance 扩展属性警告不影响已通过校验的文件。
 
-## 项目状态与历史恢复上线（2026-10-11，当前程序）
+## 项目状态与历史恢复上线（2026-10-11，历史程序）
 
-新增：在工作台选择历史版本并确认后，将历史代码复制为新版本，保留所有历史、业务数据和已发布指针，不自动发布。修复：首页/项目列表按当前保存版本显示“已生成 / 尚未生成”，不再固定显示未生成。完整工程导出、独立后端和应用级数据库仍未实现。
+新增：在工作台选择历史版本并确认后，将历史代码复制为新版本，保留所有历史、业务数据和已发布指针，不自动发布。修复：首页/项目列表按当前保存版本显示“已生成 / 尚未生成”，不再固定显示未生成。当时完整工程导出、独立后端和应用级数据库尚未实现。
 
 源码 `ca4dac816345be8c05c180202703f21aa561b564` 已推送至 GitHub main；发布包 `atoms-demo-slKx1w.tar.gz` 的 SHA-256 为 `0680171e3c4664354075aebf1774e68efe6ea67d5f06e5b206515052eaa09cb9`，干净工作树构建，服务器校验归档与 13 个载荷文件一致。文档提交可晚于该程序提交，不改写已发布归档。
 
@@ -129,6 +130,25 @@
 本机脚本与截图位于 `/private/tmp/atoms-restoration-deploy.VQzXE8/`，服务器脚本位于 `/var/tmp/atoms-restoration-deploy.UBXZbO/`，无凭据；不上传浏览器会话。GNU tar 忽略 macOS provenance 扩展属性的警告不影响载荷哈希。Chrome DevTools MCP 不可用，使用现有 Playwright 独立 Chrome。
 
 回退：停止 `atoms-demo`，将 `current` 切回保留的 `/opt/atoms-demo/releases/atoms-demo-txj7Bn`，启动并检查 HTTP health 与页面。**保留 V010、全部新版本和业务数据，不删列、不改 Flyway 记录、不恢复数据库**；配置及 Nginx 不需要改变。旧包不会展示恢复入口或来源信息，但仍可读取恢复后保存的新版本。旧包与迁移后 schema 的兼容性已在隔离库实测；真正恢复备份会丢失备份后的写入，必须另外获批。
+
+## 工程下载与默认限制上线（2026-10-13，当前程序）
+
+源码 `b9aae45bc0addbaf350bfc93baf3896be572576e`，发布包 `atoms-demo-MImuq3.tar.gz`，SHA-256 为 `f81776a4425bf1cac20f4950dbf8f4bb58d3e879699d7c2f1e2df1759649cd4d`。从干净功能分支构建，上传后归档与 13 个载荷文件全部校验通过；本轮没有推送 GitHub。文档记录提交晚于程序提交，不改写发布包。
+
+- 新增当前/历史版本的工程 ZIP 下载，包含固定 Vue + Spring Boot 17 + PostgreSQL 工程；下载不要求平台开启构建。模型生成的业务代码仍受 HTML/CSS/JS 与 SDK 契约约束，不是任意后端工程生成。
+- 本机异步构建模块随包部署，但仅允许显式开启的回环开发模式，云端保持关闭；未安装 Node/Maven、未启动用户应用实例。旧共享预览与 `/a/<slug>` 发布方式不变。
+- 正式构建通过：打包测试 3 项、前端单测 159 项、后端单测 119 项、真实 PostgreSQL 集成测试 77 项，以及类型、lint、格式与生产构建。前端锁文件 `npm audit` 为 0 已知漏洞；未升级依赖。
+- 本地 runtime Chrome 回归 20 项通过，覆盖真实当前/历史 ZIP 下载、私有数据排除、下载失败重试、键盘/手机访问、生成状态列表与刷新、恢复及发布/LIVE 数据隔离。首次运行遇到测试前端 5174 未就绪和 ERR_CONNECTION_REFUSED；设置回环 NO_PROXY 并强制新建测试服务后完整通过，没有放宽断言或修改产品代码。
+- Docker CLI 就绪检查超时，本轮未执行 Docker/Nginx/TLS 发布包浏览器套件，也未重启 Docker。替代检查：新旧真实发布 JAR 分别连接专用 `atoms_demo_test`，在 V011 已存在时均启动且 health=UP，测试时禁用模型；另对实际服务器 Nginx/HTTP 做下述公网验收。这不是完整的线上回退演练。
+- 确认无活动生成任务后停后端，备份到 `/var/backups/atoms-demo/engineering.HwpsFD/`：数据库 dump、旧外部配置及代理/服务配置；目录 root/0700，dump 与配置 root/0600。`pg_restore --list` 通过，本轮未做完整恢复演练。备份含密钥，不公开；同机备份不是异地灾备。
+- 16:01（Asia/Shanghai）切换并启动成功，Flyway 从 V010 增量应用 V011，共 12 条成功记录。切换前后已有 8 个项目、7 个版本、5 条应用状态、0 条发布记录、18 次模型调用及预算的内容摘要一致；不重建数据库、不删除项目、不重置额度。后续浏览器验收仅新增一个独立访客空项目“10月13日工程版本部署验收：不调用模型”。
+- 经用户确认，仅同步模型限制为 `DEEPSEEK_MAX_TOKENS=163840`、`DEEPSEEK_TIMEOUT_SECONDS=300`、`GENERATION_TIMEOUT_SECONDS=900`；其余配置经不输出内容的比较确认不变，权限仍为 root:atoms/0640，密钥保留。`GENERATION_MAX_MODEL_CALLS=100` 不变，验收时已用 18、剩余 82，模型已配置、worker 已启用，本轮未发起模型调用。
+- 三个服务 active，后端 NRestarts=0，内外网 health=UP、HTTP 首页 200。独立 Chrome 验证新前端资源 `index-B1HxKYjp.js`、项目创建/列表/深链接刷新、新构建列表接口、恢复非法请求 422、缺 CSRF 403、另一访客读取项目/构建 404，以及测试/敏感路径 404。正常 UI 无 console warning/error/pageerror，已检查 1440px 桌面与 390px 手机截图，无横向溢出。
+- 公网验收未使用已有用户会话，未实际下载已有用户工程 ZIP、提交有效历史恢复或生成/发布应用；这些正向功能的本地通过不能冒称为云端全流程通过。服务端建表不代表已启用独立实例预览。
+
+上传曾因 SSH 连接中断失败，带保活参数重新上传后校验通过。正式切换由一次性 systemd 单元 `atoms-engineering-deploy-20261013.service` 执行，避免 SSH 中断打断停服/切换；该单元结果 success，平台自身仍由既有 `atoms-demo.service` 管理。本机脚本/截图位于 `/private/tmp/atoms-engineering-deploy.HaPrWH/`，远端脚本位于 `/var/tmp/atoms-engineering-deploy.lYzuEo/`；不上传浏览器会话或凭据。
+
+当前版本回退：停止 `atoms-demo`，将上述备份内的 `application.properties` 恢复为 `/etc/atoms-demo/application.properties`（root:atoms/0640），把 `current` 原子切回保留的 `/opt/atoms-demo/releases/atoms-demo-slKx1w`，启动并检查回环和公网 HTTP 健康。旧配置为 168400 / 300 秒 / 600 秒 / 累计 100 次。**保留 V011、所有业务数据与调用记账，不删表、不改 Flyway 记录、不恢复数据库**；Nginx 与 systemd 配置无需改变。旧包与 V011 的启动兼容性已在专用测试库验证；真正恢复数据库会丢失备份后的写入，须另外获批。
 
 ## 备份及运维
 
@@ -148,6 +168,6 @@ systemctl restart atoms-demo
 
 配置修改后重启后端，Nginx 配置改动须先 `nginx -t` 再 reload。不要输出完整配置、密码或 Cookie。DeepSeek 密钥已授权同步，累计预算已授权为 100 次，公网访客共用；不删除记账或自动放开上限。长期开放前仍需补齐身份限流和资源配额，后端仍只允许单实例。
 
-更新/回退遵循 [部署说明](../deploy/server/README.md)：备份 → 停后端 → 切换已校验版本 → 启动检查。回退至旧 `atoms-demo-XmTJCF` 时，必须同时恢复上述备份内的外部配置、HTTPS 站点和静态安全头，将 `http-demo.conf` 移出 systemd drop-in 目录后 daemon-reload，再启动后端、检查代理配置并重载。等待协议入口就绪，不以发出 reload 信号视为完成；旧证书必须仍有效。不恢复数据库、不删除新 HTTP 期间产生的数据，不将恢复数据库当成无损代码回退。
+更新/回退遵循 [部署说明](../deploy/server/README.md)：备份 → 停后端 → 切换已校验版本 → 启动检查。当前程序回退使用上节 2026-10-13 的步骤。以下仅为首次 HTTPS 版本的历史回退方案：回退至旧 `atoms-demo-XmTJCF` 时，必须同时恢复 HTTP 切换前备份内的外部配置、HTTPS 站点和静态安全头，将 `http-demo.conf` 移出 systemd drop-in 目录后 daemon-reload，再启动后端、检查代理配置并重载。等待协议入口就绪，不以发出 reload 信号视为完成；旧证书必须仍有效。不恢复数据库、不删除新 HTTP 期间产生的数据，不将恢复数据库当成无损代码回退。
 
 尚未验收：云端实际生成版本发布与 LIVE 数据闭环、活动任务崩溃恢复、整机重启，以及不刷新页面的 SSE 断网游标恢复。云端真实 CREATE、生成中刷新后 SSE 重连、预览交互保存与刷新恢复已通过；不把一款 2048 的成功等同于任意需求稳定性保证，T29 总项继续保留未完成。
