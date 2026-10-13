@@ -145,7 +145,7 @@ it('explicitly distinguishes a successful build from the old shared preview', as
   vi.mocked(getBuild).mockResolvedValue(done)
   const wrapper = open()
   await flushPromises()
-  expect(wrapper.text()).toContain('构建完成，实例预览尚未接入')
+  expect(wrapper.text()).toContain('构建完成，可启动独立实例')
   expect(wrapper.find('iframe').exists()).toBe(false)
   expect(wrapper.findComponent(BuildArchiveDownload).props('target')).toMatchObject({
     id: done.id,

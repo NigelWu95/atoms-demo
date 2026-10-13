@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { computed, useId } from 'vue'
+import { computed, useId, watch } from 'vue'
 import type { VersionSummary } from '../api/artifacts'
-import type { BuildStage, BuildStatus } from '../api/builds'
+import type { BuildStage, BuildStatus, EngineeringBuild } from '../api/builds'
 import { useEngineeringBuild } from '../composables/useEngineeringBuild'
 import { useSessionStore } from '../stores/session'
 import BuildArchiveDownload from './BuildArchiveDownload.vue'
@@ -12,6 +12,7 @@ const props = defineProps<{
   loading: boolean
 }>()
 const session = useSessionStore()
+const emit = defineEmits<{ selected: [EngineeringBuild | null] }>()
 const descriptionId = useId()
 const unavailable = computed(() => {
   if (!session.ready || !session.identity) return '请先连接访客会话。'
@@ -48,6 +49,7 @@ const statuses: Record<BuildStatus, string> = {
   CANCELLED: '构建已取消',
   INTERRUPTED: '构建中断',
 }
+watch(build, (value) => emit('selected', value), { immediate: true })
 const stages: Record<BuildStage, string> = {
   QUEUED: '等待执行槽',
   PREPARING: '冻结工程快照',
@@ -107,7 +109,7 @@ function date(value: string) {
     <p v-else-if="!build && !error" class="muted">该版本尚无构建记录。</p>
     <template v-if="build">
       <p role="status">
-        <template v-if="build.status === 'SUCCEEDED'">构建完成，实例预览尚未接入。</template>
+        <template v-if="build.status === 'SUCCEEDED'">构建完成，可启动独立实例。</template>
         <template v-else>{{ statuses[build.status] }} · {{ stages[build.stage] }}</template>
       </p>
       <p v-if="build.errorMessage" class="inline-error">
