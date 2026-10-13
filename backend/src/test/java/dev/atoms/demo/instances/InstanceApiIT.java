@@ -10,7 +10,14 @@ import static org.assertj.core.api.Assertions.*;
 
 @SpringBootTest(webEnvironment=SpringBootTest.WebEnvironment.RANDOM_PORT) @ActiveProfiles("test")
 class InstanceApiIT {
+    @org.springframework.beans.factory.annotation.Autowired RuntimeEngine engine;
     @LocalServerPort int port;
+    @Test void claimingAnAbsentInstanceThroughSpringProxyIsANoOp() {
+        UUID id=UUID.randomUUID();
+        var value=new AppInstance(id,id,id,id,"QUEUED","a".repeat(64),null,java.time.Instant.now(),null,null);
+        assertThatCode(()->org.springframework.test.util.ReflectionTestUtils.invokeMethod(engine,"launch",new InstanceRepository.Stored(value,id,id,false)))
+                .doesNotThrowAnyException();
+    }
     @Test void emptyInstanceListIsOwnerOnlyAndNeverStartsProcesses() throws Exception {
         var owner=new ApiBrowser(port); owner.initialize();
         String id=owner.request("POST","/api/projects","{\"name\":\"独立实例边界\"}",UUID.randomUUID().toString()).body().path("id").asText();

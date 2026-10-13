@@ -15,8 +15,9 @@ public final class RuntimeDocumentPolicy implements HeaderWriter {
     private static final String UUID_PATH = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
     private static final Pattern DOCUMENT = Pattern.compile("/api/projects/" + UUID_PATH + "/versions/" + UUID_PATH + "/document");
     private static final Pattern PUBLIC_DOCUMENT = Pattern.compile("/api/public/apps/[0-9a-f]{32}/document");
+    private static final Pattern INSTANCE_DOCUMENT = Pattern.compile("/api/projects/" + UUID_PATH + "/instances/" + UUID_PATH + "/document");
     @Override public void writeHeaders(HttpServletRequest request, HttpServletResponse response) {
-        boolean document = "GET".equals(request.getMethod()) && (DOCUMENT.matcher(request.getServletPath()).matches() || PUBLIC_DOCUMENT.matcher(request.getServletPath()).matches())
+        boolean document = "GET".equals(request.getMethod()) && (DOCUMENT.matcher(request.getServletPath()).matches() || PUBLIC_DOCUMENT.matcher(request.getServletPath()).matches() || INSTANCE_DOCUMENT.matcher(request.getServletPath()).matches())
                 && response.getStatus() == 200 && CSP.equals(response.getHeader("Content-Security-Policy"))
                 && response.getContentType() != null && response.getContentType().startsWith("text/html");
         response.setHeader("X-Frame-Options", document ? "SAMEORIGIN" : "DENY");

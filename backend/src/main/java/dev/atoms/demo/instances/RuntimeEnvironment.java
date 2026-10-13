@@ -10,12 +10,18 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class RuntimeEnvironment {
+    volatile boolean ready;
     private final Environment environment;
     private final BuildExecutionEnvironment builds;
     public RuntimeEnvironment(Environment environment, BuildExecutionEnvironment builds) { this.environment=environment;this.builds=builds; }
     record Slot(UUID id, int port, String fingerprint, Path config) {}
     record Settings(WorkspacePaths paths, BuildEnvironment.Settings tools, List<Slot> slots) {}
     boolean enabled() { return environment.getProperty("atoms.runtime.enabled",Boolean.class,false); }
+    Settings admission() {
+        var value=settings();
+        if(!ready)throw unavailable();
+        return value;
+    }
     Settings settings() {
         if(!enabled()) throw new ApiException(503,"RUNTIME_DISABLED","独立运行尚未启用，请配置本机运行环境");
         try {
