@@ -18,6 +18,8 @@
 
 ## 验证与完成条件
 
+2026-10-14 一致性收口：主“下载预览工程 ZIP”以实际预览 executionId → buildId 为唯一来源，只有运行身份校验与 iframe 就绪握手成功后才开放。切换环境/项目/版本/所有者或预览失效时取消在途下载，忽略旧执行的晚到事件。同版本新构建不能改变该目标。按版本重新组装的导出折叠并明确标注“未绑定运行预览”；共享预览不承担独立工程验收。UI 使用“本机应用进程/启动应用”，不新增云实例管理能力。
+
 frontend `npm run test:unit` / `npm run typecheck` / `npm run lint` / `npm run format:check` / `npm run build`；backend `./mvnw -B verify`。真实浏览器验证构建→启动→待办保存→刷新→停止→重新启动后数据仍在、第二项目独立、越权拒绝、无控制台错误、手机与键盘访问。没有 Chrome DevTools MCP 时使用已有 Playwright 独立 Chrome，不连接个人浏览器。
 
 Always：绑定真实运行身份、下载同一快照、有限代理；Ask first：公网开启、迁移旧 PREVIEW/LIVE 数据；Never：返回模拟就绪、代理任意 URL、向 iframe 传递会话凭据。未完成项如实保留，不以接口模拟测试冒充真实运行验收。

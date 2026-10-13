@@ -1,11 +1,13 @@
 # 工程下载与独立运行
 
-2026-10-13：本地已实现。入口在工作台的代码版本区域，支持下载当前选中的已保存版本，包括历史版本。本轮没有推送 GitHub 或更新云端部署；文档中的 GitHub 链接在后续推送后对应新内容。
+2026-10-14：主入口已区分“下载预览工程 ZIP”和“导出版本源码 ZIP”。前者绑定实际预览的冻结构建，后者保留当前/历史版本导出。本轮没有推送 GitHub 或更新云端部署；文档中的 GitHub 链接在后续推送后对应新内容。
 
-## 使用方式
+需要下载与预览一致的工程时：构建当前版本 → 启动应用 → 本机运行预览就绪 → **下载预览工程 ZIP**。文件名为 `atoms-build-<构建 UUID>-engineering.zip`，来源是正在运行的构建，不受随后修改模板或选择其他构建影响。预览未就绪或切回共享预览时不开放该下载，详见[本机运行说明](https://github.com/NigelWu95/atoms-demo/blob/main/docs/app-runtime.md)。
+
+## 版本源码导出与通用启动方式
 
 1. 打开自己的项目，在代码版本区域选中要导出的 Vn。
-2. 点击“下载工程 ZIP”。文件名为 `atoms-<项目 UUID>-v<n>-engineering.zip`，不是始终下载最新版本。未生成、正在加载版本或会话未连接时，按钮说明不可用原因。
+2. 展开“其他导出：版本源码（未绑定运行预览）”，点击“导出版本源码 ZIP”。文件名为 `atoms-<项目 UUID>-v<n>-engineering.zip`。此入口用当前模板重新组装，不保证等同于正在运行的构建；未生成、正在加载或会话未连接时不可用。
 3. 解压到一个新目录，按包内 README 准备 Java 17、Node 24.20.x、npm 11.19.x 和 PostgreSQL 17。首次构建需要访问依赖仓库。
 4. 在工程外初始化运行/测试配置，由数据库管理员分别准备专用数据库与受限角色。不要复用平台数据库或将运行库用作测试库；真实配置不得提交 Git。
 5. 按 README 构建并启动，访问配置中的 origin。成品只需 Java、JAR、外部配置和 PostgreSQL，不需要平台服务、模型 API Key 或 Vite。
@@ -65,4 +67,4 @@ Accept: application/zip
 
 平台内的专用工作区与固定模板本机构建执行器已由独立的 `workspace-build` 模块实现。它先冻结版本和模板，再构建 JAR；“下载本次构建工程 ZIP”按 buildId 返回原始冻结包，不同于本页按版本与当前模板组装的下载接口。使用方式见[本机构建说明](https://github.com/NigelWu95/atoms-demo/blob/main/README.md#在平台本机构建工程)，实际构建与下载重建结果见[验收记录](https://github.com/NigelWu95/atoms-demo/blob/main/docs/workspace-build-verification.md)。
 
-2026-10-14 本地已接入独立实例启停、永久项目运行库绑定和实际 JAR 预览；运行区下载绑定同一个 buildId。维护者须预备专用配置池，平台不自动建库，实例不直接发布公网。见[实例说明](https://github.com/NigelWu95/atoms-demo/blob/main/docs/app-runtime.md)。GitHub 授权/同步、真实业务数据导入导出、任意后端生成仍未包含在内。模块关系见[能力地图](https://github.com/NigelWu95/atoms-demo/blob/main/CAPABILITY-MAP.md)。
+2026-10-14 本地已接入本机应用进程启停、永久项目运行库绑定和实际 JAR 预览；主下载入口绑定同一个 buildId 和已就绪的预览。维护者须预备专用配置池，平台不自动建库，进程不直接发布公网。见[本机运行说明](https://github.com/NigelWu95/atoms-demo/blob/main/docs/app-runtime.md)。GitHub 授权/同步、真实业务数据导入导出、任意后端生成仍未包含在内。模块关系见[能力地图](https://github.com/NigelWu95/atoms-demo/blob/main/CAPABILITY-MAP.md)。
