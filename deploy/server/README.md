@@ -32,7 +32,7 @@ sudo -u postgres psql -X -v ON_ERROR_STOP=1 -d atoms_demo -f /opt/atoms-demo/cur
 
 `PUBLIC_APP_ORIGIN=https://实际域名`，不含路径；公开链接为该 origin 加 `/a/<slug>`。`DEEPSEEK_API_KEY` 只放在服务器配置中。`GENERATION_MAX_MODEL_CALLS=0` 默认禁用付费生成；需要另外明确累计调用预算后修改，不能以清空记账表恢复额度。服务器默认新库，不自动迁移本机项目和会话；迁移属于独立备份/恢复操作。
 
-`DEEPSEEK_MAX_TOKENS` 默认为 16384，允许 1–168400；该额度包含思考与最终输出，不只是代码。`DEEPSEEK_TIMEOUT_SECONDS` 默认为 120，允许 1–300 秒。`GENERATION_TIMEOUT_SECONDS` 独立控制从任务开始执行起的整轮时间，默认 360、允许 1–1800 秒；它同时约束模型等待、阶段切换和最终保存。提高单次请求超时后应明确设置整轮预算，避免仍被默认 6 分钟终止；扩大时长/输出上限可能增加费用和单 Worker 排队时间。2 MiB 上游响应、120 KiB 源码和累计请求次数限制不会随之放宽；更高 token 上限不保证在这些限制内完成。
+`DEEPSEEK_MAX_TOKENS` 默认为 163840，允许 1–168400；该额度包含思考与最终输出，不只是代码。`DEEPSEEK_TIMEOUT_SECONDS` 默认为 300，允许 1–300 秒。`GENERATION_TIMEOUT_SECONDS` 独立控制从任务开始执行起的整轮时间，默认 900、允许 1–1800 秒；它同时约束模型等待、阶段切换和最终保存。整轮预算包含所有阶段和保存开销，并不保证每次请求均能用满 300 秒。已有显式配置优先，新默认值不自动覆盖服务器私有配置。扩大时长/输出上限可能增加费用和单 Worker 排队时间。2 MiB 上游响应、120 KiB 源码和累计请求次数限制不会随之放宽；更高 token 上限不保证在这些限制内完成。
 
 ## 3. 启动后端
 
