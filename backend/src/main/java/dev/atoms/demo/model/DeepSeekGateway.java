@@ -30,8 +30,8 @@ public class DeepSeekGateway implements ModelGateway {
     @Autowired public DeepSeekGateway(ObjectMapper json, Environment env) {
         this(json, URI.create("https://api.deepseek.com/chat/completions"),
                 env.getProperty("DEEPSEEK_API_KEY", ""), "deepseek-flash",
-                Duration.ofSeconds(env.getProperty("DEEPSEEK_TIMEOUT_SECONDS", Integer.class, 120)),
-                env.getProperty("DEEPSEEK_MAX_TOKENS", Integer.class, 16384));
+                Duration.ofSeconds(env.getProperty("DEEPSEEK_TIMEOUT_SECONDS", Integer.class, 300)),
+                env.getProperty("DEEPSEEK_MAX_TOKENS", Integer.class, 163840));
     }
     // Package-private test transport seam; no runtime configuration accepts an arbitrary upstream URL.
     DeepSeekGateway(ObjectMapper json, URI endpoint, String key, String model, Duration timeout, int maxTokens) {

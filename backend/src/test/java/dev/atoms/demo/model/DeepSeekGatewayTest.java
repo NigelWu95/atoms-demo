@@ -12,6 +12,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.mock.env.MockEnvironment;
 import static org.assertj.core.api.Assertions.*;
 
 class DeepSeekGatewayTest {
@@ -45,6 +46,37 @@ class DeepSeekGatewayTest {
     }
     @AfterEach void stop() { server.stop(0); pool.shutdownNow(); }
     private DeepSeekGateway gateway() { return new DeepSeekGateway(json, endpoint, "test-only-key", "deepseek-flash", Duration.ofSeconds(2), 8192); }
+
+    @Test void defaultsTo163840TokensAndFiveMinuteRequestTimeout() {
+        var configured = new DeepSeekGateway(json, new MockEnvironment());
+        assertThat(configured).hasFieldOrPropertyWithValue("maxTokens", 163840)
+                .hasFieldOrPropertyWithValue("timeout", Duration.ofSeconds(300));
+        assertThat(configured.configured()).isFalse();
+        assertThat(calls.get()).isZero();
+    }
+    @Test void explicitTokenLimitsStillOverrideTheDefault() {
+        for (int limit : new int[]{1, 16384, 163840, 168400}) {
+            var configured = new DeepSeekGateway(json,
+                    new MockEnvironment().withProperty("DEEPSEEK_MAX_TOKENS", Integer.toString(limit)));
+            assertThat(configured).hasFieldOrPropertyWithValue("maxTokens", limit);
+        }
+        assertThat(calls.get()).isZero();
+    }
+    @Test void explicitRequestTimeoutStillOverridesTheDefault() {
+        var configured = new DeepSeekGateway(json,
+                new MockEnvironment().withProperty("DEEPSEEK_TIMEOUT_SECONDS", "120"));
+        assertThat(configured).hasFieldOrPropertyWithValue("timeout", Duration.ofSeconds(120));
+        assertThat(calls.get()).isZero();
+    }
+    @Test void sends163840TokensWithExistingThinkingSettings() throws Exception {
+        var configured = new DeepSeekGateway(json, endpoint, "test-only-key", "deepseek-flash", Duration.ofSeconds(2), 163840);
+        assertThat(configured.complete("JSON", "test", () -> false).usage().totalTokens()).isEqualTo(50);
+        var request = json.readTree(received.get());
+        assertThat(request.path("max_tokens").asInt()).isEqualTo(163840);
+        assertThat(request.path("thinking").path("type").asText()).isEqualTo("enabled");
+        assertThat(request.path("reasoning_effort").asText()).isEqualTo("high");
+        assertThat(calls.get()).isEqualTo(1);
+    }
 
     @Test void sendsDocumentedParametersAndReturnsOnlyFinalContentAndUsage() throws Exception {
         var answer = gateway().complete("Return JSON", "生成待办", () -> false);
