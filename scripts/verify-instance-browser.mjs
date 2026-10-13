@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { startOwned } from "./standalone-process.mjs";
 
@@ -45,30 +45,42 @@ export async function verifyInstanceBrowser({
     });
     const base = `/api/projects/${project.project.id}/instances`;
     await page.goto(`http://127.0.0.1:5174/projects/${project.project.id}`);
-    const panel = page.getByRole("region", { name: "独立应用实例" });
+    const panel = page.getByRole("region", { name: "本机应用进程" });
+    const previewDownload = page.getByRole("region", { name: "预览工程下载" });
+    const downloadButton = previewDownload.getByRole("button", {
+      name: "下载预览工程 ZIP",
+      exact: true,
+    });
     await expect(panel).toContainText("运行中", { timeout: 15000 });
-    const frame = page.frameLocator('iframe[title="独立实例应用预览"]');
+    const frame = page.frameLocator('iframe[title="本机应用预览"]');
     await expect(frame.getByLabel("新待办")).toBeVisible({ timeout: 15000 });
     await frame.getByLabel("新待办").fill("真实实例浏览器保存");
     await frame.getByRole("button", { name: "添加待办" }).click();
     await expect(
-      page.getByText("独立实例 · 已保存到数据库", { exact: true }),
+      page.getByText("本机应用 · 已保存到数据库", { exact: true }),
+    ).toBeVisible();
+    await frame
+      .getByRole("checkbox", { name: "真实实例浏览器保存", exact: true })
+      .check();
+    await expect(
+      page.getByText("本机应用 · 已保存到数据库", { exact: true }),
     ).toBeVisible();
     await page.reload();
     await expect(
       frame.getByText("真实实例浏览器保存", { exact: true }),
     ).toBeVisible();
+    await expect(
+      frame.getByRole("checkbox", { name: "真实实例浏览器保存", exact: true }),
+    ).toBeChecked();
     const build = await (
       await page.request.get(
         `/api/projects/${project.project.id}/builds/${project.buildId}`,
       )
     ).json();
     const downloadEvent = page.waitForEvent("download");
-    await panel
-      .getByRole("button", {
-        name: `下载构建 ${project.buildId.slice(0, 8)} 的工程 ZIP`,
-      })
-      .click();
+    await expect(previewDownload).toContainText(project.buildId.slice(0, 8));
+    await downloadButton.focus();
+    await page.keyboard.press("Enter");
     const download = await downloadEvent;
     await download.saveAs(join(work, "runtime-engineering.zip"));
     assert.equal(
@@ -77,7 +89,19 @@ export async function verifyInstanceBrowser({
         .digest("hex"),
       build.archiveSha256,
     );
-    for (const width of [1440, 390, 320]) {
+    await writeFile(join(work, "preview-build.json"), JSON.stringify(build), {
+      mode: 0o600,
+    });
+    const modes = page.getByRole("group", { name: "预览运行环境" });
+    await modes
+      .getByRole("button", { name: "平台共享预览", exact: true })
+      .click();
+    await expect(downloadButton).toBeDisabled();
+    await modes
+      .getByRole("button", { name: "本机运行预览", exact: true })
+      .click();
+    await expect(downloadButton).toBeEnabled();
+    for (const width of [1440, 1024, 768, 390, 320]) {
       await page.setViewportSize({ width, height: 1000 });
       if (width < 768)
         await page
@@ -101,7 +125,7 @@ export async function verifyInstanceBrowser({
       // Bring the outer frame onscreen before waiting for animation frames in
       // the offscreen cross-origin child (Chrome can throttle those frames).
       await page
-        .locator('iframe[title="独立实例应用预览"]')
+        .locator('iframe[title="本机应用预览"]')
         .scrollIntoViewIfNeeded();
       await expect(
         frame.getByText("真实实例浏览器保存", { exact: true }),
@@ -116,22 +140,23 @@ export async function verifyInstanceBrowser({
       });
     }
     await page.setViewportSize({ width: 1440, height: 1000 });
-    await panel
-      .getByRole("button", { name: "停止独立实例", exact: true })
-      .click();
+    await panel.getByRole("button", { name: "停止应用", exact: true }).click();
     await expect(panel).toContainText("已停止", { timeout: 30000 });
     await expect(page.locator("iframe")).toHaveCount(0);
+    await expect(downloadButton).toBeDisabled();
     await expect(
-      page.getByText("当前版本没有运行中的独立实例。", { exact: false }),
+      page.getByText("当前版本没有运行中的本机应用。", { exact: false }),
     ).toBeVisible();
-    await panel
-      .getByRole("button", { name: "启动独立实例", exact: true })
-      .focus();
+    await panel.getByRole("button", { name: "启动应用", exact: true }).focus();
     await page.keyboard.press("Enter");
     await expect(panel).toContainText("运行中", { timeout: 105000 });
     await expect(
       frame.getByText("真实实例浏览器保存", { exact: true }),
     ).toBeVisible({ timeout: 15000 });
+    await expect(downloadButton).toBeEnabled();
+    await expect(
+      frame.getByRole("checkbox", { name: "真实实例浏览器保存", exact: true }),
+    ).toBeChecked();
     const stranger = await browser.newContext();
     try {
       const csrf = await (
@@ -150,7 +175,7 @@ export async function verifyInstanceBrowser({
     }
     assert.deepEqual(errors, []);
     console.log(
-      "Browser verification passed: real process preview, state save/reload/restart, frozen ZIP, 320/390/1440px, accessibility and owner isolation.",
+      "Browser verification passed: real process preview, add/toggle/save/reload/restart, preview-bound frozen ZIP, disabled shared/stopped downloads, 320/390/768/1024/1440px, accessibility and owner isolation.",
     );
   } catch (error) {
     if (page) {
