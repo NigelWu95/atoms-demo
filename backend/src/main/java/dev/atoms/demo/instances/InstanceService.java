@@ -40,12 +40,13 @@ public class InstanceService {
         if(!body.isObject() || body.size()!=1 || !body.path("buildId").isTextual())throw invalid();
         var build=builds.get(owner,project,body.path("buildId").asText());
         RuntimeEnvironment.Settings settings=null;ApiException failure=null;
-        try {settings=environment.settings();}catch(ApiException error){failure=error;}
+        try {settings=environment.admission();}catch(ApiException error){failure=error;}
         var candidate=settings;var rejection=failure;
         return transaction.execute(status->{
-            instances.lock();projects.lock(owner,project);
+            instances.lock();var current=projects.lock(owner,project);
             return idempotency.execute(owner,"POST","/api/projects/"+project+"/instances",key,Map.of("buildId",build.id()),()->{
                 if(!"SUCCEEDED".equals(build.status()))throw new ApiException(409,"BUILD_NOT_READY","请先成功构建所选版本");
+                if(!build.versionId().equals(current.currentVersionId()))throw new ApiException(409,"RUNTIME_VERSION_NOT_CURRENT","请先恢复为当前版本并重新构建，再启动独立实例");
                 if(rejection!=null)throw rejection;
                 if(instances.projectActive(build.projectId()))throw new ApiException(409,"RUNTIME_ALREADY_ACTIVE","该项目已有运行实例，请先停止或确认退出");
                 if(instances.activeCount()>=2)throw new ApiException(503,"RUNTIME_CAPACITY_EXCEEDED","最多同时运行两个实例，请先停止其他实例");
@@ -63,7 +64,7 @@ public class InstanceService {
             return idempotency.execute(owner,"POST","/api/projects/"+project+"/instances/"+id+"/stops",key,Map.of(),()->{
                 var current=instances.find(instance.summary().id());
                 if(current.summary().status().equals("QUEUED"))instances.finish(current.summary().id(),"STOPPED",null,true);
-                else instances.jdbc.update("UPDATE app_instances SET status='STOPPING' WHERE id=? AND status IN ('STARTING','RUNNING')",current.summary().id());
+                else instances.requestStop(current.summary().id());
                 return accepted(current.summary().id());
             });
         });

@@ -8,7 +8,7 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 class InstanceRepository {
-    final JdbcTemplate jdbc;
+    private final JdbcTemplate jdbc;
     InstanceRepository(JdbcTemplate jdbc) { this.jdbc=jdbc; }
     record Stored(AppInstance summary, UUID owner, UUID installation, boolean pending) {}
     private static final String SELECT="SELECT i.*,b.version_id,b.loaded_runtime_id FROM app_instances i JOIN engineering_builds b ON b.id=i.build_id ";
@@ -51,6 +51,15 @@ class InstanceRepository {
     }
     void finish(UUID id,String status,String error,boolean settled) {
         jdbc.update("UPDATE app_instances SET status=?,error_code=?,execution_pending=?,finished_at=now() WHERE id=?",status,error,!settled,id);
+    }
+    boolean claim(UUID id) {
+        return jdbc.update("UPDATE app_instances SET status='STARTING',execution_pending=true,started_at=now() WHERE id=? AND status='QUEUED'",id)==1;
+    }
+    boolean markReady(UUID id) {
+        return jdbc.update("UPDATE app_instances SET status='RUNNING' WHERE id=? AND status='STARTING'",id)==1;
+    }
+    void requestStop(UUID id) {
+        jdbc.update("UPDATE app_instances SET status='STOPPING' WHERE id=? AND status IN ('STARTING','RUNNING')",id);
     }
     private record Binding(UUID id,String fingerprint) {}
 }
