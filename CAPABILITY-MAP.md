@@ -14,8 +14,8 @@
 | `engineering-bundle` | 工程格式、固定模板、兼容运行层、独立数据服务与启动契约 | 现有不可变代码版本契约 | [规格](SPEC-engineering-bundle.md)；EB01–EB25 本地实现/验证完成，人工评审待完成 |
 | `project-export` | 所有者下载选定版本的工程 ZIP；界面说明和下载失败处理 | `engineering-bundle` | [规格](SPEC-project-export.md)；PE01–PE05 本地实现/验证完成 |
 | `workspace-build` | 不可变工程快照、专用目录、本机固定构建/测试、构建状态与产物 | `engineering-bundle` | [已实现规格](SPEC-workspace-build.md)；[验收记录](docs/workspace-build-verification.md)与 [WB 任务状态](tasks/todo.md#workspace-build-执行任务) |
-| `app-runtime` | 本机独立进程的启动/停止、健康、独立数据配置、资源控制与回收 | `workspace-build` | 后续单独编写 |
-| `runtime-access` | 平台预览接入对应实例、来源隔离与授权访问 | `app-runtime` | 后续单独编写 |
+| `app-runtime` | 本机独立进程的启动/停止、健康、独立数据配置、资源控制与回收 | `workspace-build` | [规格](SPEC-app-runtime.md)，实施中 |
+| `runtime-access` | 平台预览接入对应实例、来源隔离与授权访问 | `app-runtime` | [规格](SPEC-runtime-access.md)，实施中 |
 
 构建顺序：`engineering-bundle` → `project-export` → `workspace-build` → `app-runtime` → `runtime-access`。
 其中 `project-export` 不依赖执行器，导出服务不负责启动用户工程。
