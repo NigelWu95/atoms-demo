@@ -42,11 +42,16 @@ export async function verifyRuntimePair(options,signal) {
       assert.equal((await app.json()).loadedRuntimeId,loadedRuntimeId);
       assert.deepEqual((await (await context.request.get(origins[index]+'/api/state')).json()).value,{todos:[]});
       const frame=page.frameLocator('iframe');
-      await frame.getByLabel('新待办',{exact:true}).fill(index===0?'平台构建独立数据':'下载重建独立数据');
+      const title=index===0?'平台构建独立数据':'下载重建独立数据';
+      await frame.getByLabel('新待办',{exact:true}).fill(title);
       await frame.getByRole('button',{name:'添加待办',exact:true}).click();
       await page.getByRole('status').filter({hasText:'已保存到数据库'}).waitFor();
       saved[index]=await (await context.request.get(origins[index]+'/api/state')).json();
       assert.equal(saved[index].revision,1);assert.equal(saved[index].value.todos.length,1);
+      await frame.getByRole('checkbox',{name:title,exact:true}).check();
+      await page.getByRole('status').filter({hasText:'已保存到数据库'}).waitFor();
+      saved[index]=await (await context.request.get(origins[index]+'/api/state')).json();
+      assert.equal(saved[index].revision,2);assert.equal(saved[index].value.todos[0].done,true);
       await page.reload();await page.frameLocator('iframe').getByText('数据已读取。',{exact:true}).waitFor();
       assert.deepEqual(await (await context.request.get(origins[index]+'/api/state')).json(),saved[index]);
       await page.screenshot({path:join(output,`runtime-${index}.png`),fullPage:true});
