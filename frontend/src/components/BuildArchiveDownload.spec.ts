@@ -43,6 +43,26 @@ it('offers the exact snapshot and releases object URLs on unmount', async () => 
   wrapper.unmount()
   expect(revokeUrl).toHaveBeenCalledWith('blob:build')
 })
+it('keeps a pending download when polling replaces the target with the same identity', async () => {
+  let resolve!: (blob: Blob) => void
+  vi.mocked(downloadBuildArchive).mockReturnValue(
+    new Promise((done) => {
+      resolve = done
+    }),
+  )
+  const wrapper = mount(BuildArchiveDownload, { props: { target } })
+  try {
+    await wrapper.get('button').trigger('click')
+    const signal = vi.mocked(downloadBuildArchive).mock.calls[0]![1]
+    await wrapper.setProps({ target: { ...target } })
+    expect(signal.aborted).toBe(false)
+    resolve(new Blob(['zip']))
+    await flushPromises()
+    expect(click).toHaveBeenCalledOnce()
+  } finally {
+    wrapper.unmount()
+  }
+})
 it.each(['change', 'cancel', 'session'] as const)(
   'aborts and ignores late results on %s',
   async (mode) => {

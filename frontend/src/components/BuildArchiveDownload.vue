@@ -30,7 +30,12 @@ function reset() {
   release()
 }
 watch(
-  () => [props.target.id, props.target.projectId, session.ready, session.identity?.userId],
+  [
+    () => props.target.id,
+    () => props.target.projectId,
+    () => session.ready,
+    () => session.identity?.userId,
+  ],
   reset,
   { flush: 'sync' },
 )
