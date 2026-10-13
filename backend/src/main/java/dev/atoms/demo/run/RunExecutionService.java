@@ -23,7 +23,7 @@ public class RunExecutionService {
     public RunExecutionService(RunRepository repo, JdbcTemplate jdbc, ArtifactService artifacts, Environment env) {
         this.repo = repo; this.jdbc = jdbc; this.artifacts = artifacts;
         ceiling = Math.max(0, env.getProperty("GENERATION_MAX_MODEL_CALLS", Long.class, 0L));
-        timeoutSeconds = env.getProperty("GENERATION_TIMEOUT_SECONDS", Integer.class, 360);
+        timeoutSeconds = env.getProperty("GENERATION_TIMEOUT_SECONDS", Integer.class, 900);
         if (timeoutSeconds < 1 || timeoutSeconds > 1800) throw new IllegalArgumentException("Invalid generation timeout");
     }
     public Run next() {
