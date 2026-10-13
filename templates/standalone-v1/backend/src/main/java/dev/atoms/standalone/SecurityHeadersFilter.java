@@ -18,6 +18,8 @@ import org.springframework.web.filter.OncePerRequestFilter;
 final class SecurityHeadersFilter extends OncePerRequestFilter {
     private final ApiExceptionHandler errors;
     private final String origin;
+    @Value("${standalone.execution-id:}")
+    private String executionId = "";
 
     SecurityHeadersFilter(ApiExceptionHandler errors, @Value("${standalone.origin}") String origin) {
         this.errors = errors;
@@ -28,6 +30,7 @@ final class SecurityHeadersFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
         response.setHeader("X-Request-Id", ApiError.requestId(request));
+        if (!executionId.isEmpty()) response.setHeader("X-Atoms-Execution-Id", executionId);
         response.setHeader("Cache-Control", "no-store");
         response.setHeader("X-Content-Type-Options", "nosniff");
         response.setHeader("X-Frame-Options", "DENY");

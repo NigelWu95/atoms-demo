@@ -12,6 +12,18 @@ class SecurityHeadersTest {
     private final SecurityHeadersFilter filter = new SecurityHeadersFilter(
             new ApiExceptionHandler(new ObjectMapper()), "https://app.example.test");
 
+    @Test void onlyExplicitManagedExecutionAddsIdentityHeader() throws Exception {
+        var request = new MockHttpServletRequest("GET", "/api/health");
+        var plain = new MockHttpServletResponse();
+        filter.doFilter(request, plain, (req,res) -> {});
+        assertThat(plain.getHeader("X-Atoms-Execution-Id")).isNull();
+        String id = "e1cd3215-95ea-4b90-b111-21ff677c80bc";
+        org.springframework.test.util.ReflectionTestUtils.setField(filter,"executionId",id);
+        var managed = new MockHttpServletResponse();
+        filter.doFilter(new MockHttpServletRequest("GET","/api/health"), managed, (req,res) -> {});
+        assertThat(managed.getHeader("X-Atoms-Execution-Id")).isEqualTo(id);
+    }
+
     @Test
     void rejectsNullForeignAndMultipleOriginsBeforeTheRequestCanReachSessions() throws Exception {
         for (String origin : new String[] {"null", "https://evil.example", "https://app.example.test.evil", "https://app.example.test https://evil.example"}) {

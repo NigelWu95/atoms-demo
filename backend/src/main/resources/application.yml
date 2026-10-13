@@ -24,6 +24,10 @@ spring:
     init:
       mode: never
 atoms:
+  runtime:
+    enabled: ${APP_RUNTIME_ENABLED:false}
+    root: ${APP_RUNTIME_ROOT:}
+    configs: ${APP_RUNTIME_CONFIGS:}
   build:
     enabled: ${WORKSPACE_BUILD_ENABLED:false}
     root: ${WORKSPACE_BUILD_ROOT:}

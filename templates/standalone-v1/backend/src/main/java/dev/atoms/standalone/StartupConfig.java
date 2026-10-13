@@ -21,7 +21,7 @@ final class StartupConfig {
     private static final int MAX_CONFIG_BYTES = 16 * 1024;
     private static final Set<String> KEYS = Set.of("STANDALONE_DB_URL", "STANDALONE_DB_USER",
             "STANDALONE_DB_PASSWORD", "APP_INSTANCE_ID", "server.address", "server.port",
-            "standalone.origin", "standalone.test-database");
+            "standalone.origin", "standalone.test-database", "RUNTIME_EXECUTION_ID");
     private static final Set<String> DEFAULT_CREDENTIALS = Set.of(
             "password", "postgres", "root", "admin", "changeme", "change_me", "replace_me");
 
@@ -55,6 +55,12 @@ final class StartupConfig {
         if (!secure && !localHttp(address, port, origin)) throw invalid("HTTP origin and loopback listener");
 
         Map<String, Object> values = new HashMap<>();
+        if (config.containsKey("RUNTIME_EXECUTION_ID")) {
+            String execution = required(config, "RUNTIME_EXECUTION_ID");
+            if (!execution.matches("[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}"))
+                throw invalid("RUNTIME_EXECUTION_ID");
+            values.put("standalone.execution-id", execution);
+        }
         values.put("spring.datasource.url", url);
         values.put("spring.datasource.username", user);
         values.put("spring.datasource.password", password);
