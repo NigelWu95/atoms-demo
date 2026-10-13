@@ -9,7 +9,9 @@ async function openHistory(page: Page) {
   await page.getByRole('button', { name: '装载测试产物' }).click()
   await page.getByRole('link', { name: '打开测试工作台' }).click()
   await expect(page.getByText('应用已启动', { exact: true })).toBeVisible()
-  return page.getByRole('region', { name: '工程下载' })
+  await expect(page.getByRole('button', { name: '下载预览工程 ZIP', exact: true })).toBeDisabled()
+  await page.getByText('其他导出：版本源码（未绑定运行预览）', { exact: true }).click()
+  return page.getByRole('region', { name: '版本源码导出' })
 }
 
 test('downloads real current and historical engineering ZIPs with keyboard access', async ({
@@ -33,7 +35,7 @@ test('downloads real current and historical engineering ZIPs with keyboard acces
       await page.getByLabel('代码版本', { exact: true }).selectOption({ label: 'V1 · 历史只读' })
     await expect(panel).toContainText(`选中 V${number}`)
     const versionId = await page.getByLabel('代码版本', { exact: true }).inputValue()
-    const button = panel.getByRole('button', { name: '下载工程 ZIP', exact: true })
+    const button = panel.getByRole('button', { name: '导出版本源码 ZIP', exact: true })
     await button.focus()
     await page.keyboard.press('Tab')
     await page.keyboard.press('Shift+Tab')
@@ -84,7 +86,7 @@ for (const width of [320, 390, 768, 1024, 1440]) {
     const panel = await openHistory(page)
     await page.getByLabel('代码版本', { exact: true }).selectOption({ label: 'V1 · 历史只读' })
     const event = page.waitForEvent('download')
-    await panel.getByRole('button', { name: '下载工程 ZIP', exact: true }).click()
+    await panel.getByRole('button', { name: '导出版本源码 ZIP', exact: true }).click()
     expect(await (await event).failure()).toBeNull()
     await expect(panel.getByRole('status')).toContainText('V1 工程已交给浏览器下载')
     await page.setViewportSize({ width, height: 1000 })
@@ -128,7 +130,7 @@ test('download errors retain the draft and preview and allow an explicit retry',
   await expect(frame.getByLabel('新待办')).toHaveValue('下载失败保留输入')
   await expect(page.getByText('应用已启动', { exact: true })).toBeVisible()
   const event = page.waitForEvent('download')
-  await panel.getByRole('button', { name: '重试下载工程 ZIP' }).click()
+  await panel.getByRole('button', { name: '重试导出版本源码 ZIP' }).click()
   expect(await (await event).failure()).toBeNull()
   await expect(panel.getByRole('alert')).toHaveCount(0)
 })

@@ -109,7 +109,7 @@ function date(value: string) {
     <p v-else-if="!build && !error" class="muted">该版本尚无构建记录。</p>
     <template v-if="build">
       <p role="status">
-        <template v-if="build.status === 'SUCCEEDED'">构建完成，可启动独立实例。</template>
+        <template v-if="build.status === 'SUCCEEDED'">构建完成，可启动本机应用。</template>
         <template v-else>{{ statuses[build.status] }} · {{ stages[build.stage] }}</template>
       </p>
       <p v-if="build.errorMessage" class="inline-error">

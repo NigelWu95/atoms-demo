@@ -7,7 +7,7 @@ import {
 } from '../api/buildArchive'
 import { errorMessage } from '../api/client'
 import { useSessionStore } from '../stores/session'
-const props = defineProps<{ target: BuildArchiveTarget }>()
+const props = defineProps<{ target: BuildArchiveTarget; label?: string }>()
 const session = useSessionStore()
 const busy = ref(false),
   error = ref(''),
@@ -81,10 +81,10 @@ async function download() {
       type="button"
       :disabled="busy || !session.ready"
       :aria-busy="busy"
-      :aria-label="`下载构建 ${target.id.slice(0, 8)} 的工程 ZIP`"
+      :aria-label="label ?? `下载构建 ${target.id.slice(0, 8)} 的工程 ZIP`"
       @click="download"
     >
-      {{ busy ? '正在下载构建快照…' : '下载本次构建工程 ZIP' }}
+      {{ busy ? '正在下载构建快照…' : (label ?? '下载本次构建工程 ZIP') }}
     </button>
     <button
       v-if="busy"
