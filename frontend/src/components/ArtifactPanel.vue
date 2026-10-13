@@ -8,6 +8,10 @@ import SourceViewer from './SourceViewer.vue'
 import RestorationPanel from './RestorationPanel.vue'
 import EngineeringDownload from './EngineeringDownload.vue'
 import EngineeringBuild from './EngineeringBuild.vue'
+import type { EngineeringBuild as Build } from '../api/builds'
+import type { AppInstance } from '../api/instances'
+import InstancePanel from './InstancePanel.vue'
+import InstancePreviewFrame from './InstancePreviewFrame.vue'
 
 const props = defineProps<{ project: Project | null }>()
 const emit = defineEmits<{ changed: [Project] }>()
@@ -20,6 +24,21 @@ const selected = ref('')
 const version = ref<Version | null>(null)
 const loading = ref(false)
 const error = ref('')
+const build = ref<Build | null>(null)
+const running = ref<AppInstance | null>(null)
+const previewKind = ref<'shared' | 'instance'>('shared')
+function setRunning(value: AppInstance | null) {
+  if (value && value.id !== running.value?.id) previewKind.value = 'instance'
+  running.value = value
+}
+watch(
+  () => [props.project?.id, selected.value],
+  () => {
+    build.value = null
+    running.value = null
+    previewKind.value = 'shared'
+  },
+)
 const mode = computed(() =>
   selected.value === props.project?.currentVersionId ? 'CURRENT' : 'HISTORY',
 )
@@ -115,7 +134,35 @@ watch(
       >
     </div>
     <EngineeringDownload :project-id="project?.id ?? null" :version="version" :loading="loading" />
-    <EngineeringBuild :project-id="project?.id ?? null" :version="version" :loading="loading" />
+    <EngineeringBuild
+      :project-id="project?.id ?? null"
+      :version="version"
+      :loading="loading"
+      @selected="build = $event"
+    />
+    <InstancePanel
+      :project-id="project?.id ?? null"
+      :version-id="version?.id ?? null"
+      :current-version-id="project?.currentVersionId ?? null"
+      :build="build"
+      @running="setRunning"
+    />
+    <div v-if="version" class="preview-toolbar" role="group" aria-label="预览运行环境">
+      <button
+        type="button"
+        :aria-pressed="previewKind === 'shared'"
+        @click="previewKind = 'shared'"
+      >
+        平台共享预览
+      </button>
+      <button
+        type="button"
+        :aria-pressed="previewKind === 'instance'"
+        @click="previewKind = 'instance'"
+      >
+        独立实例预览
+      </button>
+    </div>
     <RestorationPanel
       v-if="project?.currentVersionId"
       :key="project.id"
@@ -132,11 +179,21 @@ watch(
           <h2 id="preview-title" class="artifact-title">{{ version.artifact.manifest.title }}</h2>
           <p class="artifact-summary">{{ version.artifact.manifest.summary }}</p>
           <PreviewFrame
+            v-if="previewKind === 'shared'"
             v-show="view === 'preview'"
             :key="version.id + mode"
             :version="version"
             :mode="mode"
           />
+          <InstancePreviewFrame
+            v-else-if="running"
+            v-show="view === 'preview'"
+            :key="running.id"
+            :instance="running"
+          />
+          <p v-else-if="view === 'preview'" role="status">
+            当前版本没有运行中的独立实例。请构建并启动，或手动切换至平台共享预览。
+          </p>
           <SourceViewer v-if="view === 'code'" :artifact="version.artifact" />
         </template>
         <div v-else class="preview-empty">
