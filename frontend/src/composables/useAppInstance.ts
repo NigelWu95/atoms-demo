@@ -191,6 +191,7 @@ export function useAppInstance(target: () => Target | null) {
     pending,
     busy,
     loading,
+    loaded,
     error,
     canStart,
     canStop,

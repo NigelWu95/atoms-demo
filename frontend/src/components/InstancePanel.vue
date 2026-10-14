@@ -9,6 +9,7 @@ const props = defineProps<{
   versionId: string | null
   currentVersionId: string | null
   build: EngineeringBuild | null
+  controller?: ReturnType<typeof useAppInstance>
 }>()
 const emit = defineEmits<{ running: [AppInstance | null] }>()
 const session = useSessionStore(),
@@ -25,11 +26,13 @@ const {
   stop,
   refresh,
   confirm,
-} = useAppInstance(() =>
-  session.ready && session.identity && props.projectId
-    ? { ownerId: session.identity.userId, projectId: props.projectId }
-    : null,
-)
+} =
+  props.controller ??
+  useAppInstance(() =>
+    session.ready && session.identity && props.projectId
+      ? { ownerId: session.identity.userId, projectId: props.projectId }
+      : null,
+  )
 const labels: Record<InstanceStatus, string> = {
   QUEUED: '等待启动',
   STARTING: '启动中',

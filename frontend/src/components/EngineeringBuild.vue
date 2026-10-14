@@ -10,6 +10,7 @@ const props = defineProps<{
   projectId: string | null
   version: VersionSummary | null
   loading: boolean
+  controller?: ReturnType<typeof useEngineeringBuild>
 }>()
 const session = useSessionStore()
 const emit = defineEmits<{ selected: [EngineeringBuild | null] }>()
@@ -35,11 +36,17 @@ const {
   cancel,
   confirm,
   refresh,
-} = useEngineeringBuild(() =>
-  !unavailable.value && props.projectId && props.version && session.identity
-    ? { ownerId: session.identity.userId, projectId: props.projectId, versionId: props.version.id }
-    : null,
-)
+} =
+  props.controller ??
+  useEngineeringBuild(() =>
+    !unavailable.value && props.projectId && props.version && session.identity
+      ? {
+          ownerId: session.identity.userId,
+          projectId: props.projectId,
+          versionId: props.version.id,
+        }
+      : null,
+  )
 const statuses: Record<BuildStatus, string> = {
   QUEUED: '等待构建',
   BUILDING: '构建中',

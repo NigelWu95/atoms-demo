@@ -52,6 +52,7 @@ export async function verifyInstanceBrowser({
       exact: true,
     });
     await expect(panel).toContainText("运行中", { timeout: 15000 });
+    await expect(page.getByRole("button", { name: "导出版本源码 ZIP", exact: true })).toBeVisible();
     const frame = page.frameLocator('iframe[title="本机应用预览"]');
     await expect(frame.getByLabel("新待办")).toBeVisible({ timeout: 15000 });
     await frame.getByLabel("新待办").fill("真实实例浏览器保存");
@@ -97,9 +98,7 @@ export async function verifyInstanceBrowser({
       .getByRole("button", { name: "平台共享预览", exact: true })
       .click();
     await expect(downloadButton).toBeDisabled();
-    await modes
-      .getByRole("button", { name: "本机运行预览", exact: true })
-      .click();
+    await page.getByRole("button", { name: "运行应用", exact: true }).click();
     await expect(downloadButton).toBeEnabled();
     for (const width of [1440, 1024, 768, 390, 320]) {
       await page.setViewportSize({ width, height: 1000 });
@@ -147,7 +146,7 @@ export async function verifyInstanceBrowser({
     await expect(
       page.getByText("当前版本没有运行中的本机应用。", { exact: false }),
     ).toBeVisible();
-    await panel.getByRole("button", { name: "启动应用", exact: true }).focus();
+    await page.getByRole("button", { name: "运行应用", exact: true }).focus();
     await page.keyboard.press("Enter");
     await expect(panel).toContainText("运行中", { timeout: 105000 });
     await expect(
@@ -175,7 +174,7 @@ export async function verifyInstanceBrowser({
     }
     assert.deepEqual(errors, []);
     console.log(
-      "Browser verification passed: real process preview, add/toggle/save/reload/restart, preview-bound frozen ZIP, disabled shared/stopped downloads, 320/390/768/1024/1440px, accessibility and owner isolation.",
+      "Browser verification passed: one-click reuse/start/preview, visible source export, real process preview, add/toggle/save/reload/restart, preview-bound frozen ZIP, disabled shared/stopped downloads, 320/390/768/1024/1440px, accessibility and owner isolation.",
     );
   } catch (error) {
     if (page) {

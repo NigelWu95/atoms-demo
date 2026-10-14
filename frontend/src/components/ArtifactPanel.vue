@@ -7,10 +7,8 @@ import PreviewFrame from './PreviewFrame.vue'
 import SourceViewer from './SourceViewer.vue'
 import RestorationPanel from './RestorationPanel.vue'
 import EngineeringDownload from './EngineeringDownload.vue'
-import EngineeringBuild from './EngineeringBuild.vue'
-import type { EngineeringBuild as Build } from '../api/builds'
+import ApplicationRunPanel from './ApplicationRunPanel.vue'
 import type { AppInstance } from '../api/instances'
-import InstancePanel from './InstancePanel.vue'
 import InstancePreviewFrame from './InstancePreviewFrame.vue'
 import BuildArchiveDownload from './BuildArchiveDownload.vue'
 import { useSessionStore } from '../stores/session'
@@ -26,7 +24,6 @@ const selected = ref('')
 const version = ref<Version | null>(null)
 const loading = ref(false)
 const error = ref('')
-const build = ref<Build | null>(null)
 const running = ref<AppInstance | null>(null)
 const previewKind = ref<'shared' | 'instance'>('shared')
 const session = useSessionStore()
@@ -62,10 +59,13 @@ function setRunning(value: AppInstance | null) {
   if (value && value.id !== running.value?.id) previewKind.value = 'instance'
   running.value = value
 }
+function showRunningPreview() {
+  view.value = 'preview'
+  previewKind.value = 'instance'
+}
 watch(
   () => [props.project?.id, selected.value],
   () => {
-    build.value = null
     running.value = null
     previewKind.value = 'shared'
   },
@@ -179,23 +179,15 @@ watch(
         请先构建并启动应用，等待本机运行预览就绪后下载。共享预览不作为工程一致性验收。
       </p>
     </section>
-    <EngineeringDownload
+    <EngineeringDownload :project-id="project?.id ?? null" :version="version" :loading="loading" />
+    <ApplicationRunPanel
       :project-id="project?.id ?? null"
-      :version="version"
-      :loading="loading"
-    />
-    <EngineeringBuild
-      :project-id="project?.id ?? null"
-      :version="version"
-      :loading="loading"
-      @selected="build = $event"
-    />
-    <InstancePanel
-      :project-id="project?.id ?? null"
-      :version-id="version?.id ?? null"
+      :owner-id="project?.ownerId ?? null"
       :current-version-id="project?.currentVersionId ?? null"
-      :build="build"
+      :version="version"
+      :loading="loading"
       @running="setRunning"
+      @preview="showRunningPreview"
     />
     <div v-if="version" class="preview-toolbar" role="group" aria-label="预览运行环境">
       <button
