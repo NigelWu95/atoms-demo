@@ -2,9 +2,8 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia } from 'pinia'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import ArtifactPanel from './ArtifactPanel.vue'
-import InstancePanel from './InstancePanel.vue'
+import ApplicationRunPanel from './ApplicationRunPanel.vue'
 import InstancePreviewFrame from './InstancePreviewFrame.vue'
-import EngineeringBuild from './EngineeringBuild.vue'
 import { getVersion, listVersions, type Version } from '../api/artifacts'
 import { downloadBuildArchive } from '../api/buildArchive'
 import type { AppInstance } from '../api/instances'
@@ -68,8 +67,7 @@ function open() {
       stubs: {
         RouterLink: true,
         EngineeringDownload: true,
-        EngineeringBuild: true,
-        InstancePanel: true,
+        ApplicationRunPanel: true,
         InstancePreviewFrame: true,
         PreviewFrame: true,
         SourceViewer: true,
@@ -84,7 +82,7 @@ type Panel = ReturnType<typeof open>['wrapper']
 const download = (wrapper: Panel) => wrapper.get('[aria-label="预览工程下载"] button')
 async function start(wrapper: Panel) {
   await flushPromises()
-  wrapper.findComponent(InstancePanel).vm.$emit('running', runtime)
+  wrapper.findComponent(ApplicationRunPanel).vm.$emit('running', runtime)
   await flushPromises()
 }
 async function ready(wrapper: Panel) {
@@ -120,7 +118,7 @@ it('downloads running build A, never the newly selected build B or a version re-
   const { wrapper } = open()
   await ready(wrapper)
   wrapper
-    .findComponent(EngineeringBuild)
+    .findComponent(ApplicationRunPanel)
     .vm.$emit('selected', { id: 'build-b', status: 'SUCCEEDED' })
   await flushPromises()
   await download(wrapper).trigger('click')
@@ -155,7 +153,7 @@ it.each([
 ])('rejects a runtime outside the selected live context: %o', async (mismatch) => {
   const { wrapper } = open()
   await flushPromises()
-  wrapper.findComponent(InstancePanel).vm.$emit('running', { ...runtime, ...mismatch })
+  wrapper.findComponent(ApplicationRunPanel).vm.$emit('running', { ...runtime, ...mismatch })
   await flushPromises()
   expect(wrapper.findComponent(InstancePreviewFrame).exists()).toBe(false)
   expect(download(wrapper).attributes('disabled')).toBeDefined()
@@ -184,7 +182,7 @@ it.each(['stop', 'shared', 'version', 'project', 'owner'] as const)(
     await ready(wrapper)
     await download(wrapper).trigger('click')
     const signal = vi.mocked(downloadBuildArchive).mock.calls[0]![1]
-    if (change === 'stop') wrapper.findComponent(InstancePanel).vm.$emit('running', null)
+    if (change === 'stop') wrapper.findComponent(ApplicationRunPanel).vm.$emit('running', null)
     if (change === 'shared')
       await wrapper.get('[aria-label="预览运行环境"] button').trigger('click')
     if (change === 'version')

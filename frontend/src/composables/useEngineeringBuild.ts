@@ -269,6 +269,7 @@ export function useEngineeringBuild(target: () => BuildTarget | null) {
     pending,
     busy,
     loading,
+    loaded,
     error,
     canSubmit,
     canCancel,

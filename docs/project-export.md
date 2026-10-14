@@ -2,7 +2,7 @@
 
 2026-10-14：主入口已区分“下载预览工程 ZIP”和“导出版本源码 ZIP”。前者绑定实际预览的冻结构建，后者保留当前/历史版本导出。本轮没有推送 GitHub 或更新云端部署；文档中的 GitHub 链接在后续推送后对应新内容。
 
-需要下载与预览一致的工程时：构建当前版本 → 启动应用 → 本机运行预览就绪 → **下载预览工程 ZIP**。文件名为 `atoms-build-<构建 UUID>-engineering.zip`，来源是正在运行的构建，不受随后修改模板或选择其他构建影响。预览未就绪或切回共享预览时不开放该下载，详见[本机运行说明](https://github.com/NigelWu95/atoms-demo/blob/main/docs/app-runtime.md)。
+需要下载与预览一致的工程时：选中当前版本 → **运行应用** → 本机运行预览就绪 → **下载预览工程 ZIP**。文件名为 `atoms-build-<构建 UUID>-engineering.zip`，来源是正在运行的构建，不受随后修改模板或选择其他构建影响。预览未就绪或切回共享预览时不开放该下载，详见[本机运行说明](https://github.com/NigelWu95/atoms-demo/blob/main/docs/app-runtime.md)。
 
 ## 版本源码导出与通用启动方式
 
