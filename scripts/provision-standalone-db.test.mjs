@@ -55,6 +55,32 @@ test('prepares three independent private configs with stable credentials and ide
   assert.equal(calls.length, 6);
 });
 
+test('prepares daily local runtime databases without touching verification configs or databases', async (t) => {
+  const { root, directory, options } = await fixture(t);
+  await provision(options, async () => {}, root);
+  const before = await readFile(join(directory, 'provisioning.json'), 'utf8');
+  const local = parseOptions(args.map(value => value === '.local/standalone' ? '.local/local-runtime' : value));
+  const calls = [];
+  await provision(local, async sql => { calls.push(sql); }, root);
+  const localDir = join(root, '.local/local-runtime');
+  const testConfig = await readFile(join(localDir, 'test.properties'), 'utf8');
+  const runtimeA = await readFile(join(localDir, 'runtime-a.properties'), 'utf8');
+  const runtimeB = await readFile(join(localDir, 'runtime-b.properties'), 'utf8');
+  assert.match(testConfig, /\/atoms_local_build_it\n/);
+  assert.match(runtimeA, /\/atoms_local_app_a\n/);
+  assert.match(runtimeB, /\/atoms_local_app_b\n/);
+  assert.match(runtimeA, /server.port=19089\n/);
+  assert.match(runtimeB, /server.port=19090\n/);
+  assert.match(testConfig, /standalone.test-database=true/);
+  assert.match(runtimeA, /standalone.test-database=false/);
+  assert.equal(calls.length, 3);
+  assert.ok(calls.every(sql => !/atoms_standalone_|atoms_demo/.test(sql)));
+  assert.equal(await readFile(join(directory, 'provisioning.json'), 'utf8'), before);
+  await provision(local, async () => {}, root);
+  assert.equal(await readFile(join(localDir, 'runtime-a.properties'), 'utf8'), runtimeA);
+  assert.equal((await stat(join(localDir, 'runtime-a.properties'))).mode & 0o777, 0o600);
+});
+
 test('database failures are redacted and retry preserves installation credentials', async (t) => {
   const { root, directory, options } = await fixture(t);
   await assert.rejects(provision(options, async () => { throw new Error('private-sql-canary'); }, root),
@@ -62,6 +88,18 @@ test('database failures are redacted and retry preserves installation credential
   const before = await readFile(join(directory, 'provisioning.json'), 'utf8');
   await provision(options, async () => {}, root);
   assert.equal(await readFile(join(directory, 'provisioning.json'), 'utf8'), before);
+});
+
+test('rejects a copied verification state in the daily profile before executing SQL', async (t) => {
+  const { root, directory, options } = await fixture(t);
+  await provision(options, async () => {}, root);
+  const local = parseOptions(args.map(value => value === '.local/standalone' ? '.local/local-runtime' : value));
+  await provision(local, async () => {}, root);
+  await writeFile(join(root, '.local/local-runtime/provisioning.json'),
+    await readFile(join(directory, 'provisioning.json')));
+  let calls = 0;
+  await assert.rejects(provision(local, async () => { calls++; }, root), /PROVISION_STATE_INVALID/);
+  assert.equal(calls, 0);
 });
 
 test('changed connection or private state is rejected before any database commands', async (t) => {

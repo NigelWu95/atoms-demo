@@ -6,7 +6,18 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const databases = ['atoms_standalone_it', 'atoms_standalone_a', 'atoms_standalone_b'];
+const profiles = {
+  '.local/standalone': {
+    databases: ['atoms_standalone_it', 'atoms_standalone_a', 'atoms_standalone_b'],
+    firstPort: 18088,
+    description: 'Dedicated standalone fixture',
+  },
+  '.local/local-runtime': {
+    databases: ['atoms_local_build_it', 'atoms_local_app_a', 'atoms_local_app_b'],
+    firstPort: 19088,
+    description: 'Dedicated daily local application environment',
+  },
+};
 const outputs = ['test.properties', 'runtime-a.properties', 'runtime-b.properties'];
 const uuidPattern = /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/;
 const failure = (code) => new Error(`${code}: stopped; no existing passwords or data were reset.`);
@@ -24,7 +35,7 @@ export function parseOptions(args) {
   if (args.length !== 8 || !/^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,62}$/.test(container ?? '')
     || !/^[a-z_][a-z0-9_]{0,62}$/.test(adminUser ?? '')
     || !/^[0-9]{1,5}$/.test(port ?? '') || Number(port) < 1 || Number(port) > 65535
-    || configDir !== '.local/standalone') throw failure('PROVISION_USAGE');
+    || !Object.hasOwn(profiles, configDir ?? '')) throw failure('PROVISION_USAGE');
   return { container, adminUser, port: Number(port), configDir };
 }
 
@@ -57,8 +68,10 @@ async function createPrivate(path, content) {
 }
 
 function validateState(state, options) {
+  const { databases } = profiles[options.configDir];
   if (state.version !== 1 || state.container !== options.container || state.adminUser !== options.adminUser
-    || state.port !== options.port || !Array.isArray(state.installations) || state.installations.length !== 3
+    || state.port !== options.port || state.configDir !== options.configDir
+    || !Array.isArray(state.installations) || state.installations.length !== 3
     || state.installations.some((entry, index) => entry?.database !== databases[index]
       || !uuidPattern.test(entry.id ?? '') || !/^[a-f0-9]{64}$/.test(entry.password ?? ''))
     || new Set(state.installations.map((entry) => entry.id)).size !== 3
@@ -67,15 +80,16 @@ function validateState(state, options) {
   }
 }
 
-function configText(entry, index, port) {
-  return `# Dedicated standalone fixture. Keep private; do not commit or copy into an export.
-STANDALONE_DB_URL=jdbc:postgresql://127.0.0.1:${port}/${entry.database}
+function configText(entry, index, options) {
+  const { firstPort, description } = profiles[options.configDir];
+  return `# ${description}. Keep private; do not commit or copy into an export.
+STANDALONE_DB_URL=jdbc:postgresql://127.0.0.1:${options.port}/${entry.database}
 STANDALONE_DB_USER=${entry.database}
 STANDALONE_DB_PASSWORD=${entry.password}
 APP_INSTANCE_ID=${entry.id}
 server.address=127.0.0.1
-server.port=${18088 + index}
-standalone.origin=http://127.0.0.1:${18088 + index}
+server.port=${firstPort + index}
+standalone.origin=http://127.0.0.1:${firstPort + index}
 standalone.test-database=${index === 0}
 `;
 }
@@ -96,6 +110,7 @@ export async function provision(options, runSql, root = repoRoot) {
   // Revalidate even when called programmatically; no SQL accepts arbitrary identifiers.
   options = parseOptions(['--container', options.container, '--admin-user', options.adminUser,
     '--port', String(options.port), '--config-dir', options.configDir]);
+  const { databases } = profiles[options.configDir];
   const directory = join(root, options.configDir);
   await privateDirectory(join(root, '.local'));
   await privateDirectory(directory);
@@ -114,7 +129,7 @@ export async function provision(options, runSql, root = repoRoot) {
       validateState(state, options);
       if (saved === null) await createPrivate(statePath, JSON.stringify(state) + '\n');
     } catch { throw failure('PROVISION_STATE_INVALID'); }
-    const configs = state.installations.map((entry, index) => configText(entry, index, options.port));
+    const configs = state.installations.map((entry, index) => configText(entry, index, options));
     // Refuse changed/linked outputs before any database commands, not after mutation.
     const missing = [];
     for (let i = 0; i < outputs.length; i++) {
@@ -156,8 +171,9 @@ function dockerSql(sql, options) {
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {
-    await provision(parseOptions(process.argv.slice(2)), dockerSql);
-    console.log('PROVISION_READY: three dedicated databases verified; private configs are in .local/standalone.');
+    const options = parseOptions(process.argv.slice(2));
+    await provision(options, dockerSql);
+    console.log(`PROVISION_READY: three dedicated databases verified; private configs are in ${options.configDir}.`);
   } catch (error) {
     console.error(/^PROVISION_[A-Z_]+:/.test(error.message) ? error.message : failure('PROVISION_FAILED').message);
     process.exitCode = 1;
