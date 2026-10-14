@@ -33,6 +33,37 @@ export APP_RUNTIME_CONFIGS=/absolute/private/app-a.properties,/absolute/private/
 
 不要填写平台库、构建测试库或另一项目的运行库，不要提交凭据。仓库 `.local/standalone/runtime-a.properties` / `runtime-b.properties` 已绑定隔离测试项目，**不能直接拿它们启用日常平台**。本轮不改写 `.env.local`，不自动重启原 8080 服务、不推送 GitHub、不更新云端。
 
+### 日常本机环境的准备入口
+
+已有 Docker PostgreSQL 的本机可显式执行下面的维护者命令。先确认 Docker 管理接口、数据库以及回环端口 19089/19090 正常；不要在 Docker 无响应时重复执行。
+
+```sh
+node scripts/provision-standalone-db.mjs \
+  --container atoms-demo-postgres --admin-user postgres --port 5432 \
+  --config-dir .local/local-runtime
+```
+
+这会准备单独的 `atoms_local_build_it` 构建测试库及 `atoms_local_app_a/b` 运行库，对应三个不同的受限账号。配置写入忽略目录 `.local/local-runtime`（0700），文件 0600；不存在时创建，已存在时核验，不覆盖密码或清理数据。原 `.local/standalone` 验证环境、平台数据库和 `.env.local` 均不改动。配置/安装标识禁止跨环境复制。
+
+成功后，在项目根新建自己的私有 `.local/local-builds` 和 `.local/local-processes` 目录（0700；若已有则先核对归属），再在启动日常 backend 的终端设置：
+
+```sh
+export WORKSPACE_BUILD_ENABLED=true
+export WORKSPACE_BUILD_ROOT="$PWD/.local/local-builds"
+export WORKSPACE_BUILD_NODE="/Users/wubingheng/.nvm/versions/node/v24.20.0/bin/node"
+export WORKSPACE_BUILD_JAVA="/Users/wubingheng/.sdkman/candidates/java/17.0.5-oracle/bin/java"
+export WORKSPACE_BUILD_TEST_CONFIG="$PWD/.local/local-runtime/test.properties"
+export APP_RUNTIME_ENABLED=true
+export APP_RUNTIME_ROOT="$PWD/.local/local-processes"
+export APP_RUNTIME_CONFIGS="$PWD/.local/local-runtime/runtime-a.properties,$PWD/.local/local-runtime/runtime-b.properties"
+cd backend
+./mvnw -B spring-boot:run
+```
+
+路径按本机调整；先正常关闭原后端，不能同时占用 8080，不退出 Docker 或重置数据库。该配置仅接通本机环境，不涉及新服务器部署或公网发布。
+
+2026-10-14 检查：日常两个开关仍为默认关闭，原 8080 健康接口正常；Docker `desktop-linux` 管理 socket 的 `_ping` 在 5 秒内没有响应。因此本轮只完成准备脚本与隔离环境验收，**尚未实际创建日常专用库或重启日常后端启用此功能**。
+
 ## 错误与资源边界
 
 - `RUNTIME_DISABLED` / `RUNTIME_ENVIRONMENT_NOT_READY`：检查开关、工具、目录、配置后重启平台。
