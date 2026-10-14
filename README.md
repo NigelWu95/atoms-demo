@@ -45,7 +45,7 @@ cd backend
 - `BUILD_INPUT_CHANGED` / `BUILD_ARTIFACT_UNAVAILABLE`：来源或产物完整性失败；旧记录保留，不用当前模板替换历史归档。
 - `INTERRUPTED`：重启不重跑旧任务；若不能核验匹配的进程退出证明，执行槽继续保留。不要手工清空数据库占位或按旧 PID 查杀；保留原工作根，核实原因后再处理。关闭开关仍可查询记录，但冻结包下载也需要原工作根和有效执行配置。
 
-**构建完成不等于已启动应用。** 构建成功后点击“启动应用”，本机新进程就绪后显示该 JAR 的真实页面，保存到专用运行库。停止后再次启动保留数据，主下载指向相同 buildId 的冻结 ZIP，只带初始数据。原共享预览和 `/a/:slug` 发布保持原状，不冒充本机运行预览。进程启动需显式启用并配置专用运行库池，不会给平台账号数据库管理权限；默认关闭，未自动改写日常开发配置或部署云端。步骤、限制见[本机运行说明](https://github.com/NigelWu95/atoms-demo/blob/main/docs/app-runtime.md)，证据见[验收记录](https://github.com/NigelWu95/atoms-demo/blob/main/docs/app-runtime-verification.md)。
+**手动构建完成不等于已启动应用。** 可以直接点击“运行应用”串联整个流程，也可手动构建后点击“启动应用”。本机新进程就绪后显示该 JAR 的真实页面，保存到专用运行库。停止后再次启动保留数据，主下载指向相同 buildId 的冻结 ZIP，只带初始数据。原共享预览和 `/a/:slug` 发布保持原状，不冒充本机运行预览。进程启动需显式启用并配置专用运行库池，不会给平台账号数据库管理权限；默认关闭，未自动改写日常开发配置或部署云端。新增日常专用库的显式准备命令与当前启用阻塞见[本机运行说明](https://github.com/NigelWu95/atoms-demo/blob/main/docs/app-runtime.md)，证据见[验收记录](https://github.com/NigelWu95/atoms-demo/blob/main/docs/app-runtime-verification.md)。
 
 ## 打包到服务器
 
