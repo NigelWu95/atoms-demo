@@ -1,6 +1,6 @@
 # 云服务器部署记录
 
-2026-10-08 首次部署，2026-10-13 更新当前程序与模型限制；这是 Demo 验收环境，不是完整生产上线签收。用户明确不等待域名，使用 IP + 端口访问。下方按日期保留历史操作，不将历史参数视为当前配置。
+2026-10-08 首次部署，2026-10-14 更新当前程序；这是 Demo 验收环境，不是完整生产上线签收。用户明确不等待域名，使用 IP + 端口访问。下方按日期保留历史操作，不将历史参数视为当前配置。
 
 ## 访问和当前边界
 
@@ -8,7 +8,7 @@
 - 这是显式的临时 Demo 例外，HTTP 流量未加密。独立 Cookie `ATOMS_HTTP_SESSION` 保留 HttpOnly / SameSite=Lax，但不含 Secure；旧 HTTPS 访客数据保留，不自动映射到新 HTTP 访客。
 - 原 HTTPS 自签证书仅为回退保留，有效期至 **2026-11-07 02:15:58（Asia/Shanghai）**，没有自动续期。SHA-256 指纹：`C5:4F:98:43:36:47:87:F5:AA:3F:01:C6:6B:5C:CD:69:4F:9E:AA:85:09:BE:B2:C7:D9:7F:A1:FF:97:34:4D:34`。
 - 使用全新数据库，没有上传本地项目、会话或整个 `.env.local`。已按用户授权单独同步 DeepSeek 密钥，并将云端累计模型请求上限设为 **100 次**，公网访客共用。启用时已预留 0、剩余 100；不是每日/每用户额度，也不是 100 次完整应用生成。配置验证没有发起生成或更改本地数据、模型记账。
-- 当前模型限制为 **163840 tokens / 单次 300 秒 / 整轮 900 秒**；2026-10-13 部署验收时累计已预留 18、剩余 82，本轮没有调用模型。未将本地 10000 次上限同步到公网。
+- 当前模型限制为 **163840 tokens / 单次 300 秒 / 整轮 900 秒**；2026-10-14 部署验收时累计已预留 32、剩余 68，本轮没有调用服务器模型。未将本地 10000 次上限同步到公网。
 - 全站采用既有访客模式，项目按所有者隔离。身份频率限制、总存储配额、长期数据清理仍待完成；不适合无人监管地长期开放。侧栏个别“本地”字样仍是既有展示文案，不代表请求发往开发机。
 
 ## 实际安装
@@ -19,8 +19,8 @@
 
 | 项目 | 位置 / 状态 |
 |---|---|
-| 发布版本 | `atoms-demo-MImuq3`，源码 `b9aae45bc0addbaf350bfc93baf3896be572576e`，打包时 dirty=false；2026-10-13 更新 |
-| 程序 | `/opt/atoms-demo/releases/atoms-demo-MImuq3`；`/opt/atoms-demo/current` 为其符号链接；旧 `atoms-demo-slKx1w` 及此前发布包保留 |
+| 发布版本 | `atoms-demo-vM9VRY`，源码 `f2bd4e807d45599d64c3d2528db5a661855af251`，打包时 dirty=false；2026-10-14 更新 |
+| 程序 | `/opt/atoms-demo/releases/atoms-demo-vM9VRY`；`/opt/atoms-demo/current` 为其符号链接；旧 `atoms-demo-MImuq3` 及此前发布包保留 |
 | 外部配置 | `/etc/atoms-demo/application.properties`，root:atoms / 0640，目录 0750 |
 | TLS（未启用） | `/etc/atoms-demo/tls/server.crt`、`server.key` 为回退保留；私钥 root / 0600，目录 0700 |
 | 后端服务 | `atoms-demo.service`，非 root 的 `atoms` 账号，单实例 |
@@ -131,7 +131,7 @@
 
 回退：停止 `atoms-demo`，将 `current` 切回保留的 `/opt/atoms-demo/releases/atoms-demo-txj7Bn`，启动并检查 HTTP health 与页面。**保留 V010、全部新版本和业务数据，不删列、不改 Flyway 记录、不恢复数据库**；配置及 Nginx 不需要改变。旧包不会展示恢复入口或来源信息，但仍可读取恢复后保存的新版本。旧包与迁移后 schema 的兼容性已在隔离库实测；真正恢复备份会丢失备份后的写入，必须另外获批。
 
-## 工程下载与默认限制上线（2026-10-13，当前程序）
+## 工程下载与默认限制上线（2026-10-13，历史程序）
 
 源码 `b9aae45bc0addbaf350bfc93baf3896be572576e`，发布包 `atoms-demo-MImuq3.tar.gz`，SHA-256 为 `f81776a4425bf1cac20f4950dbf8f4bb58d3e879699d7c2f1e2df1759649cd4d`。从干净功能分支构建，上传后归档与 13 个载荷文件全部校验通过；本轮没有推送 GitHub。文档记录提交晚于程序提交，不改写发布包。
 
@@ -148,7 +148,22 @@
 
 上传曾因 SSH 连接中断失败，带保活参数重新上传后校验通过。正式切换由一次性 systemd 单元 `atoms-engineering-deploy-20261013.service` 执行，避免 SSH 中断打断停服/切换；该单元结果 success，平台自身仍由既有 `atoms-demo.service` 管理。本机脚本/截图位于 `/private/tmp/atoms-engineering-deploy.HaPrWH/`，远端脚本位于 `/var/tmp/atoms-engineering-deploy.lYzuEo/`；不上传浏览器会话或凭据。
 
-当前版本回退：停止 `atoms-demo`，将上述备份内的 `application.properties` 恢复为 `/etc/atoms-demo/application.properties`（root:atoms/0640），把 `current` 原子切回保留的 `/opt/atoms-demo/releases/atoms-demo-slKx1w`，启动并检查回环和公网 HTTP 健康。旧配置为 168400 / 300 秒 / 600 秒 / 累计 100 次。**保留 V011、所有业务数据与调用记账，不删表、不改 Flyway 记录、不恢复数据库**；Nginx 与 systemd 配置无需改变。旧包与 V011 的启动兼容性已在专用测试库验证；真正恢复数据库会丢失备份后的写入，须另外获批。
+当时版本回退：停止 `atoms-demo`，将上述备份内的 `application.properties` 恢复为 `/etc/atoms-demo/application.properties`（root:atoms/0640），把 `current` 原子切回保留的 `/opt/atoms-demo/releases/atoms-demo-slKx1w`，启动并检查回环和公网 HTTP 健康。旧配置为 168400 / 300 秒 / 600 秒 / 累计 100 次。**保留 V011、所有业务数据与调用记账，不删表、不改 Flyway 记录、不恢复数据库**；Nginx 与 systemd 配置无需改变。旧包与 V011 的启动兼容性已在专用测试库验证；真正恢复数据库会丢失备份后的写入，须另外获批。
+
+## 一键运行界面与直接导出上线（2026-10-14，当前程序）
+
+按用户要求部署当前分支，不推送 GitHub。发布包 `atoms-demo-vM9VRY.tar.gz`，源码 `f2bd4e807d45599d64c3d2528db5a661855af251`；SHA-256 为 `4fb6103304f938caaf1209f9def52e8fbff1c8b4dfbd2fe6629d5e731bb9c4a8`。构建时工作区干净；以下记录晚于打包，不改写已发布归档。
+
+- 正式发布构建：打包测试 3 项、前端 199 项、后端 123 单元 + 83 真实 PostgreSQL 集成测试通过，后端无失败或跳过；类型、lint、格式及生产构建通过。平台和导出模板前端锁文件审计均为 0 已知漏洞，没有升级依赖。
+- 停服前确认没有活动生成或构建；数据库 dump、外部配置、Nginx/systemd 配置备份在 `/var/backups/atoms-demo/runtime.7iNq4z/`。目录 root/0700，配置和 dump 不公开；`pg_restore --list` 验证通过，未执行恢复演练。
+- 归档及解包后 13 个载荷哈希全部通过，原子切换 `current` 后重启成功；Flyway 从 V011 增量应用 V012。切换前后 13 个项目、16 个版本、8 条应用状态、0 条发布记录、32 次模型记账及预算、0 条工程构建的数量和内容摘要均相同。新增运行表为空；外部配置逐字节不变，不重建数据库、不重置额度。
+- 后端、Nginx、PostgreSQL 均 active；后端 NRestarts=0，回环/公网 HTTP 首页 200、health=UP。独立 Chrome 验证新资源 `index-By1liB2b.js`，旧“导出版本源码 ZIP”直接可见、新“运行应用”入口可见，项目创建/刷新、首页/列表、新运行记录接口、所有者隔离和 CSRF 保护通过；390px 无横向溢出，正常页面无 pageerror/console error。
+- 远程冒烟仅新增一个独立验收访客的空项目“10月14日新版部署验收（不调用模型）”。模型可用，剩余额度检查前后均为 68，没有调用服务器模型，也未访问其他用户的私有工程或会话。
+- **服务器构建与本机进程开关仍关闭**：保留现有 server profile 与安全边界，未安装 Node 或应用专用运行数据库池。界面与代码上线不等于服务器已支持一键构建启动；原共享预览、直接版本导出及 `/a/<slug>` 发布方式不变。本地真实 2048 验收另记于[运行验收记录](https://github.com/NigelWu95/atoms-demo/blob/main/docs/app-runtime-verification.md)。
+
+本机部署脚本/截图：`/private/tmp/atoms-runtime-deploy.VP06fc/`；服务器脚本：`/var/tmp/atoms-runtime-deploy.gOwT3L/`。Chrome 使用独立验收会话，不使用或上传用户浏览器凭据。Docker 管理接口超时，未重启/退出登录 Docker；因此未执行依赖 Docker 的 Nginx/TLS 发布包套件，远程实际 HTTP 冒烟不代替该套件。
+
+当前程序回退预案：先确认无活动任务，停止 `atoms-demo`，将 `current` 原子切回 `/opt/atoms-demo/releases/atoms-demo-MImuq3`，再启动并核对回环/公网 health、页面与日志。配置本次未变，无需恢复配置。**保留 V012、业务数据及额度记账；不删除运行表、不修改迁移记录、不直接恢复数据库。** 本次升级未触发回退，尚未实测旧包在 V012 下的启动；执行回退时须核验兼容性，不能只以切换成功作为验收。备份仍为同机备份，不是异地灾备。
 
 ## 备份及运维
 
@@ -168,6 +183,6 @@ systemctl restart atoms-demo
 
 配置修改后重启后端，Nginx 配置改动须先 `nginx -t` 再 reload。不要输出完整配置、密码或 Cookie。DeepSeek 密钥已授权同步，累计预算已授权为 100 次，公网访客共用；不删除记账或自动放开上限。长期开放前仍需补齐身份限流和资源配额，后端仍只允许单实例。
 
-更新/回退遵循 [部署说明](../deploy/server/README.md)：备份 → 停后端 → 切换已校验版本 → 启动检查。当前程序回退使用上节 2026-10-13 的步骤。以下仅为首次 HTTPS 版本的历史回退方案：回退至旧 `atoms-demo-XmTJCF` 时，必须同时恢复 HTTP 切换前备份内的外部配置、HTTPS 站点和静态安全头，将 `http-demo.conf` 移出 systemd drop-in 目录后 daemon-reload，再启动后端、检查代理配置并重载。等待协议入口就绪，不以发出 reload 信号视为完成；旧证书必须仍有效。不恢复数据库、不删除新 HTTP 期间产生的数据，不将恢复数据库当成无损代码回退。
+更新/回退遵循 [部署说明](../deploy/server/README.md)：备份 → 停后端 → 切换已校验版本 → 启动检查。当前程序回退使用上节 2026-10-14 的步骤。以下仅为首次 HTTPS 版本的历史回退方案：回退至旧 `atoms-demo-XmTJCF` 时，必须同时恢复 HTTP 切换前备份内的外部配置、HTTPS 站点和静态安全头，将 `http-demo.conf` 移出 systemd drop-in 目录后 daemon-reload，再启动后端、检查代理配置并重载。等待协议入口就绪，不以发出 reload 信号视为完成；旧证书必须仍有效。不恢复数据库、不删除新 HTTP 期间产生的数据，不将恢复数据库当成无损代码回退。
 
 尚未验收：云端实际生成版本发布与 LIVE 数据闭环、活动任务崩溃恢复、整机重启，以及不刷新页面的 SSE 断网游标恢复。云端真实 CREATE、生成中刷新后 SSE 重连、预览交互保存与刷新恢复已通过；不把一款 2048 的成功等同于任意需求稳定性保证，T29 总项继续保留未完成。
