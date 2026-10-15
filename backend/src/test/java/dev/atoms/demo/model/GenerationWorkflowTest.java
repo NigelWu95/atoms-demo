@@ -71,7 +71,33 @@ class GenerationWorkflowTest {
         workflow.generate("生成应用", null, (stage, system, user) -> {
             if (!stage.equals("PLANNING"))
                 assertThat(system).contains("Aim for <=12 KiB", "Do not omit requested behavior",
-                        "Never save initialState on startup", "all three files every time");
+                        "Never overwrite existing stored data with initialState", "all three files every time");
+            return new ModelGateway.Answer(stage.equals("PLANNING") ? plan
+                    : stage.equals("BUILDING") ? "{}" : source, null);
+        }, ignored -> {});
+    }
+    @Test void builderAndRepairDistinguishFirstInitializationFromRestoringExistingData() {
+        var workflow = new GenerationWorkflow(json, new ArtifactValidator());
+        workflow.generate("保存随机棋盘", null, (stage, system, user) -> {
+            if (!stage.equals("PLANNING")) {
+                assertThat(system).contains("successful get()", "revision === 0",
+                        "persist the newly created state before initialization completes",
+                        "If the initial read fails, do not create or save replacement state");
+                assertThat(system).doesNotContain("Never save initialState on startup");
+            }
+            return new ModelGateway.Answer(stage.equals("PLANNING") ? plan
+                    : stage.equals("BUILDING") ? "{}" : source, null);
+        }, ignored -> {});
+    }
+    @Test void builderAndRepairBindQueuedSavesToTheLastAcknowledgedRevisionWithoutHidingConflicts() {
+        var workflow = new GenerationWorkflow(json, new ArtifactValidator());
+        workflow.generate("连续快速移动", null, (stage, system, user) -> {
+            if (!stage.equals("PLANNING"))
+                assertThat(system).contains("Queue immutable values, not revision numbers",
+                        "Capture expectedRevision only when sending",
+                        "latest acknowledged revision", "Retry the exact failed value/revision",
+                        "Do not automatically reload and overwrite after STATE_CONFLICT",
+                        "500 ms storage latency");
             return new ModelGateway.Answer(stage.equals("PLANNING") ? plan
                     : stage.equals("BUILDING") ? "{}" : source, null);
         }, ignored -> {});
