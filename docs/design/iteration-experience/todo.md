@@ -1,15 +1,17 @@
 # 实施任务
 每项完成前检查测试与构建；本轮用户已授权连续推进，不以中间人工检查点阻断。
-- [ ] IC01：当前版本谱系历史上下文；文件：IterationContext、GenerationWorker、GenerationWorkflow、上下文 IT（M）。验收：恢复分支正确、跨用户不可见、有界；验证：聚焦 IT + WorkflowTest。
-- [ ] AP01：精确补丁合并；文件：ArtifactPatch、ArtifactPatchTest（S）。验收：错基线/歧义/越界/危险代码拒绝；验证：单测红绿。
-- [ ] AP02：生成工作流与 prompt 接入补丁、历史上下文；文件：GenerationWorkflow、builder/planner prompts、WorkflowTest（M）。验收：CREATE 兼容、MODIFY 可补丁、仍仅一次修复；验证：单测与 GenerationExecutionIT。
-- [ ] 检查点 A：完整快照仍可预览/下载，失败不改指针；后端回归。
-- [ ] WR01：审阅 API；文件：VersionReviewService、ArtifactController、ReviewIT（M）。验收：所有权、基线、请求关联、真实变更信息；验证：HTTP IT。
-- [ ] WR02：前端差异查看；文件：review API、VersionReview、测试、ArtifactPanel（M）。验收：文本安全、加载失败可重试、旧导出入口仍可见；验证：单测/类型。
-- [ ] WR03：工作台阶段和结果；文件：ConversationPanel、相关测试（S）。验收：显示真实阶段、需求可关联版本、不宣称运行验收；验证：单测与浏览器。
-- [ ] DP01：草稿持久化 API；文件：V015、ProjectDraftService/Controller、DraftIT（M）。验收：CAS、重复重试、上限、owner 隔离；验证：专用库 IT。
-- [ ] DP02：草稿自动保存 UI；文件：draft API/composable、测试、WorkbenchPage（M）。验收：刷新恢复、晚响应隔离、冲突恢复、保存反馈；验证：单测、浏览器。
-- [ ] 检查点 B：账户切换不串草稿；原登录和导出测试通过。
-- [ ] PL01：项目检索归档 API；文件：V016、ProjectService/Controller/record、ProjectIT（M）。验收：排序分页、搜索、归档恢复、所有权；验证：HTTP IT。
-- [ ] PL02：项目列表界面；文件：projects API、ProjectList、ProjectsPage、相关测试（M）。验收：键盘可用、空/错/加载态、账号文案；验证：单测/浏览器。
-- [ ] 最终：全量后端/前端检查、真实浏览器验证、代码审阅、文档更新。不推送、不部署。
+- [x] IC01：当前版本谱系历史上下文；恢复分支、跨用户隔离、有界上下文 IT 通过。
+- [x] AP01：精确补丁合并；错基线/歧义/路径越界/不合规 HTML 拒绝，单测红绿；不将结构校验称为任意代码安全认证。
+- [x] AP02：工作流与 prompts 接入；CREATE 兼容、MODIFY 补丁、最多一次修复。替身模型经真实 Worker 连续三轮修改验证，前几轮内容与业务状态保留。
+- [x] 检查点 A：完整快照预览/原下载链路、失败不改指针，后端及 Chrome 回归通过。
+- [x] WR01：版本审阅 API；所有权、实际基线、关联需求、恢复版本 HTTP IT 通过。
+- [x] WR02：文件前后源码对比、文本安全、重试入口，旧导出直接展示；前端单测/类型/Chrome 通过。
+- [x] WR03：显示真实阶段和结果，不宣称功能已验收；单测及浏览器通过。
+- [x] DP01：V015 与草稿 API；CAS、并发竞争、精确重试、上限和 owner 隔离通过。
+- [x] DP02：自动保存与恢复、过期回包隔离、冲突处理、保存反馈与离开提醒；包含审阅发现的三项边界回归。
+- [x] 检查点 B：账户切换不串草稿；原邮箱登录与工程下载测试通过，真实邮件未重发。
+- [x] PL01：检索归档 API；排序分页、过滤绑定游标、字面搜索、归档恢复与所有权通过。
+- [x] PL02：项目列表、加载/空/错反馈、账号文案；多尺寸、浏览器键盘路径和无障碍检查通过。
+- [x] 最终：后端 138 单元 + 103 集成、前端 221 单元与检查/构建通过；Chrome 基础 16 项、运行时覆盖 35 项（含失败修正后的局部复跑）。代码审阅与 mutation check 完成，文档更新；未推送、未部署、未重启日常后端。
+
+详细证据和失败修正见 [verification.md](verification.md)。真实 DeepSeek 连续多轮质量、逐行差异高亮、离线/自动合并草稿及生产迁移不在本轮已验收范围内。

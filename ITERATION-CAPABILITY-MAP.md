@@ -9,3 +9,5 @@
 | project-library | 搜索、最近编辑排序、归档与恢复 | — |
 顺序：iteration-context → artifact-patches → workbench-review → draft-persistence → project-library。
 规格入口：根目录对应 `SPEC-<模块>.md`；任务入口：[实施计划](docs/design/iteration-experience/plan.md)。
+
+2026-10-16：五模块本地实现和回归完成，详见 [验收记录](docs/design/iteration-experience/verification.md)。未推送、未部署、未重启日常服务；真实模型连续修改质量另行实测。
