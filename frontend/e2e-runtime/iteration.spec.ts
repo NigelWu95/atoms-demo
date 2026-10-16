@@ -74,6 +74,17 @@ test('workbench shows real version comparison while preserving preview and expor
   await expect(page.getByText('应用已启动', { exact: true })).toBeVisible()
   const preview = page.frameLocator('iframe')
   await expect(preview.getByRole('heading', { name: '把想法，一件件完成。' })).toBeVisible()
+  expect(
+    await page.locator('.preview-stage').evaluate((element) => {
+      const advanced = document.querySelector('[aria-label="高级构建与进程管理"]')!
+      const downloads = document.querySelector('[aria-label="版本源码导出"]')!
+      return (
+        Boolean(element.compareDocumentPosition(downloads) & Node.DOCUMENT_POSITION_FOLLOWING) &&
+        Boolean(downloads.compareDocumentPosition(advanced) & Node.DOCUMENT_POSITION_FOLLOWING) &&
+        !downloads.closest('details')
+      )
+    }),
+  ).toBe(true)
   await page.getByRole('button', { name: '查看修改记录与差异' }).click()
   const review = page.getByRole('region', { name: '版本修改记录' })
   await expect(review).toContainText('相对 V1')

@@ -165,28 +165,6 @@ watch(
         >共享预览新窗口 ↗</RouterLink
       >
     </div>
-    <section class="preview-download" aria-label="预览工程下载">
-      <BuildArchiveDownload
-        v-if="previewDownload"
-        :target="previewDownload"
-        label="下载预览工程 ZIP"
-      />
-      <button v-else type="button" class="button secondary" disabled>下载预览工程 ZIP</button>
-      <p v-if="previewDownload" role="status">
-        当前预览：V{{ version?.versionNo }} · 构建 {{ previewDownload.id.slice(0, 8) }}。
-        下载其冻结的完整工程源码；按包内说明构建启动。只带初始数据，不复制当前业务数据或凭据。
-      </p>
-      <p v-else class="muted">
-        请先构建并启动应用，等待本机运行预览就绪后下载。共享预览不作为工程一致性验收。
-      </p>
-    </section>
-    <EngineeringDownload :project-id="project?.id ?? null" :version="version" :loading="loading" />
-    <VersionReview
-      v-if="project && version"
-      :key="project.id"
-      :project-id="project.id"
-      :version-id="version.id"
-    />
     <ApplicationRunPanel
       :project-id="project?.id ?? null"
       :owner-id="project?.ownerId ?? null"
@@ -195,83 +173,112 @@ watch(
       :loading="loading"
       @running="setRunning"
       @preview="showRunningPreview"
-    />
-    <div v-if="version" class="preview-toolbar" role="group" aria-label="预览运行环境">
-      <button
-        type="button"
-        :aria-pressed="previewKind === 'shared'"
-        @click="previewKind = 'shared'"
-      >
-        平台共享预览
-      </button>
-      <button
-        type="button"
-        :aria-pressed="previewKind === 'instance'"
-        @click="previewKind = 'instance'"
-      >
-        本机运行预览
-      </button>
-    </div>
-    <RestorationPanel
-      v-if="project?.currentVersionId"
-      :key="project.id"
-      :project="project"
-      :version="version"
-      @changed="emit('changed', $event)"
-      @locked="restorationLocked = $event"
-    />
-    <p v-if="error" class="inline-error" role="alert">{{ error }} 请重新打开项目。</p>
-    <div class="preview-stage" :aria-busy="loading">
-      <div class="preview-canvas" :class="{ 'mobile-canvas': device === 'mobile' }">
-        <div class="browser-decoration" aria-hidden="true"><i /><i /><i /></div>
-        <template v-if="version">
-          <h2 id="preview-title" class="artifact-title">{{ version.artifact.manifest.title }}</h2>
-          <p class="artifact-summary">{{ version.artifact.manifest.summary }}</p>
-          <PreviewFrame
-            v-if="previewKind === 'shared'"
-            v-show="view === 'preview'"
-            :key="version.id + mode"
-            :version="version"
-            :mode="mode"
-          />
-          <InstancePreviewFrame
-            v-else-if="previewRuntime"
-            v-show="view === 'preview'"
-            :key="previewRuntime.id"
-            :instance="previewRuntime"
-            @availability="setAvailability"
-          />
-          <p v-else-if="view === 'preview'" role="status">
-            当前版本没有运行中的本机应用。请构建并启动，或手动切换至平台共享预览。
-          </p>
-          <SourceViewer v-if="view === 'code'" :artifact="version.artifact" />
-        </template>
-        <div v-else class="preview-empty">
-          <span class="preview-icon" aria-hidden="true">{{ view === 'preview' ? '◫' : '⌘' }}</span>
-          <h2 id="preview-title">
-            {{
-              loading
-                ? '正在加载版本…'
-                : view === 'preview'
-                  ? '还没有生成应用'
-                  : '还没有可查看的源码'
-            }}
-          </h2>
-          <p>
-            {{
-              view === 'preview'
-                ? '生成完成后，你可以在这里直接使用应用。'
-                : '真实生成的 HTML、CSS 和 JavaScript 将显示在这里。'
-            }}
-          </p>
-          <span v-if="!loading" class="outline-badge">等待首个代码版本</span>
+    >
+      <div v-if="version" class="preview-toolbar" role="group" aria-label="预览运行环境">
+        <button
+          type="button"
+          :aria-pressed="previewKind === 'shared'"
+          @click="previewKind = 'shared'"
+        >
+          平台共享预览
+        </button>
+        <button
+          type="button"
+          :aria-pressed="previewKind === 'instance'"
+          @click="previewKind = 'instance'"
+        >
+          本机运行预览
+        </button>
+      </div>
+      <RestorationPanel
+        v-if="project?.currentVersionId"
+        :key="project.id"
+        :project="project"
+        :version="version"
+        @changed="emit('changed', $event)"
+        @locked="restorationLocked = $event"
+      />
+      <p v-if="error" class="inline-error" role="alert">{{ error }} 请重新打开项目。</p>
+      <div class="preview-stage" :aria-busy="loading">
+        <div class="preview-canvas" :class="{ 'mobile-canvas': device === 'mobile' }">
+          <div class="browser-decoration" aria-hidden="true"><i /><i /><i /></div>
+          <template v-if="version">
+            <h2 id="preview-title" class="artifact-title">{{ version.artifact.manifest.title }}</h2>
+            <p class="artifact-summary">{{ version.artifact.manifest.summary }}</p>
+            <PreviewFrame
+              v-if="previewKind === 'shared'"
+              v-show="view === 'preview'"
+              :key="version.id + mode"
+              :version="version"
+              :mode="mode"
+            />
+            <InstancePreviewFrame
+              v-else-if="previewRuntime"
+              v-show="view === 'preview'"
+              :key="previewRuntime.id"
+              :instance="previewRuntime"
+              @availability="setAvailability"
+            />
+            <p v-else-if="view === 'preview'" role="status">
+              当前版本没有运行中的本机应用。请构建并启动，或手动切换至平台共享预览。
+            </p>
+            <SourceViewer v-if="view === 'code'" :artifact="version.artifact" />
+          </template>
+          <div v-else class="preview-empty">
+            <span class="preview-icon" aria-hidden="true">{{
+              view === 'preview' ? '◫' : '⌘'
+            }}</span>
+            <h2 id="preview-title">
+              {{
+                loading
+                  ? '正在加载版本…'
+                  : view === 'preview'
+                    ? '还没有生成应用'
+                    : '还没有可查看的源码'
+              }}
+            </h2>
+            <p>
+              {{
+                view === 'preview'
+                  ? '生成完成后，你可以在这里直接使用应用。'
+                  : '真实生成的 HTML、CSS 和 JavaScript 将显示在这里。'
+              }}
+            </p>
+            <span v-if="!loading" class="outline-badge">等待首个代码版本</span>
+          </div>
         </div>
       </div>
-    </div>
-    <footer class="preview-status">
-      <span>{{ version ? `V${version.versionNo} · 数据与源码分别保存` : '暂无产物' }}</span
-      ><span>{{ version ? '受限浏览器运行 · 非安全认证' : '未执行预览检查' }}</span>
-    </footer>
+      <footer class="preview-status">
+        <span>{{ version ? `V${version.versionNo} · 数据与源码分别保存` : '暂无产物' }}</span
+        ><span>{{ version ? '受限浏览器运行 · 非安全认证' : '未执行预览检查' }}</span>
+      </footer>
+      <section class="preview-download" aria-label="预览工程下载">
+        <BuildArchiveDownload
+          v-if="previewDownload"
+          :target="previewDownload"
+          label="下载预览工程 ZIP"
+        />
+        <button v-else type="button" class="button secondary" disabled>下载预览工程 ZIP</button>
+        <p v-if="previewDownload" role="status">
+          当前预览：V{{ version?.versionNo }} · 构建 {{ previewDownload.id.slice(0, 8) }}。
+          下载其冻结的完整工程源码；按包内说明构建启动。只带初始数据，不复制当前业务数据或凭据。
+        </p>
+        <p v-else class="muted">
+          请先构建并启动应用，等待本机运行预览就绪后下载。共享预览不作为工程一致性验收。
+        </p>
+      </section>
+      <EngineeringDownload
+        :project-id="project?.id ?? null"
+        :version="version"
+        :loading="loading"
+      />
+    </ApplicationRunPanel>
+    <VersionReview
+      v-if="project && version"
+      :key="project.id"
+      :project-id="project.id"
+      :version-id="version.id"
+    />
   </section>
 </template>
 

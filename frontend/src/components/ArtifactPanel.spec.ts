@@ -68,6 +68,39 @@ async function open() {
   await flushPromises()
   return wrapper
 }
+it('prioritizes the preview while keeping downloads visible and advanced controls afterward', async () => {
+  const wrapper = await open()
+  try {
+    const order = [
+      '[aria-label="运行应用流程"]',
+      '[aria-label="预览运行环境"]',
+      '.preview-stage',
+      '[aria-label="预览工程下载"]',
+      '[aria-label="版本源码导出"]',
+      '[aria-label="高级构建与进程管理"]',
+      '[aria-label="版本修改记录"]',
+    ].map((selector) => wrapper.get(selector).element)
+    for (let i = 1; i < order.length; i++) {
+      expect(
+        order[i - 1]!.compareDocumentPosition(order[i]!) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy()
+    }
+    expect(wrapper.get('[aria-label="版本源码导出"]').element.closest('details')).toBeNull()
+    const frame = wrapper.get('preview-frame-stub').element
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === '代码')!
+      .trigger('click')
+    expect(wrapper.get('preview-frame-stub').element).toBe(frame)
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === '预览')!
+      .trigger('click')
+    expect(wrapper.get('preview-frame-stub').element).toBe(frame)
+  } finally {
+    wrapper.unmount()
+  }
+})
 it('requires confirmation, restores the selected version and refreshes the project pointer', async () => {
   const wrapper = await open()
   try {

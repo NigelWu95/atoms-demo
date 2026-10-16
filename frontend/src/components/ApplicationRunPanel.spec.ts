@@ -82,12 +82,26 @@ function open() {
   const wrapper = mount(ApplicationRunPanel, {
     props: { projectId: id, ownerId: id, currentVersionId: id, version, loading: false },
     global: { plugins: [pinia], stubs: { BuildArchiveDownload: true } },
+    slots: { default: '<div data-preview-content>应用画面</div>' },
   })
   wrappers.push(wrapper)
   return { wrapper, session }
 }
 const run = (wrapper: ReturnType<typeof open>['wrapper']) =>
   wrapper.get('[data-action="run-application"]')
+it('places the preview slot between the primary action and advanced controls without extra controllers', async () => {
+  const { wrapper } = open()
+  await flushPromises()
+  const primary = wrapper.get('[aria-label="运行应用流程"]').element
+  const preview = wrapper.get('[data-preview-content]').element
+  const advanced = wrapper.get('[aria-label="高级构建与进程管理"]').element
+  expect(primary.compareDocumentPosition(preview) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  expect(preview.compareDocumentPosition(advanced) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  expect(listBuilds).toHaveBeenCalledTimes(1)
+  expect(listInstances).toHaveBeenCalledTimes(1)
+  expect(submitBuild).not.toHaveBeenCalled()
+  expect(startInstance).not.toHaveBeenCalled()
+})
 async function finishBuild() {
   vi.mocked(getBuild).mockResolvedValue(done)
   await vi.advanceTimersByTimeAsync(2000)

@@ -70,21 +70,25 @@ const { canRun, canCancel, message, run, cancel } = useRunApplication(
     </p>
     <p v-else-if="!version" class="muted">生成并保存首个版本后可运行应用。</p>
   </section>
-  <EngineeringBuild
-    :project-id="projectId"
-    :version="version"
-    :loading="loading"
-    :controller="builds"
-    @selected="emit('selected', $event)"
-  />
-  <InstancePanel
-    :project-id="projectId"
-    :version-id="version?.id ?? null"
-    :current-version-id="currentVersionId"
-    :build="build"
-    :controller="runtime"
-    @running="emit('running', $event)"
-  />
+  <slot />
+  <section class="advanced-runtime" aria-label="高级构建与进程管理">
+    <h3>构建与进程管理</h3>
+    <EngineeringBuild
+      :project-id="projectId"
+      :version="version"
+      :loading="loading"
+      :controller="builds"
+      @selected="emit('selected', $event)"
+    />
+    <InstancePanel
+      :project-id="projectId"
+      :version-id="version?.id ?? null"
+      :current-version-id="currentVersionId"
+      :build="build"
+      :controller="runtime"
+      @running="emit('running', $event)"
+    />
+  </section>
 </template>
 
 <style scoped>
@@ -105,5 +109,10 @@ const { canRun, canCancel, message, run, cancel } = useRunApplication(
 }
 .application-run p {
   margin: 0.5rem 0 0;
+}
+.advanced-runtime h3 {
+  padding: 1rem 1rem 0;
+  font-size: 0.875rem;
+  font-weight: 500;
 }
 </style>

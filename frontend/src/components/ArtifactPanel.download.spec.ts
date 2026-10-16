@@ -67,7 +67,7 @@ function open() {
       stubs: {
         RouterLink: true,
         EngineeringDownload: true,
-        ApplicationRunPanel: true,
+        ApplicationRunPanel: { template: '<div><slot /></div>' },
         InstancePreviewFrame: true,
         PreviewFrame: true,
         SourceViewer: true,
