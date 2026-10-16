@@ -2,6 +2,7 @@
 import { onUnmounted, ref, watch } from 'vue'
 import { getVersionReview, type VersionReview } from '../api/versionReview'
 import { errorMessage } from '../api/client'
+import LineDiff from './LineDiff.vue'
 const props = defineProps<{ projectId: string; versionId: string }>()
 const review = ref<VersionReview | null>(null)
 const open = ref(false)
@@ -66,22 +67,7 @@ function toggle() {
           <summary>
             {{ change.file }} · {{ change.before.length }} → {{ change.after.length }} 字符
           </summary>
-          <div class="comparison">
-            <div>
-              <h4>修改前</h4>
-              <pre
-                tabindex="0"
-                :aria-label="`${change.file} 修改前`"
-              ><code>{{ change.before || '（空）' }}</code></pre>
-            </div>
-            <div>
-              <h4>修改后</h4>
-              <pre
-                tabindex="0"
-                :aria-label="`${change.file} 修改后`"
-              ><code>{{ change.after || '（空）' }}</code></pre>
-            </div>
-          </div>
+          <LineDiff :file="change.file" :before="change.before" :after="change.after" />
         </details>
       </template>
     </div>
@@ -110,25 +96,5 @@ p {
 summary {
   cursor: pointer;
   padding: 0.75rem 0;
-}
-.comparison {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.75rem;
-}
-h4 {
-  margin: 0.5rem 0;
-}
-pre {
-  overflow: auto;
-  max-height: 18rem;
-  padding: 0.75rem;
-  border: 1px solid var(--border);
-  font-size: 0.75rem;
-}
-@media (max-width: 768px) {
-  .comparison {
-    grid-template-columns: minmax(0, 1fr);
-  }
 }
 </style>
