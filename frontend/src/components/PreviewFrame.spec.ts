@@ -73,6 +73,18 @@ it('does not mount or execute an invalid script and allows saving a failure repo
     expect.any(String),
   )
 })
+it('offers explicit repair preparation only for a permitted current failure, never raw errors', async () => {
+  const wrapper = setup('const broken = ;')
+  await flushPromises()
+  expect(wrapper.find('[data-action="prepare-repair"]').exists()).toBe(false)
+  await wrapper.setProps({ repairable: true })
+  expect(wrapper.emitted('repair')).toBeUndefined()
+  await wrapper.get('[data-action="prepare-repair"]').trigger('click')
+  expect(wrapper.emitted('repair')).toEqual([['SYNTAX']])
+  expect(savePreviewReport).not.toHaveBeenCalled()
+  await wrapper.setProps({ mode: 'HISTORY' })
+  expect(wrapper.find('[data-action="prepare-repair"]').exists()).toBe(false)
+})
 it('requires SDK startup, latches runtime failures, and keeps checks separate from data saves', async () => {
   const wrapper = setup()
   await flushPromises()
