@@ -25,7 +25,9 @@ export default defineConfig({
       // The test-only entry point never ships with the application JAR.
       // https://playwright.dev/docs/test-webserver
       command:
-        './mvnw -B spring-boot:test-run -Dspring-boot.run.main-class=dev.atoms.fixtures.FixtureApplication',
+        './mvnw -B spring-boot:test-run -Dspring-boot.run.main-class=dev.atoms.fixtures.FixtureApplication -Dspring-boot.run.arguments=--atoms.generation.worker-enabled=false',
+      // Admission tests need a configured gateway, never real credentials or execution.
+      env: { DEEPSEEK_API_KEY: 'test-only-key', GENERATION_MAX_MODEL_CALLS: '100000' },
       cwd: '../backend',
       url: 'http://127.0.0.1:8081/test-lab',
       reuseExistingServer: !process.env.CI,
