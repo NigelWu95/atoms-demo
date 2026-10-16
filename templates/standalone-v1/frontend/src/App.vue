@@ -35,11 +35,11 @@ function reload() {
       <span class="instance-label">独立应用</span>
     </header>
 
-    <main id="main-content" tabindex="-1">
+    <main id="main-content" :class="{ 'has-app': app }" tabindex="-1">
       <section class="startup" :class="{ 'has-app': app }" aria-labelledby="app-title">
-        <p class="eyebrow">APPLICATION</p>
+        <p v-if="!app" class="eyebrow">APPLICATION</p>
         <h1 id="app-title">{{ app?.title ?? '正在打开独立应用' }}</h1>
-        <p class="intro">{{ app?.summary ?? '连接当前应用的服务，建立独立访客会话。' }}</p>
+        <p v-if="!app" class="intro">连接当前应用的服务，建立独立访客会话。</p>
 
         <div class="connection-panel" :data-state="phase">
           <p
@@ -54,8 +54,7 @@ function reload() {
             }}</span>
             {{ status }}
           </p>
-          <p v-if="phase === 'connected'" class="detail">访客会话已连接，已读取当前应用信息。</p>
-          <p v-else-if="busy" class="detail">正在检查服务、建立会话并读取应用，最多等待 15 秒。</p>
+          <p v-if="busy" class="detail">正在检查服务、建立会话并读取应用，最多等待 15 秒。</p>
           <p v-if="failure" class="error-message" role="alert">{{ failure.message }}</p>
           <p v-if="requestId" class="detail">请求编号：{{ requestId }}</p>
           <button type="button" :aria-disabled="busy" @click="reload">
@@ -65,6 +64,11 @@ function reload() {
         </div>
 
         <RuntimeFrame v-if="app" :title="app.title" :loaded-runtime-id="app.loadedRuntimeId" />
+        <details v-if="app" class="app-information">
+          <summary>应用说明</summary>
+          <p>{{ app.summary }}</p>
+          <p class="detail">访客会话已连接，已读取当前应用信息。</p>
+        </details>
       </section>
     </main>
 

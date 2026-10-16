@@ -104,6 +104,12 @@ main {
 .startup.has-app {
   max-width: 960px;
 }
+main.has-app {
+  padding-block: 24px 32px;
+}
+.startup.has-app h1 {
+  font-size: clamp(1.5rem, 2.6vw, 2rem);
+}
 .intro,
 .detail,
 .error-message,
@@ -196,6 +202,48 @@ h2 {
 }
 .runtime-panel {
   margin-top: 28px;
+}
+.startup.has-app .connection-panel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 16px;
+  margin-top: 16px;
+  padding: 12px 16px;
+}
+.startup.has-app .connection-status {
+  font-size: 14px;
+}
+.startup.has-app .connection-panel button {
+  margin-top: 0;
+  color: var(--text);
+  background: transparent;
+  border-color: var(--border);
+}
+.startup.has-app .connection-panel button:hover {
+  background: var(--background);
+  border-color: var(--accent);
+}
+.app-information {
+  margin-top: 24px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.app-information summary {
+  min-height: 44px;
+  padding: 10px 16px;
+  cursor: pointer;
+  color: var(--text);
+}
+.app-information summary::marker {
+  color: var(--accent);
+}
+.app-information p {
+  margin: 0 16px 16px;
+  white-space: pre-wrap;
 }
 .runtime-heading {
   display: flex;
