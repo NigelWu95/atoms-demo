@@ -18,13 +18,15 @@ public class GenerationWorker {
     private final ModelGateway model;
     private final ArtifactService artifacts;
     private final ObjectMapper json;
-    public GenerationWorker(RunExecutionService execution, GenerationWorkflow workflow, ModelGateway model, ArtifactService artifacts, ObjectMapper json) {
-        this.execution = execution; this.workflow = workflow; this.model = model; this.artifacts = artifacts; this.json = json;
+    private final IterationContext context;
+    public GenerationWorker(RunExecutionService execution, GenerationWorkflow workflow, ModelGateway model, ArtifactService artifacts, ObjectMapper json, IterationContext context) {
+        this.execution = execution; this.workflow = workflow; this.model = model; this.artifacts = artifacts; this.json = json; this.context = context;
     }
     public void process(Run run) {
         try {
             var base = run.baseVersionId() == null ? null : json.valueToTree(artifacts.get(run.ownerId(), run.projectId().toString(), run.baseVersionId().toString()).artifact());
-            var result = workflow.generate(run.prompt(), base, (stage, system, user) -> call(run, stage, system, user), plan -> execution.plan(run, plan));
+            var history = context.history(run.ownerId(), run.projectId().toString(), run.baseVersionId());
+            var result = workflow.generate(run.prompt(), base, history, (stage, system, user) -> call(run, stage, system, user), plan -> execution.plan(run, plan));
             execution.complete(run, result);
         } catch (ModelException error) { execution.fail(run, error.code(), error.getMessage()); }
         catch (ApiException conflict) { execution.fail(run, conflict.code(), conflict.getMessage()); }
