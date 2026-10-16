@@ -52,7 +52,7 @@ function prepareRepair(diagnosis: PreviewDiagnosis) {
   })
 }
 watch(
-  () => [props.project?.id, selected.value, previewKind.value],
+  [() => props.project?.id, () => selected.value, () => previewKind.value],
   () => emit('repair', null),
   { flush: 'sync' },
 )
@@ -91,13 +91,10 @@ function showRunningPreview() {
   view.value = 'preview'
   previewKind.value = 'instance'
 }
-watch(
-  () => [props.project?.id, selected.value],
-  () => {
-    running.value = null
-    previewKind.value = 'shared'
-  },
-)
+watch([() => props.project?.id, () => selected.value], () => {
+  running.value = null
+  previewKind.value = 'shared'
+})
 const mode = computed(() =>
   selected.value === props.project?.currentVersionId ? 'CURRENT' : 'HISTORY',
 )
@@ -115,7 +112,7 @@ async function loadVersions(append = false) {
   }
 }
 watch(
-  () => [props.project?.id, props.project?.currentVersionId],
+  [() => props.project?.id, () => props.project?.currentVersionId],
   () => {
     revision++
     versions.value = []
@@ -129,7 +126,7 @@ watch(
 // Vue cleanup invalidates pending loads on selection change and on unmount.
 // https://vuejs.org/guide/essentials/watchers.html#side-effect-cleanup
 watch(
-  () => [props.project?.id, selected.value],
+  [() => props.project?.id, () => selected.value],
   async (_, __, onCleanup) => {
     let active = true
     onCleanup(() => {
