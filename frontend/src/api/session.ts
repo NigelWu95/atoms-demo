@@ -1,7 +1,7 @@
 import { api, isRecord, protocolFailure, type Csrf } from './client'
 
 export type Identity = { userId: string; isGuest: boolean; displayName: string }
-function decodeIdentity(value: unknown): Identity {
+export function decodeIdentity(value: unknown): Identity {
   if (
     !isRecord(value) ||
     typeof value.userId !== 'string' ||
@@ -11,7 +11,7 @@ function decodeIdentity(value: unknown): Identity {
     return protocolFailure()
   return { userId: value.userId, isGuest: value.isGuest, displayName: value.displayName }
 }
-async function refreshCsrf() {
+export async function refreshCsrf() {
   const token = await api.request('/api/csrf', (value): Csrf => {
     if (
       !isRecord(value) ||

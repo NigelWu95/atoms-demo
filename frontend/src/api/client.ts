@@ -7,6 +7,7 @@ export class ApiFailure extends Error {
     public readonly status = 0,
     public readonly requestId: string | null = null,
     public readonly retryable = false,
+    public readonly retryAfter: number | null = null,
   ) {
     super(message)
   }
@@ -27,11 +28,13 @@ type RequestOptions = {
   body?: unknown
   idempotencyKey?: string
   signal?: AbortSignal
+  timeoutMs?: number
 }
 export type Csrf = { token: string; headerName: string }
 
 export function createApiClient() {
   let csrf: Csrf | null = null
+  let scope = new AbortController()
   let onSessionFailure: ((error: ApiFailure) => void) | undefined
   function failHttp(response: Response, body: unknown): never {
     const structured = isRecord(body) && isRecord(body.error) ? body.error : null
@@ -43,6 +46,8 @@ export function createApiClient() {
       response.status,
       isRecord(body) && typeof body.requestId === 'string' ? body.requestId : null,
       structured?.retryable === true,
+      /^\d{1,5}$/.test(response.headers.get('Retry-After') ?? '')
+        ? Number(response.headers.get('Retry-After')) : null,
     )
     if ([401, 403].includes(response.status)) {
       csrf = null
@@ -53,10 +58,11 @@ export function createApiClient() {
 
   async function binary(path: string, callerSignal: AbortSignal, limit: number) {
     callerSignal.throwIfAborted()
+    const identitySignal = scope.signal
     const timeout = new AbortController()
     const timer = setTimeout(() => timeout.abort(), 30000)
     // https://developer.mozilla.org/en-US/docs/Web/API/AbortSignal/any_static
-    const signal = AbortSignal.any([callerSignal, timeout.signal])
+    const signal = AbortSignal.any([callerSignal, timeout.signal, identitySignal])
     try {
       const response = await fetch(path, {
         headers: { Accept: 'application/zip' },
@@ -73,15 +79,19 @@ export function createApiClient() {
           // HTML, invalid JSON or oversized errors still retain HTTP/session semantics.
         }
         callerSignal.throwIfAborted()
+        identitySignal.throwIfAborted()
         return failHttp(response, body)
       }
+      const bytes = await readBounded(response, limit, signal)
+      identitySignal.throwIfAborted()
       return {
-        bytes: await readBounded(response, limit, signal),
+        bytes,
         type: response.headers.get('Content-Type'),
       }
     } catch (error) {
       callerSignal.throwIfAborted()
       if (error instanceof ApiFailure) throw error
+      identitySignal.throwIfAborted()
       if (error instanceof RangeError) return protocolFailure()
       throw new ApiFailure('NETWORK_ERROR', '工程下载中断或超时，请重试。', 0, null, true)
     } finally {
@@ -94,6 +104,7 @@ export function createApiClient() {
     options: RequestOptions = {},
   ): Promise<T> {
     options.signal?.throwIfAborted()
+    const identitySignal = scope.signal
     const method = options.method ?? 'GET'
     const headers: Record<string, string> = { Accept: 'application/json' }
     if (method !== 'GET') {
@@ -109,13 +120,13 @@ export function createApiClient() {
         headers,
         credentials: 'same-origin',
         cache: 'no-store',
-        signal: options.signal
-          ? AbortSignal.any([options.signal, AbortSignal.timeout(10000)])
-          : AbortSignal.timeout(10000),
+        signal: AbortSignal.any([identitySignal, AbortSignal.timeout(options.timeoutMs ?? 10000),
+          ...(options.signal ? [options.signal] : [])]),
         body: options.body === undefined ? undefined : JSON.stringify(options.body),
       })
     } catch {
       options.signal?.throwIfAborted()
+      identitySignal.throwIfAborted()
       throw new ApiFailure(
         'NETWORK_ERROR',
         '连接中断，操作结果尚不确定。请保留输入并重试。',
@@ -125,22 +136,30 @@ export function createApiClient() {
       )
     }
     options.signal?.throwIfAborted()
+    identitySignal.throwIfAborted()
     if (response.status === 204) return decode(undefined)
     let body: unknown
     try {
       body = await response.json()
     } catch {
       options.signal?.throwIfAborted()
+      identitySignal.throwIfAborted()
       if (response.ok) return protocolFailure()
       body = null
     }
     options.signal?.throwIfAborted()
+    identitySignal.throwIfAborted()
     if (!response.ok) return failHttp(response, body)
     return decode(body)
   }
   return {
     request,
     binary,
+    resetScope: () => {
+      scope.abort()
+      scope = new AbortController()
+      csrf = null
+    },
     setCsrf: (value: Csrf) => {
       csrf = value
     },
