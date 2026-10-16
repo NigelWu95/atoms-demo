@@ -21,6 +21,11 @@ import static org.assertj.core.api.Assertions.*;
         "EMAIL_MAX_SENDS_PER_HOUR=1000", "EMAIL_MAX_SENDS_PER_DAY=10000"})
 @Import(EmailChallengeIT.MailConfig.class)
 class EmailChallengeIT {
+    private static final String KEY = UUID.randomUUID().toString().replace("-", "").repeat(2);
+    @org.springframework.test.context.DynamicPropertySource
+    static void isolatedBudgets(org.springframework.test.context.DynamicPropertyRegistry properties) {
+        properties.add("EMAIL_CODE_HMAC_KEY", () -> KEY);
+    }
     @Autowired EmailAuthService service;
     @Autowired GuestIdentityService guests;
     @Autowired JdbcTemplate jdbc;
@@ -77,5 +82,24 @@ class EmailChallengeIT {
             assertThat(java.util.List.of(first.get(), second.get())).containsExactlyInAnyOrder(true, false);
             assertThat(jdbc.queryForObject("SELECT count(*) FROM email_identities WHERE email = ?", Integer.class, email)).isEqualTo(1);
         } finally { pool.shutdownNow(); }
+    }
+    @Test void failedResendPreservesPriorCodeAndSuccessfulResendReplacesOnlyItsOwnSession() {
+        UUID owner = guest(); String session = UUID.randomUUID().toString(), email = owner + "@example.com";
+        var original = service.send(owner, session, session, email); String originalCode = mail.codes.get(email);
+        cooldown(session, email); mail.fail = true;
+        assertThatThrownBy(() -> service.send(owner, session, session, email)).isInstanceOf(ApiException.class);
+        assertThat(jdbc.queryForObject("SELECT status FROM email_auth_challenges WHERE id = ?", String.class, original.challengeId())).isEqualTo("SENT");
+        mail.fail = false; cooldown(session, email);
+        UUID other = guest(); String otherSession = UUID.randomUUID().toString();
+        var otherCode = service.send(other, otherSession, otherSession, email);
+        cooldown(session, email);
+        var replacement = service.send(owner, session, session, email);
+        assertThat(jdbc.queryForObject("SELECT status FROM email_auth_challenges WHERE id = ?", String.class, otherCode.challengeId())).isEqualTo("SENT");
+        assertThatThrownBy(() -> service.verify(owner, session, session, original.challengeId(), originalCode)).isInstanceOf(ApiException.class);
+        assertThat(service.verify(owner, session, session, replacement.challengeId(), mail.codes.get(email))).isEqualTo(owner);
+    }
+    private void cooldown(String session, String email) {
+        for (String key : new String[]{EmailCode.digest(KEY, "budget", "send-cooldown-session", session), EmailCode.digest(KEY, "budget", "send-cooldown-email", email)})
+            jdbc.update("UPDATE email_auth_budgets SET expires_at = now() - interval '1 second' WHERE budget_key = ?", key);
     }
 }
