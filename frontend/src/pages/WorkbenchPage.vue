@@ -11,6 +11,7 @@ import ArtifactPanel from '../components/ArtifactPanel.vue'
 import ConversationPanel from '../components/ConversationPanel.vue'
 import PublicationPanel from '../components/PublicationPanel.vue'
 import { useProjectDraft } from '../composables/useProjectDraft'
+import { matchesRepair, type RepairProposal } from '../runtime/previewRepair'
 
 const draft = useDraftStore()
 const session = useSessionStore()
@@ -81,6 +82,34 @@ watch(
   { immediate: true },
 )
 const panel = ref<'conversation' | 'preview'>('conversation')
+const repair = ref<RepairProposal | null>(null)
+function prepareRepair(proposal: RepairProposal | null) {
+  if (!proposal) {
+    repair.value = null
+    return
+  }
+  if (
+    !project.value ||
+    !session.ready ||
+    !matchesRepair(proposal, project.value, session.identity?.userId ?? null)
+  )
+    return
+  repair.value = proposal
+  panel.value = 'conversation'
+}
+watch(
+  () => [
+    project.value?.id,
+    project.value?.currentVersionId,
+    project.value?.projectRevision,
+    session.ready,
+    session.identity?.userId,
+  ],
+  () => {
+    repair.value = null
+  },
+  { flush: 'sync' },
+)
 </script>
 
 <template>
@@ -158,6 +187,8 @@ const panel = ref<'conversation' | 'preview'>('conversation')
         :key="project.id"
         v-model="prompt"
         :project="project"
+        :repair="repair"
+        @dismiss-repair="repair = null"
         @changed="project = $event"
       />
       <section v-else class="conversation-panel" aria-labelledby="conversation-title">
@@ -182,7 +213,7 @@ const panel = ref<'conversation' | 'preview'>('conversation')
           hint="请先创建项目，再开始生成"
         />
       </section>
-      <ArtifactPanel :project="project" @changed="project = $event" />
+      <ArtifactPanel :project="project" @changed="project = $event" @repair="prepareRepair" />
     </div>
   </div>
 </template>

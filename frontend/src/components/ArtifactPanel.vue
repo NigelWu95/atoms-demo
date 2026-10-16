@@ -13,9 +13,10 @@ import type { AppInstance } from '../api/instances'
 import InstancePreviewFrame from './InstancePreviewFrame.vue'
 import BuildArchiveDownload from './BuildArchiveDownload.vue'
 import { useSessionStore } from '../stores/session'
+import type { PreviewDiagnosis, RepairProposal } from '../runtime/previewRepair'
 
 const props = defineProps<{ project: Project | null }>()
-const emit = defineEmits<{ changed: [Project] }>()
+const emit = defineEmits<{ changed: [Project]; repair: [RepairProposal | null] }>()
 const restorationLocked = ref(false)
 const view = ref<'preview' | 'code'>('preview')
 const device = ref<'desktop' | 'mobile'>('desktop')
@@ -29,6 +30,32 @@ const running = ref<AppInstance | null>(null)
 const previewKind = ref<'shared' | 'instance'>('shared')
 const session = useSessionStore()
 const readyExecutionId = ref<string | null>(null)
+const canRepair = computed(
+  () =>
+    session.ready &&
+    session.identity?.userId === props.project?.ownerId &&
+    !!version.value &&
+    version.value.id === props.project?.currentVersionId &&
+    previewKind.value === 'shared' &&
+    view.value === 'preview' &&
+    !loading.value,
+)
+function prepareRepair(diagnosis: PreviewDiagnosis) {
+  if (!canRepair.value || !props.project || !version.value) return
+  emit('repair', {
+    ownerId: props.project.ownerId,
+    projectId: props.project.id,
+    baseVersionId: version.value.id,
+    expectedProjectRevision: props.project.projectRevision,
+    versionNo: version.value.versionNo,
+    diagnosis,
+  })
+}
+watch(
+  () => [props.project?.id, selected.value, previewKind.value],
+  () => emit('repair', null),
+  { flush: 'sync' },
+)
 // Both the frame and its download use this one validated execution, never the selected build.
 const previewRuntime = computed(() =>
   previewKind.value === 'instance' &&
@@ -211,6 +238,8 @@ watch(
               :key="version.id + mode"
               :version="version"
               :mode="mode"
+              :repairable="canRepair"
+              @repair="prepareRepair"
             />
             <InstancePreviewFrame
               v-else-if="previewRuntime"

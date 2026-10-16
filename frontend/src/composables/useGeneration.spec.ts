@@ -6,6 +6,10 @@ import { getProject, type Project } from '../api/projects'
 import { generationAvailability, listMessages, listRuns, submitRun, type Run } from '../api/runs'
 import { useGeneration } from './useGeneration'
 import { subscribeToRun } from '../api/runEvents'
+import { useSessionStore } from '../stores/session'
+import { useGenerationStore } from '../stores/generation'
+import { ApiFailure } from '../api/client'
+import { repairPrompt, type RepairProposal } from '../runtime/previewRepair'
 
 vi.mock('../api/runEvents', () => ({ subscribeToRun: vi.fn(() => vi.fn()) }))
 
@@ -39,10 +43,13 @@ const task: Run = {
   lastEventSeq: 3,
 }
 const wrappers: ReturnType<typeof mount>[] = []
-function setup(draft = '') {
+function setup(draft = '', pinia = createPinia()) {
   const project = ref(initial)
   const prompt = ref(draft)
   let generation!: ReturnType<typeof useGeneration>
+  const session = useSessionStore(pinia)
+  session.state = 'ready'
+  session.identity = { userId: initial.ownerId, displayName: '测试', isGuest: true }
   wrappers.push(
     mount(
       defineComponent({
@@ -60,10 +67,18 @@ function setup(draft = '') {
           return () => null
         },
       }),
-      { global: { plugins: [createPinia()] } },
+      { global: { plugins: [pinia] } },
     ),
   )
-  return { generation, project, prompt }
+  return {
+    generation,
+    project,
+    prompt,
+    session,
+    pinia,
+    intents: useGenerationStore(pinia),
+    unmount: () => wrappers.pop()!.unmount(),
+  }
 }
 beforeEach(() => {
   vi.resetAllMocks()
@@ -202,4 +217,162 @@ it('closes an old project stream and ignores its late events after navigation', 
   expect(generation.run.value).toBeNull()
   expect(generation.error.value).toBe('')
   expect(vi.mocked(subscribeToRun).mock.results[0]!.value).toHaveBeenCalled()
+})
+
+const repairProject = { ...initial, currentVersionId: 'version-1', projectRevision: 1 }
+const proposal: RepairProposal = {
+  projectId: initial.id,
+  ownerId: initial.ownerId,
+  baseVersionId: 'version-1',
+  expectedProjectRevision: 1,
+  versionNo: 1,
+  diagnosis: 'SYNTAX',
+}
+async function setupRepair(draft = '尚未提交的新需求') {
+  vi.mocked(getProject).mockResolvedValue({ ...repairProject })
+  vi.mocked(listRuns).mockResolvedValue({ items: [], nextCursor: null })
+  const result = setup(draft)
+  await flushPromises()
+  return result
+}
+it.each(['', '尚未提交的新需求', repairPrompt(proposal, '')])(
+  'submits a bound repair without replacing draft %j, even on failure',
+  async (draft) => {
+    const { generation, prompt } = await setupRepair(draft)
+    vi.mocked(submitRun).mockImplementation(async () => {
+      vi.mocked(listRuns).mockResolvedValue({
+        items: [{ ...task, prompt: repairPrompt(proposal, '') }],
+        nextCursor: null,
+      })
+      return { runId: task.id }
+    })
+    expect(await generation.submitRepair(proposal, '')).toBe(true)
+    expect(submitRun).toHaveBeenCalledWith(
+      initial.id,
+      {
+        prompt: repairPrompt(proposal, ''),
+        intent: 'MODIFY',
+        baseVersionId: 'version-1',
+        expectedProjectRevision: 1,
+      },
+      expect.any(String),
+    )
+    expect(prompt.value).toBe(draft)
+    await generation.refresh()
+    expect(prompt.value).toBe(draft)
+  },
+)
+it('retries an unknown repair with the original body/key and still preserves the user draft', async () => {
+  const { generation, prompt } = await setupRepair()
+  vi.mocked(submitRun).mockRejectedValueOnce(new ApiFailure('NETWORK_ERROR', '结果未知'))
+  await generation.submitRepair(proposal, '补充说明')
+  expect(generation.pending.value).toBeTruthy()
+  expect(await generation.submitRepair(proposal, '不能覆盖原请求')).toBe(false)
+  prompt.value = '之后继续输入的草稿'
+  vi.mocked(submitRun).mockResolvedValue({ runId: task.id })
+  await generation.submit()
+  expect(vi.mocked(submitRun).mock.calls[0]).toEqual(vi.mocked(submitRun).mock.calls[1])
+  expect(prompt.value).toBe('之后继续输入的草稿')
+})
+it.each(['version', 'revision', 'owner', 'session', 'active', 'length'] as const)(
+  'rejects repair on invalid %s without requesting the model',
+  async (change) => {
+    const { generation, project, session } = await setupRepair()
+    if (change === 'version') project.value.currentVersionId = 'new-version'
+    if (change === 'revision') project.value.projectRevision++
+    if (change === 'owner')
+      session.identity = { userId: 'another', displayName: 'other', isGuest: true }
+    if (change === 'session') session.state = 'connecting'
+    if (change === 'active') generation.run.value = { ...task, status: 'RUNNING' }
+    expect(
+      await generation.submitRepair(proposal, change === 'length' ? 'x'.repeat(1001) : ''),
+    ).toBe(false)
+    expect(submitRun).not.toHaveBeenCalled()
+  },
+)
+
+it('does not start a repair while the latest project and run are still refreshing', async () => {
+  const { generation } = await setupRepair()
+  let finish!: (value: { items: Run[]; nextCursor: null }) => void
+  vi.mocked(listRuns).mockReturnValueOnce(new Promise((resolve) => (finish = resolve)))
+  const refresh = generation.refresh()
+  try {
+    expect(generation.loading.value).toBe(true)
+    expect(await generation.submitRepair(proposal, '')).toBe(false)
+    expect(submitRun).not.toHaveBeenCalled()
+  } finally {
+    finish({ items: [], nextCursor: null })
+    await refresh
+  }
+})
+
+it('submits only once when repair confirmation is clicked again before the response', async () => {
+  const { generation } = await setupRepair()
+  let finish!: (value: { runId: string }) => void
+  vi.mocked(submitRun).mockReturnValueOnce(new Promise((resolve) => (finish = resolve)))
+  const first = generation.submitRepair(proposal, '')
+  expect(await generation.submitRepair(proposal, '')).toBe(false)
+  expect(submitRun).toHaveBeenCalledTimes(1)
+  finish({ runId: task.id })
+  await first
+})
+
+it.each(['success', 'rejection'] as const)(
+  'ignores a late repair %s after the account changes, preserving the new pending request',
+  async (outcome) => {
+    const { generation, session, intents, prompt } = await setupRepair()
+    let finish!: (value: { runId: string }) => void
+    let reject!: (failure: unknown) => void
+    vi.mocked(submitRun).mockReturnValueOnce(
+      new Promise((resolve, fail) => {
+        finish = resolve
+        reject = fail
+      }),
+    )
+    const oldRequest = generation.submitRepair(proposal, '')
+    session.invalidate('账号切换')
+    session.identity = { userId: 'new-owner', displayName: '新账号', isGuest: false }
+    session.state = 'ready'
+    const next = intents.intent(initial.id, {
+      prompt: '新账号请求',
+      intent: 'MODIFY',
+      baseVersionId: 'new-version',
+      expectedProjectRevision: 2,
+    })
+    prompt.value = '新账号草稿'
+    generation.error.value = '新账号界面状态'
+    const reads = vi.mocked(getProject).mock.calls.length
+    if (outcome === 'success') finish({ runId: task.id })
+    else reject(new ApiFailure('STALE_VERSION', '旧请求失败', 409))
+    await oldRequest
+    expect(intents.pending[initial.id]).toEqual(next)
+    expect(prompt.value).toBe('新账号草稿')
+    expect(generation.error.value).toBe('新账号界面状态')
+    expect(generation.run.value).toBeNull()
+    expect(getProject).toHaveBeenCalledTimes(reads)
+  },
+)
+
+it('preserves repair retry metadata and an empty draft across route remounts', async () => {
+  const first = await setupRepair('')
+  vi.mocked(submitRun).mockRejectedValueOnce(new ApiFailure('NETWORK_ERROR', '结果未知'))
+  await first.generation.submitRepair(proposal, '')
+  first.unmount()
+  vi.mocked(listRuns).mockResolvedValue({
+    items: [{ ...task, prompt: repairPrompt(proposal, '') }],
+    nextCursor: null,
+  })
+  const second = setup('', first.pinia)
+  await flushPromises()
+  expect(second.prompt.value).toBe('')
+  expect(second.generation.pending.value?.preserveDraft).toBe(true)
+  vi.mocked(submitRun).mockResolvedValue({ runId: task.id })
+  await second.generation.submit()
+  expect(vi.mocked(submitRun).mock.calls[1]).toEqual(vi.mocked(submitRun).mock.calls[0])
+  expect(second.prompt.value).toBe('')
+  second.unmount()
+  const third = setup('', first.pinia)
+  await flushPromises()
+  expect(third.generation.pending.value).toBeUndefined()
+  expect(third.prompt.value).toBe('')
 })

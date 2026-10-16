@@ -14,6 +14,8 @@ import {
 } from '../api/runs'
 import { useGenerationStore } from '../stores/generation'
 import { subscribeToRun, type StreamState } from '../api/runEvents'
+import { useSessionStore } from '../stores/session'
+import { matchesRepair, repairPrompt, type RepairProposal } from '../runtime/previewRepair'
 
 export function useGeneration(
   project: () => Project,
@@ -22,6 +24,7 @@ export function useGeneration(
   changed: (value: Project) => void,
 ) {
   const intents = useGenerationStore()
+  const session = useSessionStore()
   const run = ref<Run | null>(null)
   const messages = ref<Message[]>([])
   const cursor = ref<string | null>(null)
@@ -116,6 +119,7 @@ export function useGeneration(
       if (
         run.value &&
         ['FAILED', 'INTERRUPTED', 'CANCELLED'].includes(run.value.status) &&
+        intents.canRestoreDraft(id, run.value.id) &&
         !prompt().trim()
       )
         setPrompt(run.value.prompt)
@@ -139,24 +143,61 @@ export function useGeneration(
       baseVersionId: current.currentVersionId ?? null,
       expectedProjectRevision: current.projectRevision,
     })
+    await dispatch(current, intent)
+  }
+  async function submitRepair(proposal: RepairProposal, description: string): Promise<boolean> {
+    if (!session.ready || !matchesRepair(proposal, project(), session.identity?.userId ?? null)) {
+      error.value = '修复建议已失效，请在当前版本重新检查并准备。'
+      return false
+    }
+    if (loading.value || !canSubmit.value || description.length > 1000) return false
+    const current = project()
+    const intent = intents.intent(
+      current.id,
+      {
+        prompt: repairPrompt(proposal, description),
+        intent: 'MODIFY',
+        baseVersionId: proposal.baseVersionId,
+        expectedProjectRevision: proposal.expectedProjectRevision,
+      },
+      true,
+    )
+    await dispatch(current, intent)
+    return true
+  }
+  async function dispatch(current: Project, intent: ReturnType<typeof intents.intent>) {
+    const id = current.id
+    const scope = session.revision
+    const currentView = () =>
+      mounted &&
+      project().id === id &&
+      project().ownerId === current.ownerId &&
+      session.revision === scope
     busy.value = true
     error.value = ''
     stopWatching()
     revision++
     loading.value = false
     try {
-      await submitRun(id, intent.body, intent.key)
-      intents.resolved(id)
-      if (!mounted || project().id !== id) return
-      if (prompt().trim() === intent.body.prompt) setPrompt('')
+      const result = await submitRun(id, intent.body, intent.key)
+      if (session.revision !== scope) return
+      if (intents.pending[id]?.key === intent.key) intents.resolved(id, result.runId)
+      if (!currentView()) return
+      if (!intent.preserveDraft && prompt().trim() === intent.body.prompt) setPrompt('')
       await refresh()
     } catch (failure) {
       // Unknown outcomes retain the ORIGINAL request and key, including its baseline.
-      if (failure instanceof ApiFailure && failure.status >= 400 && failure.status < 500)
+      if (
+        session.revision === scope &&
+        intents.pending[id]?.key === intent.key &&
+        failure instanceof ApiFailure &&
+        failure.status >= 400 &&
+        failure.status < 500
+      )
         intents.resolved(id)
-      if (mounted && project().id === id) error.value = errorMessage(failure)
+      if (currentView()) error.value = errorMessage(failure)
     } finally {
-      if (mounted && project().id === id) busy.value = false
+      if (currentView()) busy.value = false
     }
   }
   async function cancel() {
@@ -229,6 +270,7 @@ export function useGeneration(
     canSubmit,
     refresh,
     submit,
+    submitRepair,
     cancel,
     older,
   }

@@ -50,6 +50,7 @@ it('clears private drafts and hides the old identity on session failure', async 
   generation.pending = {
     'old-project': {
       key: 'key',
+      preserveDraft: false,
       body: { prompt: 'secret', intent: 'CREATE', baseVersionId: null, expectedProjectRevision: 0 },
     },
   }
