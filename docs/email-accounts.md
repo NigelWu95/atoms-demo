@@ -1,6 +1,6 @@
 # QQ 邮箱验证码注册 / 登录
 
-2026-10-16，本地功能已实现，维护者已配置启用；仓库示例仍默认关闭。**真实 QQ 发信、Outlook 收信及一次验证码登录已通过；未推送 GitHub、未部署远程服务器。** 本文 GitHub 文档链接在推送后生效。
+2026-10-16，代码已推送 GitHub 并部署到现有服务器；仓库示例仍默认关闭。**本地真实 QQ 发信、Outlook 收信及一次验证码登录通过；云端配置已启用，SMTP TLS/认证与公网页面检查通过，云端实际收信登录待用户复核。** 见[部署与备份记录](https://github.com/NigelWu95/atoms-demo/blob/main/docs/cloud-deployment.md)。
 
 ## 功能与归属
 
@@ -58,7 +58,7 @@ server.servlet.session.cookie.name=ATOMS_HTTP_SESSION
 
 该开关默认 `false`，统一控制能力发现、发送、验证及登录后的账号请求；它不自动启用 `EMAIL_AUTH_ENABLED`，不修改 Cookie，也不放宽 CSRF、验证码、限流、归属或退出撤销。只设置发布链接的 `ALLOW_INSECURE_HTTP_PUBLIC_ORIGIN=true` 不会开放邮箱 HTTP 登录，这两个开关用途不同。本机回环开发不需要这个例外开关。
 
-当前服务器 `http://192.0.2.10:8443` 保持原样，**本地已启用并验收，远程服务器尚未配置或部署邮箱功能**。远程上线仍需单独确认、同步私有配置，并验收服务器出站 SMTP 与公网账号流程；本地通过不能代替。不要暴露 8081/5174 测试服务或放开可信代理来源。`GET /api/auth/methods` 的 `emailCodeEnabled=true` 只代表本请求的配置/传输条件允许，不代表 QQ 已连接或邮件已送达。
+服务器 [账号页](http://192.0.2.10:8443/account) 已按用户授权开放：本地邮箱/模型键通过 SSH 合并到 `/etc/atoms-demo/application.properties`，权限 root:atoms / 0640。没有覆盖服务器数据库密码、origin 或 Cookie 名称。显式 HTTP 例外已启用，QQ SMTP TLS/认证与公网页面检查通过；没有自动发送云端测试邮件，仍需用户在账号页收信并验证。不要暴露 8081/5174 测试服务或放开可信代理来源。`GET /api/auth/methods` 的 `emailCodeEnabled=true` 只代表配置/传输条件允许，不单独证明邮件送达。
 
 以后改用 HTTPS 时，把 `EMAIL_AUTH_ALLOW_INSECURE_HTTP=false`、Cookie `secure=true`，并换回 HTTPS 专用 Cookie 名称，重启后重新登录；旧账号和项目不删除。仅关闭 HTTP 例外而仍通过 HTTP 访问时，已登录账号请求会被拒绝。详见 [ADR-015](https://github.com/NigelWu95/atoms-demo/blob/main/docs/decisions/015-explicit-http-email-demo.md)。
 

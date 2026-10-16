@@ -6,7 +6,7 @@
 
 同日验收补记：维护者已完成本地私有配置。真实 QQ 向指定的 Outlook 邮箱发信返回 201，用户输入验证码后返回 200，并确认测试 OK。仅完成本地单次真实邮件登录；远程部署、重复真实发码登录与规模化投递不在这次证据范围内。
 
-规格：[SPEC-email-accounts.md](https://github.com/NigelWu95/atoms-demo/blob/main/SPEC-email-accounts.md)。此链接须本文件及规格推送后才有效；本轮不推送或部署。
+规格：[SPEC-email-accounts.md](https://github.com/NigelWu95/atoms-demo/blob/main/SPEC-email-accounts.md)。上述为本地实施阶段记录；用户后续另行授权的推送、云端部署及私有配置同步已于同日完成，证据与回退边界见[部署记录](https://github.com/NigelWu95/atoms-demo/blob/main/docs/cloud-deployment.md)。
 
 ## 背景与决定
 

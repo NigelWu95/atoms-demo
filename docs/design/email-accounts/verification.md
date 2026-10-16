@@ -1,6 +1,6 @@
 # 邮箱账号本地验收记录
 
-日期：2026-10-16。基线 `c551a76`，分支 `feature/standalone-engineering`。范围是 QQ SMTP 适配、免密码邮箱账号、会话与前端隔离；未推送、未部署。实施阶段不修改日常私有配置；用户随后自行配置，另行授权的真实邮件验收见下文。
+日期：2026-10-16。基线 `c551a76`，分支 `feature/standalone-engineering`。本文记录本地 QQ SMTP 适配、免密码邮箱账号、会话与前端隔离验收；该阶段未推送或部署。用户随后自行配置，另行授权的真实邮件验收见下文。再后续授权的 GitHub 同步与云部署已完成，独立记录在[云部署文档](https://github.com/NigelWu95/atoms-demo/blob/main/docs/cloud-deployment.md)，不将本地证据冒充云端真实收信。
 
 ## 自动验收的环境与隔离
 
