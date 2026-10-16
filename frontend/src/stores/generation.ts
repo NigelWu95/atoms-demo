@@ -15,5 +15,8 @@ export const useGenerationStore = defineStore('generation', () => {
   function resolved(projectId: string) {
     delete pending.value[projectId]
   }
-  return { pending, intent, resolved }
+  function reset() {
+    pending.value = {}
+  }
+  return { pending, intent, resolved, reset }
 })
