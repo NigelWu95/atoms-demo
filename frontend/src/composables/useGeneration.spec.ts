@@ -1,4 +1,4 @@
-import { createPinia } from 'pinia'
+import { createPinia, disposePinia } from 'pinia'
 import { mount, flushPromises } from '@vue/test-utils'
 import { defineComponent, ref } from 'vue'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
@@ -23,16 +23,16 @@ vi.mock('../api/runs', async (original) => ({
   cancelRun: vi.fn(),
 }))
 const initial: Project = {
-  id: 'project-1',
+  id: '22222222-2222-4222-8222-222222222222',
   name: 'App',
-  ownerId: 'owner-1',
+  ownerId: '11111111-1111-4111-8111-111111111111',
   projectRevision: 0,
   currentVersionId: null,
   createdAt: '2026-10-07T00:00:00Z',
   updatedAt: '2026-10-07T00:00:00Z',
 }
 const task: Run = {
-  id: 'run-1',
+  id: '44444444-4444-4444-8444-444444444444',
   projectId: initial.id,
   prompt: '创建计数器',
   status: 'FAILED',
@@ -43,7 +43,9 @@ const task: Run = {
   lastEventSeq: 3,
 }
 const wrappers: ReturnType<typeof mount>[] = []
+const stores = new Set<ReturnType<typeof createPinia>>()
 function setup(draft = '', pinia = createPinia()) {
+  stores.add(pinia)
   const project = ref(initial)
   const prompt = ref(draft)
   let generation!: ReturnType<typeof useGeneration>
@@ -81,6 +83,8 @@ function setup(draft = '', pinia = createPinia()) {
   }
 }
 beforeEach(() => {
+  sessionStorage.clear()
+  localStorage.clear()
   vi.resetAllMocks()
   vi.mocked(subscribeToRun).mockImplementation(() => vi.fn())
   vi.mocked(generationAvailability).mockResolvedValue({
@@ -95,6 +99,52 @@ beforeEach(() => {
 })
 afterEach(() => {
   wrappers.splice(0).forEach((wrapper) => wrapper.unmount())
+  stores.forEach(disposePinia)
+  stores.clear()
+  vi.restoreAllMocks()
+})
+
+it('restores a normal pending request unchanged and discards it only after explicit confirmation', async () => {
+  vi.mocked(listRuns).mockResolvedValue({ items: [], nextCursor: null })
+  const first = setup('原始需求')
+  await flushPromises()
+  vi.mocked(submitRun).mockRejectedValueOnce(new ApiFailure('NETWORK_ERROR', '结果未知'))
+  await first.generation.submit()
+  const original = first.generation.pending.value
+  first.unmount()
+  first.intents.$dispose()
+  const second = setup('新的草稿')
+  await flushPromises()
+  expect(second.generation.pending.value).toEqual(original)
+  expect(second.generation.canSubmit.value).toBe(false)
+  expect(submitRun).toHaveBeenCalledTimes(1)
+  const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
+  second.generation.discardRecovery()
+  expect(second.generation.pending.value).toEqual(original)
+  confirm.mockReturnValue(true)
+  second.generation.discardRecovery()
+  expect(confirm).toHaveBeenCalledWith(expect.stringContaining('不会取消后台任务'))
+  expect(second.generation.pending.value).toBeUndefined()
+  expect(second.generation.canSubmit.value).toBe(true)
+  expect(second.prompt.value).toBe('新的草稿')
+  expect(submitRun).toHaveBeenCalledTimes(1)
+})
+
+it('ignores an accepted response after the same account starts a new recovery epoch', async () => {
+  const { generation, intents, prompt } = await setupRepair()
+  let finish!: (value: { runId: string }) => void
+  vi.mocked(submitRun).mockReturnValueOnce(
+    new Promise((resolve) => {
+      finish = resolve
+    }),
+  )
+  const old = generation.submit()
+  localStorage.setItem('atoms.session.changed', 'new-login')
+  intents.bind({ userId: initial.ownerId, isGuest: true })
+  finish({ runId: task.id })
+  await old
+  expect(prompt.value).toBe('尚未提交的新需求')
+  expect(intents.pending).toEqual({})
 })
 
 it('reads the project after the terminal run, so completion cannot strand an old preview', async () => {
@@ -219,11 +269,15 @@ it('closes an old project stream and ignores its late events after navigation', 
   expect(vi.mocked(subscribeToRun).mock.results[0]!.value).toHaveBeenCalled()
 })
 
-const repairProject = { ...initial, currentVersionId: 'version-1', projectRevision: 1 }
+const repairProject = {
+  ...initial,
+  currentVersionId: '33333333-3333-4333-8333-333333333333',
+  projectRevision: 1,
+}
 const proposal: RepairProposal = {
   projectId: initial.id,
   ownerId: initial.ownerId,
-  baseVersionId: 'version-1',
+  baseVersionId: repairProject.currentVersionId,
   expectedProjectRevision: 1,
   versionNo: 1,
   diagnosis: 'SYNTAX',
@@ -252,7 +306,7 @@ it.each(['', '尚未提交的新需求', repairPrompt(proposal, '')])(
       {
         prompt: repairPrompt(proposal, ''),
         intent: 'MODIFY',
-        baseVersionId: 'version-1',
+        baseVersionId: repairProject.currentVersionId,
         expectedProjectRevision: 1,
       },
       expect.any(String),
@@ -375,4 +429,49 @@ it('preserves repair retry metadata and an empty draft across route remounts', a
   await flushPromises()
   expect(third.generation.pending.value).toBeUndefined()
   expect(third.prompt.value).toBe('')
+})
+
+it('restores an unknown repair across a fresh application without submitting until clicked', async () => {
+  const first = await setupRepair('')
+  vi.mocked(submitRun).mockRejectedValueOnce(new ApiFailure('NETWORK_ERROR', '结果未知'))
+  await first.generation.submitRepair(proposal, '必须保留原内容')
+  first.unmount()
+  first.intents.$dispose()
+  vi.mocked(listRuns).mockResolvedValue({
+    items: [{ ...task, prompt: repairPrompt(proposal, '必须保留原内容') }],
+    nextCursor: null,
+  })
+  const second = setup('')
+  await flushPromises()
+  expect(submitRun).toHaveBeenCalledTimes(1)
+  expect(second.prompt.value).toBe('')
+  expect(second.generation.pending.value?.preserveDraft).toBe(true)
+  expect(second.generation.canSubmit.value).toBe(false)
+  second.prompt.value = '刷新后写的新草稿'
+  vi.mocked(submitRun).mockResolvedValue({ runId: task.id })
+  await second.generation.submit()
+  expect(vi.mocked(submitRun).mock.calls[1]).toEqual(vi.mocked(submitRun).mock.calls[0])
+  expect(second.prompt.value).toBe('刷新后写的新草稿')
+  second.unmount()
+  second.intents.$dispose()
+  const third = setup('')
+  await flushPromises()
+  expect(third.prompt.value).toBe('')
+  expect(third.generation.pending.value).toBeUndefined()
+  expect(submitRun).toHaveBeenCalledTimes(2)
+})
+
+it('does not restore or submit a request before the latest project ownership is verified', async () => {
+  const first = await setupRepair()
+  vi.mocked(submitRun).mockRejectedValueOnce(new ApiFailure('NETWORK_ERROR', '结果未知'))
+  await first.generation.submitRepair(proposal, '')
+  first.unmount()
+  first.intents.$dispose()
+  vi.mocked(getProject).mockResolvedValue({ ...repairProject, ownerId: 'another-owner' })
+  const second = setup()
+  await flushPromises()
+  expect(second.generation.pending.value).toBeUndefined()
+  expect(second.generation.canSubmit.value).toBe(false)
+  await second.generation.submit()
+  expect(submitRun).toHaveBeenCalledTimes(1)
 })
