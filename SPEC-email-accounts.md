@@ -4,6 +4,8 @@
 
 当前账号方向为邮箱验证码；原 `SPEC-oauth-accounts.md` 与 `docs/design/oauth-accounts/` 暂缓并保留。根目录工程导出任务不覆盖。实现与验证记录存于 `docs/design/email-accounts/`，本文件为批准后的契约，实际证据见该目录 verification.md；真实邮件验收仅覆盖单收件人的一次登录，不代表全部验收场景或远程部署已经通过。
 
+后续交付补记：用户另行授权推送、部署及本地 env 同步，2026-10-16 已完成云端更新和 SMTP TLS/认证、公网页面验收；云端实际收信登录待复核。下文“不部署”是初始实施范围，后续授权及证据见[部署记录](https://github.com/NigelWu95/atoms-demo/blob/main/docs/cloud-deployment.md)。
+
 ## 1. 目标、假设与范围
 
 让其他用户能收到真实邮件、完成注册、跨浏览器登录并找回平台项目。管理员使用 QQ 邮箱发信，收件人不限定 QQ 邮箱；实际投递受收件方和供应商规则影响。
