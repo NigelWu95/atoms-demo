@@ -64,6 +64,25 @@ describe('standalone startup shell', () => {
     )
   }
 
+  it('keeps the application before collapsed complete text-only information', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(applicationResponse))
+    const wrapper = mount(App)
+    expect(wrapper.find('details').exists()).toBe(false)
+    await flushPromises()
+    const details = wrapper.get('details')
+    expect(details.attributes('open')).toBeUndefined()
+    expect(details.get('summary').text()).toBe('应用说明')
+    expect(details.get('p').text()).toBe('<b>安全显示的摘要</b>')
+    expect(details.find('b').exists()).toBe(false)
+    expect(wrapper.find('.intro').exists()).toBe(false)
+    const frame = wrapper.get('[data-testid="runtime"]').element
+    expect(
+      frame.compareDocumentPosition(details.element) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).not.toBe(0)
+    expect(wrapper.get('main').classes()).toContain('has-app')
+    wrapper.unmount()
+  })
+
   it('keeps the last error visible during retry and prevents duplicate checks', async () => {
     let complete!: (response: Response) => void
     const fetcher = vi

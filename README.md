@@ -2,6 +2,8 @@
 
 提交说明：[实现思路、完成程度与后续优先级](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-summary.md)。
 
+2026-10-17 **独立导出应用首屏优化已完成（本地，未推送或部署）**：连接就绪后优先展示应用画面，完整说明移到画面之后，默认收起；不折叠平台原有下载按钮。长说明在 320/768/1024/1440 px 下不会把应用推到首屏以下，展开说明不重建应用、不丢输入。独立工程前端 69 项单测、工程导出相关 57 项测试及 Chrome 外壳 18 项回归通过。已有 ZIP、JAR 和冻结构建不自动变化，新样式需重新导出或构建。此次没有调用模型；详见[SU01 验收记录](https://github.com/NigelWu95/atoms-demo/blob/main/docs/design/iteration-experience/verification.md)。
+
 2026-10-17 **真实 DeepSeek 首次生成 + 连续三轮修改及下载工程独立运行验收通过（本地）**：同一待办项目依次增加筛选、搜索、全部完成，旧任务和完成状态保留；共 8 次真实请求，未超过本轮 12 次上限。最终 ZIP 的应用源码与平台 V4 逐字节一致；下载工程完整构建、独立 Java 进程启动、实际操作、刷新和进程重启恢复、访客隔离通过，运行时未请求平台或模型 API。导出不包含平台业务数据。这里只验证一个应用样本，不代表任意需求成功率，也不等于真实错误修复已验收；未推送或部署。详见[本轮验收记录](https://github.com/NigelWu95/atoms-demo/blob/main/docs/design/iteration-experience/verification.md#2026-10-17pr03-真实模型连续修改与下载工程验收)。
 
 2026-10-17 **逐行差异、预览优先布局和确认式修复已在本地实现，尚未推送或部署**：修改记录显示增删行、行号与上下文，大文件回退全文；应用画面和两种直接展示的下载入口排在高级管理之前。当前共享预览报错后可准备修复建议、补充说明并确认，再复用原 MODIFY 流程；原始报错不自动发送，未提交草稿保持不变，不自动发布。前端 251 项单测、类型/规范/构建检查通过，修复流程四尺寸 Chrome/无障碍检查通过。真实错误修复效果仍待验收，不把受控响应测试当作模型效果。详见[验收记录](https://github.com/NigelWu95/atoms-demo/blob/main/docs/design/iteration-experience/verification.md)。
