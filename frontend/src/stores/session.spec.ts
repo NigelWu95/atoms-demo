@@ -4,10 +4,69 @@ import { api } from '../api/client'
 import { useSessionStore } from './session'
 import { useDraftStore } from './draft'
 import { useGenerationStore } from './generation'
+import { RECOVERY_KEY, writeRecovery } from '../runtime/generationRecovery'
 
 afterEach(() => {
   api.resetScope()
   vi.unstubAllGlobals()
+  vi.restoreAllMocks()
+  sessionStorage.clear()
+  localStorage.clear()
+})
+
+it('binds recovery only after authenticated initialization and clears it on invalidation', async () => {
+  setActivePinia(createPinia())
+  const identity = {
+    userId: '11111111-1111-4111-8111-111111111111',
+    isGuest: true,
+    displayName: '访客',
+  }
+  const projectId = '22222222-2222-4222-8222-222222222222'
+  writeRecovery({ ownerId: identity.userId, isGuest: true, stamp: '' }, [
+    {
+      projectId,
+      createdAt: Date.now(),
+      repairRunId: null,
+      expired: false,
+      pending: {
+        key: 'original',
+        preserveDraft: false,
+        body: {
+          prompt: '私有需求',
+          intent: 'CREATE',
+          baseVersionId: null,
+          expectedProjectRevision: 0,
+        },
+      },
+    },
+  ])
+  const session = useSessionStore()
+  const generation = useGenerationStore()
+  const binding = vi.spyOn(generation, 'bind')
+  let finish!: (value: Response) => void
+  vi.stubGlobal(
+    'fetch',
+    vi.fn((path) =>
+      path === '/api/session'
+        ? new Promise<Response>((resolve) => {
+            finish = resolve
+          })
+        : Promise.resolve(Response.json({ token: 'test', headerName: 'X-CSRF-TOKEN' })),
+    ),
+  )
+  const connecting = session.initialize()
+  await vi.waitFor(() => expect(finish).toBeDefined())
+  expect(binding).not.toHaveBeenCalled()
+  finish(Response.json(identity))
+  await connecting
+  expect(binding).toHaveBeenCalledWith(identity)
+  expect(generation.pending).toEqual({})
+  generation.activate(projectId, identity.userId)
+  expect(generation.pending[projectId]?.body.prompt).toBe('私有需求')
+  session.invalidate('已退出')
+  expect(sessionStorage.getItem(RECOVERY_KEY)).toBeNull()
+  expect(generation.pending).toEqual({})
+  generation.$dispose()
 })
 it('does not remount private views when keyboard focus returns from the preview iframe', async () => {
   setActivePinia(createPinia())

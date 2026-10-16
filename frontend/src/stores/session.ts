@@ -40,6 +40,7 @@ export const useSessionStore = defineStore('session', () => {
       .then((value) => {
         if (epoch !== revision.value) return
         identity.value = value
+        useGenerationStore().bind(value)
         state.value = 'ready'
         hasConnected.value = true
       })
@@ -54,13 +55,13 @@ export const useSessionStore = defineStore('session', () => {
     return pending
   }
   function announce() {
-    channel?.postMessage('changed')
-    // Invalidation only; never put identities, emails, codes, or cookies in browser storage.
+    // This broadcast marker contains no identity, email, code, or cookie.
     try {
       localStorage.setItem('atoms.session.changed', `${Date.now()}:${Math.random()}`)
     } catch {
       /* storage may be disabled */
     }
+    channel?.postMessage('changed')
   }
   async function transition(action: () => Promise<Identity | null>) {
     if (changing) return
@@ -83,6 +84,7 @@ export const useSessionStore = defineStore('session', () => {
       state.value = 'ready'
       hasConnected.value = true
       announce()
+      useGenerationStore().bind(value)
     } catch (failure) {
       if (epoch === revision.value) {
         if (identity.value && failure instanceof ApiFailure && [422, 429].includes(failure.status))
@@ -119,6 +121,7 @@ export const useSessionStore = defineStore('session', () => {
       await refreshCsrf()
       if (epoch !== revision.value) return
       identity.value = value
+      useGenerationStore().bind(value)
       state.value = 'ready'
       error.value = ''
     } catch (failure) {
