@@ -8,6 +8,7 @@ export type Project = {
   currentVersionId?: string | null
   createdAt: string
   updatedAt: string
+  archived?: boolean
 }
 export type ProjectPage = { items: Project[]; nextCursor: string | null }
 function decodeProject(value: unknown): Project {
@@ -38,11 +39,26 @@ function decodeProject(value: unknown): Project {
           : protocolFailure(),
     createdAt: value.createdAt,
     updatedAt: value.updatedAt,
+    archived:
+      value.archived === undefined
+        ? false
+        : typeof value.archived === 'boolean'
+          ? value.archived
+          : protocolFailure(),
   }
 }
-export function listProjects(limit = 20, cursor: string | null = null): Promise<ProjectPage> {
+export function listProjects(
+  limit = 20,
+  cursor: string | null = null,
+  options?: { q: string; sort: 'created' | 'updated'; archived: boolean },
+): Promise<ProjectPage> {
   const params = new URLSearchParams({ limit: String(limit) })
   if (cursor) params.set('cursor', cursor)
+  if (options) {
+    params.set('q', options.q)
+    params.set('sort', options.sort)
+    params.set('archived', String(options.archived))
+  }
   return api.request(`/api/projects?${params}`, (value) => {
     if (
       !isRecord(value) ||
@@ -68,5 +84,11 @@ export function renameProject(id: string, name: string): Promise<Project> {
   return api.request(`/api/projects/${encodeURIComponent(id)}`, decodeProject, {
     method: 'PATCH',
     body: { name },
+  })
+}
+export function archiveProject(id: string, archived: boolean): Promise<Project> {
+  return api.request(`/api/projects/${encodeURIComponent(id)}/archive`, decodeProject, {
+    method: archived ? 'POST' : 'DELETE',
+    body: {},
   })
 }

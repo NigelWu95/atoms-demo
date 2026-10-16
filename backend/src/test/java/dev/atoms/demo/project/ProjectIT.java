@@ -69,6 +69,29 @@ class ProjectIT {
             assertThat(owner.get("/api/projects").body().path("items")).hasSize(1);
         } finally { pool.shutdownNow(); }
     }
+    @Test void searchesLiterallySortsByRecentEditsAndArchivesWithoutDeleting() throws Exception {
+        var owner = guest();
+        String first = owner.request("POST", "/api/projects", "{\"name\":\"alpha%\"}", UUID.randomUUID().toString()).body().path("id").asText();
+        String second = owner.request("POST", "/api/projects", "{\"name\":\"beta\"}", UUID.randomUUID().toString()).body().path("id").asText();
+        owner.request("PATCH", "/api/projects/" + first, "{\"name\":\"changed%\"}", null);
+        var page = owner.get("/api/projects?sort=updated&limit=1");
+        assertThat(page.body().path("items").get(0).path("id").asText()).isEqualTo(first);
+        String cursor = URLEncoder.encode(page.body().path("nextCursor").asText(), StandardCharsets.UTF_8);
+        assertThat(owner.get("/api/projects?sort=updated&limit=1&cursor=" + cursor).body().path("items").get(0).path("id").asText()).isEqualTo(second);
+        assertThat(owner.get("/api/projects?sort=created&cursor=" + cursor).status()).isEqualTo(400);
+        assertThat(owner.get("/api/projects?q=%25").body().path("items")).hasSize(1);
+        String archive = "/api/projects/" + first + "/archive";
+        assertThat(owner.request("POST", archive, "{}", null).status()).isEqualTo(200);
+        assertThat(owner.request("POST", archive, "{}", null).body().path("archived").asBoolean()).isTrue();
+        assertThat(owner.get("/api/projects").body().path("items")).hasSize(1);
+        assertThat(owner.get("/api/projects?archived=true").body().path("items")).hasSize(1);
+        assertThat(owner.get("/api/projects/" + first).body().path("projectRevision").asLong()).isZero();
+        var stranger = guest();
+        assertThat(stranger.request("DELETE", archive, null, null).status()).isEqualTo(404);
+        assertThat(owner.request("DELETE", archive, null, null).body().path("archived").asBoolean()).isFalse();
+        assertThat(owner.get("/api/projects").body().path("items")).hasSize(2);
+        assertThat(owner.get("/api/projects?sort=bad").status()).isEqualTo(422);
+    }
     @Test
     void paginatesDeterministicallyAndValidatesBoundaries() throws Exception {
         var owner = guest();

@@ -30,8 +30,17 @@ public class ProjectController {
     }
     @GetMapping
     ProjectService.Page list(Principal principal, @RequestParam(required = false) String cursor,
-                              @RequestParam(defaultValue = "20") int limit) {
-        return projects.list(UUID.fromString(principal.getName()), cursor, limit);
+                              @RequestParam(defaultValue = "20") int limit, @RequestParam(defaultValue = "") String q,
+                              @RequestParam(defaultValue = "created") String sort, @RequestParam(defaultValue = "false") boolean archived) {
+        return projects.list(UUID.fromString(principal.getName()), cursor, limit, q, sort, archived);
+    }
+    @PostMapping("/{id}/archive")
+    Project archive(Principal principal, @PathVariable String id) {
+        return projects.archive(UUID.fromString(principal.getName()), id, true);
+    }
+    @DeleteMapping("/{id}/archive")
+    Project unarchive(Principal principal, @PathVariable String id) {
+        return projects.archive(UUID.fromString(principal.getName()), id, false);
     }
     @GetMapping("/{id}")
     Project get(Principal principal, @PathVariable String id) {
