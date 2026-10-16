@@ -125,6 +125,10 @@ test('unknown response retries same save key and preserves draft; two tabs confl
   await frame.getByRole('button', { name: '添加待办' }).click()
   await expect(frame.getByRole('button', { name: '重试保存' })).toBeVisible()
   await expect(frame.getByLabel('新待办')).toHaveValue('保留输入并重试')
+  // Center the host after the error banner shifts it; nearest-edge scrolling can clip subpixels.
+  // https://playwright.dev/docs/input#scrolling
+  await page.locator('iframe').evaluate((element) => element.scrollIntoView({ block: 'center' }))
+  await expect(page.locator('iframe')).toBeInViewport({ ratio: 1 })
   await frame.getByRole('button', { name: '重试保存' }).click()
   await expect(page.getByText('已保存到数据库', { exact: true })).toBeVisible()
   expect(keys).toHaveLength(2)
