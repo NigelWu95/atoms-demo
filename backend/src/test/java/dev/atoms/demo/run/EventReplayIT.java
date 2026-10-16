@@ -127,4 +127,20 @@ class EventReplayIT {
             assertThat(browser.get(run).body().path("status").asText()).isEqualTo("QUEUED");
         }
     }
+    @Test void logoutClosesAnAlreadyOpenStreamWithoutCancellingGeneration() throws Exception {
+        var browser = new ApiBrowser(port); String path = queued(browser);
+        var run = jdbc.queryForObject("SELECT * FROM runs WHERE id = ?", RunRepository.ROW,
+                UUID.fromString(path.substring(path.lastIndexOf('/') + 1)));
+        var response = browser.events(path + "/events?after=1", null);
+        try (var reader = new BufferedReader(new InputStreamReader(response.body(), StandardCharsets.UTF_8))) {
+            assertThat(frame(reader)).contains(":connected");
+            assertThat(browser.request("DELETE", "/api/session", null, null).status()).isEqualTo(204);
+            assertThat(frame(reader)).isEmpty();
+            assertThat(runs.get(run.ownerId(), run.id().toString()).status()).isEqualTo("QUEUED");
+        } finally {
+            // Only the test-created row: no user jobs are touched by this cleanup.
+            jdbc.update("UPDATE runs SET status = 'CANCELLED' WHERE id = ?", run.id());
+            created.remove(path);
+        }
+    }
 }
