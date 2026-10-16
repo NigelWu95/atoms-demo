@@ -3,8 +3,10 @@ import { nextTick, watch } from 'vue'
 import { RouterLink, RouterView, useRoute } from 'vue-router'
 import ServiceStatus from './components/ServiceStatus.vue'
 import SessionStatus from './components/SessionStatus.vue'
+import { useSessionStore } from './stores/session'
 
 const route = useRoute()
+const session = useSessionStore()
 watch(
   () => route.path,
   async () => {
@@ -55,7 +57,19 @@ watch(
         </div>
       </div>
     </aside>
-    <main id="main-content" class="main-content"><RouterView /></main>
+    <main id="main-content" class="main-content">
+      <RouterView
+        v-if="!session.hasConnected || session.ready || route.path === '/account'"
+        :key="route.path === '/account' ? 'account' : session.revision"
+      />
+      <section v-else class="simple-page" aria-live="polite">
+        <h1 tabindex="-1">
+          {{ session.state === 'connecting' ? '正在验证会话' : '请重新连接账号' }}
+        </h1>
+        <p>账号状态更新时，私有项目内容已隐藏。</p>
+        <p v-if="session.error" role="alert">{{ session.error }}</p>
+      </section>
+    </main>
   </div>
   <main v-else-if="route.meta.publicApp" id="main-content" class="public-app-shell">
     <RouterView />

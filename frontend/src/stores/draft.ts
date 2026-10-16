@@ -20,5 +20,10 @@ export const useDraftStore = defineStore('draft', () => {
     if (current?.prompt !== value)
       projectDrafts.value[projectId] = { prompt: value, intentKey: randomId() }
   }
-  return { prompt, projectDrafts, creationKey, attach, updateProjectPrompt }
+  function reset() {
+    prompt.value = ''
+    projectDrafts.value = {}
+    creation.value = null
+  }
+  return { prompt, projectDrafts, creationKey, attach, updateProjectPrompt, reset }
 })
