@@ -5,9 +5,27 @@ import { runLabel } from '../api/runs'
 import { useGeneration } from '../composables/useGeneration'
 import PromptComposer from './PromptComposer.vue'
 import GenerationProgress from './GenerationProgress.vue'
+import RepairConfirmation from './RepairConfirmation.vue'
+import { matchesRepair, type RepairProposal } from '../runtime/previewRepair'
+import { useSessionStore } from '../stores/session'
 
-const props = defineProps<{ project: Project; modelValue: string }>()
-const emit = defineEmits<{ 'update:modelValue': [value: string]; changed: [project: Project] }>()
+const props = defineProps<{
+  project: Project
+  modelValue: string
+  repair?: RepairProposal | null
+}>()
+const emit = defineEmits<{
+  'update:modelValue': [value: string]
+  changed: [project: Project]
+  dismissRepair: []
+}>()
+const session = useSessionStore()
+const validRepair = computed(
+  () =>
+    props.repair &&
+    session.ready &&
+    matchesRepair(props.repair, props.project, session.identity?.userId ?? null),
+)
 const {
   run,
   messages,
@@ -22,6 +40,7 @@ const {
   canSubmit,
   refresh,
   submit,
+  submitRepair,
   cancel,
   older,
 } = useGeneration(
@@ -30,6 +49,12 @@ const {
   (value) => emit('update:modelValue', value),
   (project) => emit('changed', project),
 )
+async function confirmRepair(description: string) {
+  const proposal = props.repair
+  if (!proposal || !validRepair.value) return
+  const sent = await submitRepair(proposal, description)
+  if (sent && props.repair === proposal) emit('dismissRepair')
+}
 const configuration = computed(() => {
   if (!availability.value) return '正在读取生成配置…'
   if (!availability.value.workerEnabled) return '当前服务未启用生成执行器，请联系维护者检查配置。'
@@ -63,6 +88,14 @@ const connectionLabel = computed(
     </div>
     <div class="generation-conversation">
       <p class="muted generation-config">{{ configuration }}</p>
+      <RepairConfirmation
+        v-if="repair && validRepair"
+        :proposal="repair"
+        :disabled="loading || !canSubmit"
+        :submitting="busy"
+        @confirm="confirmRepair"
+        @dismiss="emit('dismissRepair')"
+      />
       <GenerationProgress :stage="run?.stage ?? null" :status="run?.status ?? null" />
       <p v-if="connectionLabel" role="status" aria-live="polite" class="muted">
         {{ connectionLabel }}

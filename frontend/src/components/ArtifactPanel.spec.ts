@@ -6,6 +6,7 @@ import { getVersion, listVersions, restoreVersion, type Version } from '../api/a
 import { getProject, type Project } from '../api/projects'
 import { ApiFailure } from '../api/client'
 import { useSessionStore } from '../stores/session'
+import PreviewFrame from './PreviewFrame.vue'
 
 vi.mock('../api/artifacts', () => ({
   getVersion: vi.fn(),
@@ -97,6 +98,34 @@ it('prioritizes the preview while keeping downloads visible and advanced control
       .find((button) => button.text() === '预览')!
       .trigger('click')
     expect(wrapper.get('preview-frame-stub').element).toBe(frame)
+  } finally {
+    wrapper.unmount()
+  }
+})
+it('prepares repairs only from the current owned shared preview and binds its baseline', async () => {
+  const wrapper = await open()
+  try {
+    const session = useSessionStore()
+    session.identity = { userId: 'owner', displayName: 'test', isGuest: true }
+    wrapper.getComponent(PreviewFrame).vm.$emit('repair', 'SYNTAX')
+    expect(wrapper.emitted('repair')?.filter(([proposal]) => proposal)).toHaveLength(0)
+    await wrapper.get('select').setValue('v2')
+    await flushPromises()
+    wrapper.getComponent(PreviewFrame).vm.$emit('repair', 'SYNTAX')
+    expect(wrapper.emitted('repair')?.at(-1)).toEqual([
+      {
+        projectId: 'p',
+        ownerId: 'owner',
+        baseVersionId: 'v2',
+        expectedProjectRevision: 2,
+        versionNo: 2,
+        diagnosis: 'SYNTAX',
+      },
+    ])
+    session.identity = { userId: 'other', displayName: 'test', isGuest: true }
+    await flushPromises()
+    wrapper.getComponent(PreviewFrame).vm.$emit('repair', 'RUNTIME')
+    expect(wrapper.emitted('repair')?.filter(([proposal]) => proposal)).toHaveLength(1)
   } finally {
     wrapper.unmount()
   }
