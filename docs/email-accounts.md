@@ -1,6 +1,6 @@
 # QQ 邮箱验证码注册 / 登录
 
-2026-10-16，本地功能已实现；默认关闭。**尚未配置或验收真实 QQ 收信，未推送 GitHub、未部署远程服务器。** 本文 GitHub 文档链接在推送后生效。
+2026-10-16，本地功能已实现，维护者已配置启用；仓库示例仍默认关闭。**真实 QQ 发信、Outlook 收信及一次验证码登录已通过；未推送 GitHub、未部署远程服务器。** 本文 GitHub 文档链接在推送后生效。
 
 ## 功能与归属
 
@@ -58,7 +58,7 @@ server.servlet.session.cookie.name=ATOMS_HTTP_SESSION
 
 该开关默认 `false`，统一控制能力发现、发送、验证及登录后的账号请求；它不自动启用 `EMAIL_AUTH_ENABLED`，不修改 Cookie，也不放宽 CSRF、验证码、限流、归属或退出撤销。只设置发布链接的 `ALLOW_INSECURE_HTTP_PUBLIC_ORIGIN=true` 不会开放邮箱 HTTP 登录，这两个开关用途不同。本机回环开发不需要这个例外开关。
 
-当前服务器 `http://118.195.239.8:8443` 保持原样，**代码和示例已支持，但本轮没有修改实际配置、启用邮箱或部署**。对外使用前仍需配置并验收真实 QQ 收信。不要暴露 8081/5174 测试服务或放开可信代理来源。`GET /api/auth/methods` 的 `emailCodeEnabled=true` 只代表本请求的配置/传输条件允许，不代表 QQ 已连接或邮件已送达。
+当前服务器 `http://118.195.239.8:8443` 保持原样，**本地已启用并验收，远程服务器尚未配置或部署邮箱功能**。远程上线仍需单独确认、同步私有配置，并验收服务器出站 SMTP 与公网账号流程；本地通过不能代替。不要暴露 8081/5174 测试服务或放开可信代理来源。`GET /api/auth/methods` 的 `emailCodeEnabled=true` 只代表本请求的配置/传输条件允许，不代表 QQ 已连接或邮件已送达。
 
 以后改用 HTTPS 时，把 `EMAIL_AUTH_ALLOW_INSECURE_HTTP=false`、Cookie `secure=true`，并换回 HTTPS 专用 Cookie 名称，重启后重新登录；旧账号和项目不删除。仅关闭 HTTP 例外而仍通过 HTTP 访问时，已登录账号请求会被拒绝。详见 [ADR-015](https://github.com/NigelWu95/atoms-demo/blob/main/docs/decisions/015-explicit-http-email-demo.md)。
 
@@ -95,4 +95,8 @@ V013/V014 为增量表，旧项目外键和 `guest_users` 不变。验证码只�
 
 自动验收使用 `atoms_demo_test` / `atoms_test`、8081 / 5174、独立 Chrome 和测试发件器；测试码读取端点只编译到 test classpath，受测试库/角色/回环保护，生产 JAR 不包含。没有真实邮件或模型调用。测试不会重启 8080 / 5173 或改动云端。
 
-最终数量与失败修正见[本轮验收记录](https://github.com/NigelWu95/atoms-demo/blob/main/docs/design/email-accounts/verification.md)；详细契约见[规格](https://github.com/NigelWu95/atoms-demo/blob/main/SPEC-email-accounts.md)、[ADR-014](https://github.com/NigelWu95/atoms-demo/blob/main/docs/decisions/014-smtp-email-accounts.md)。测试截图/trace 为忽略提交的本地文件，可能含测试认证信息，不公开上传。真实 QQ 收信保持待验，不能用测试发件器代替。
+另经用户授权完成真实邮件验收：生产 SMTP 适配器的 TLS/认证检查通过；本地 8080 / 5173 的真实页面向指定 Outlook 邮箱只发出一次邮件（201），用户收信并自行输入验证码，验证接口返回 200，用户确认测试 OK。日常本地库增量应用 V013/V014，未删除原有项目。未读取收件箱，也未记录验证码、授权码或 HMAC 密钥。真实邮件下退出后的重新发码登录尚未复测；自动浏览器已用测试发件器覆盖该逻辑，不代表更多真实邮箱或批量投递通过。
+
+这次邮件测试启动的本地后端通过命令行临时关闭生成 Worker，未修改私有模型配置或额度、未调用模型。继续测试应用生成前需恢复日常启动方式并检查活动任务，避免把邮件测试的进程状态当作完整创作环境。
+
+最终数量与失败修正见[本轮验收记录](https://github.com/NigelWu95/atoms-demo/blob/main/docs/design/email-accounts/verification.md)；详细契约见[规格](https://github.com/NigelWu95/atoms-demo/blob/main/SPEC-email-accounts.md)、[ADR-014](https://github.com/NigelWu95/atoms-demo/blob/main/docs/decisions/014-smtp-email-accounts.md)。测试截图/trace 为忽略提交的本地文件，可能含测试认证信息，不公开上传。

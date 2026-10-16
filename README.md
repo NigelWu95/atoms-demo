@@ -2,7 +2,7 @@
 
 提交说明：[实现思路、完成程度与后续优先级](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-summary.md)。
 
-2026-10-16 本地新增 **QQ SMTP 邮箱验证码注册/登录**：新邮箱保留当前访客项目，已有邮箱跨浏览器登录原账号，支持退出和跨标签页切换。入口 `/account`；默认关闭，需维护者在私有配置中填写发信 QQ 邮箱、SMTP 授权码和独立 HMAC 密钥。真实 QQ 收信尚未验收，未推送或部署。公网默认要求 HTTPS；临时 HTTP 演示可显式设置 `EMAIL_AUTH_ALLOW_INSECURE_HTTP=true` 并配置 HTTP Cookie，流量仍未加密。见[配置与使用说明](https://github.com/NigelWu95/atoms-demo/blob/main/docs/email-accounts.md)（新文档待推送后可访问）。
+2026-10-16 本地新增 **QQ SMTP 邮箱验证码注册/登录**：新邮箱保留当前访客项目，已有邮箱跨浏览器登录原账号，支持退出和跨标签页切换。入口 `/account`；仓库默认关闭，维护者已在本地私有配置中启用。真实 QQ 向用户指定的 Outlook 邮箱发送一次验证码、用户收信并验证登录已通过（发送 201、验证 200）；未推送或部署。公网默认要求 HTTPS；临时 HTTP 演示可显式设置 `EMAIL_AUTH_ALLOW_INSECURE_HTTP=true` 并配置 HTTP Cookie，流量仍未加密。见[配置与使用说明](https://github.com/NigelWu95/atoms-demo/blob/main/docs/email-accounts.md)（新文档待推送后可访问）。
 
 Java 17 + Spring Boot + Vue 工程。已实现访客与项目持久化、代码版本与受限预览、应用数据保存，并接通 DeepSeek 网关、后台规划/构建/有限修复及普通工作台的生成与修改交互。已提交的需求、规划和任务结果会保存到数据库。**本地真实 DeepSeek 的“生成待办 → 操作保存 → 刷新恢复 → 修改生成 V2 → 筛选且保留原数据”闭环已通过**，详见下文。固定版本发布、独立应用页面和 LIVE 数据隔离已实现；云端真实 2048 生成、预览操作和保存/刷新恢复已通过，云端发布与 LIVE 闭环仍待验收。设计见 [设计目录](docs/design/README.md)，原平台进度见 [原任务清单](docs/design/tasks/todo.md)，新增独立工程与下载模块见 [模块任务清单](tasks/todo.md)。
 
