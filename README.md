@@ -2,15 +2,17 @@
 
 提交说明：[实现思路、完成程度与后续优先级](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-summary.md)。
 
-2026-10-17 **生成/修复请求的整页刷新恢复已在本地实现，未推送或部署**：同标签页暂存原请求，恢复有效期 24 小时。刷新只读取状态；点击“重试原提交”才发送原 key/body，已接受时返回同一任务，未送达时仍可能首次创建并消耗额度。身份和项目归属确认后才展示正文，账号变更清理；过期、损坏或存储不可用有明确提示，放弃本地记录不取消后台任务。最多保留 10 个项目；缓存不是加密存储，请勿输入敏感资料。真实验收及边界见 [PR04 记录](https://github.com/NigelWu95/atoms-demo/blob/main/docs/design/iteration-experience/verification.md#2026-10-17pr04-整页刷新请求恢复)，新增链接需推送后可访问。
+2026-10-17 当前程序已推送 GitHub main 并部署至 **<http://192.0.2.10:8443/>**，源码 `382a976`、发布包 `atoms-demo-<release-id>`。包含下述迭代、草稿、项目归档、请求恢复与导出模板优化；原有数据和邮箱/模型配置保留，云端构建与应用进程开关仍关闭。详细验证范围和回退见[部署记录](https://github.com/NigelWu95/atoms-demo/blob/main/docs/cloud-deployment.md)。以下本地验收不自动等同于云端模型或工程运行验收，早期带日期的部署参数只作历史记录。
 
-2026-10-17 **独立导出应用首屏优化已完成（本地，未推送或部署）**：连接就绪后优先展示应用画面，完整说明移到画面之后，默认收起；不折叠平台原有下载按钮。长说明在 320/768/1024/1440 px 下不会把应用推到首屏以下，展开说明不重建应用、不丢输入。独立工程前端 69 项单测、工程导出相关 57 项测试及 Chrome 外壳 18 项回归通过。已有 ZIP、JAR 和冻结构建不自动变化，新样式需重新导出或构建。此次没有调用模型；详见[SU01 验收记录](https://github.com/NigelWu95/atoms-demo/blob/main/docs/design/iteration-experience/verification.md)。
+2026-10-17 **生成/修复请求的整页刷新恢复已实现并部署**：同标签页暂存原请求，恢复有效期 24 小时。刷新只读取状态；点击“重试原提交”才发送原 key/body，已接受时返回同一任务，未送达时仍可能首次创建并消耗额度。身份和项目归属确认后才展示正文，账号变更清理；过期、损坏或存储不可用有明确提示，放弃本地记录不取消后台任务。最多保留 10 个项目；缓存不是加密存储，请勿输入敏感资料。真实验收及边界见 [PR04 记录](https://github.com/NigelWu95/atoms-demo/blob/main/docs/design/iteration-experience/verification.md#2026-10-17pr04-整页刷新请求恢复)。
 
-2026-10-17 **真实 DeepSeek 首次生成 + 连续三轮修改及下载工程独立运行验收通过（本地）**：同一待办项目依次增加筛选、搜索、全部完成，旧任务和完成状态保留；共 8 次真实请求，未超过本轮 12 次上限。最终 ZIP 的应用源码与平台 V4 逐字节一致；下载工程完整构建、独立 Java 进程启动、实际操作、刷新和进程重启恢复、访客隔离通过，运行时未请求平台或模型 API。导出不包含平台业务数据。这里只验证一个应用样本，不代表任意需求成功率，也不等于真实错误修复已验收；未推送或部署。详见[本轮验收记录](https://github.com/NigelWu95/atoms-demo/blob/main/docs/design/iteration-experience/verification.md#2026-10-17pr03-真实模型连续修改与下载工程验收)。
+2026-10-17 **独立导出应用首屏优化已完成，模板随包部署**：连接就绪后优先展示应用画面，完整说明移到画面之后，默认收起；不折叠平台原有下载按钮。长说明在 320/768/1024/1440 px 下不会把应用推到首屏以下，展开说明不重建应用、不丢输入。独立工程前端 69 项单测、工程导出相关 57 项测试及 Chrome 外壳 18 项回归通过。已有 ZIP、JAR 和冻结构建不自动变化，新样式需重新导出或构建。这些为本地验收，不代表服务器启用独立运行；详见[SU01 验收记录](https://github.com/NigelWu95/atoms-demo/blob/main/docs/design/iteration-experience/verification.md)。
 
-2026-10-17 **逐行差异、预览优先布局和确认式修复已在本地实现，尚未推送或部署**：修改记录显示增删行、行号与上下文，大文件回退全文；应用画面和两种直接展示的下载入口排在高级管理之前。当前共享预览报错后可准备修复建议、补充说明并确认，再复用原 MODIFY 流程；原始报错不自动发送，未提交草稿保持不变，不自动发布。前端 251 项单测、类型/规范/构建检查通过，修复流程四尺寸 Chrome/无障碍检查通过。真实错误修复效果仍待验收，不把受控响应测试当作模型效果。详见[验收记录](https://github.com/NigelWu95/atoms-demo/blob/main/docs/design/iteration-experience/verification.md)。
+2026-10-17 **真实 DeepSeek 首次生成 + 连续三轮修改及下载工程独立运行验收通过（本地）**：同一待办项目依次增加筛选、搜索、全部完成，旧任务和完成状态保留；共 8 次真实请求，未超过本轮 12 次上限。最终 ZIP 的应用源码与平台 V4 逐字节一致；下载工程完整构建、独立 Java 进程启动、实际操作、刷新和进程重启恢复、访客隔离通过，运行时未请求平台或模型 API。导出不包含平台业务数据。这里只验证一个应用样本，不代表任意需求成功率，也不等于云端模型闭环或真实错误修复已验收。详见[本轮验收记录](https://github.com/NigelWu95/atoms-demo/blob/main/docs/design/iteration-experience/verification.md#2026-10-17pr03-真实模型连续修改与下载工程验收)。
 
-2026-10-16 **连续开发与工作台优化已在本地实现，尚未推送或部署**：修改时带入当前版本谱系的有效历史需求，支持基线哈希校验的局部补丁；工作台增加真实阶段、关联需求及文件前后对比；项目草稿自动保存到服务端并检测多标签冲突；项目列表支持搜索、最近编辑排序与归档恢复。旧导出按钮继续直接展示。此次没有调用真实模型或发送真实邮件，多轮模型质量仍需另行实测。设计与验证见[迭代体验计划](https://github.com/NigelWu95/atoms-demo/blob/main/docs/design/iteration-experience/plan.md)和[验收记录](https://github.com/NigelWu95/atoms-demo/blob/main/docs/design/iteration-experience/verification.md)（新增文档链接需推送后才可访问）。以下带日期的部署条目为历史记录，不代表此次改动已上线。
+2026-10-17 **逐行差异、预览优先布局和确认式修复已实现并部署**：修改记录显示增删行、行号与上下文，大文件回退全文；应用画面和两种直接展示的下载入口排在高级管理之前。当前共享预览报错后可准备修复建议、补充说明并确认，再复用原 MODIFY 流程；原始报错不自动发送，未提交草稿保持不变，不自动发布。该阶段前端 251 项单测、类型/规范/构建检查通过，修复流程四尺寸 Chrome/无障碍检查通过。真实错误修复效果仍待验收，不把受控响应测试当作模型效果。详见[验收记录](https://github.com/NigelWu95/atoms-demo/blob/main/docs/design/iteration-experience/verification.md)。
+
+2026-10-16 **连续开发与工作台优化已实现，10 月 17 日部署**：修改时带入当前版本谱系的有效历史需求，支持基线哈希校验的局部补丁；工作台增加真实阶段、关联需求及文件前后对比；项目草稿自动保存到服务端并检测多标签冲突；项目列表支持搜索、最近编辑排序与归档恢复。旧导出按钮继续直接展示。初版验证未调用真实模型或发送真实邮件；后续真实三轮修改样本见上文。设计与验证见[迭代体验计划](https://github.com/NigelWu95/atoms-demo/blob/main/docs/design/iteration-experience/plan.md)和[验收记录](https://github.com/NigelWu95/atoms-demo/blob/main/docs/design/iteration-experience/verification.md)。
 
 2026-10-16 **QQ SMTP 邮箱验证码注册/登录已推送并部署**：[账号入口](http://192.0.2.10:8443/account)。新邮箱保留当前访客项目，已有邮箱跨浏览器登录原账号，支持退出和跨标签页切换。真实发信/收信及一次验证码登录已在本地通过；云端已通过 SMTP TLS/认证、公网页面与健康检查，云端实际收信登录仍待用户复核。邮箱及模型配置通过 SSH 写入服务器私有文件，未进入仓库；模型累计上限同步为 10000，验收时已用 39、剩余 9961。当前保留用户指定的 HTTP 演示模式，流量未加密；仓库默认仍要求公网 HTTPS。见[邮箱说明](https://github.com/NigelWu95/atoms-demo/blob/main/docs/email-accounts.md)和[部署记录](https://github.com/NigelWu95/atoms-demo/blob/main/docs/cloud-deployment.md)。
 
@@ -26,9 +28,9 @@ Java 17 + Spring Boot + Vue 工程。已实现访客与项目持久化、代码�
 
 2026-10-14 本地入口：选中当前 Vn → **“运行应用”**（复用或构建工程 → 启动本机进程 → 打开预览）→ 本机预览就绪 → **“下载预览工程 ZIP”**，取得正在运行的同一个 buildId 的冻结完整工程。预览未就绪、已停止或使用共享预览时，主下载不可用；不会改下其他构建或重新组装版本来代替。包内包含 Vue + Spring Boot 17 + PostgreSQL 源码及配置、构建和启动说明，成品不依赖平台或模型 Key。
 
-历史版本/无需构建的“导出版本源码 ZIP”直接展示，不折叠。它使用当前模板重新组装，不承诺与运行预览相同。云端 10 月 13 日的旧入口仍名为“下载工程 ZIP”，此次改动未部署。
+历史版本/无需构建的“导出版本源码 ZIP”直接展示，不折叠。它使用当前模板重新组装，不承诺与运行预览相同；该入口已部署，不要求云端开启本机构建。
 
-只携带所选源码与初始数据，不携带平台会话、对话、PREVIEW/LIVE 真实数据或密钥。生成业务代码仍受 HTML/CSS/JS 与 SDK 契约约束。平台支持固定工程的本机工作区、异步构建；2026-10-14 本地新增独立实例启停和对应 iframe 预览。详见[工程下载说明](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-export.md)与[能力地图](https://github.com/NigelWu95/atoms-demo/blob/main/CAPABILITY-MAP.md)。云端仍为 10 月 13 日版本，未更新此次实例功能；新代码及文档未推送 GitHub。云端未开启本机构建，按版本下载 ZIP 不依赖此开关。
+只携带所选源码与初始数据，不携带平台会话、对话、PREVIEW/LIVE 真实数据或密钥。生成业务代码仍受 HTML/CSS/JS 与 SDK 契约约束。平台支持固定工程的本机工作区、异步构建；2026-10-14 本地新增独立实例启停和对应 iframe 预览。详见[工程下载说明](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-export.md)与[能力地图](https://github.com/NigelWu95/atoms-demo/blob/main/CAPABILITY-MAP.md)。相关代码现已推送并随包部署，但云端构建与应用进程开关仍关闭，未配置运行库池；按版本导出 ZIP 不依赖这些开关。
 
 ## 在平台本机构建工程
 
