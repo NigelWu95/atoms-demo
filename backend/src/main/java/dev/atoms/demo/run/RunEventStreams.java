@@ -20,8 +20,8 @@ public class RunEventStreams {
     private final Set<Subscription> active = ConcurrentHashMap.newKeySet();
     public RunEventStreams(RunRepository runs) { this.runs = runs; pool.setRemoveOnCancelPolicy(true); }
 
-    SseEmitter open(Run run, long after) {
-        var subscription = new Subscription(run, after);
+    SseEmitter open(Run run, long after, java.util.function.BooleanSupplier authorized) {
+        var subscription = new Subscription(run, after, authorized);
         synchronized (active) {
             if (active.size() >= 32) throw new ApiException(429, "EVENT_STREAM_LIMIT", "进度连接已满，请稍后刷新任务状态。");
             active.add(subscription);
@@ -41,17 +41,21 @@ public class RunEventStreams {
     }
     private final class Subscription {
         final Run identity;
+        final java.util.function.BooleanSupplier authorized;
         final SseEmitter emitter = new SseEmitter(60000L);
         final AtomicBoolean closed = new AtomicBoolean();
         volatile ScheduledFuture<?> future;
         long cursor;
         long lastHeartbeat = System.nanoTime();
         boolean connected;
-        Subscription(Run run, long cursor) { this.identity = run; this.cursor = cursor; }
+        Subscription(Run run, long cursor, java.util.function.BooleanSupplier authorized) {
+            this.identity = run; this.cursor = cursor; this.authorized = authorized;
+        }
 
         void tick() {
             if (closed.get()) return;
             try {
+                if (!authorized.getAsBoolean()) { finish(); return; }
                 if (!connected) {
                     emitter.send(SseEmitter.event().comment("connected").reconnectTime(2000));
                     connected = true;
@@ -59,6 +63,7 @@ public class RunEventStreams {
                 Run snapshot = runs.get(identity.ownerId(), identity.id().toString());
                 for (var event : runs.events(snapshot, cursor)) {
                     if (closed.get()) return;
+                    if (!authorized.getAsBoolean()) { finish(); return; }
                     emitter.send(SseEmitter.event().id(Long.toString(event.seq())).name(event.type()).data(event.data()));
                     cursor = event.seq();
                 }

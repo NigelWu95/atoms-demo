@@ -21,6 +21,16 @@ class EmailAuthIT {
     @LocalServerPort int port;
     @Autowired EmailChallengeIT.Capture mail;
     @Autowired JdbcTemplate jdbc;
+    @Autowired SessionRevocations revocations;
+    @Test void rejectsRevokedButPersistedSessionsAndUnverifiedGuestContextsForAccounts() throws Exception {
+        var revoked = new ApiBrowser(port); String owner = revoked.initialize().body().path("userId").asText();
+        String sessionId = jdbc.queryForObject("SELECT session_id FROM spring_session WHERE principal_name = ?", String.class, owner);
+        revocations.revoke(sessionId); // Models a stale parallel request that saved a revoked session again.
+        assertThat(revoked.get("/api/me").status()).isEqualTo(401);
+        var unverified = new ApiBrowser(port); owner = unverified.initialize().body().path("userId").asText();
+        jdbc.update("INSERT INTO user_accounts(user_id) VALUES (?)", UUID.fromString(owner));
+        assertThat(unverified.get("/api/projects").status()).isEqualTo(401);
+    }
     @Test void registersKeepsProjectsRotatesCredentialsAndLogsBackIntoSameAccount() throws Exception {
         var browser = new ApiBrowser(port);
         var original = browser.initialize();
