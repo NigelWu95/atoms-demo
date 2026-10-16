@@ -22,21 +22,32 @@ public class GenerationWorkflow {
     public GenerationWorkflow(ObjectMapper json, ArtifactValidator validator) { this.json = json; this.validator = validator; }
 
     public JsonNode generate(String prompt, JsonNode base, Call call, Consumer<JsonNode> onPlan) {
+        return generate(prompt, base, json.createArrayNode(), call, onPlan);
+    }
+    public JsonNode generate(String prompt, JsonNode base, JsonNode history, Call call, Consumer<JsonNode> onPlan) {
         var context = json.createObjectNode().put("request", prompt);
-        if (base != null) context.set("currentArtifact", base);
+        context.set("successfulHistory", history);
+        if (base != null) {
+            context.set("currentArtifact", base);
+            context.put("baseHash", ArtifactPatch.hash(base));
+        }
         JsonNode plan = parse(call.invoke("PLANNING", planner, context.toString()).content());
         validatePlan(plan); onPlan.accept(plan); context.set("plan", plan);
         String output = call.invoke("BUILDING", builder, context.toString()).content();
-        try { return artifact(output); }
+        try { return artifact(output, base); }
         catch (ApiException | ModelException invalid) {
             // One bounded repair for an actual contract failure, never for auth, rate or transport errors.
             context.put("previousOutput", output).put("validationError", invalid.getMessage());
             String repaired = call.invoke("REPAIRING", builder, context.toString()).content();
-            try { return artifact(repaired); }
+            try { return artifact(repaired, base); }
             catch (ApiException | ModelException again) { throw new ModelException("INVALID_ARTIFACT", "模型产物一次修复后仍未通过校验，旧版本保持不变。"); }
         }
     }
-    private JsonNode artifact(String output) { JsonNode value = parse(output); validator.parse(value); return value; }
+    private JsonNode artifact(String output, JsonNode base) {
+        JsonNode value = parse(output);
+        if (value != null && value.has("format")) return new ArtifactPatch(validator).apply(base, value);
+        validator.parse(value); return value;
+    }
     private JsonNode parse(String output) {
         if (output == null || output.getBytes(StandardCharsets.UTF_8).length > 512 * 1024) throw invalid("输出为空或超过 512 KiB");
         try { return json.reader().with(DeserializationFeature.FAIL_ON_TRAILING_TOKENS).readTree(output); }

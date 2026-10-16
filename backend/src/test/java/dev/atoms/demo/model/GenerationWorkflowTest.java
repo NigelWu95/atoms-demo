@@ -11,6 +11,21 @@ class GenerationWorkflowTest {
     private final ObjectMapper json = new ObjectMapper();
     private final String plan = "{\"title\":\"待办\",\"goal\":\"记录任务\",\"features\":[\"新增\"],\"preserve\":[],\"steps\":[\"实现\"],\"dataNeeded\":true}";
     private final String source = "{\"formatVersion\":1,\"manifest\":{\"title\":\"待办\",\"summary\":\"测试替身，不是真实模型\",\"runtime\":\"web-static-v1\",\"stateSchemaVersion\":1,\"initialState\":{}},\"files\":{\"view.html\":\"<main>待办</main>\",\"styles.css\":\"\",\"main.js\":\"Atoms.ready(async (sdk) => { await sdk.storage.get(); });\"}}";
+    @Test void modificationUsesBoundedHistoryAndPatchWhileReturningAFullSnapshot() throws Exception {
+        var workflow = new GenerationWorkflow(json, new ArtifactValidator());
+        var base = json.readTree(source);
+        var history = json.createArrayNode().addObject().put("request", "保留已有需求");
+        var result = workflow.generate("标题变更", base, history, (stage, system, user) -> {
+            assertThat(user).contains("successfulHistory", "保留已有需求", "baseHash");
+            if (stage.equals("PLANNING")) return new ModelGateway.Answer(plan, null);
+            var patch = json.createObjectNode().put("format", "artifact-patch-v1").put("baseHash", ArtifactPatch.hash(base));
+            patch.putArray("edits").addObject().put("file", "view.html").put("before", "待办").put("after", "新待办");
+            return new ModelGateway.Answer(patch.toString(), null);
+        }, ignored -> {});
+        assertThat(result.path("files").path("view.html").asText()).isEqualTo("<main>新待办</main>");
+        assertThat(result.path("files").size()).isEqualTo(3);
+        assertThat(base.path("files").path("view.html").asText()).isEqualTo("<main>待办</main>");
+    }
     @Test void plansBuildsAndRepairsOnlyOnceWithoutBusinessData() throws Exception {
         var workflow = new GenerationWorkflow(json, new ArtifactValidator());
         var stages = new ArrayList<String>(); var plans = new ArrayList<String>();
