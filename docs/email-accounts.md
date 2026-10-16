@@ -44,9 +44,23 @@ QQ 参数为 `smtp.qq.com:465`，隐式 TLS；发件地址固定为认证邮箱�
 
 ## 公网注意
 
-发信不要求平台有域名，但**账号登录的公网访问必须使用 HTTPS 和 Secure Cookie**；SMTP TLS 不能保护浏览器到平台这段流量。代码拒绝非回环 HTTP 的发码/验证，也不允许已认证账号通过明文 HTTP 访问私有数据。
+发信不要求平台有域名，公网账号登录**默认要求 HTTPS 和 Secure Cookie**。没有域名且暂时只能使用 HTTP 时，支持维护者显式开启临时演示模式。它只是放开协议限制，**不会加密验证码、Cookie 或项目数据，也不能防止网络窃听、篡改和账号冒用**；不适合正式账号服务。QQ SMTP 仍使用 TLS，不能代替网站 HTTPS。
 
-当前服务器 `http://118.195.239.8:8443` 保持原样，本轮没有启用邮箱或修改部署。将来上线需另行准备可信 HTTPS、正确的可信代理配置及安全 Cookie；不要关闭校验或向公网暴露 8081/5174 测试服务。`GET /api/auth/methods` 的 `emailCodeEnabled=true` 只代表本请求的配置/传输条件允许，不代表 QQ 已连接或邮件已送达。
+在服务器**已有的私有配置**中保留上面的 QQ 发信配置，追加/更新下列项，然后重启后端（不要覆盖数据库/模型配置）：
+
+```properties
+EMAIL_AUTH_ALLOW_INSECURE_HTTP=true
+server.servlet.session.cookie.secure=false
+server.servlet.session.cookie.name=ATOMS_HTTP_SESSION
+```
+
+若用 systemd 环境变量配置 Cookie，对应为 `SERVER_SERVLET_SESSION_COOKIE_SECURE=false` 与 `SERVER_SERVLET_SESSION_COOKIE_NAME=ATOMS_HTTP_SESSION`。环境变量优先级高于配置文件；两处不要留冲突值。已有 HTTP 部署若已使用上述 Cookie 名称则保留，避免无必要地切换访客会话。
+
+该开关默认 `false`，统一控制能力发现、发送、验证及登录后的账号请求；它不自动启用 `EMAIL_AUTH_ENABLED`，不修改 Cookie，也不放宽 CSRF、验证码、限流、归属或退出撤销。只设置发布链接的 `ALLOW_INSECURE_HTTP_PUBLIC_ORIGIN=true` 不会开放邮箱 HTTP 登录，这两个开关用途不同。本机回环开发不需要这个例外开关。
+
+当前服务器 `http://118.195.239.8:8443` 保持原样，**代码和示例已支持，但本轮没有修改实际配置、启用邮箱或部署**。对外使用前仍需配置并验收真实 QQ 收信。不要暴露 8081/5174 测试服务或放开可信代理来源。`GET /api/auth/methods` 的 `emailCodeEnabled=true` 只代表本请求的配置/传输条件允许，不代表 QQ 已连接或邮件已送达。
+
+以后改用 HTTPS 时，把 `EMAIL_AUTH_ALLOW_INSECURE_HTTP=false`、Cookie `secure=true`，并换回 HTTPS 专用 Cookie 名称，重启后重新登录；旧账号和项目不删除。仅关闭 HTTP 例外而仍通过 HTTP 访问时，已登录账号请求会被拒绝。详见 [ADR-015](https://github.com/NigelWu95/atoms-demo/blob/main/docs/decisions/015-explicit-http-email-demo.md)。
 
 ## 限制与故障排查
 
@@ -63,7 +77,7 @@ QQ 参数为 `smtp.qq.com:465`，隐式 TLS；发件地址固定为认证邮箱�
 这是平台防滥用预算，不是 QQ 配额，不影响 DeepSeek 调用次数。验证尝试（包括成功尝试）另有限制：每会话/邮箱 10 次、每来源 IP 50 次 / 固定 15 分钟。429 带 `Retry-After`；页面据此等待，不自动重发。固定窗口在边界可能突发，个人邮箱不适合作大规模验证码通道。
 
 - `EMAIL_AUTH_UNAVAILABLE`：后端未启用，检查私有配置及启动进程加载的文件。
-- `EMAIL_AUTH_SECURE_TRANSPORT_REQUIRED`：使用 HTTPS；本机回环开发例外。
+- `EMAIL_AUTH_SECURE_TRANSPORT_REQUIRED`：默认模式下使用 HTTPS；本机回环开发例外。临时公网 HTTP 演示需维护者按上文显式配置，不接受浏览器传入的开关。
 - `EMAIL_DELIVERY_UNCONFIRMED`：认证、连接、拒收或超时，可能邮件已到但服务器无法确认。检查授权码是否有效、出站 465、防火墙及供应商限制；稍后重新获取，不使用失败请求的旧邮件。
 - `EMAIL_CODE_INVALID`：过期、错误、耗尽次数、已使用，或在不同浏览器验证；仅在发起页面使用该验证码。发送成功后刷新页面需要重新申请。
 - `ACCOUNT_ALREADY_SIGNED_IN`：先退出当前账号，首版不支持绑定另一个邮箱。

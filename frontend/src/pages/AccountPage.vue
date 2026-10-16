@@ -160,7 +160,8 @@ onBeforeUnmount(() => {
         <template v-else-if="enabled === false">
           <h2>邮箱登录暂未开放</h2>
           <p>
-            管理员需要先配置发信邮箱。公网访问还需要 HTTPS；本机开发可使用 localhost 或 127.0.0.1。
+            管理员需要配置发信邮箱和站点访问方式。公网默认使用 HTTPS；临时 HTTP
+            演示需由管理员显式开启，传输不加密。
           </p>
           <p>你仍可以用访客身份创作，当前浏览器的项目会保存在服务端。</p>
           <RouterLink to="/" class="button primary">继续访客创作</RouterLink>
