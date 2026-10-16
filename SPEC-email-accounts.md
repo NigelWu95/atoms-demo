@@ -78,7 +78,7 @@
 
 退出/切换清空前端项目、对话、版本、预览、草稿和未知提交状态，停止旧轮询/SSE，并使迟到响应不能覆盖新身份。跨标签页与页面恢复时重新确认身份；已开启 SSE 要在会话失效后停止该会话的推送，后台任务不取消。
 
-注册认证响应 `no-store`；Cookie 保持 HttpOnly、SameSite=Lax。本机回环可以 HTTP 测试；公网需 HTTPS 和 Secure Cookie。本轮不修改现有 HTTP 服务器，不把 SMTP TLS 等同于网站 TLS。
+注册认证响应 `no-store`；Cookie 保持 HttpOnly、SameSite=Lax。本机回环可以 HTTP 测试；公网默认要求 HTTPS 和 Secure Cookie。用户明确要求暂用公网 HTTP 演示，新增默认关闭的 `EMAIL_AUTH_ALLOW_INSECURE_HTTP=false`：显式开启后，认证能力发现、发码、验证和已登录账号请求统一允许 HTTP；仍保留所有验证码、CSRF、归属、会话撤销和预算检查。HTTP 部署还需维护者显式配置非 Secure Cookie，不自动降低 Cookie 或 SMTP TLS 安全设置。此模式不能防止网络窃听或篡改，不适合正式账号服务；本轮不修改现有服务器。
 
 日志只记 requestId、耗时及有限结果码，不打印邮箱、验证码、摘要、授权码、SMTP 原始异常或邮件正文，关闭邮件协议 debug。凭据和个人数据不进入模型上下文、下载工程或浏览器存储。
 
@@ -92,6 +92,7 @@ QQ 邮箱网页端：设置 → 账号与安全 → 安全设置，开启 POP3/I
 
 ```properties
 EMAIL_AUTH_ENABLED=false
+EMAIL_AUTH_ALLOW_INSECURE_HTTP=false
 SMTP_HOST=smtp.qq.com
 SMTP_PORT=465
 SMTP_USERNAME=
@@ -157,7 +158,7 @@ git diff --check
 - 另行确认：超范围依赖/权限、邮箱控制台操作、配置真实授权码、真实邮件收件对象、日常服务重启、公网部署、GitHub 推送和生产迁移。
 - 禁止：SMTP 配置或密钥上传、绕过证书验证、收件人任意批量发送、账号自动合并、模板暗带认证配置、删除现有项目/工程数据。
 
-免密码注册登录及默认防滥用预算已获用户确认。待用户准备：已开启 SMTP 的发信邮箱、授权码及独立 HMAC 密钥（仅本地填写）；不阻止代码和替身验收，阻止真实收信验收。公网 HTTPS 仍是对外启用账号能力前的独立待办。
+免密码注册登录及默认防滥用预算已获用户确认。待用户准备：已开启 SMTP 的发信邮箱、授权码及独立 HMAC 密钥（仅本地填写）；不阻止代码和替身验收，阻止真实收信验收。用户选择暂用 HTTP 演示，正式账号服务的公网 HTTPS 仍为独立待办。
 
 ## 官方依据
 

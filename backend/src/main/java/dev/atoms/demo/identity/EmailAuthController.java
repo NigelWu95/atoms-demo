@@ -27,11 +27,11 @@ public class EmailAuthController {
         this.settings = settings; this.emails = emails; this.sessions = sessions; this.identities = identities; this.json = json;
     }
     @GetMapping("/api/auth/methods")
-    Map<String, Boolean> methods(HttpServletRequest request) { return Map.of("emailCodeEnabled", settings.enabled() && secure(request)); }
+    Map<String, Boolean> methods(HttpServletRequest request) { return Map.of("emailCodeEnabled", settings.enabled() && allowsTransport(request, settings)); }
 
     @PostMapping(value = "/api/auth/email/challenges", consumes = "application/json")
     ResponseEntity<EmailAuthService.Challenge> send(Principal principal, HttpServletRequest request) {
-        requireSecure(request); JsonNode body = body(request, Set.of("email"));
+        requireTransport(request); JsonNode body = body(request, Set.of("email"));
         long started = System.nanoTime();
         try {
             var sent = emails.send(UUID.fromString(principal.getName()), request.getSession().getId(), request.getRemoteAddr(), body.path("email").asText());
@@ -41,7 +41,7 @@ public class EmailAuthController {
     }
     @PostMapping(value = "/api/auth/email/verifications", consumes = "application/json")
     GuestIdentityService.Identity verify(Principal principal, HttpServletRequest request, HttpServletResponse response) {
-        requireSecure(request); JsonNode body = body(request, Set.of("challengeId", "code"));
+        requireTransport(request); JsonNode body = body(request, Set.of("challengeId", "code"));
         UUID challenge;
         try {
             String raw = body.path("challengeId").asText(); challenge = UUID.fromString(raw);
@@ -78,12 +78,14 @@ public class EmailAuthController {
         } catch (IOException invalid) { throw invalid(); }
     }
     private static ApiException invalid() { return new ApiException(422, "INVALID_INPUT", "认证请求字段无效。"); }
-    static boolean secure(HttpServletRequest request) {
+    static boolean allowsTransport(HttpServletRequest request, EmailAuthSettings settings) {
         Set<String> loopback = Set.of("localhost", "127.0.0.1", "::1", "[::1]", "0:0:0:0:0:0:0:1");
-        return request.isSecure() || (loopback.contains(request.getServerName()) && loopback.contains(request.getRemoteAddr()));
+        // Explicit demo opt-in only; it does not encrypt HTTP or change SMTP/cookie settings.
+        return settings.allowInsecureHttp() || request.isSecure()
+                || (loopback.contains(request.getServerName()) && loopback.contains(request.getRemoteAddr()));
     }
-    private static void requireSecure(HttpServletRequest request) {
-        if (!secure(request)) throw new ApiException(503, "EMAIL_AUTH_SECURE_TRANSPORT_REQUIRED", "请通过 HTTPS 使用邮箱注册登录。");
+    private void requireTransport(HttpServletRequest request) {
+        if (!allowsTransport(request, settings)) throw new ApiException(503, "EMAIL_AUTH_SECURE_TRANSPORT_REQUIRED", "请通过 HTTPS 使用邮箱注册登录。");
     }
     private static void event(HttpServletRequest request, String event, String result, long started) {
         LoggerFactory.getLogger(EmailAuthController.class).info("event={} entryPoint=http requestId={} result={} durationMs={}",

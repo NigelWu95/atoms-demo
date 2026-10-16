@@ -15,7 +15,10 @@ import org.springframework.web.filter.OncePerRequestFilter;
 final class SessionAccessFilter extends OncePerRequestFilter {
     private final SessionAccess access;
     private final ObjectMapper json;
-    SessionAccessFilter(SessionAccess access, ObjectMapper json) { this.access = access; this.json = json; }
+    private final EmailAuthSettings settings;
+    SessionAccessFilter(SessionAccess access, ObjectMapper json, EmailAuthSettings settings) {
+        this.access = access; this.json = json; this.settings = settings;
+    }
     @Override protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
         var auth = SecurityContextHolder.getContext().getAuthentication();
@@ -27,7 +30,7 @@ final class SessionAccessFilter extends OncePerRequestFilter {
                 reject(request, response, 503, "SESSION_UNAVAILABLE", "暂时无法验证会话，请稍后重试。"); return;
             }
             boolean user = auth.getAuthorities().stream().anyMatch(role -> role.getAuthority().equals("ROLE_USER"));
-            if (!valid || (user && !EmailAuthController.secure(request))) {
+            if (!valid || (user && !EmailAuthController.allowsTransport(request, settings))) {
                 SecurityContextHolder.clearContext();
                 if (session != null) session.invalidate();
                 reject(request, response, 401, "SESSION_REQUIRED", "会话已失效，请重新连接并登录。"); return;

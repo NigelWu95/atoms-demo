@@ -16,8 +16,11 @@
 - [x] C2 全栈检查点：后台 verify、前端类型/静态/单元/构建。
 - [x] E11 浏览器与 SMTP 适配测试：测试专用 sender、真实 Chrome、账户重登/归属/退出/axe；现有隔离回归；不包含真实 QQ 收信。
 - [x] E12 配置及交付文档：私有配置口子、QQ 操作、限制、证据、回退；diff 检查/代码审查。
+- [x] E13 临时公网 HTTP：显式开关、完整登录会话链、默认拒绝与防护回归、配置及风险说明；不自动部署。
 - [ ] 真实 QQ 收信：用户本地配置后由受控收件邮箱验收，不以替身冒充。
 
 ## 验证记录
 
-后端最终 131 单元 + 95 集成通过；前端最终 208 单元及 typecheck / lint / format:check / build 通过。焦点回归修复后，基础 Chrome 16 项与运行时 Chrome 33 项全部通过。详细结果、失败修正及未验收边界见[验收记录](https://github.com/NigelWu95/atoms-demo/blob/main/docs/design/email-accounts/verification.md)（待推送后可访问）。
+E01–E12 验收：后端 131 单元 + 95 集成通过；前端 208 单元及 typecheck / lint / format:check / build 通过。焦点回归修复后，基础 Chrome 16 项与运行时 Chrome 33 项全部通过。
+
+E13 HTTP 补充验收：后端完整 134 单元 + 96 集成通过；前端上述检查及 208 单元重新通过，邮箱 Chrome 2 项回归通过。详细结果、失败修正及未验收边界见[验收记录](https://github.com/NigelWu95/atoms-demo/blob/main/docs/design/email-accounts/verification.md)（待推送后可访问）。
