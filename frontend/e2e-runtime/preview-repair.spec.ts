@@ -61,6 +61,10 @@ test('repair requires consent, preserves the draft and retries only the original
     expectedProjectRevision: 2,
   })
   await expect(draft).toHaveValue('未提交的需求必须保留')
+  await page.reload()
+  await expect(page.getByRole('button', { name: '重试原提交' })).toBeEnabled()
+  await expect(draft).toHaveValue('未提交的需求必须保留')
+  expect(submissions).toHaveLength(1)
   await page.getByRole('button', { name: '重试原提交' }).click()
   await expect(page.getByRole('button', { name: '重试原提交' })).toHaveCount(0)
   expect(submissions).toHaveLength(2)
