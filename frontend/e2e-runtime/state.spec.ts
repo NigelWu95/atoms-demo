@@ -93,7 +93,7 @@ test('todo adds, completes, survives reload and shows real source in a private w
   try {
     const other = await stranger.newPage()
     await other.goto(`http://127.0.0.1:5174${href}`)
-    await expect(other.getByRole('alert')).toContainText('项目不存在或当前访客无权访问')
+    await expect(other.getByRole('alert')).toContainText('项目不存在或当前身份无权访问')
     await expect(other.locator('iframe')).toHaveCount(0)
   } finally {
     await stranger.close()

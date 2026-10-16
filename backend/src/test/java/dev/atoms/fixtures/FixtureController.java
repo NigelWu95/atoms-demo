@@ -33,7 +33,7 @@ public class FixtureController {
     ResponseEntity<JsonNode> create(Principal principal, @RequestBody JsonNode input,
                                     @RequestHeader(value = "Idempotency-Key", required = false) String key) {
         if (!input.isObject() || input.size() != 1 || !input.path("fixture").isTextual()
-                || !Set.of("counter", "closing-tags", "security", "history", "todo", "todo-history").contains(input.path("fixture").asText())) {
+                || !Set.of("counter", "closing-tags", "security", "history", "todo", "todo-history", "todo-review").contains(input.path("fixture").asText())) {
             throw new ApiException(422, "INVALID_FIXTURE", "仅允许固定的测试产物，不能提交任意源码。");
         }
         String fixture = input.path("fixture").asText();
@@ -42,7 +42,13 @@ public class FixtureController {
             var project = projects.create(owner, "测试产物 · " + fixture);
             var source = source(fixture);
             var first = artifacts.save(owner, project.id().toString(), 0, null, source);
-            var current = fixture.endsWith("history") ? artifacts.save(owner, project.id().toString(), 1, first.id(), source) : first;
+            var nextSource = source.deepCopy();
+            if (fixture.equals("todo-review")) {
+                ((com.fasterxml.jackson.databind.node.ObjectNode) nextSource.path("files")).put("styles.css",
+                        nextSource.path("files").path("styles.css").asText() + "\n/* V2 review fixture */\nh1{letter-spacing:.01em}");
+            }
+            var current = fixture.endsWith("history") || fixture.equals("todo-review")
+                    ? artifacts.save(owner, project.id().toString(), 1, first.id(), nextSource) : first;
             return new IdempotencyService.Result(201, json.valueToTree(Map.of("project", projects.get(owner, project.id().toString()),
                     "version", current, "firstVersionId", first.id(), "testOnly", true)));
         });

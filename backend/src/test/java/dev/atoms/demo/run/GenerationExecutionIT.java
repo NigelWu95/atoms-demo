@@ -38,6 +38,7 @@ class GenerationExecutionIT {
         final AtomicInteger calls = new AtomicInteger();
         boolean fail;
         Runnable duringBuild = () -> {};
+        java.util.function.Function<String, String> buildOutput;
         public boolean configured() { return true; }
         public Answer complete(String system, String user, BooleanSupplier cancelled) {
             calls.incrementAndGet();
@@ -47,13 +48,14 @@ class GenerationExecutionIT {
             else {
                 duringBuild.run();
                 content = "{\"formatVersion\":1,\"manifest\":{\"title\":\"测试应用\",\"summary\":\"仅集成测试替身\",\"runtime\":\"web-static-v1\",\"stateSchemaVersion\":1,\"initialState\":{\"count\":0}},\"files\":{\"view.html\":\"<main>测试应用</main>\",\"styles.css\":\"\",\"main.js\":\"Atoms.ready(async (sdk) => { await sdk.storage.get(); });\"}}";
+                if (buildOutput != null) content = buildOutput.apply(user);
             }
             return new Answer(content, new Usage(10L, 20L, 30L));
         }
     }
     record Setup(ApiBrowser browser, UUID owner, String project) {}
     Setup setup() throws Exception {
-        model.fail = false; model.duringBuild = () -> {};
+        model.fail = false; model.duringBuild = () -> {}; model.buildOutput = null;
         var browser = new ApiBrowser(port); UUID owner = UUID.fromString(browser.initialize().body().path("userId").asText());
         String project = browser.request("POST", "/api/projects", "{\"name\":\"工作流集成测试\"}", UUID.randomUUID().toString()).body().path("id").asText();
         return new Setup(browser, owner, project);
@@ -87,6 +89,59 @@ class GenerationExecutionIT {
         assertThat(s.browser.get("/api/projects/" + s.project + "/preview-state?versionId=" + changed.resultVersionId()).body().path("value").path("count").asInt()).isEqualTo(7);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM model_calls WHERE run_id = ? AND status = 'SUCCEEDED'", Integer.class, first.id())).isEqualTo(2);
         assertThat(runs.messages(s.owner, s.project, null, 20).items()).hasSize(6);
+    }
+    @Test void threePatchIterationsKeepFullSnapshotsStateAndFailedPatchDoesNotAdvanceVersion() throws Exception {
+        var s = setup();
+        Run first = enqueue(s, null, 0); worker.process(first);
+        UUID current = runs.get(s.owner, first.id().toString()).resultVersionId();
+        String api = "/api/projects/" + s.project;
+        var state = json.createObjectNode().put("loadedVersionId", current.toString())
+                .put("expectedRevision", 0).put("stateSchemaVersion", 1);
+        state.putObject("value").put("count", 73);
+        assertThat(s.browser.request("PUT", api + "/preview-state", state.toString(), "state").status()).isEqualTo(200);
+        var original = artifacts.get(s.owner, s.project, current.toString()).artifact();
+        for (int iteration = 1; iteration <= 3; iteration++) {
+            int step = iteration;
+            model.buildOutput = user -> {
+                try {
+                    var context = json.readTree(user);
+                    assertThat(context.path("successfulHistory")).hasSize(step);
+                    assertThat(context.path("currentArtifact").path("manifest").path("initialState").path("count").asInt()).isZero();
+                    var patch = json.createObjectNode().put("format", "artifact-patch-v1")
+                            .put("baseHash", context.path("baseHash").asText());
+                    patch.putArray("edits").addObject().put("file", "view.html")
+                            .put("before", "</main>").put("after", "<p>第" + step + "轮新增</p></main>");
+                    return patch.toString();
+                } catch (java.io.IOException failure) { throw new AssertionError(failure); }
+            };
+            Run modifying = enqueue(s, current, iteration); worker.process(modifying);
+            Run result = runs.get(s.owner, modifying.id().toString());
+            assertThat(result.status()).isEqualTo("SUCCEEDED");
+            var version = artifacts.get(s.owner, s.project, result.resultVersionId().toString());
+            assertThat(version.basedOnId()).isEqualTo(current);
+            assertThat(version.versionNo()).isEqualTo(iteration + 1);
+            assertThat(version.artifact().files()).hasSize(3);
+            assertThat(version.artifact().files().get("main.js")).isEqualTo(original.files().get("main.js"));
+            for (int preserved = 1; preserved <= iteration; preserved++)
+                assertThat(version.artifact().files().get("view.html")).contains("第" + preserved + "轮新增");
+            current = result.resultVersionId();
+            assertThat(s.browser.get(api + "/preview-state?versionId=" + current).body().path("value").path("count").asInt()).isEqualTo(73);
+            var review = s.browser.get(api + "/versions/" + current + "/review");
+            assertThat(review.status()).isEqualTo(200);
+            assertThat(review.body().path("changes")).hasSize(1);
+            assertThat(review.body().path("request").asText()).isEqualTo("创建或修改测试应用");
+            var document = s.browser.document(api + "/versions/" + current + "/document?previewMode=CURRENT");
+            assertThat(document.statusCode()).isEqualTo(200);
+            assertThat(document.body()).contains("第" + iteration + "轮新增");
+        }
+        int before = model.calls.get();
+        model.buildOutput = ignored -> "{\"format\":\"artifact-patch-v1\",\"baseHash\":\"wrong\",\"edits\":[]}";
+        Run invalid = enqueue(s, current, 4); worker.process(invalid);
+        assertThat(runs.get(s.owner, invalid.id().toString()).errorCode()).isEqualTo("INVALID_ARTIFACT");
+        assertThat(model.calls.get() - before).isEqualTo(3);
+        assertThat(artifacts.list(s.owner, s.project, null, 20).items()).hasSize(4);
+        assertThat(s.browser.get(api).body().path("currentVersionId").asText()).isEqualTo(current.toString());
+        assertThat(s.browser.get(api + "/preview-state?versionId=" + current).body().path("value").path("count").asInt()).isEqualTo(73);
     }
     @Test void cancellationDuringProviderCallPreventsLateVersionCommit() throws Exception {
         var s = setup(); Run run = enqueue(s, null, 0);

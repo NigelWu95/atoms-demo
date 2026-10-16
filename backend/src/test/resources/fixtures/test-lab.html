@@ -9,7 +9,7 @@
 <h1>运行文档测试台</h1>
 <p>这里只装载固定的手工测试产物，不是 AI 生成。数据写入 atoms_demo_test 专用测试库；不会替换正式项目。计数只在当前页面内有效，刷新会归零。</p>
 <label for="fixture">测试产物</label>
-<select id="fixture"><option value="counter">交互计数器</option><option value="todo">持久化待办（工作台）</option><option value="todo-history">待办历史只读（工作台）</option><option value="closing-tags">闭合标签转义</option><option value="security">隔离与资源拦截</option><option value="history">历史版本</option></select>
+<select id="fixture"><option value="counter">交互计数器</option><option value="todo">持久化待办（工作台）</option><option value="todo-history">待办历史只读（工作台）</option><option value="todo-review">待办版本差异（工作台）</option><option value="closing-tags">闭合标签转义</option><option value="security">隔离与资源拦截</option><option value="history">历史版本</option></select>
 <button id="create" type="button">装载测试产物</button>
 <p id="status" role="status" aria-live="polite">准备建立独立测试访客会话。</p>
 <p id="error" role="alert"></p>
