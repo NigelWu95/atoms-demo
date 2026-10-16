@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onBeforeUnmount, ref } from 'vue'
+import { computed, onMounted, onBeforeUnmount, ref } from 'vue'
 import type { Version } from '../api/artifacts'
 import type { BridgeStatus } from '../runtime/bridge'
 import { mountFrame } from '../runtime/mountFrame'
@@ -7,13 +7,16 @@ import { createPreviewContext, type PreviewMode } from '../runtime/previewContex
 import { validateScript } from '../runtime/validateScript'
 import type { Observation } from '../api/previewReports'
 import PreviewChecks from './PreviewChecks.vue'
+import { diagnosePreview, type PreviewDiagnosis } from '../runtime/previewRepair'
 
 // The parent keys this component by project/version/mode; a reload replaces the iframe entirely.
-const props = defineProps<{ version: Version; mode: PreviewMode }>()
+const props = defineProps<{ version: Version; mode: PreviewMode; repairable?: boolean }>()
+const emit = defineEmits<{ repair: [diagnosis: PreviewDiagnosis] }>()
 const container = ref<HTMLDivElement | null>(null)
 const status = ref<BridgeStatus>('connecting')
 const message = ref('正在加载预览…')
 const observation = ref<Observation>({ status: 'UNKNOWN', checks: [], errors: [] })
+const diagnosis = computed(() => diagnosePreview(observation.value))
 let cleanup: (() => void) | undefined
 let revision = 0
 function reload() {
@@ -97,5 +100,16 @@ onBeforeUnmount(() => {
       :observation="observation"
       :read-only="mode === 'HISTORY'"
     />
+    <div v-if="repairable && mode === 'CURRENT' && diagnosis" class="runtime-controls">
+      <button
+        type="button"
+        class="button secondary"
+        data-action="prepare-repair"
+        @click="emit('repair', diagnosis)"
+      >
+        准备修复建议
+      </button>
+      <span class="muted">先查看内容，确认后才请求模型；不会自动发布。</span>
+    </div>
   </div>
 </template>
