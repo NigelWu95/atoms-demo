@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { randomId } from '../runtime/randomId'
 
-// Unsubmitted drafts are memory-only; submitted messages live on the server. Never store credentials here.
+// In-memory edit buffer; workbench project drafts are synchronized by useProjectDraft. Never store credentials here.
 export const useDraftStore = defineStore('draft', () => {
   const prompt = ref('')
   const projectDrafts = ref<Record<string, { prompt: string; intentKey: string }>>({})

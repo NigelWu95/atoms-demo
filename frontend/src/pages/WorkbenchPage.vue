@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { onBeforeRouteLeave, onBeforeRouteUpdate, useRoute } from 'vue-router'
 import PromptComposer from '../components/PromptComposer.vue'
 import { useDraftStore } from '../stores/draft'
 import { useSessionStore } from '../stores/session'
@@ -10,6 +10,7 @@ import ProjectHeading from '../components/ProjectHeading.vue'
 import ArtifactPanel from '../components/ArtifactPanel.vue'
 import ConversationPanel from '../components/ConversationPanel.vue'
 import PublicationPanel from '../components/PublicationPanel.vue'
+import { useProjectDraft } from '../composables/useProjectDraft'
 
 const draft = useDraftStore()
 const session = useSessionStore()
@@ -27,6 +28,35 @@ const prompt = computed({
     else draft.prompt = value
   },
 })
+const autosave = useProjectDraft(
+  () =>
+    session.ready && project.value?.ownerId === session.identity?.userId ? project.value : null,
+  prompt,
+  () => !!(projectId.value && draft.projectDrafts[projectId.value]),
+)
+function canLeave() {
+  return (
+    !autosave.dirty.value || window.confirm('草稿尚未确认保存，离开可能丢失当前输入。仍要离开吗？')
+  )
+}
+onBeforeRouteLeave(canLeave)
+onBeforeRouteUpdate(canLeave)
+async function reloadDraft() {
+  if (window.confirm('重新读取会替换当前输入。请先复制需要保留的内容，确定继续吗？'))
+    await autosave.reload()
+}
+const draftStatus = computed(
+  () =>
+    ({
+      idle: '',
+      loading: '正在读取草稿…',
+      saved: '草稿已保存',
+      dirty: '草稿待保存…',
+      saving: '正在保存草稿…',
+      error: '草稿尚未确认保存',
+      conflict: '草稿存在冲突',
+    })[autosave.status.value],
+)
 async function loadProject() {
   const request = ++requestRevision
   project.value = null
@@ -87,8 +117,30 @@ const panel = ref<'conversation' | 'preview'>('conversation')
     </header>
     <p class="workbench-notice">
       {{ project ? '项目名称已保存到数据库。' : '这是尚未保存的需求草稿。' }}
-      已提交的需求与结果会保存；未提交草稿仅在当前页面会话中保留。发布仅开放应用，不开放创作工作台。
+      项目内未提交需求会自动保存草稿；首页尚未创建项目的输入仅在当前页面保留。发布仅开放应用，不开放创作工作台。
     </p>
+    <div v-if="project" class="draft-status">
+      <span role="status" aria-live="polite">{{ draftStatus }}</span>
+      <p v-if="autosave.error.value" role="alert" class="inline-error">
+        {{ autosave.error.value }}
+      </p>
+      <button
+        v-if="autosave.status.value === 'error'"
+        type="button"
+        class="button secondary"
+        @click="autosave.retry"
+      >
+        重试草稿保存
+      </button>
+      <button
+        v-if="autosave.status.value === 'conflict'"
+        type="button"
+        class="button secondary"
+        @click="reloadDraft"
+      >
+        重新读取服务器草稿
+      </button>
+    </div>
     <div class="mobile-view-controls" role="group" aria-label="工作台区域">
       <button
         type="button"
@@ -134,3 +186,24 @@ const panel = ref<'conversation' | 'preview'>('conversation')
     </div>
   </div>
 </template>
+
+<style scoped>
+.draft-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  padding: 0.75rem 1.5rem;
+  border-bottom: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+.draft-status .inline-error {
+  flex-basis: 100%;
+}
+@media (max-width: 768px) {
+  .draft-status {
+    padding-inline: 1rem;
+  }
+}
+</style>
