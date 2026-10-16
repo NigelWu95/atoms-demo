@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import ProjectList from '../components/ProjectList.vue'
+import { useSessionStore } from '../stores/session'
+const session = useSessionStore()
 </script>
 
 <template>
@@ -10,8 +12,13 @@ import ProjectList from '../components/ProjectList.vue'
       <RouterLink to="/" class="button primary">新建项目 ＋</RouterLink>
     </div>
     <p class="project-privacy-note">
-      按创建时间排序。访客身份仅绑定此浏览器，清除 Cookie
-      或会话过期后无法找回旧项目；请勿存放敏感资料。
+      <template v-if="session.identity?.isGuest !== false"
+        >按创建时间排序。访客身份仅绑定此浏览器，清除 Cookie
+        或会话过期后无法找回旧项目；可通过邮箱注册保存账号，请勿存放敏感资料。</template
+      >
+      <template v-else
+        >按创建时间排序。项目归属当前账号，可通过邮箱验证码在其他浏览器登录后继续创作。</template
+      >
     </p>
     <ProjectList />
   </section>
