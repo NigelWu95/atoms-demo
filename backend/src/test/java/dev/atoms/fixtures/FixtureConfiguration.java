@@ -16,6 +16,12 @@ import org.springframework.security.web.SecurityFilterChain;
 
 @TestConfiguration(proxyBeanMethods = false)
 public class FixtureConfiguration {
+    @Bean @org.springframework.context.annotation.Primary @DependsOnDatabaseInitialization
+    EmailFixture emailFixture(JdbcTemplate jdbc, Environment environment) {
+        requireTestDatabase(jdbc.queryForObject("SELECT current_database()", String.class),
+                jdbc.queryForObject("SELECT current_user", String.class), environment.getProperty("server.address"));
+        return new EmailFixture(jdbc);
+    }
     @Bean @DependsOnDatabaseInitialization
     FixtureController fixtureController(JdbcTemplate jdbc, Environment environment, ArtifactService artifacts,
                                          ProjectService projects, IdempotencyService idempotency, ObjectMapper json) {

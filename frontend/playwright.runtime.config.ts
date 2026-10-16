@@ -1,5 +1,12 @@
 import { defineConfig, devices } from '@playwright/test'
 
+// Readiness checks must reach this run's loopback servers, not a system HTTP proxy.
+const noProxy = [process.env.NO_PROXY, process.env.no_proxy, '127.0.0.1,localhost,::1']
+  .filter(Boolean)
+  .join(',')
+process.env.NO_PROXY = noProxy
+process.env.no_proxy = noProxy
+
 export default defineConfig({
   testDir: './e2e-runtime',
   outputDir: './test-results-runtime',
