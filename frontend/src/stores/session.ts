@@ -107,7 +107,7 @@ export const useSessionStore = defineStore('session', () => {
     if (!ready.value || changing || pending) return
     const previous = identity.value
     let epoch = revision.value
-    // Hide private views while a restored/focused tab revalidates its shared cookie.
+    // Hide private views while a restored tab revalidates its shared cookie.
     state.value = 'connecting'
     try {
       const value = await api.request('/api/me', decodeIdentity)
@@ -140,20 +140,19 @@ export const useSessionStore = defineStore('session', () => {
     const storage = (event: StorageEvent) => {
       if (!channel && event.key === 'atoms.session.changed') changed()
     }
-    const focus = () => {
+    const visible = () => {
       if (document.visibilityState === 'visible') void reconcile()
     }
     window.addEventListener('storage', storage)
-    window.addEventListener('focus', focus)
-    window.addEventListener('pageshow', focus)
-    document.addEventListener('visibilitychange', focus)
+    // Window focus also fires when leaving a sandbox iframe; that is not an identity transition.
+    window.addEventListener('pageshow', visible)
+    document.addEventListener('visibilitychange', visible)
     return () => {
       channel?.close()
       channel = null
       window.removeEventListener('storage', storage)
-      window.removeEventListener('focus', focus)
-      window.removeEventListener('pageshow', focus)
-      document.removeEventListener('visibilitychange', focus)
+      window.removeEventListener('pageshow', visible)
+      document.removeEventListener('visibilitychange', visible)
     }
   }
   return {
