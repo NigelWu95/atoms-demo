@@ -7,8 +7,12 @@ const decode = (value: unknown) => value
 describe('HTTP boundary', () => {
   it('aborts all old identity requests and ignores late results and failures', async () => {
     const finishes: ((response: Response) => void)[] = []
-    vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>((resolve) => finishes.push(resolve))))
-    const client = createApiClient(), failure = vi.fn()
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => new Promise<Response>((resolve) => finishes.push(resolve))),
+    )
+    const client = createApiClient(),
+      failure = vi.fn()
     client.onSessionFailure(failure)
     const old = client.request('/api/projects', decode)
     const denied = client.request('/api/me', decode)
