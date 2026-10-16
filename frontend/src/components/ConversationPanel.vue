@@ -6,6 +6,7 @@ import { useGeneration } from '../composables/useGeneration'
 import PromptComposer from './PromptComposer.vue'
 import GenerationProgress from './GenerationProgress.vue'
 import RepairConfirmation from './RepairConfirmation.vue'
+import GenerationRecovery from './GenerationRecovery.vue'
 import { matchesRepair, type RepairProposal } from '../runtime/previewRepair'
 import { useSessionStore } from '../stores/session'
 
@@ -36,6 +37,11 @@ const {
   busy,
   error,
   pending,
+  recoveryBlocked,
+  recoverySavedAt,
+  storageUnavailable,
+  recoveryReady,
+  discardRecovery,
   active,
   canSubmit,
   refresh,
@@ -115,12 +121,15 @@ const connectionLabel = computed(
         </button>
       </div>
       <p v-if="error" role="alert" class="inline-error">{{ error }}</p>
-      <div v-if="pending" class="generation-pending">
-        <p>提交结果尚未确认。重试会发送原需求和原版本基线，不重复创建任务。</p>
-        <button type="button" class="button secondary" :disabled="busy" @click="submit">
-          重试原提交
-        </button>
-      </div>
+      <GenerationRecovery
+        :pending="pending"
+        :saved-at="recoverySavedAt"
+        :blocked="recoveryBlocked"
+        :unavailable="storageUnavailable"
+        :disabled="busy || !recoveryReady"
+        @retry="submit"
+        @discard="discardRecovery"
+      />
       <button
         v-if="cursor"
         class="button secondary"
@@ -163,7 +172,7 @@ const connectionLabel = computed(
       :disabled="!canSubmit"
       label="继续完善你的需求"
       :action-label="project.currentVersionId ? '修改应用' : '生成应用'"
-      hint="需求、当前源码及有效历史需求会发送给 DeepSeek；请勿输入密钥或敏感资料。"
+      hint="需求、源码及有效历史需求会发送给 DeepSeek；提交的原需求在本标签页暂存，恢复有效期 24 小时。请勿输入密钥或敏感资料。"
       @update:model-value="emit('update:modelValue', $event)"
       @submit="submit"
     />
