@@ -9,6 +9,35 @@ afterEach(() => {
   api.resetScope()
   vi.unstubAllGlobals()
 })
+it('does not remount private views when keyboard focus returns from the preview iframe', async () => {
+  setActivePinia(createPinia())
+  const store = useSessionStore()
+  store.identity = { userId: 'guest', isGuest: true, displayName: '访客' }
+  store.state = 'ready'
+  const fetch = vi
+    .fn()
+    .mockImplementation((path) =>
+      Promise.resolve(
+        Response.json(
+          path === '/api/me'
+            ? { userId: 'account', isGuest: false, displayName: '账号' }
+            : { token: 'test', headerName: 'X-CSRF-TOKEN' },
+        ),
+      ),
+    )
+  vi.stubGlobal('fetch', fetch)
+  const stop = store.listen()
+  try {
+    window.dispatchEvent(new Event('focus'))
+    expect(store.ready).toBe(true)
+    expect(fetch).not.toHaveBeenCalled()
+    document.dispatchEvent(new Event('visibilitychange'))
+    await vi.waitFor(() => expect(store.identity?.userId).toBe('account'))
+    expect(store.ready).toBe(true)
+  } finally {
+    stop()
+  }
+})
 it('clears private drafts and hides the old identity on session failure', async () => {
   setActivePinia(createPinia())
   const store = useSessionStore(),

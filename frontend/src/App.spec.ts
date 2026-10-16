@@ -4,6 +4,7 @@ import { createMemoryHistory } from 'vue-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import App from './App.vue'
 import { createAppRouter } from './router'
+import { useSessionStore } from './stores/session'
 
 const project = {
   id: 'project-1',
@@ -61,6 +62,24 @@ async function openApp(path = '/') {
 }
 
 describe('foundation website', () => {
+  it('hides but preserves a private view during identity revalidation', async () => {
+    vi.stubGlobal('fetch', mockApi())
+    const { wrapper } = await openApp()
+    try {
+      const input = wrapper.get('textarea').element
+      await wrapper.get('textarea').setValue('仍属于同一身份的草稿')
+      const session = useSessionStore()
+      session.state = 'connecting'
+      await flushPromises()
+      expect(wrapper.get('textarea').element).toBe(input)
+      session.state = 'ready'
+      await flushPromises()
+      expect(wrapper.get('textarea').element).toBe(input)
+      expect(input.value).toBe('仍属于同一身份的草稿')
+    } finally {
+      wrapper.unmount()
+    }
+  })
   it.each(['/', '/projects'])('shows saved generation state on %s', async (path) => {
     const fetch = mockApi()
     const original = fetch.getMockImplementation()!
