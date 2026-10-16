@@ -5,6 +5,20 @@ afterEach(() => vi.unstubAllGlobals())
 const decode = (value: unknown) => value
 
 describe('HTTP boundary', () => {
+  it('aborts all old identity requests and ignores late results and failures', async () => {
+    const finishes: ((response: Response) => void)[] = []
+    vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>((resolve) => finishes.push(resolve))))
+    const client = createApiClient(), failure = vi.fn()
+    client.onSessionFailure(failure)
+    const old = client.request('/api/projects', decode)
+    const denied = client.request('/api/me', decode)
+    client.resetScope()
+    finishes[0]!(Response.json({ secret: 'old project' }))
+    finishes[1]!(Response.json({}, { status: 401 }))
+    await expect(old).rejects.toMatchObject({ name: 'AbortError' })
+    await expect(denied).rejects.toMatchObject({ name: 'AbortError' })
+    expect(failure).not.toHaveBeenCalled()
+  })
   it('does not apply an old session error after its caller aborts', async () => {
     let finish!: (response: Response) => void
     const fetch = vi
