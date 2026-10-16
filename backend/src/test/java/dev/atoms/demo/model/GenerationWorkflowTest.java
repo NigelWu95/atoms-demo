@@ -14,7 +14,8 @@ class GenerationWorkflowTest {
     @Test void modificationUsesBoundedHistoryAndPatchWhileReturningAFullSnapshot() throws Exception {
         var workflow = new GenerationWorkflow(json, new ArtifactValidator());
         var base = json.readTree(source);
-        var history = json.createArrayNode().addObject().put("request", "保留已有需求");
+        var history = json.createArrayNode();
+        history.addObject().put("request", "保留已有需求");
         var result = workflow.generate("标题变更", base, history, (stage, system, user) -> {
             assertThat(user).contains("successfulHistory", "保留已有需求", "baseHash");
             if (stage.equals("PLANNING")) return new ModelGateway.Answer(plan, null);
