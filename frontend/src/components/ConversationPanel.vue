@@ -4,6 +4,7 @@ import type { Project } from '../api/projects'
 import { runLabel } from '../api/runs'
 import { useGeneration } from '../composables/useGeneration'
 import PromptComposer from './PromptComposer.vue'
+import GenerationProgress from './GenerationProgress.vue'
 
 const props = defineProps<{ project: Project; modelValue: string }>()
 const emit = defineEmits<{ 'update:modelValue': [value: string]; changed: [project: Project] }>()
@@ -31,7 +32,7 @@ const {
 )
 const configuration = computed(() => {
   if (!availability.value) return '正在读取生成配置…'
-  if (!availability.value.workerEnabled) return '当前测试服务不执行生成，请使用 5173 普通工作台。'
+  if (!availability.value.workerEnabled) return '当前服务未启用生成执行器，请联系维护者检查配置。'
   if (!availability.value.configured) return '未配置 DeepSeek API Key，请在服务端完成配置。'
   if (availability.value.remainingRequests < 2) return '剩余模型调用次数不足，请在服务端调整额度。'
   return `DeepSeek Flash · 最多剩余 ${availability.value.remainingRequests} 次请求；每轮通常 2 次，修复额外 1 次。`
@@ -62,6 +63,7 @@ const connectionLabel = computed(
     </div>
     <div class="generation-conversation">
       <p class="muted generation-config">{{ configuration }}</p>
+      <GenerationProgress :stage="run?.stage ?? null" :status="run?.status ?? null" />
       <p v-if="connectionLabel" role="status" aria-live="polite" class="muted">
         {{ connectionLabel }}
       </p>
@@ -128,7 +130,7 @@ const connectionLabel = computed(
       :disabled="!canSubmit"
       label="继续完善你的需求"
       :action-label="project.currentVersionId ? '修改应用' : '生成应用'"
-      hint="需求与当前源码将发送给 DeepSeek；请勿输入密钥或敏感资料。"
+      hint="需求、当前源码及有效历史需求会发送给 DeepSeek；请勿输入密钥或敏感资料。"
       @update:model-value="emit('update:modelValue', $event)"
       @submit="submit"
     />

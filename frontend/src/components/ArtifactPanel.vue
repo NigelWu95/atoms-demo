@@ -5,6 +5,7 @@ import { getVersion, listVersions, type Version, type VersionSummary } from '../
 import { errorMessage } from '../api/client'
 import PreviewFrame from './PreviewFrame.vue'
 import SourceViewer from './SourceViewer.vue'
+import VersionReview from './VersionReview.vue'
 import RestorationPanel from './RestorationPanel.vue'
 import EngineeringDownload from './EngineeringDownload.vue'
 import ApplicationRunPanel from './ApplicationRunPanel.vue'
@@ -180,6 +181,12 @@ watch(
       </p>
     </section>
     <EngineeringDownload :project-id="project?.id ?? null" :version="version" :loading="loading" />
+    <VersionReview
+      v-if="project && version"
+      :key="project.id"
+      :project-id="project.id"
+      :version-id="version.id"
+    />
     <ApplicationRunPanel
       :project-id="project?.id ?? null"
       :owner-id="project?.ownerId ?? null"
