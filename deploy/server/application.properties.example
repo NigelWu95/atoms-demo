@@ -19,3 +19,12 @@ PUBLIC_APP_ORIGIN=https://atoms.example.com
 # ALLOW_INSECURE_HTTP_PUBLIC_ORIGIN=true
 # Use systemd environment SERVER_SERVLET_SESSION_COOKIE_SECURE=false and
 # SERVER_SERVLET_SESSION_COOKIE_NAME=ATOMS_HTTP_SESSION; configure Nginx HTTP.
+
+# Optional email accounts: enable only after HTTPS / Secure Cookie are configured.
+# Public plaintext HTTP cannot send or verify codes, even if this is true.
+EMAIL_AUTH_ENABLED=false
+SMTP_HOST=smtp.qq.com
+SMTP_PORT=465
+SMTP_USERNAME=
+SMTP_PASSWORD=
+EMAIL_CODE_HMAC_KEY=

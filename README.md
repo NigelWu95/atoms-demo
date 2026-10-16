@@ -2,6 +2,8 @@
 
 提交说明：[实现思路、完成程度与后续优先级](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-summary.md)。
 
+2026-10-16 本地新增 **QQ SMTP 邮箱验证码注册/登录**：新邮箱保留当前访客项目，已有邮箱跨浏览器登录原账号，支持退出和跨标签页切换。入口 `/account`；默认关闭，需维护者在私有配置中填写发信 QQ 邮箱、SMTP 授权码和独立 HMAC 密钥。真实 QQ 收信尚未验收，未推送或部署，公网 HTTP 不开放邮箱认证。见[配置与使用说明](https://github.com/NigelWu95/atoms-demo/blob/main/docs/email-accounts.md)（新文档待推送后可访问）。
+
 Java 17 + Spring Boot + Vue 工程。已实现访客与项目持久化、代码版本与受限预览、应用数据保存，并接通 DeepSeek 网关、后台规划/构建/有限修复及普通工作台的生成与修改交互。已提交的需求、规划和任务结果会保存到数据库。**本地真实 DeepSeek 的“生成待办 → 操作保存 → 刷新恢复 → 修改生成 V2 → 筛选且保留原数据”闭环已通过**，详见下文。固定版本发布、独立应用页面和 LIVE 数据隔离已实现；云端真实 2048 生成、预览操作和保存/刷新恢复已通过，云端发布与 LIVE 闭环仍待验收。设计见 [设计目录](docs/design/README.md)，原平台进度见 [原任务清单](docs/design/tasks/todo.md)，新增独立工程与下载模块见 [模块任务清单](tasks/todo.md)。
 
 2026-10-08 已按用户要求部署到 **<http://118.195.239.8:8443>**：单台云服务器原生运行整套平台和 PostgreSQL，按 `/a/<slug>` 发布应用。不接 ngrok、不等待域名；初始 HTTPS 已按用户明确要求切换为临时 HTTP Demo，流量未加密。HTTP 使用独立访客 Cookie，旧 HTTPS 项目不删除但不会自动归属新访客。云端已按用户授权同步 DeepSeek 密钥，累计调用上限 100 次由公网访客共用；当时配置为单次上限 **168400 tokens**（包含思考与最终输出）、单次超时 300 秒、整轮超时 600 秒，本地数据与私有配置不变。此前云端 2048 在 32768 tokens / 180 秒配置下已验证生成中刷新后 SSE 恢复、自动预览、游戏合并计分和状态刷新恢复。随后 16840 配置下的一次构建因 length 失败，其中 16266 tokens 用于推理；用户因此要求提高至 168400。本次调整不调用模型，部署后累计 6 / 100；更高额度不保证所有需求均能在超时和响应大小限制内完成。云端发布/LIVE 闭环仍待验收。见 [实际部署记录与回退](docs/cloud-deployment.md)、[ADR-011](docs/decisions/011-single-server-release.md) 和 [服务器部署说明](deploy/server/README.md)。数据库和后端内部端口不直接开放公网。
@@ -160,9 +162,9 @@ npm run dev:fixtures
 
 ## 当前可体验的交互
 
-- 首页自动建立/恢复访客会话；失败可重试，未连接不能创建项目。手机端也保留会话状态与重试入口。
+- 首页自动建立访客会话或恢复当前邮箱账号会话；失败可重试，未连接不能创建项目。手机端也保留会话状态与重试入口。
 - 首页的三个示例只填充需求；非空输入通过按钮或 Enter 创建真实项目并进入 `/projects/:id`，Shift+Enter 换行，中文组合输入期间不提交。名称从需求前 40 字符整理而来，可在工作台重命名。
-- 项目名称保存到 PostgreSQL，刷新、重新打开和重启后端仍保留。我的项目仅列出当前访客自己的数据，其他访客猜测 ID 也不能打开或重命名。
+- 项目名称保存到 PostgreSQL，刷新、重新打开和重启后端仍保留。我的项目仅列出当前身份自己的数据，其他访客或账号猜测 ID 也不能打开或重命名。
 - 未提交的需求草稿及未知提交的意图键仅在当前页面会话保留；提交成功后需求、规划和任务结果持久化。刷新可能丢弃未提交草稿，但不删除项目/对话；先查看恢复的任务再决定下一轮操作。`/workbench` 仍是未保存草稿入口。
 - 创建失败保留输入，同一次操作的重试复用幂等键，避免响应丢失造成重复项目。
 - 有版本的工作台展示运行预览、历史版本及 view.html/styles.css/main.js/manifest.json；源码只读转义展示，空项目不伪造文件。支持桌面/手机宽度和窄屏对话/预览切换。模型未配置、次数不足或任务仍在执行时不能新建生成；生成期间后端拒绝新的发布，旧发布不受影响。
@@ -172,7 +174,7 @@ npm run dev:fixtures
 - 侧栏服务状态来自真实 `/api/health`；失败时可重试。未知路由有返回入口。
 - Vite 开发页面有 CSP/基础安全响应头；仅开发 HMR 放行本地 WebSocket 与内联样式。`npm run preview` 使用更严格 CSP，但它只是本地构建预览，不是正式部署方案。
 
-下一步在已授权的云端累计 100 次请求额度内完成生成/SSE/发布验收，不再接隧道；此次配置变更本身未发起生成。活动任务重启演练和完整资源限制仍待完成。T24 要求的第二轮真实修改及 T31 多类型应用质量验证不能自动扩大预算或重置记账。用户自定义模型设置后续支持；T04/T29 未覆盖的远程验证保留待办。OAuth 暂不接入，继续采用访客模式。
+下一步在已授权的云端累计 100 次请求额度内完成生成/SSE/发布验收，不再接隧道；此次配置变更本身未发起生成。活动任务重启演练和完整资源限制仍待完成。T24 要求的第二轮真实修改及 T31 多类型应用质量验证不能自动扩大预算或重置记账。用户自定义模型设置后续支持；T04/T29 未覆盖的远程验证保留待办。OAuth 暂缓；本地新增可选邮箱验证码账号，访客模式仍保留，云端尚未更新。
 
 访客身份只绑定当前浏览器 Cookie，有效期最多 7 天；清除 Cookie、更换浏览器或过期后不能找回旧访客项目。统一使用上面的 `127.0.0.1` 地址，避免与 `localhost` 形成两个浏览器空间。请勿存放敏感资料。本地配置不应用于公网；部署前还需限流/总配额、数据保留与删除策略以及完整安全验收，见 [ADR-003](docs/decisions/003-guest-project-persistence.md)。
 
@@ -182,13 +184,15 @@ npm run dev:fixtures
 
 已接通 `GET /api/csrf`、`POST /api/session`、`GET /api/me`，以及 `/api/projects` 的创建/分页列表和 `/api/projects/{id}` 的详情/重命名。新增版本列表 `GET /api/projects/{id}/versions`、详情 `GET /api/projects/{id}/versions/{versionId}` 与受限 HTML `GET /api/projects/{id}/versions/{versionId}/document?previewMode=CURRENT|HISTORY`；均验证项目归属。生产没有提交任意源码的 HTTP 接口。
 
+邮箱认证新增 `GET /api/auth/methods`、`POST /api/auth/email/challenges`、`POST /api/auth/email/verifications`、`DELETE /api/session`。沿用服务端 Cookie 与 CSRF，不使用浏览器存储 JWT；`/api/me` 和 `/api/session` 的字段保持不变，已注册身份返回 `isGuest:false`。具体契约见[邮箱账号规格](https://github.com/NigelWu95/atoms-demo/blob/main/SPEC-email-accounts.md)。
+
 预览状态使用 `GET /api/projects/{id}/preview-state?versionId=...` 与 `PUT /api/projects/{id}/preview-state`，仅项目所有者可访问；新保存意图必须绑定当前版本与预期状态 revision。所有写请求都要求 CSRF，创建项目、提交生成和保存状态还要求 Idempotency-Key。单份状态上限 256 KiB，不代表已有总配额或数据清理策略。
 
 预览报告新增 `POST /api/projects/{id}/versions/{versionId}/preview-reports`（CSRF + Idempotency-Key）与 `GET /api/projects/{id}/versions/{versionId}/preview-reports/latest`。均检查归属；新报告只写当前版本，历史可读旧报告。没有记录时返回 UNKNOWN；最多 5 条、每条 1000 字符错误，检查字段与视口严格验证。
 
 发布新增 `GET/PUT /api/projects/{id}/publication` 和 `DELETE /api/projects/{id}/publication?expectedPublicationRevision=...`，仅所有者可管理，写入需 CSRF/幂等键。匿名 `GET /api/public/apps/{slug}`、`GET /api/public/apps/{slug}/document?versionId=...` 仅返回已发布版本；`GET/PUT /api/public/apps/{slug}/state` 要求访客会话，GET 携带 versionId，PUT 携带已加载版本和预期状态 revision。已下线返回 404，旧版本新请求返回 409。
 
-生成新增 `GET /api/generation`（是否配置、Worker 是否启用、剩余请求数）、`POST/GET /api/projects/{id}/runs`、`GET /api/projects/{id}/messages`、`GET /api/runs/{runId}`、`GET /api/runs/{runId}/events?after=...`（SSE）及 `PUT /api/runs/{runId}/cancellation`。这些生成接口均需访客身份；项目、消息、任务和事件必须属于当前访客。SSE 优先使用重连的 Last-Event-ID，终态已补齐返回 204。具体字段和边界见 [接口契约](docs/design/04-api-contracts.md)。
+生成新增 `GET /api/generation`（是否配置、Worker 是否启用、剩余请求数）、`POST/GET /api/projects/{id}/runs`、`GET /api/projects/{id}/messages`、`GET /api/runs/{runId}`、`GET /api/runs/{runId}/events?after=...`（SSE）及 `PUT /api/runs/{runId}/cancellation`。这些生成接口均需有效平台会话（访客或邮箱账号）；项目、消息、任务和事件必须属于当前身份。SSE 优先使用重连的 Last-Event-ID，终态已补齐返回 204，退出后停止旧会话推送而不取消任务。具体字段和边界见 [接口契约](docs/design/04-api-contracts.md)。
 
 历史恢复：在工作台选择历史代码版本，点击“恢复此版本”并确认，服务端通过 `POST /api/projects/{id}/restorations` 复制源码为新版本（例如恢复 V1 得到 V3），保留 V2、业务数据和已发布指针，不自动发布。要求项目所有者、CSRF、幂等键、项目修订号匹配且无活动生成；结果未知时可重试原恢复操作。V010 是新增可空恢复来源列的迁移，详见 [ADR-012](docs/decisions/012-version-restoration.md)。2026-10-11 已部署云端，完整恢复流程在本地验证，云端基础接口检查通过。首页与项目列表按 `currentVersionId` 显示是否已生成，不再使用固定“尚未生成”文案；“已生成”不代表预览检查或发布通过。
 
