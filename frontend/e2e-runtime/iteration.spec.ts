@@ -78,7 +78,20 @@ test('workbench shows real version comparison while preserving preview and expor
   const review = page.getByRole('region', { name: '版本修改记录' })
   await expect(review).toContainText('相对 V1')
   await review.locator('summary').first().click()
+  const diff = review.getByRole('region', { name: 'styles.css 逐行差异' })
+  await expect(diff.getByRole('columnheader', { name: '旧行' })).toBeVisible()
+  await expect(diff.getByRole('columnheader', { name: '新行' })).toBeVisible()
+  await expect(diff.locator('[data-kind="add"]')).toHaveCount(2)
+  await expect(diff.locator('[data-kind="remove"]')).toHaveCount(0)
+  await expect(diff.locator('[data-kind="add"]').last()).toContainText('h1{letter-spacing:.01em}')
+  const previewElement = await page.locator('iframe').elementHandle()
+  // Both modes remain keyboard accessible; switching modes never remounts the preview.
+  await review.getByRole('button', { name: '全文对比', exact: true }).focus()
+  await page.keyboard.press('Enter')
   await expect(review.getByRole('heading', { name: '修改前' }).first()).toBeVisible()
+  await page.keyboard.press('Enter')
+  await expect(diff).toBeVisible()
+  expect(await previewElement?.evaluate((element) => element.isConnected)).toBe(true)
   for (const width of [320, 768, 1024, 1440]) {
     await page.setViewportSize({ width, height: 1000 })
     if (width < 768)
@@ -92,6 +105,8 @@ test('workbench shows real version comparison while preserving preview and expor
         path: testInfo.outputPath('version-review-mobile.png'),
         fullPage: true,
       })
+    await diff.scrollIntoViewIfNeeded()
+    await expect(diff).toBeVisible()
     expect(
       (await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze())
         .violations,
