@@ -47,7 +47,8 @@ export function createApiClient() {
       isRecord(body) && typeof body.requestId === 'string' ? body.requestId : null,
       structured?.retryable === true,
       /^\d{1,5}$/.test(response.headers.get('Retry-After') ?? '')
-        ? Number(response.headers.get('Retry-After')) : null,
+        ? Number(response.headers.get('Retry-After'))
+        : null,
     )
     if ([401, 403].includes(response.status)) {
       csrf = null
@@ -120,8 +121,11 @@ export function createApiClient() {
         headers,
         credentials: 'same-origin',
         cache: 'no-store',
-        signal: AbortSignal.any([identitySignal, AbortSignal.timeout(options.timeoutMs ?? 10000),
-          ...(options.signal ? [options.signal] : [])]),
+        signal: AbortSignal.any([
+          identitySignal,
+          AbortSignal.timeout(options.timeoutMs ?? 10000),
+          ...(options.signal ? [options.signal] : []),
+        ]),
         body: options.body === undefined ? undefined : JSON.stringify(options.body),
       })
     } catch {
