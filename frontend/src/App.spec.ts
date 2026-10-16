@@ -15,6 +15,7 @@ const project = {
   updatedAt: '2026-10-07T00:00:00Z',
 }
 function mockApi() {
+  let savedDraft = { prompt: '', revision: 0 }
   return vi.fn().mockImplementation((path: string, options?: RequestInit) => {
     if (path === '/api/health') return Promise.resolve(Response.json({ status: 'UP' }))
     if (path === '/api/csrf')
@@ -26,6 +27,13 @@ function mockApi() {
     if (path === '/api/projects' && options?.method === 'POST')
       return Promise.resolve(Response.json(project, { status: 201 }))
     if (path === '/api/projects/project-1') return Promise.resolve(Response.json(project))
+    if (path === '/api/projects/project-1/draft') {
+      if (options?.method === 'PUT') {
+        const input = JSON.parse(String(options.body)) as { prompt: string }
+        savedDraft = { prompt: input.prompt, revision: savedDraft.revision + 1 }
+      }
+      return Promise.resolve(Response.json(savedDraft))
+    }
     if (path === '/api/generation')
       return Promise.resolve(
         Response.json({
@@ -185,8 +193,10 @@ describe('foundation website', () => {
     expect(wrapper.text()).toContain('还没有生成应用')
     expect(wrapper.get('button[type="submit"]').attributes('disabled')).toBeDefined()
     expect(wrapper.get('textarea').element.value).toContain('待办')
+    await vi.waitFor(() => expect(wrapper.text()).toContain('草稿已保存'))
     await router.push('/')
     await flushPromises()
+    expect(router.currentRoute.value.path).toBe('/')
     expect(wrapper.get('textarea').element.value).toContain('待办')
     wrapper.unmount()
   })

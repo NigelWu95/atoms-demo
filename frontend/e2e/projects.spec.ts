@@ -82,6 +82,7 @@ test('failed create retains input; explicit retry reuses intent after response i
   expect(keys).toHaveLength(2)
   expect(keys[0]).toBeTruthy()
   expect(keys[0]).toBe(keys[1])
+  await expect(page.getByText('草稿已保存', { exact: true })).toBeVisible()
   await page.getByRole('link', { name: '我的项目', exact: true }).click()
   await expect(page.getByRole('link', { name: /重试不重复创建的项目/ })).toHaveCount(1)
 })
