@@ -155,6 +155,26 @@ it('requires confirmation, restores the selected version and refreshes the proje
     wrapper.unmount()
   }
 })
+
+it('preserves the preview and repair when a project refresh keeps the same baseline', async () => {
+  const wrapper = await open()
+  try {
+    useSessionStore().identity = { userId: 'owner', displayName: 'test', isGuest: true }
+    await wrapper.get('select').setValue('v2')
+    await flushPromises()
+    wrapper.getComponent(PreviewFrame).vm.$emit('repair', 'SYNTAX')
+    const repair = wrapper.emitted('repair')?.at(-1)
+    const frame = wrapper.get('preview-frame-stub').element
+    vi.mocked(getVersion).mockClear()
+    await wrapper.setProps({ project: { ...project, name: '更新项目名称' } })
+    await flushPromises()
+    expect(wrapper.emitted('repair')?.at(-1)).toEqual(repair)
+    expect(getVersion).not.toHaveBeenCalled()
+    expect(wrapper.get('preview-frame-stub').element).toBe(frame)
+  } finally {
+    wrapper.unmount()
+  }
+})
 it('keeps the original restore intent when the response is lost', async () => {
   vi.mocked(restoreVersion).mockRejectedValueOnce(new ApiFailure('NETWORK_ERROR', '结果尚不确定'))
   const wrapper = await open()

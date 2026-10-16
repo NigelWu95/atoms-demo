@@ -98,12 +98,12 @@ function prepareRepair(proposal: RepairProposal | null) {
   panel.value = 'conversation'
 }
 watch(
-  () => [
-    project.value?.id,
-    project.value?.currentVersionId,
-    project.value?.projectRevision,
-    session.ready,
-    session.identity?.userId,
+  [
+    () => project.value?.id,
+    () => project.value?.currentVersionId,
+    () => project.value?.projectRevision,
+    () => session.ready,
+    () => session.identity?.userId,
   ],
   () => {
     repair.value = null
