@@ -2,7 +2,7 @@
 
 模块：`workspace-navigation`；索引：[能力地图](ACCOUNT-WORKSPACE-CAPABILITY-MAP.md)。
 
-状态：2026-10-17 版本已部署；2026-10-18 按用户反馈修正规则：根地址始终展示介绍首页，只有工作区入口使用 `/create`。本次修正尚未推送或部署。依赖账号管理与登录页的路由契约，不依赖密码字段或凭据存储实现。证据见[本轮记录](https://github.com/NigelWu95/atoms-demo/blob/main/docs/account-workspace-verification.md)。
+状态：2026-10-18 按用户反馈修正规则：根地址始终展示介绍首页，只有工作区入口使用 `/create`。修正源码 `dc2aa3d` 已于 00:56 部署，未推送 GitHub。依赖账号管理与登录页的路由契约，不依赖密码字段或凭据存储实现。证据见[本轮记录](https://github.com/NigelWu95/atoms-demo/blob/main/docs/account-workspace-verification.md)。
 
 ## 目标与当前原因
 
