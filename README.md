@@ -2,6 +2,8 @@
 
 提交说明：[实现思路、完成程度与后续优先级](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-summary.md)。
 
+2026-10-17 **账号管理、可选密码登录与常驻工作区已在本地实现**：管理页展示本人真实邮箱、账号 ID 和注册时间；首次设置密码需专用邮箱验证码，修改需原密码。登录页默认验证码（新邮箱注册、已有邮箱登录），也可选择已有账号密码登录。进入工作区后“开始创作”使用右侧 `/create`，保留导航；首页来源登录后同样带着 idea 进入工作区。密码变更撤销旧版本会话，公网 HTTP 密码功能默认关闭。本轮未推送或部署，私有邮箱/模型配置未修改；服务器仍以下方部署记录为准。[使用说明](https://github.com/NigelWu95/atoms-demo/blob/main/docs/email-accounts.md)、[本轮验收](https://github.com/NigelWu95/atoms-demo/blob/main/docs/account-workspace-verification.md)。
+
 2026-10-17 16:43 当前程序已部署至 **<http://192.0.2.10:8443/>**，源码 `209ae88`、发布包 `atoms-demo-<release-id>`。已修复同身份会话重校验误清空验证码表单的问题，保留欢迎页、独立账号页、登录后返回来源页面及此前迭代、草稿、归档、请求恢复与导出模板优化；本轮仅部署，未推送 GitHub。原有数据和邮箱/模型配置保留，云端构建与应用进程开关仍关闭。详细验证范围和回退见[部署记录](https://github.com/NigelWu95/atoms-demo/blob/main/docs/cloud-deployment.md)。以下本地验收不自动等同于云端真实邮件、模型或工程运行验收，早期带日期的部署参数只作历史记录。
 
 2026-10-17 **生成/修复请求的整页刷新恢复已实现并部署**：同标签页暂存原请求，恢复有效期 24 小时。刷新只读取状态；点击“重试原提交”才发送原 key/body，已接受时返回同一任务，未送达时仍可能首次创建并消耗额度。身份和项目归属确认后才展示正文，账号变更清理；过期、损坏或存储不可用有明确提示，放弃本地记录不取消后台任务。最多保留 10 个项目；缓存不是加密存储，请勿输入敏感资料。真实验收及边界见 [PR04 记录](https://github.com/NigelWu95/atoms-demo/blob/main/docs/design/iteration-experience/verification.md#2026-10-17pr04-整页刷新请求恢复)。
