@@ -102,11 +102,13 @@ test('session and list failures have recovery actions, and session failure disab
     }),
   )
   await page.goto('/')
-  await page.getByRole('textbox').fill('暂时不能提交')
-  await expect(page.getByRole('button', { name: '创建项目' })).toBeDisabled()
+  await expect(page.getByRole('textbox')).toBeHidden()
+  await expect(page.getByRole('heading', { name: '请重新连接账号' })).toBeVisible()
+  await expect(page.getByRole('button', { name: '创建项目', includeHidden: true })).toBeDisabled()
   await expect(page.getByRole('button', { name: '重新连接会话' })).toBeVisible()
   await page.unroute('**/api/session')
   await page.getByRole('button', { name: '重新连接会话' }).click()
+  await page.getByRole('textbox').fill('恢复后可以提交')
   await expect(page.getByRole('button', { name: '创建项目' })).toBeEnabled()
   await page.route('**/api/projects?*', (route) =>
     route.fulfill({
