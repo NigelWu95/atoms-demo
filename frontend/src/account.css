@@ -1,0 +1,115 @@
+.account-page {
+  max-width: 560px;
+  padding: 24px 24px 0;
+  margin: 0 auto;
+}
+.account-back {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  margin-bottom: 24px;
+  color: var(--muted);
+}
+.account-back:hover {
+  color: var(--text);
+}
+.account-page > .eyebrow,
+.account-page > h1,
+.account-intro {
+  text-align: center;
+}
+.account-page h1 {
+  font-size: clamp(24px, 4vw, 32px);
+  font-weight: 550;
+  margin: 12px 0 16px;
+  line-height: 1.4;
+}
+.account-intro,
+.account-card p,
+.account-details p {
+  color: var(--muted);
+  line-height: 1.8;
+}
+.account-layout {
+  margin-top: 28px;
+}
+.account-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 32px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.account-card h2 {
+  margin: 0 0 12px;
+  font-size: 20px;
+}
+.account-card label {
+  display: block;
+  font-weight: 600;
+  margin: 20px 0 8px;
+}
+.account-card input {
+  width: 100%;
+  min-height: 48px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 16px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+}
+.account-card input[readonly] {
+  color: var(--muted);
+}
+.account-send-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+.account-submit {
+  width: 100%;
+  margin-top: 16px;
+}
+.account-details {
+  padding: 24px 8px 0;
+  font-size: 12px;
+}
+.account-details p + p,
+.account-notice,
+.account-error {
+  margin-top: 12px;
+}
+.account-details h2 {
+  font-size: 16px;
+  line-height: 1.5;
+  margin: 8px 0 12px;
+}
+.account-warning {
+  border-left: 2px solid var(--accent);
+  padding-left: 12px;
+}
+.account-card .account-error {
+  color: var(--danger);
+}
+.account-card .account-notice,
+.account-badge {
+  color: var(--accent);
+}
+.account-badge {
+  display: inline-block;
+  margin-bottom: 20px;
+}
+.account-card > .button {
+  margin: 12px 12px 0 0;
+}
+@media (max-width: 600px) {
+  .account-page {
+    padding: 8px 20px 0;
+  }
+  .account-card {
+    padding: 20px;
+  }
+}

@@ -140,7 +140,8 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <section class="simple-page account-page">
+  <section class="account-page">
+    <RouterLink to="/" class="account-back">← 返回创作</RouterLink>
     <p class="eyebrow">YOUR ACCOUNT</p>
     <h1 tabindex="-1">{{ registered ? '账号与工作空间' : '让灵感，有处可存' }}</h1>
     <p class="account-intro">用邮箱验证码登录，在不同浏览器继续你的创作。无需设置密码。</p>
@@ -251,7 +252,7 @@ onBeforeUnmount(() => {
         </div>
         <p v-if="error" class="account-error" role="alert">{{ error }}</p>
         <p v-if="notice" class="account-notice" role="status">{{ notice }}</p>
-        <p v-if="!session.ready" class="muted">请等待会话连接；连接失败时可在侧栏重新连接。</p>
+        <p v-if="!session.ready" class="muted">请等待会话连接；连接失败时可在页首重新连接。</p>
       </div>
       <aside class="account-details" aria-label="账号说明">
         <span class="eyebrow">KEEP CREATING</span>
@@ -268,105 +269,4 @@ onBeforeUnmount(() => {
   </section>
 </template>
 
-<style scoped>
-.account-page {
-  max-width: 1100px;
-  margin: auto;
-}
-.account-intro,
-.account-card p,
-.account-details p {
-  color: var(--muted);
-  line-height: 1.8;
-}
-.account-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
-  gap: 40px;
-  margin-top: 32px;
-  align-items: start;
-}
-.account-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 20px;
-  padding: 32px;
-  min-width: 0;
-}
-.account-card h2 {
-  margin: 0 0 16px;
-  font-size: 22px;
-}
-.account-card label {
-  display: block;
-  font-weight: 600;
-  margin: 20px 0 8px;
-}
-.account-card input {
-  width: 100%;
-  min-height: 48px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 12px 14px;
-  background: var(--bg);
-  color: var(--text);
-  font: inherit;
-}
-.account-card input[readonly] {
-  color: var(--muted);
-}
-.account-send-row {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin-top: 12px;
-}
-.account-submit {
-  width: 100%;
-}
-.account-details {
-  padding: 24px 0;
-}
-.account-details p + p,
-.account-notice,
-.account-error {
-  margin-top: 12px;
-}
-.account-details h2 {
-  font-size: 24px;
-  line-height: 1.5;
-  margin: 16px 0;
-}
-.account-warning {
-  border-left: 2px solid var(--accent);
-  padding-left: 16px;
-}
-.account-card .account-error {
-  color: #ffb4a5;
-  overflow-wrap: anywhere;
-}
-.account-card .account-notice,
-.account-badge {
-  color: var(--accent);
-}
-.account-badge {
-  display: inline-block;
-  margin-bottom: 20px;
-  font-size: 14px;
-}
-.account-card > .button {
-  margin: 12px 12px 0 0;
-}
-@media (max-width: 800px) {
-  .account-layout {
-    grid-template-columns: 1fr;
-    gap: 12px;
-  }
-  .account-card {
-    padding: 24px;
-  }
-  .account-details {
-    padding: 12px 0;
-  }
-}
-</style>
+<style scoped src="../account.css"></style>

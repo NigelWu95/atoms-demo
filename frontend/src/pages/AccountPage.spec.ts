@@ -19,6 +19,19 @@ function open() {
   const wrapper = mount(AccountPage, { global: { plugins: [pinia], stubs: { RouterLink: true } } })
   return { wrapper, session }
 }
+it('presents a standalone account card with return navigation and correct reconnect guidance', async () => {
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ emailCodeEnabled: true })))
+  const { wrapper, session } = open()
+  await flushPromises()
+  expect(wrapper.get('.account-back').attributes('to')).toBe('/')
+  expect(wrapper.find('.account-details').exists()).toBe(true)
+  expect(wrapper.get('#account-warning').text()).toContain('不会合并当前访客的项目')
+  session.state = 'failed'
+  await flushPromises()
+  expect(wrapper.text()).toContain('页首重新连接')
+  expect(wrapper.text()).not.toContain('侧栏')
+  wrapper.unmount()
+})
 it('does not offer a pretend send when email authentication is unavailable', async () => {
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ emailCodeEnabled: false })))
   const { wrapper } = open()
