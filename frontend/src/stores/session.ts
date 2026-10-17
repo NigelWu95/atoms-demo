@@ -64,7 +64,7 @@ export const useSessionStore = defineStore('session', () => {
     channel?.postMessage('changed')
   }
   async function transition(action: () => Promise<Identity | null>) {
-    if (changing) return
+    if (changing) return false
     changing = true
     api.resetScope()
     pending = null
@@ -74,17 +74,18 @@ export const useSessionStore = defineStore('session', () => {
     try {
       await refreshCsrf()
       const result = await action()
-      if (epoch !== revision.value) return
+      if (epoch !== revision.value) return false
       clearPrivate()
       epoch = revision.value
       const value = result ?? (await initializeSession())
       if (result) await refreshCsrf()
-      if (epoch !== revision.value) return
+      if (epoch !== revision.value) return false
       identity.value = value
       state.value = 'ready'
       hasConnected.value = true
       announce()
       useGenerationStore().bind(value)
+      return true
     } catch (failure) {
       if (epoch === revision.value) {
         if (identity.value && failure instanceof ApiFailure && [422, 429].includes(failure.status))

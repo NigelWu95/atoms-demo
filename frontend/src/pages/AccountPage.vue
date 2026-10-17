@@ -1,10 +1,20 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { ApiFailure, errorMessage } from '../api/client'
 import { emailMethods, sendEmailCode, type EmailChallenge } from '../api/emailAuth'
+import { getProject } from '../api/projects'
+import { accountReturnTarget } from '../runtime/accountReturn'
+import { useDraftStore } from '../stores/draft'
 import { useSessionStore } from '../stores/session'
 
 const session = useSessionStore()
+const drafts = useDraftStore()
+const route = useRoute(),
+  router = useRouter()
+const returnTarget = computed(() => accountReturnTarget(route.query.returnTo))
+const backTo = computed(() => returnTarget.value?.path ?? '/')
+const retryReturn = ref(false)
 const enabled = ref<boolean | null>(null),
   loading = ref(false),
   busy = ref(false)
@@ -85,9 +95,22 @@ async function verify() {
   busy.value = true
   error.value = ''
   notice.value = ''
+  const origin = route.fullPath,
+    epoch = session.revision
+  // Carry only deliberate homepage input in this tab, never project/recovery caches.
+  const idea = returnTarget.value?.path === '/' ? drafts.prompt : null
   try {
-    await session.login(challenge.value.challengeId, code.value)
-    if (mounted) notice.value = '登录成功，项目已关联当前账号。'
+    const completed = await session.login(challenge.value.challengeId, code.value)
+    if (
+      !completed ||
+      !mounted ||
+      route.fullPath !== origin ||
+      session.revision !== epoch + 1 ||
+      !registered.value
+    )
+      return
+    if (idea !== null) drafts.prompt = idea
+    await returnToSource()
   } catch (failure) {
     if (mounted) error.value = errorMessage(failure)
   } finally {
@@ -95,6 +118,33 @@ async function verify() {
       busy.value = false
       code.value = ''
     }
+  }
+}
+async function returnToSource() {
+  if (!registered.value) return
+  const origin = route.fullPath,
+    epoch = session.revision
+  const current = () =>
+    mounted && route.fullPath === origin && session.revision === epoch && registered.value
+  const target = returnTarget.value
+  busy.value = true
+  retryReturn.value = false
+  error.value = ''
+  notice.value = '登录成功，正在返回…'
+  try {
+    if (target?.projectId) await getProject(target.projectId)
+    if (current()) await router.replace(target?.path ?? '/projects')
+  } catch (failure) {
+    if (!current()) return
+    if (failure instanceof ApiFailure && failure.status === 404) {
+      await router.replace({ path: '/projects', query: { notice: 'account-project-unavailable' } })
+    } else {
+      notice.value = ''
+      error.value = `登录已成功，但暂时无法返回原页面。${errorMessage(failure)}`
+      retryReturn.value = true
+    }
+  } finally {
+    if (mounted) busy.value = false
   }
 }
 async function logout() {
@@ -124,6 +174,8 @@ watch(
     code.value = ''
     challenge.value = null
     notice.value = ''
+    retryReturn.value = false
+    error.value = ''
   },
 )
 onMounted(() => {
@@ -141,7 +193,9 @@ onBeforeUnmount(() => {
 
 <template>
   <section class="account-page">
-    <RouterLink to="/" class="account-back">← 返回创作</RouterLink>
+    <RouterLink :to="backTo" class="account-back">{{
+      backTo === '/' ? '← 返回创作' : '← 返回原页面'
+    }}</RouterLink>
     <p class="eyebrow">YOUR ACCOUNT</p>
     <h1 tabindex="-1">{{ registered ? '账号与工作空间' : '让灵感，有处可存' }}</h1>
     <p class="account-intro">用邮箱验证码登录，在不同浏览器继续你的创作。无需设置密码。</p>
@@ -154,8 +208,18 @@ onBeforeUnmount(() => {
             项目、历史对话和应用版本归属当前账号。退出不会删除已保存的内容，也不会停止正在进行的生成。
           </p>
           <RouterLink to="/projects" class="button primary">回到我的项目</RouterLink>
+          <button
+            v-if="retryReturn"
+            class="button secondary"
+            type="button"
+            data-test="retry-return"
+            :disabled="busy"
+            @click="returnToSource"
+          >
+            重试返回原页面
+          </button>
           <button class="button secondary" type="button" :disabled="busy" @click="logout">
-            {{ busy ? '正在退出…' : '退出账号' }}
+            {{ busy ? '请稍候…' : '退出账号' }}
           </button>
         </template>
         <template v-else-if="enabled === false">
@@ -170,6 +234,13 @@ onBeforeUnmount(() => {
         <form v-else-if="enabled" @submit.prevent="verify">
           <h2>邮箱注册 / 登录</h2>
           <p id="email-help">首次验证会创建账号，已有邮箱会直接登录。</p>
+          <p class="muted">
+            {{
+              returnTarget
+                ? '登录后返回刚才的页面；原项目需当前账号有访问权限。'
+                : '登录后进入「我的项目」。'
+            }}
+          </p>
           <label for="account-email">邮箱地址</label>
           <input
             id="account-email"

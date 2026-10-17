@@ -221,14 +221,14 @@ test('guest upgrade and logout remove recovery text, including an opener copy', 
   expect(captured.status()).toBe(200)
   await page.getByRole('textbox', { name: '6 位验证码' }).fill((await captured.json()).code)
   await page.getByRole('button', { name: '验证并登录', exact: true }).click()
-  await expect(page.getByText('邮箱账号 · 已登录', { exact: true })).toBeVisible()
+  await expect(page).toHaveURL(projectUrl)
+  await expect(page.getByRole('link', { name: '管理账号', exact: true })).toBeVisible()
   await expect(copy.getByRole('link', { name: '管理账号' })).toBeVisible()
   for (const tab of [page, copy]) {
     const journal = await tab.evaluate((key) => sessionStorage.getItem(key), cacheKey)
     expect(JSON.parse(journal ?? '{"entries":[]}').entries).toEqual([])
     await expect(tab.getByRole('button', { name: '重试原提交' })).toHaveCount(0)
   }
-  await page.goto(projectUrl)
   await expect(page.getByRole('textbox', { name: '继续完善你的需求' })).toHaveValue(original)
   await expect(page.getByText('草稿已保存', { exact: true })).toBeVisible()
   await page.getByRole('textbox', { name: '继续完善你的需求' }).fill('账号退出前的恢复正文')

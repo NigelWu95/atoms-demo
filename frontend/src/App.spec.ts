@@ -72,7 +72,7 @@ async function openApp(path = '/') {
 }
 
 describe('foundation website', () => {
-  it.each(['/', '/account'])(
+  it.each(['/', '/account', '/account?returnTo=/projects'])(
     'uses a full-width entry layout with account access on %s',
     async (path) => {
       vi.stubGlobal('fetch', mockApi())
@@ -80,12 +80,15 @@ describe('foundation website', () => {
       try {
         expect(wrapper.find('.sidebar').exists()).toBe(false)
         expect(wrapper.get('header .brand').attributes('href')).toBe('/')
-        expect(wrapper.get('header a[href="/account"]').text()).toBe('注册 / 登录')
+        expect(wrapper.get('header .account-link').text()).toBe('注册 / 登录')
+        expect(wrapper.get('header .account-link').attributes('href')).toBe(
+          path === '/' ? '/account?returnTo=/' : path,
+        )
         expect(wrapper.get('header a[href="/projects"]').text()).toBe('我的项目')
         const session = useSessionStore()
         session.identity = { userId: 'account-1', isGuest: false, displayName: '已注册用户' }
         await flushPromises()
-        expect(wrapper.get('header a[href="/account"]').text()).toBe('我的账号')
+        expect(wrapper.get('header .account-link').text()).toBe('我的账号')
       } finally {
         wrapper.unmount()
       }
@@ -96,6 +99,18 @@ describe('foundation website', () => {
     const { wrapper } = await openApp('/projects')
     expect(wrapper.find('.sidebar').exists()).toBe(true)
     expect(wrapper.find('.entry-header').exists()).toBe(false)
+    wrapper.unmount()
+  })
+  it('only shows the inaccessible-project return notice for a signed-in account', async () => {
+    vi.stubGlobal('fetch', mockApi())
+    const { wrapper } = await openApp('/projects?notice=account-project-unavailable')
+    expect(wrapper.text()).not.toContain('原项目不存在或不属于当前账号')
+    const session = useSessionStore()
+    session.identity = { userId: 'account', isGuest: false, displayName: '账号' }
+    await flushPromises()
+    expect(wrapper.get('.simple-page [role="status"]').text()).toContain(
+      '原项目不存在或不属于当前账号',
+    )
     wrapper.unmount()
   })
   it('hides but preserves a private view during identity revalidation', async () => {

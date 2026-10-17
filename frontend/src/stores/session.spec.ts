@@ -143,3 +143,46 @@ it('does not restore a late identity after invalidation', async () => {
   expect(store.identity).toBeNull()
   expect(store.state).toBe('failed')
 })
+
+it('reports a successful explicit login only after the identity transition completes', async () => {
+  setActivePinia(createPinia())
+  const store = useSessionStore()
+  store.identity = { userId: 'guest', isGuest: true, displayName: '访客' }
+  store.state = 'ready'
+  useDraftStore().prompt = '旧输入'
+  vi.stubGlobal(
+    'fetch',
+    vi.fn((path) =>
+      Promise.resolve(
+        Response.json(
+          path === '/api/auth/email/verifications'
+            ? { userId: 'account', isGuest: false, displayName: '账号' }
+            : { token: 'test', headerName: 'X-CSRF-TOKEN' },
+        ),
+      ),
+    ),
+  )
+  expect(await store.login('challenge', '123456')).toBe(true)
+  expect(store.identity?.userId).toBe('account')
+  expect(useDraftStore().prompt).toBe('')
+})
+it('does not report success for a second login while a transition is in flight', async () => {
+  setActivePinia(createPinia())
+  const store = useSessionStore()
+  let finish!: (response: Response) => void
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(
+      () =>
+        new Promise<Response>((resolve) => {
+          finish = resolve
+        }),
+    ),
+  )
+  const pending = store.login('first', '123456').catch(() => undefined)
+  expect(await store.login('second', '123456')).toBe(false)
+  store.invalidate('已换账号')
+  finish(Response.json({ token: 'test', headerName: 'X-CSRF-TOKEN' }))
+  await pending
+  expect(store.identity).toBeNull()
+})
