@@ -138,8 +138,18 @@ test('unknown response retries same save key and preserves draft; two tabs confl
   await otherFrame.getByRole('button', { name: '添加待办' }).click()
   await expect(second.getByText(/数据已在另一处更新/).first()).toBeVisible()
   await expect(otherFrame.getByLabel('新待办')).toHaveValue('另一标签的输入')
+  // The conflict banner shifts this host too; keep the actual iframe click fully in view.
+  await second.locator('iframe').evaluate((element) => element.scrollIntoView({ block: 'center' }))
+  await expect(second.locator('iframe')).toBeInViewport({ ratio: 1 })
+  const latest = second.waitForResponse(
+    (response) =>
+      new URL(response.url()).pathname.endsWith('/preview-state') &&
+      response.request().method() === 'GET',
+  )
   await otherFrame.getByRole('button', { name: '读取最新数据' }).click()
+  expect((await latest).status()).toBe(200)
   await expect(otherFrame.getByText('保留输入并重试', { exact: true })).toBeVisible()
+  await expect(otherFrame.getByLabel('新待办')).toHaveValue('另一标签的输入')
   await second.close()
 })
 
