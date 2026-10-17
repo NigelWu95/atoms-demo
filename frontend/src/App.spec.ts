@@ -18,6 +18,8 @@ function mockApi() {
   let savedDraft = { prompt: '', revision: 0 }
   return vi.fn().mockImplementation((path: string, options?: RequestInit) => {
     if (path === '/api/health') return Promise.resolve(Response.json({ status: 'UP' }))
+    if (path === '/api/auth/methods')
+      return Promise.resolve(Response.json({ emailCodeEnabled: true }))
     if (path === '/api/csrf')
       return Promise.resolve(Response.json({ token: 'test-token', headerName: 'X-CSRF-TOKEN' }))
     if (path === '/api/session')
@@ -70,6 +72,32 @@ async function openApp(path = '/') {
 }
 
 describe('foundation website', () => {
+  it.each(['/', '/account'])(
+    'uses a full-width entry layout with account access on %s',
+    async (path) => {
+      vi.stubGlobal('fetch', mockApi())
+      const { wrapper } = await openApp(path)
+      try {
+        expect(wrapper.find('.sidebar').exists()).toBe(false)
+        expect(wrapper.get('header .brand').attributes('href')).toBe('/')
+        expect(wrapper.get('header a[href="/account"]').text()).toBe('注册 / 登录')
+        expect(wrapper.get('header a[href="/projects"]').text()).toBe('我的项目')
+        const session = useSessionStore()
+        session.identity = { userId: 'account-1', isGuest: false, displayName: '已注册用户' }
+        await flushPromises()
+        expect(wrapper.get('header a[href="/account"]').text()).toBe('我的账号')
+      } finally {
+        wrapper.unmount()
+      }
+    },
+  )
+  it('retains the workspace navigation outside the entry pages', async () => {
+    vi.stubGlobal('fetch', mockApi())
+    const { wrapper } = await openApp('/projects')
+    expect(wrapper.find('.sidebar').exists()).toBe(true)
+    expect(wrapper.find('.entry-header').exists()).toBe(false)
+    wrapper.unmount()
+  })
   it('hides but preserves a private view during identity revalidation', async () => {
     vi.stubGlobal('fetch', mockApi())
     const { wrapper } = await openApp()

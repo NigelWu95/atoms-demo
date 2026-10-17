@@ -1,5 +1,17 @@
 # 独立工程导出与运行 · 开发任务
 
+## 欢迎体验与旧任务收口（2026-10-17，连续实施）
+
+依据用户已确认的 `SPEC-welcome-experience.md`；保留全部历史任务与证据。不调用真实模型或邮件，不推送/部署。
+
+- [ ] WE01 入口布局：`App.vue`、`router.ts`、`EntryHeader.vue`、`SessionStatus.vue`、`App.spec.ts`。首页/账号页无侧栏，项目/工作台保留；账号状态和重连可用，公开应用不创建管理会话。验证：App 定向红绿测试、前端检查/构建。无前置依赖。
+- [ ] WE02 欢迎页：`HomePage.vue`、`welcome.css`、`App.spec.ts`。首屏介绍/idea 输入与示例，提交后真实建项目，失败保留输入、原 key 重试，首页无管理列表。验证：App/PromptComposer 单测与构建；依赖 WE01。
+- [ ] WE03 账号页：`AccountPage.vue`、`account.css`、`AccountPage.spec.ts`。居中整页卡片、返回入口、全部邮箱与会话状态、重要切换提示；不改认证逻辑。验证：账号单测与构建；依赖 WE01。
+- [ ] WE04 浏览器：`e2e/foundation.spec.ts`、`e2e/email-account.spec.ts`、`e2e/projects.spec.ts`、`e2e-runtime/generation.spec.ts` 中受影响入口。四尺寸、键盘/axe、创建/刷新、验证码测试替身及跨标签身份切换；新旧工作台检查通过。依赖 WE02/WE03，完整前端 unit/type/lint/format/build 及基础/运行时 Chrome 回归。
+- [ ] WE05 旧任务和文档：核对 L04/L05 历史证据、保留人工验收；同步运行说明、README 与本轮验证范围。依赖 WE04；验证 diff、来源链接与未完项不误勾。
+
+检查点用于汇报证据，不逐项阻断已授权实施。新增真实模型质量评测仍需明确费用预算；人工评审不由自动测试代签。
+
 ## 本机体验优化（不部署服务器）
 
 - [x] L01 版本源码导出直接展示；16 项相关单测通过，真实浏览器回归纳入 L03。

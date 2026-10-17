@@ -12,8 +12,8 @@ export function createAppRouter(history: RouterHistory) {
     history,
     routes: [
       { path: '/a/:slug', component: PublicAppPage, meta: { title: '公开应用', publicApp: true } },
-      { path: '/', component: HomePage, meta: { title: '开始创作' } },
-      { path: '/account', component: AccountPage, meta: { title: '邮箱账号' } },
+      { path: '/', component: HomePage, meta: { title: '开始创作', entryPage: true } },
+      { path: '/account', component: AccountPage, meta: { title: '邮箱账号', entryPage: true } },
       { path: '/workbench', component: WorkbenchPage, meta: { title: '工作台' } },
       { path: '/projects', component: ProjectsPage, meta: { title: '我的项目' } },
       { path: '/projects/:id', component: WorkbenchPage, meta: { title: '项目工作台' } },
