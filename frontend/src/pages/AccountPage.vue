@@ -15,6 +15,9 @@ const route = useRoute(),
 const returnTarget = computed(() => accountReturnTarget(route.query.returnTo))
 const backTo = computed(() => returnTarget.value?.path ?? '/')
 const retryReturn = ref(false)
+const mode = ref<'code' | 'password'>('code'),
+  password = ref(''),
+  passwordEnabled = ref(false)
 const enabled = ref<boolean | null>(null),
   loading = ref(false),
   busy = ref(false)
@@ -23,6 +26,7 @@ const email = ref(''),
   error = ref(''),
   notice = ref('')
 const challenge = ref<EmailChallenge | null>(null),
+  challengeEmail = ref(''),
   now = ref(Date.now()),
   resendAt = ref(0)
 const codeInput = ref<HTMLInputElement | null>(null)
@@ -45,7 +49,10 @@ async function load() {
   error.value = ''
   try {
     const value = await emailMethods()
-    if (mounted) enabled.value = value.emailCodeEnabled
+    if (mounted) {
+      enabled.value = value.emailCodeEnabled
+      passwordEnabled.value = value.passwordEnabled
+    }
   } catch (failure) {
     if (mounted) error.value = errorMessage(failure)
   } finally {
@@ -61,6 +68,7 @@ async function send() {
     const sent = await sendEmailCode(email.value.trim(), controller.signal)
     if (!mounted) return
     challenge.value = sent
+    challengeEmail.value = email.value.trim()
     code.value = ''
     now.value = Date.now()
     resendAt.value = now.value + sent.resendAfterSeconds * 1000
@@ -87,9 +95,9 @@ async function verify() {
   if (
     busy.value ||
     !session.ready ||
-    !challenge.value ||
-    expired.value ||
-    !/^\d{6}$/.test(code.value)
+    (mode.value === 'code'
+      ? !challenge.value || expired.value || !/^\d{6}$/.test(code.value)
+      : !passwordEnabled.value || !emailValid.value || !password.value)
   )
     return
   busy.value = true
@@ -98,9 +106,12 @@ async function verify() {
   const origin = route.fullPath,
     epoch = session.revision
   // Carry only deliberate homepage input in this tab, never project/recovery caches.
-  const idea = returnTarget.value?.path === '/' ? drafts.prompt : null
+  const idea = ['/', '/create'].includes(returnTarget.value?.path ?? '') ? drafts.prompt : null
   try {
-    const completed = await session.login(challenge.value.challengeId, code.value)
+    const completed =
+      mode.value === 'code'
+        ? await session.login(challenge.value!.challengeId, code.value)
+        : await session.loginPassword(email.value.trim(), password.value)
     if (
       !completed ||
       !mounted ||
@@ -117,6 +128,7 @@ async function verify() {
     if (mounted) {
       busy.value = false
       code.value = ''
+      password.value = ''
     }
   }
 }
@@ -133,7 +145,8 @@ async function returnToSource() {
   notice.value = '登录成功，正在返回…'
   try {
     if (target?.projectId) await getProject(target.projectId)
-    if (current()) await router.replace(target?.path ?? '/projects')
+    if (current())
+      await router.replace(target?.path === '/' ? '/create' : (target?.path ?? '/projects'))
   } catch (failure) {
     if (!current()) return
     if (failure instanceof ApiFailure && failure.status === 404) {
@@ -172,6 +185,7 @@ watch(
   [() => session.revision, () => session.identity?.userId, () => session.identity?.isGuest],
   () => {
     email.value = ''
+    password.value = ''
     code.value = ''
     challenge.value = null
     notice.value = ''
@@ -179,6 +193,14 @@ watch(
     error.value = ''
   },
 )
+watch(mode, () => {
+  password.value = ''
+  code.value = ''
+  error.value = ''
+  notice.value = ''
+  if (mode.value === 'code' && challenge.value && email.value.trim() !== challengeEmail.value)
+    challenge.value = null
+})
 onMounted(() => {
   void load()
   timer = setInterval(() => {
@@ -199,7 +221,7 @@ onBeforeUnmount(() => {
     }}</RouterLink>
     <p class="eyebrow">YOUR ACCOUNT</p>
     <h1 tabindex="-1">{{ registered ? '账号与工作空间' : '让灵感，有处可存' }}</h1>
-    <p class="account-intro">用邮箱验证码登录，在不同浏览器继续你的创作。无需设置密码。</p>
+    <p class="account-intro">用邮箱验证码或账号密码登录，在不同浏览器继续你的创作。</p>
     <div class="account-layout">
       <div class="account-card">
         <template v-if="registered">
@@ -209,6 +231,7 @@ onBeforeUnmount(() => {
             项目、历史对话和应用版本归属当前账号。退出不会删除已保存的内容，也不会停止正在进行的生成。
           </p>
           <RouterLink to="/projects" class="button primary">回到我的项目</RouterLink>
+          <RouterLink to="/settings/account" class="button secondary">管理账号与密码</RouterLink>
           <button
             v-if="retryReturn"
             class="button secondary"
@@ -234,7 +257,33 @@ onBeforeUnmount(() => {
         </template>
         <form v-else-if="enabled" @submit.prevent="verify">
           <h2>邮箱注册 / 登录</h2>
-          <p id="email-help">首次验证会创建账号，已有邮箱会直接登录。</p>
+          <div class="login-options" role="group" aria-label="选择登录方式">
+            <button
+              type="button"
+              class="button secondary"
+              :aria-pressed="mode === 'code'"
+              :disabled="busy"
+              @click="mode = 'code'"
+            >
+              验证码登录
+            </button>
+            <button
+              type="button"
+              class="button secondary"
+              :aria-pressed="mode === 'password'"
+              :disabled="busy"
+              @click="mode = 'password'"
+            >
+              密码登录
+            </button>
+          </div>
+          <p id="email-help">
+            {{
+              mode === 'code'
+                ? '首次验证会创建账号，已有邮箱会直接登录。'
+                : '使用已设置密码的邮箱账号登录；未设置或忘记密码可使用验证码登录。'
+            }}
+          </p>
           <p class="muted">
             {{
               returnTarget
@@ -251,12 +300,12 @@ onBeforeUnmount(() => {
             inputmode="email"
             maxlength="254"
             required
-            :readonly="!!challenge"
+            :readonly="mode === 'code' && !!challenge"
             :disabled="busy || !session.ready"
             aria-describedby="email-help account-warning"
             placeholder="you@example.com"
           />
-          <div class="account-send-row">
+          <div v-if="mode === 'code'" class="account-send-row">
             <button
               class="button secondary"
               type="button"
@@ -284,7 +333,7 @@ onBeforeUnmount(() => {
               更换邮箱
             </button>
           </div>
-          <template v-if="challenge">
+          <template v-if="mode === 'code' && challenge">
             <label for="account-code">6 位验证码</label>
             <input
               id="account-code"
@@ -312,6 +361,28 @@ onBeforeUnmount(() => {
               :disabled="busy || !session.ready || expired || !/^\d{6}$/.test(code)"
             >
               {{ busy ? '正在验证…' : '验证并登录' }}
+            </button>
+          </template>
+          <template v-if="mode === 'password'">
+            <label for="account-password">账号密码</label>
+            <input
+              id="account-password"
+              v-model="password"
+              type="password"
+              autocomplete="current-password"
+              maxlength="128"
+              required
+              :disabled="busy || !session.ready || !passwordEnabled"
+            />
+            <p v-if="!passwordEnabled" role="status">
+              当前访问方式未开放密码登录。公网需 HTTPS，你仍可切回验证码登录。
+            </p>
+            <button
+              class="button primary account-submit"
+              type="submit"
+              :disabled="busy || !session.ready || !passwordEnabled || !emailValid || !password"
+            >
+              {{ busy ? '正在登录…' : '登录' }}
             </button>
           </template>
         </form>

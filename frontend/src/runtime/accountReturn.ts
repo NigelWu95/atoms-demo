@@ -7,7 +7,8 @@ export function accountReturnTarget(
   value: unknown,
 ): { path: string; projectId: string | null } | null {
   if (typeof value !== 'string') return null
-  if (['/', '/projects', '/workbench'].includes(value)) return { path: value, projectId: null }
+  if (['/', '/create', '/settings/account', '/projects', '/workbench'].includes(value))
+    return { path: value, projectId: null }
   const match = projectPath.exec(value) ?? previewPath.exec(value)
   return match && match[0] === value ? { path: value, projectId: match[1]! } : null
 }

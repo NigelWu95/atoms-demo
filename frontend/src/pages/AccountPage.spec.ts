@@ -49,6 +49,46 @@ it('does not offer a pretend send when email authentication is unavailable', asy
   expect(wrapper.find('input[type="email"]').exists()).toBe(false)
   wrapper.unmount()
 })
+it('defaults to codes and logs an existing account in with a password through the same return flow', async () => {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn().mockResolvedValue(Response.json({ emailCodeEnabled: true, passwordEnabled: true })),
+  )
+  const { wrapper, session, router } = await open('/create')
+  const login = vi.spyOn(session, 'loginPassword').mockImplementation(async () => {
+    session.revision++
+    session.identity = { userId: 'account', isGuest: false, displayName: '账号' }
+    return true
+  })
+  await flushPromises()
+  expect(wrapper.find('[data-test="send-code"]').exists()).toBe(true)
+  expect(wrapper.find('#account-password').exists()).toBe(false)
+  await wrapper.findAll('.login-options button')[1]!.trigger('click')
+  await wrapper.get('#account-email').setValue('creator@example.com')
+  await wrapper.get('#account-password').setValue(' exact password phrase ')
+  await wrapper.get('form').trigger('submit')
+  await flushPromises()
+  expect(login).toHaveBeenCalledExactlyOnceWith('creator@example.com', ' exact password phrase ')
+  expect(router.currentRoute.value.path).toBe('/create')
+  wrapper.unmount()
+})
+it('does not submit passwords when the server disallows the current transport', async () => {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn().mockResolvedValue(Response.json({ emailCodeEnabled: true, passwordEnabled: false })),
+  )
+  const { wrapper, session } = await open()
+  const login = vi.spyOn(session, 'loginPassword')
+  await flushPromises()
+  await wrapper.findAll('.login-options button')[1]!.trigger('click')
+  await wrapper.get('#account-email').setValue('creator@example.com')
+  await wrapper.get('#account-password').setValue('test-only-password-phrase')
+  await wrapper.get('form').trigger('submit')
+  expect(wrapper.get('button[type="submit"]').attributes('disabled')).toBeDefined()
+  expect(wrapper.text()).toContain('公网需 HTTPS')
+  expect(login).not.toHaveBeenCalled()
+  wrapper.unmount()
+})
 it('sends once, disables resend during cooldown, and does not accept malformed codes', async () => {
   const fetch = vi.fn((path) =>
     Promise.resolve(
@@ -178,7 +218,7 @@ it('carries only this tab’s homepage idea through explicit login, not private 
   drafts.attach(projectId, '旧身份私有项目输入', 'old-key')
   await wrapper.get('form').trigger('submit')
   await flushPromises()
-  expect(router.currentRoute.value.path).toBe('/')
+  expect(router.currentRoute.value.path).toBe('/create')
   expect(drafts.prompt).toBe('做一个 2048 游戏')
   expect(drafts.projectDrafts).toEqual({})
   wrapper.unmount()

@@ -1,7 +1,7 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia } from 'pinia'
 import { createMemoryHistory } from 'vue-router'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App.vue'
 import { createAppRouter } from './router'
 import { useSessionStore } from './stores/session'
@@ -56,7 +56,11 @@ function mockApi() {
   })
 }
 
-afterEach(() => vi.unstubAllGlobals())
+beforeEach(() => localStorage.clear())
+afterEach(() => {
+  localStorage.clear()
+  vi.unstubAllGlobals()
+})
 
 async function openApp(path = '/') {
   // jsdom has no layout/scroll implementation; actual scrolling is browser-tested.
@@ -88,7 +92,10 @@ describe('foundation website', () => {
         const session = useSessionStore()
         session.identity = { userId: 'account-1', isGuest: false, displayName: '已注册用户' }
         await flushPromises()
-        expect(wrapper.get('header .account-link').text()).toBe('我的账号')
+        expect(
+          wrapper.get(path === '/' ? '.sidebar .account-link' : 'header .account-link').text(),
+        ).toBe(path === '/' ? '管理账号' : '我的账号')
+        expect(wrapper.get('.account-link').attributes('href')).toBe('/settings/account')
       } finally {
         wrapper.unmount()
       }
@@ -253,7 +260,8 @@ describe('foundation website', () => {
     await vi.waitFor(() => expect(wrapper.text()).toContain('草稿已保存'))
     await router.push('/')
     await flushPromises()
-    expect(router.currentRoute.value.path).toBe('/')
+    expect(router.currentRoute.value.path).toBe('/create')
+    expect(wrapper.find('.sidebar').exists()).toBe(true)
     expect(wrapper.get('textarea').element.value).toContain('待办')
     wrapper.unmount()
   })

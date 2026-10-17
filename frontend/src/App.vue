@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { nextTick, watch } from 'vue'
-import { RouterLink, RouterView, useRoute } from 'vue-router'
+import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import ServiceStatus from './components/ServiceStatus.vue'
 import SessionStatus from './components/SessionStatus.vue'
 import EntryHeader from './components/EntryHeader.vue'
@@ -8,6 +8,15 @@ import { useSessionStore } from './stores/session'
 
 const route = useRoute()
 const session = useSessionStore()
+const router = useRouter()
+watch(
+  [() => route.path, () => session.ready, () => session.identity?.isGuest],
+  () => {
+    if (route.path === '/' && session.ready && session.identity?.isGuest === false)
+      void router.replace('/create')
+  },
+  { immediate: true },
+)
 watch(
   () => route.path,
   async () => {
@@ -29,7 +38,7 @@ watch(
   >
     <EntryHeader v-if="route.meta.entryPage" />
     <aside v-else class="sidebar">
-      <RouterLink class="brand" to="/" aria-label="Atoms Demo Studio 首页">
+      <RouterLink class="brand" to="/create" aria-label="Atoms Demo Studio 创作页">
         <span class="brand-mark" aria-hidden="true">✳</span>
         <span>atoms<span class="brand-subtitle">DEMO STUDIO</span></span>
       </RouterLink>
@@ -40,7 +49,7 @@ watch(
         >
       </div>
       <nav class="primary-nav" aria-label="主要导航">
-        <RouterLink to="/" exact-active-class="active"
+        <RouterLink to="/create" exact-active-class="active"
           ><span aria-hidden="true">＋</span>开始创作</RouterLink
         >
         <RouterLink to="/projects" active-class="active"
@@ -65,11 +74,19 @@ watch(
     <main id="main-content" class="main-content">
       <RouterView
         v-if="!session.hasConnected || session.identity || route.path === '/account'"
-        v-show="!session.hasConnected || session.ready || route.path === '/account'"
+        v-show="
+          (route.path !== '/' && !session.hasConnected) ||
+          session.ready ||
+          route.path === '/account'
+        "
         :key="route.path === '/account' ? 'account' : session.revision"
       />
       <section
-        v-if="session.hasConnected && !session.ready && route.path !== '/account'"
+        v-if="
+          (session.hasConnected || route.path === '/') &&
+          !session.ready &&
+          route.path !== '/account'
+        "
         class="simple-page"
         aria-live="polite"
       >
