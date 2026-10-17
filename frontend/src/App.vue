@@ -3,6 +3,7 @@ import { nextTick, watch } from 'vue'
 import { RouterLink, RouterView, useRoute } from 'vue-router'
 import ServiceStatus from './components/ServiceStatus.vue'
 import SessionStatus from './components/SessionStatus.vue'
+import EntryHeader from './components/EntryHeader.vue'
 import { useSessionStore } from './stores/session'
 
 const route = useRoute()
@@ -21,9 +22,13 @@ watch(
   <div
     v-if="route.matched.length && !route.meta.publicApp"
     class="app-shell"
-    :class="{ 'workbench-shell': route.path === '/workbench' || !!route.params.id }"
+    :class="{
+      'entry-shell': route.meta.entryPage,
+      'workbench-shell': route.path === '/workbench' || !!route.params.id,
+    }"
   >
-    <aside class="sidebar">
+    <EntryHeader v-if="route.meta.entryPage" />
+    <aside v-else class="sidebar">
       <RouterLink class="brand" to="/" aria-label="Atoms Demo Studio 首页">
         <span class="brand-mark" aria-hidden="true">✳</span>
         <span>atoms<span class="brand-subtitle">DEMO STUDIO</span></span>
@@ -75,8 +80,24 @@ watch(
         <p v-if="session.error" role="alert">{{ session.error }}</p>
       </section>
     </main>
+    <footer v-if="route.meta.entryPage" class="entry-footer"><ServiceStatus /></footer>
   </div>
   <main v-else-if="route.meta.publicApp" id="main-content" class="public-app-shell">
     <RouterView />
   </main>
 </template>
+
+<style scoped>
+.entry-shell {
+  display: flex;
+  flex-direction: column;
+}
+.entry-shell > .main-content {
+  flex: 1;
+}
+.entry-footer {
+  display: flex;
+  justify-content: center;
+  padding: 24px;
+}
+</style>
