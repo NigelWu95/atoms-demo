@@ -71,10 +71,14 @@ test('repair requires consent, preserves the draft and retries only the original
   expect(submissions[0]).toEqual(submissions[1])
   await page.getByRole('button', { name: '准备修复建议' }).click()
   await expect(confirmation).toBeVisible()
-  await page.getByLabel('代码版本').selectOption({ label: 'V1 · 历史只读' })
+  await page
+    .getByRole('combobox', { name: '代码版本', exact: true })
+    .selectOption({ label: 'V1 · 历史只读' })
   await expect(confirmation).toHaveCount(0)
   await expect(page.getByRole('button', { name: '准备修复建议' })).toHaveCount(0)
-  await page.getByLabel('代码版本').selectOption({ label: 'V2 · 当前版本' })
+  await page
+    .getByRole('combobox', { name: '代码版本', exact: true })
+    .selectOption({ label: 'V2 · 当前版本' })
   await page.setViewportSize({ width: 320, height: 1000 })
   await page
     .getByRole('group', { name: '工作台区域' })
