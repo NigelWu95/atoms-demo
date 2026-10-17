@@ -2,7 +2,7 @@
 
 模块：`password-auth`；依赖 `account-profile`；索引：[能力地图](ACCOUNT-WORKSPACE-CAPABILITY-MAP.md)。
 
-状态：2026-10-17 用户已确认并实施，V017 仅应用于隔离测试库；本地验收收口中，未推送或部署。证据见[本轮记录](https://github.com/NigelWu95/atoms-demo/blob/main/docs/account-workspace-verification.md)。
+状态：2026-10-17 用户已确认，实施与本地验收完成；V017 仅应用于隔离测试库，未推送或部署。证据见[本轮记录](https://github.com/NigelWu95/atoms-demo/blob/main/docs/account-workspace-verification.md)。
 
 ## 目标与范围
 
