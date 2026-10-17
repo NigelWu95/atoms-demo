@@ -1,6 +1,6 @@
 # 账号管理、密码登录与工作区导航
 
-状态：2026-10-17 用户已批准三个规格并要求一次完成；三个模块已实现并完成本地验收。基线为 `8ee0808`，未推送或部署，不表示云端已包含本轮功能。证据与复跑边界见[本轮记录](https://github.com/NigelWu95/atoms-demo/blob/main/docs/account-workspace-verification.md)。
+状态：2026-10-17 用户已批准三个规格并要求一次完成；三个模块已实现并完成本地验收。基线为 `8ee0808`；按后续要求，源码 `80d0d06` 已推送 main，并于 22:59 部署 `atoms-demo-eXKVPV`。公网 HTTP 密码操作仍关闭。实施证据与复跑边界见[本轮记录](https://github.com/NigelWu95/atoms-demo/blob/main/docs/account-workspace-verification.md)，线上验收范围见[部署记录](https://github.com/NigelWu95/atoms-demo/blob/main/docs/cloud-deployment.md)。
 
 | 模块 ID | 职责 | 依赖 | 规格 |
 |---|---|---|---|

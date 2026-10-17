@@ -10,6 +10,7 @@
 - 服务器保留原有独立数据库，没有上传本地项目或会话。2026-10-16 按用户授权，通过 SSH 将本地 `.env.local` 的模型与邮箱键合并进服务器私有配置；不复制本地应用/测试数据库密码，不覆盖站点 origin、Cookie 名称或其他服务器配置。真实值不进入 GitHub 或发布包。
 - 当前模型限制为 **163840 tokens / 单次 300 秒 / 整轮 900 秒**，累计请求上限已随本地配置同步为 **10000 次**。本次验收已用 39、剩余 9961，记账未清零，也未调用模型；该上限由平台用户共用，不是每日或每用户额度。
 - 访客与可选邮箱验证码账号并存，项目按所有者隔离。邮箱入口 `/account` 已开放，QQ SMTP TLS/认证检查通过；云端真实收信与验证码登录仍需用户在公网页面复核，本地单次真实流程已通过。认证有数据库共享限流，生成身份频率限制、总存储配额、长期数据清理仍待完善；不适合无人监管地长期开放。
+- 账号管理 `/settings/account`、可选密码认证与常驻创作区 `/create` 已部署。公网实际 `emailCodeEnabled=true`、`passwordEnabled=false`：保留 HTTP 验证码演示例外，但不自动开启明文密码登录或设置/修改。密码功能已本地验收；本次未登录或修改服务器原有账号。
 
 ## 实际安装
 
@@ -19,14 +20,14 @@
 
 | 项目 | 位置 / 状态 |
 |---|---|
-| 发布版本 | `atoms-demo-02c79i`，源码 `209ae88da8307bccb39fbad47f6f9097cba63bb9`；2026-10-17 16:43 更新；本轮未推送 GitHub，dirty=true 仅因未跟踪的 OAuth 草稿，详见本次记录 |
-| 程序 | `/opt/atoms-demo/releases/atoms-demo-02c79i`；`/opt/atoms-demo/current` 为其符号链接；保留的 `atoms-demo-fZrPBf` 为账号兼容回退候选，但它仍有验证码表单重校验问题，不能直接回退到更早的纯访客程序 |
+| 发布版本 | `atoms-demo-eXKVPV`，源码 `80d0d06071a41fdf1152238c53f2cb7174b14cf7` 已推送 GitHub main；2026-10-17 22:59 更新；dirty=true 仅因未跟踪的 OAuth 草稿，未跟踪内容不进入发布包 |
+| 程序 | `/opt/atoms-demo/releases/atoms-demo-eXKVPV`；`/opt/atoms-demo/current` 为其符号链接；旧包保留，但 V017 后不能直接切回忽略认证版本撤销的旧程序，见下文故障处理 |
 | 外部配置 | `/etc/atoms-demo/application.properties`，root:atoms / 0640，目录 0750 |
 | TLS（未启用） | `/etc/atoms-demo/tls/server.crt`、`server.key` 为回退保留；私钥 root / 0600，目录 0700 |
 | 后端服务 | `atoms-demo.service`，非 root 的 `atoms` 账号，单实例 |
 | 主机特有配置 | `/etc/systemd/system/atoms-demo.service.d/runtime.conf`，Java 路径、PG17 启动顺序、内存和正常退出码；`http-demo.conf` 配置独立 HTTP Cookie |
 | Nginx 站点 | `/etc/nginx/conf.d/atoms-demo.conf`，监听明文 `8443`；路由/安全头在 `/etc/nginx/atoms-demo/`，HTTP 不发 HSTS |
-| 数据库 | `atoms_demo` / schema `atoms` / 受限角色 `atoms_app`；数据目录 `/var/lib/pgsql/17/data` |
+| 数据库 | `atoms_demo` / schema `atoms`（V017，18 条成功迁移）/ 受限角色 `atoms_app`；数据目录 `/var/lib/pgsql/17/data` |
 | 数据库服务 | `postgresql-17.service`；本机 peer、回环 TCP SCRAM-SHA-256，数据页校验已开启 |
 | 公网监听 | SSH 22、HTTP 8443；8080 和 5432 仅回环监听 |
 
@@ -217,7 +218,7 @@
 
 本机脚本/截图位于 `.local/deploy-welcome-20261017.biJxVw/`，服务器暂存目录 `/var/tmp/atoms-welcome-deploy.Xzj63z/`，部署单元 `atoms-welcome-deploy-20261017.service`。临时脚本、截图及发布产物不进入 Git；未上传新密钥，也未修改日常本地启动环境。
 
-## 验证码表单修复上线（2026-10-17，当前程序）
+## 验证码表单修复上线（2026-10-17，历史程序）
 
 用户确认部署修复。16:43:40（Asia/Shanghai）切换为源码 `209ae88da8307bccb39fbad47f6f9097cba63bb9`，发布包 `atoms-demo-02c79i.tar.gz`，SHA-256 `9454c1f4a47d5f14456ee6632d358a656698804a492c6e571bc0fa8e74aa5500`。本轮不合并或推送 GitHub；dirty=true 仍仅来自未跟踪的 OAuth 草稿，草稿和私有配置不进入发布包。
 
@@ -231,6 +232,24 @@
 回退候选为 `/opt/atoms-demo/releases/atoms-demo-fZrPBf`。确认无活动任务后停止后端、原子切回该目录、启动并检查健康及账号入口；**不恢复数据库或旧配置，不删表或清零额度**。后端及 schema 未变，旧包保留，但会重新引入本次前端缺陷；本次未触发回退。
 
 本机脚本/截图：`.local/deploy-email-form-20261017.q5z9ee/`；远端暂存目录 `/var/tmp/atoms-email-form-deploy.L1HlCb/`；部署单元 `atoms-email-form-deploy-20261017.service`。这些临时证据不推送。用户须刷新账号页加载新版，再重新获取验证码；旧页面内存中已被清掉的挑战不能由更新恢复。
+
+## 账号管理、密码能力与常驻工作区上线（2026-10-17，当前程序）
+
+用户要求推送和部署。源码 `80d0d06071a41fdf1152238c53f2cb7174b14cf7` 已快进推送至 GitHub main，远端提交号查询一致；没有强推、改写历史或提交 OAuth 草稿。22:59:12（Asia/Shanghai）部署完成，发布包 `atoms-demo-eXKVPV.tar.gz`，SHA-256 `a74c9f89464811d7828ad118de3394ea5813460d93cf07c91d2ae6abb744f1b6`。文档发布记录晚于程序提交，不改写归档；dirty=true 仅源于两处未跟踪 OAuth 草稿，正式载荷来自已提交源码与白名单构建产物。
+
+- 本次重新运行正式发布流程：3 项打包测试、前端 52 文件 / 346 单测、后端 143 单元 + 113 PostgreSQL/HTTP 集成全部通过，零失败/跳过；类型、lint、格式与生产构建通过。平台和导出模板 npm audit 均为 0 已知漏洞。保留已有 Java deprecated API 编译提示，不声称无警告；未升级依赖或执行后端外部漏洞扫描。此前完整浏览器回归的结果与复跑区别见[账号工作区验收](https://github.com/NigelWu95/atoms-demo/blob/main/docs/account-workspace-verification.md)，不是本次公网测试数量。
+- 发布包上传后，归档与全部 13 个载荷校验通过；生产包不包含测试入口、OAuth 草稿或私有配置。Nginx 配置检查通过；停服前后均无活动生成、构建或应用进程。
+- 数据库、外部配置及 Nginx/systemd 配置备份至 `/var/backups/atoms-demo/account-workspace-20261017.94Nz8y/`，目录 root/0700，dump 与私有配置 0600；`pg_restore --list` 通过。本次未进行完整恢复演练，同机备份不是异地灾备，不公开上传。
+- Flyway 仅增量应用 V017：账号认证版本、密码表与验证码用途。迁移后密码表为空、原有账号版本为 0，不回填默认密码。原有 1 个邮箱账号与身份、22 个项目、6 条草稿、18 个版本、10 条状态、60 条消息、21 次任务、39 次模型记账、预算及空发布/构建/运行表的数量和内容摘要一致；账号摘要排除新增的 `auth_version` 字段。
+- 私有配置、Nginx 与 systemd 文件逐字节未变，权限仍 root:atoms/0640。邮箱/模型/HMAC、HTTP 方式与 10000 次累计额度保留，云端构建和应用进程开关不变。公网实际 `emailCodeEnabled=true`、`passwordEnabled=false`，没有额外开启明文密码认证。部署单元 success / 退出码 0，后端、Nginx、PostgreSQL 均 active；后端 NRestarts=0，内外 health=UP，首页 200。
+- DevTools MCP 不可用，使用独立 Playwright Chrome。真实公网检查首页无侧栏、进入项目列表后“开始创作”保留侧栏、`/create` 刷新与根地址回访、访客账号资料及不缓存响应、账号独立页面与返回管理页、默认验证码/可选密码模式与 HTTP 密码禁用提示。未登录读取本人资料为 401，敏感 env、真实测试页 `/test-lab` 和测试验证码端点均为 404。
+- 验证码阶段使用浏览器内模拟发送成功，随后真实 `/api/me` 两次重校验均保留邮箱、部分验证码、登录按钮与冷却。是事件重放，不冒称实际打开系统邮箱。320/390/768/1024/1440px 登录页及 320/1440px 资料页均无横向溢出；已查看手机登录页与桌面资料页截图，pageerror/console error/warning 均为 0。
+- 首轮公网脚本在最后的路径检查失败：误用并不存在的 `/__fixtures__/`，实际返回普通 SPA 外壳。核对 Nginx 与已有测试代码后改为真实 `/test-lab` 及验证码测试端点，完整复跑通过；保留失败截图，未修改线上程序或放宽状态断言。
+- 仅创建独立测试访客会话，未创建项目、读取原有用户项目、操作真实账号、发送真实邮件或调用模型；剩余额度仍为 9961。**云端正式账号资料、真实验证码登录和密码正向闭环未在本次验证**；密码正向行为已本地测试，公网 HTTP 仍明确关闭。
+
+故障处理：V017 之后保留密码版本撤销检查。新程序无法启动时停止服务并前向修复，不自动切回 `atoms-demo-02c79i` 或更早的旧程序；不降低 `auth_version`、删除密码表、修改 Flyway 历史、恢复旧数据库或重置调用额度。若认证入口出现问题，可在当前安全兼容版本上另行关闭邮箱认证并重启；本次未执行该配置变更。数据库恢复必须另行确认备份后数据损失范围；本次未触发回退。
+
+本地无凭据脚本/截图在 `.local/deploy-account-workspace-20261017.wEfCDB/`，服务器暂存目录 `/var/tmp/atoms-account-workspace-deploy.HNoNPC/`；一次性部署单元 `atoms-account-workspace-deploy-20261017.service`，避免 SSH 中断打断切换。临时脚本、浏览器证据、备份和发布包不进入 Git；日常本地服务未重启。
 
 ## 备份及运维
 
@@ -250,6 +269,6 @@ systemctl restart atoms-demo
 
 配置修改后重启后端，Nginx 配置改动须先 `nginx -t` 再 reload。不要输出完整配置、密码或 Cookie。DeepSeek 与邮箱配置已授权同步，累计模型预算为 10000 次，平台用户共用；不删除记账或自动放开上限。长期开放前仍需补齐生成身份限流和资源配额，后端仍只允许单实例。
 
-更新/回退遵循 [部署说明](https://github.com/NigelWu95/atoms-demo/blob/main/deploy/server/README.md)：备份 → 停后端 → 切换已校验版本 → 启动检查。当前版本使用上节“验证码表单修复上线”的账号兼容回退候选 `atoms-demo-fZrPBf`，注意该包仍有已知前端缺陷，不使用纯访客程序回退。以下仅为首次 HTTPS 版本的历史方案：当时切回旧 `atoms-demo-XmTJCF` 还需同时恢复 HTTP 切换前的配置、站点、静态安全头及 Secure Cookie，并验证证书与入口；它不适用于当前账号版本，不能作为无损回退指令。
+更新/回退遵循 [部署说明](https://github.com/NigelWu95/atoms-demo/blob/main/deploy/server/README.md)：备份 → 停后端 → 切换已校验版本 → 启动检查。**当前 V017 必须保留认证版本撤销防护，优先前向修复，不能直接套用上文历史版本的旧包切换方案。** 以下仅为首次 HTTPS 版本的历史方案：当时切回旧 `atoms-demo-XmTJCF` 还需同时恢复 HTTP 切换前的配置、站点、静态安全头及 Secure Cookie，并验证证书与入口；它不适用于当前账号版本，不能作为无损回退指令。
 
 尚未验收：云端实际生成版本发布与 LIVE 数据闭环、活动任务崩溃恢复、整机重启，以及不刷新页面的 SSE 断网游标恢复。云端真实 CREATE、生成中刷新后 SSE 重连、预览交互保存与刷新恢复已通过；不把一款 2048 的成功等同于任意需求稳定性保证，T29 总项继续保留未完成。
