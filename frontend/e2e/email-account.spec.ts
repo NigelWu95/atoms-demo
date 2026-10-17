@@ -38,7 +38,8 @@ test('email account preserves projects, synchronizes tabs, logs out and logs in 
   const sibling = await page.context().newPage()
   await sibling.goto('/')
   await sibling.getByRole('textbox', { name: '描述你的应用想法' }).fill('只属于旧身份的草稿')
-  await page.getByRole('link', { name: '邮箱注册 / 登录' }).click()
+  await page.getByRole('link', { name: '注册 / 登录', exact: true }).click()
+  await expect(page.locator('.sidebar')).toHaveCount(0)
   const email = `${crypto.randomUUID()}@example.com`,
     sentAt = Date.now()
   const code = await requestCode(page, email)
@@ -47,12 +48,14 @@ test('email account preserves projects, synchronizes tabs, logs out and logs in 
   await verify(page, code)
   expect((await (await page.request.get('/api/me')).json()).userId).toBe(owner)
   expect((await page.request.get(projectPath)).status()).toBe(200)
-  await expect(sibling.getByRole('link', { name: '管理账号' })).toBeVisible()
+  await expect(sibling.getByRole('link', { name: '我的账号' })).toBeVisible()
   await expect(sibling.getByRole('textbox', { name: '描述你的应用想法' })).toHaveValue('')
   await page.screenshot({ path: info.outputPath('account-signed-in.png'), fullPage: true })
   await page.getByRole('button', { name: '退出账号', exact: true }).click()
   await expect(page.getByRole('textbox', { name: '邮箱地址', exact: true })).toBeEnabled()
-  await expect(sibling.getByRole('link', { name: '邮箱注册 / 登录' })).toBeVisible()
+  await expect(sibling.getByRole('link', { name: '注册 / 登录', exact: true })).toBeVisible()
+  await sibling.getByRole('link', { name: '我的项目', exact: true }).click()
+  await expect(sibling.getByRole('heading', { name: '还没有项目，从一个想法开始' })).toBeVisible()
   await expect(sibling.getByRole('link', { name: /邮箱注册前的项目/ })).toHaveCount(0)
   expect((await page.request.get(projectPath)).status()).toBe(404)
 
@@ -80,8 +83,12 @@ test('account form is keyboard accessible and responsive; invalid codes do not s
   page,
 }, info) => {
   await page.goto('/account')
+  await page.reload()
   await expect(page.getByRole('textbox', { name: '邮箱地址', exact: true })).toBeEnabled()
-  for (const width of [320, 390, 1440]) {
+  await expect(page.locator('.sidebar')).toHaveCount(0)
+  await page.getByRole('textbox', { name: '邮箱地址', exact: true }).fill('layout@example.com')
+  await expect(page.getByRole('button', { name: '发送验证码', exact: true })).toBeEnabled()
+  for (const width of [320, 390, 768, 1024, 1440]) {
     await page.setViewportSize({ width, height: 1000 })
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
     expect(
@@ -100,4 +107,30 @@ test('account form is keyboard accessible and responsive; invalid codes do not s
   await page.getByRole('textbox', { name: '6 位验证码' }).fill(code)
   await page.getByRole('textbox', { name: '6 位验证码' }).press('Enter')
   await expect(page.getByText('邮箱账号 · 已登录', { exact: true })).toBeVisible()
+})
+
+test('account entry supports keyboard navigation, browser back and session recovery', async ({
+  page,
+}) => {
+  await page.goto('/')
+  await page.getByRole('textbox', { name: '描述你的应用想法' }).fill('返回时保留的想法')
+  const entry = page.getByRole('link', { name: '注册 / 登录', exact: true })
+  await entry.focus()
+  await page.keyboard.press('Enter')
+  await expect(page).toHaveURL(/\/account$/)
+  await expect(page.getByRole('heading', { level: 1 })).toBeFocused()
+  await expect(page.getByRole('textbox', { name: '邮箱地址', exact: true })).toBeEnabled()
+  await page.goBack()
+  await expect(page.getByRole('textbox', { name: '描述你的应用想法' })).toHaveValue(
+    '返回时保留的想法',
+  )
+  await page.route('**/api/session', (route) => route.fulfill({ status: 503, body: '{}' }))
+  await page.goto('/account')
+  await expect(page.getByRole('button', { name: '重新连接会话' })).toBeVisible()
+  await expect(page.getByRole('textbox', { name: '邮箱地址', exact: true })).toBeDisabled()
+  await page.unroute('**/api/session')
+  await page.getByRole('button', { name: '重新连接会话' }).click()
+  await expect(page.getByRole('textbox', { name: '邮箱地址', exact: true })).toBeEnabled()
+  await page.getByRole('link', { name: '← 返回创作', exact: true }).click()
+  await expect(page).toHaveURL(/\/$/)
 })
