@@ -1,8 +1,15 @@
 <script setup lang="ts">
-import { onMounted, onBeforeUnmount } from 'vue'
+import { computed, onMounted, onBeforeUnmount } from 'vue'
+import { useRoute } from 'vue-router'
+import { accountReturnTarget } from '../runtime/accountReturn'
 import { useSessionStore } from '../stores/session'
 defineProps<{ compact?: boolean }>()
 const session = useSessionStore()
+const route = useRoute()
+const accountLink = computed(() => {
+  const target = accountReturnTarget(route.path === '/account' ? route.query.returnTo : route.path)
+  return { path: '/account', query: target ? { returnTo: target.path } : {} }
+})
 let stop: (() => void) | undefined
 onMounted(() => {
   stop = session.listen()
@@ -24,15 +31,20 @@ onBeforeUnmount(() => stop?.())
       <span class="identity-name">{{ session.identity?.displayName }}</span>
       <span v-if="!compact" class="muted">项目已启用持久化</span>
     </template>
-    <RouterLink to="/account" class="account-link" :class="{ button: compact, primary: compact }">{{
-      session.ready && session.identity && !session.identity.isGuest
-        ? compact
-          ? '我的账号'
-          : '管理账号'
-        : compact
-          ? '注册 / 登录'
-          : '邮箱注册 / 登录'
-    }}</RouterLink>
+    <RouterLink
+      :to="accountLink"
+      class="account-link"
+      :class="{ button: compact, primary: compact }"
+      >{{
+        session.ready && session.identity && !session.identity.isGuest
+          ? compact
+            ? '我的账号'
+            : '管理账号'
+          : compact
+            ? '注册 / 登录'
+            : '邮箱注册 / 登录'
+      }}</RouterLink
+    >
   </div>
 </template>
 

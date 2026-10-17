@@ -12,10 +12,10 @@ async function requestCode(page: Page, email: string) {
   expect(captured.status()).toBe(200)
   return (await captured.json()).code as string
 }
-async function verify(page: Page, code: string) {
+async function verify(page: Page, code: string, destination = '/projects') {
   await page.getByRole('textbox', { name: '6 位验证码' }).fill(code)
   await page.getByRole('button', { name: '验证并登录', exact: true }).click()
-  await expect(page.getByText('邮箱账号 · 已登录', { exact: true })).toBeVisible()
+  await expect(page).toHaveURL(new URL(destination, page.url()).href)
 }
 
 test('email account preserves projects, synchronizes tabs, logs out and logs in from another browser', async ({
@@ -38,6 +38,7 @@ test('email account preserves projects, synchronizes tabs, logs out and logs in 
   const sibling = await page.context().newPage()
   await sibling.goto('/')
   await sibling.getByRole('textbox', { name: '描述你的应用想法' }).fill('只属于旧身份的草稿')
+  await page.getByRole('textbox', { name: '描述你的应用想法' }).fill('登录后继续制作 2048')
   await page.getByRole('link', { name: '注册 / 登录', exact: true }).click()
   await expect(page.locator('.sidebar')).toHaveCount(0)
   const email = `${crypto.randomUUID()}@example.com`,
@@ -45,12 +46,17 @@ test('email account preserves projects, synchronizes tabs, logs out and logs in 
   const code = await requestCode(page, email)
   await expect(page.getByRole('textbox', { name: '6 位验证码' })).toBeFocused()
   await expect(page.getByRole('button', { name: /秒后可重发/ })).toBeDisabled()
-  await verify(page, code)
+  await verify(page, code, '/')
+  await expect(page.getByRole('textbox', { name: '描述你的应用想法' })).toHaveValue(
+    '登录后继续制作 2048',
+  )
   expect((await (await page.request.get('/api/me')).json()).userId).toBe(owner)
   expect((await page.request.get(projectPath)).status()).toBe(200)
   await expect(sibling.getByRole('link', { name: '我的账号' })).toBeVisible()
   await expect(sibling.getByRole('textbox', { name: '描述你的应用想法' })).toHaveValue('')
-  await page.screenshot({ path: info.outputPath('account-signed-in.png'), fullPage: true })
+  await page.screenshot({ path: info.outputPath('home-after-login.png'), fullPage: true })
+  await page.getByRole('link', { name: '我的账号', exact: true }).click()
+  await expect(page.getByText('邮箱账号 · 已登录', { exact: true })).toBeVisible()
   await page.getByRole('button', { name: '退出账号', exact: true }).click()
   await expect(page.getByRole('textbox', { name: '邮箱地址', exact: true })).toBeEnabled()
   await expect(sibling.getByRole('link', { name: '注册 / 登录', exact: true })).toBeVisible()
@@ -62,14 +68,35 @@ test('email account preserves projects, synchronizes tabs, logs out and logs in 
   const separate = await browser.newContext({ baseURL: 'http://127.0.0.1:5174' })
   try {
     const login = await separate.newPage()
-    await login.goto('/account')
+    await login.goto('/')
+    await expect(login.getByRole('link', { name: '注册 / 登录', exact: true })).toBeVisible()
+    const guestCsrf = (await (await login.request.get('/api/csrf')).json()).token
+    const guestProject = await login.request.post('/api/projects', {
+      data: { name: '不可合并的访客项目' },
+      headers: { 'X-CSRF-TOKEN': guestCsrf, 'Idempotency-Key': crypto.randomUUID() },
+    })
+    expect(guestProject.status()).toBe(201)
+    const guestId = (await guestProject.json()).id
+    await login.goto(`/projects/${guestId}`)
+    await login.getByRole('link', { name: '邮箱注册 / 登录', exact: true }).click()
+    await login.reload()
+    expect(new URL(login.url()).searchParams.get('returnTo')).toBe(`/projects/${guestId}`)
     await expect(login.getByRole('textbox', { name: '邮箱地址', exact: true })).toBeEnabled()
     expect((await login.request.get(projectPath)).status()).toBe(404)
     // Exercise the real, fixed 60-second cooldown without any test-only bypass in production code.
     await login.waitForTimeout(Math.max(0, sentAt + 62000 - Date.now()))
-    await verify(login, await requestCode(login, email))
+    await verify(
+      login,
+      await requestCode(login, email),
+      '/projects?notice=account-project-unavailable',
+    )
+    await expect(
+      login.getByRole('status').filter({ hasText: '原项目不存在或不属于当前账号' }),
+    ).toBeVisible()
+    expect((await login.request.get(`/api/projects/${guestId}`)).status()).toBe(404)
     expect((await (await login.request.get('/api/me')).json()).userId).toBe(owner)
     expect((await login.request.get(projectPath)).status()).toBe(200)
+    await login.getByRole('link', { name: '管理账号', exact: true }).click()
     await login.reload()
     await expect(login.getByText('邮箱账号 · 已登录', { exact: true })).toBeVisible()
   } finally {
@@ -106,7 +133,8 @@ test('account form is keyboard accessible and responsive; invalid codes do not s
   expect((await (await page.request.get('/api/me')).json()).isGuest).toBe(true)
   await page.getByRole('textbox', { name: '6 位验证码' }).fill(code)
   await page.getByRole('textbox', { name: '6 位验证码' }).press('Enter')
-  await expect(page.getByText('邮箱账号 · 已登录', { exact: true })).toBeVisible()
+  await expect(page).toHaveURL(/\/projects$/)
+  await expect(page.getByRole('link', { name: '管理账号', exact: true })).toBeVisible()
 })
 
 test('account entry supports keyboard navigation, browser back and session recovery', async ({
@@ -117,7 +145,7 @@ test('account entry supports keyboard navigation, browser back and session recov
   const entry = page.getByRole('link', { name: '注册 / 登录', exact: true })
   await entry.focus()
   await page.keyboard.press('Enter')
-  await expect(page).toHaveURL(/\/account$/)
+  await expect(page).toHaveURL(/\/account\?returnTo=\/$/)
   await expect(page.getByRole('heading', { level: 1 })).toBeFocused()
   await expect(page.getByRole('textbox', { name: '邮箱地址', exact: true })).toBeEnabled()
   await page.goBack()

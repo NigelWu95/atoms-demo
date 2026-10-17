@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import ProjectList from '../components/ProjectList.vue'
+import { useRoute } from 'vue-router'
 import { useSessionStore } from '../stores/session'
 const session = useSessionStore()
+const route = useRoute()
 </script>
 
 <template>
@@ -11,6 +13,15 @@ const session = useSessionStore()
       <h1 tabindex="-1">我的项目</h1>
       <RouterLink to="/" class="button primary">新建项目 ＋</RouterLink>
     </div>
+    <p
+      v-if="
+        session.identity?.isGuest === false && route.query.notice === 'account-project-unavailable'
+      "
+      role="status"
+      class="project-privacy-note"
+    >
+      已登录。原项目不存在或不属于当前账号，已返回「我的项目」；访客项目不会自动合并。
+    </p>
     <p class="project-privacy-note">
       <template v-if="session.identity?.isGuest !== false"
         >默认按最近编辑排序。访客身份仅绑定此浏览器，清除 Cookie
