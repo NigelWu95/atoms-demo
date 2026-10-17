@@ -358,6 +358,14 @@ h1:focus {
 .button.primary:not(:disabled):hover {
   background: #e5ffa0;
 }
+.button.secondary {
+  color: var(--text);
+  background: var(--surface-raised);
+  border-color: var(--border);
+}
+.button.secondary:not(:disabled):hover {
+  border-color: var(--muted);
+}
 .example-prompts {
   display: flex;
   flex-wrap: wrap;
@@ -542,14 +550,14 @@ h1:focus {
     position: static;
     margin-top: 0;
   }
-  .service-status {
+  .sidebar .service-status {
     position: absolute;
     top: 16px;
     right: 16px;
     padding: 4px 0;
     font-size: 10px;
   }
-  .service-status p {
+  .sidebar .service-status p {
     display: none;
   }
   .text-button {

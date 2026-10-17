@@ -39,6 +39,13 @@ for (const width of [320, 390, 768, 1024, 1440]) {
     await page.setViewportSize({ width, height: 1000 })
     await page.goto('/')
     await expect(page.getByText('服务已连接')).toBeVisible()
+    await expect(page.locator('.sidebar')).toHaveCount(0)
+    await expect(page.getByRole('link', { name: '注册 / 登录', exact: true })).toBeVisible()
+    const footer = await page.locator('.entry-footer').boundingBox()
+    const health = await page.locator('.entry-footer .service-status').boundingBox()
+    expect(footer).not.toBeNull()
+    expect(health).not.toBeNull()
+    expect(health!.y).toBeGreaterThanOrEqual(footer!.y)
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
     expect(
       (await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze())
@@ -46,6 +53,7 @@ for (const width of [320, 390, 768, 1024, 1440]) {
     ).toEqual([])
     if ([390, 1440].includes(width))
       await page.screenshot({ path: testInfo.outputPath(`home-${width}.png`), fullPage: true })
+    await page.getByRole('link', { name: '我的项目', exact: true }).click()
     await page.getByRole('link', { name: '工作台', exact: true }).click()
     if (width < 768) {
       await expect(page.getByRole('heading', { name: '需求与对话' })).toBeVisible()
