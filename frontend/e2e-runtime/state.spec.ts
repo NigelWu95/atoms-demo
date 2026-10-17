@@ -9,7 +9,7 @@ async function openTodo(page: Page, fixture = 'todo') {
   await expect(page.getByText('应用已启动', { exact: true })).toBeVisible()
   return page.frameLocator('iframe')
 }
-test('generated projects retain their status on home, project list and reload', async ({
+test('welcome links to generated projects with correct status after reload', async ({
   page,
 }, testInfo) => {
   const errors: string[] = []
@@ -20,9 +20,9 @@ test('generated projects retain their status on home, project list and reload', 
   await openTodo(page)
   const path = new URL(page.url()).pathname
   await page.getByRole('link', { name: '← 返回创作' }).click()
+  await expect(page.locator('.project-row')).toHaveCount(0)
+  await expect(page.getByRole('textbox', { name: '描述你的应用想法' })).toBeVisible()
   const row = page.locator(`.project-row[href="${path}"]`)
-  await expect(row).toContainText('已生成')
-  await expect(row).not.toContainText('尚未生成')
   await expect(page.getByText('AI 生成稍后接入', { exact: false })).toHaveCount(0)
   await page.getByRole('link', { name: '我的项目', exact: true }).click()
   await expect(row).toContainText('已生成')
