@@ -59,7 +59,7 @@ cd backend
 - `BUILD_INPUT_CHANGED` / `BUILD_ARTIFACT_UNAVAILABLE`：来源或产物完整性失败；旧记录保留，不用当前模板替换历史归档。
 - `INTERRUPTED`：重启不重跑旧任务；若不能核验匹配的进程退出证明，执行槽继续保留。不要手工清空数据库占位或按旧 PID 查杀；保留原工作根，核实原因后再处理。关闭开关仍可查询记录，但冻结包下载也需要原工作根和有效执行配置。
 
-**手动构建完成不等于已启动应用。** 可以直接点击“运行应用”串联整个流程，也可手动构建后点击“启动应用”。本机新进程就绪后显示该 JAR 的真实页面，保存到专用运行库。停止后再次启动保留数据，主下载指向相同 buildId 的冻结 ZIP，只带初始数据。原共享预览和 `/a/:slug` 发布保持原状，不冒充本机运行预览。进程启动需显式启用并配置专用运行库池，不会给平台账号数据库管理权限；默认关闭，未自动改写日常开发配置或部署云端。新增日常专用库的显式准备命令与当前启用阻塞见[本机运行说明](https://github.com/NigelWu95/atoms-demo/blob/main/docs/app-runtime.md)，证据见[验收记录](https://github.com/NigelWu95/atoms-demo/blob/main/docs/app-runtime-verification.md)。
+**手动构建完成不等于已启动应用。** 可以直接点击“运行应用”串联整个流程，也可手动构建后点击“启动应用”。本机新进程就绪后显示该 JAR 的真实页面，保存到专用运行库。停止后再次启动保留数据，主下载指向相同 buildId 的冻结 ZIP，只带初始数据。原共享预览和 `/a/:slug` 发布保持原状，不冒充本机运行预览。代码默认关闭执行；日常本机已于 10 月 14 日晚准备专用库并在私有启动脚本中启用，15 日通过 2048 V2 闭环；没有修改 `.env.local` 默认开关，云端执行仍关闭。新机器需显式准备配置，不复用已绑定库，见[本机运行说明](https://github.com/NigelWu95/atoms-demo/blob/main/docs/app-runtime.md)和[历史验收记录](https://github.com/NigelWu95/atoms-demo/blob/main/docs/app-runtime-verification.md)。
 
 ## 打包到服务器
 
@@ -104,7 +104,7 @@ cd backend
 
 前端目录提供 `npm run typecheck`、`npm run test:unit`、`npm run lint`、`npm run format:check`、`npm run build` 和 `npm run test:e2e`。验收证据见 [verification.md](docs/verification.md)，环境决策见 [ADR-002](docs/decisions/002-local-java17-baseline.md)。
 
-浏览器测试位于 `frontend/e2e`，当前配置使用本机已安装的 Google Chrome，并创建独立临时测试会话。运行前启动后端；Playwright 可复用本地前端或自动启动它。不连接个人浏览器资料，不依赖登录账号。没有 Chrome 的机器需准备对应浏览器并调整测试 channel，不能把未运行的浏览器测试当作通过。
+浏览器测试位于 `frontend/e2e`，使用本机 Google Chrome 和独立临时会话，不连接个人浏览器资料。欢迎/邮箱/项目完整回归在前端目录执行 `CI=1 npx playwright test --config playwright.entry.config.ts`，自动启动 8081/5174 隔离服务，使用专用测试数据库、捕获邮件的测试适配器和禁用的模型 Worker；不要连接日常 SMTP/模型服务。`npm run test:e2e` 保留旧 5173 配置，不用于这一组邮箱验收。工作台回归使用 `playwright.runtime.config.ts`；命令与范围见[欢迎体验验收](https://github.com/NigelWu95/atoms-demo/blob/main/docs/welcome-experience-verification.md)。没有 Chrome 的机器需准备浏览器并调整测试 channel，不能把未执行当作通过。
 
 ## DeepSeek 主工作台（5173）
 
@@ -174,6 +174,8 @@ npm run dev:fixtures
 
 ## 当前可体验的交互
 
+2026-10-17 本地欢迎体验：`/` 为无侧栏的介绍页，输入 idea 后直接创建项目、进入工作台；右上角提供“我的项目”和“注册 / 登录”，已登录显示“我的账号”。`/account` 为可直达、可刷新的居中整页表单，不嵌入工作台，也不是模态覆盖层。首页不再加载历史列表，项目生成状态统一在 `/projects` 查看。创建项目不自动调用模型，进入工作台后明确点击“生成应用”；访客创作与邮箱验证码机制不变。本轮尚未推送或部署。
+
 - 首页自动建立访客会话或恢复当前邮箱账号会话；失败可重试，未连接不能创建项目。手机端也保留会话状态与重试入口。
 - 首页的三个示例只填充需求；非空输入通过按钮或 Enter 创建真实项目并进入 `/projects/:id`，Shift+Enter 换行，中文组合输入期间不提交。名称从需求前 40 字符整理而来，可在工作台重命名。
 - 项目名称保存到 PostgreSQL，刷新、重新打开和重启后端仍保留。我的项目仅列出当前身份自己的数据，其他访客或账号猜测 ID 也不能打开或重命名。
@@ -184,7 +186,7 @@ npm run dev:fixtures
 - 当前版本应用状态存入 PostgreSQL，代码升级不重置数据；两标签保存竞争返回冲突。断网或响应异常时保留输入，手动重试复用同一保存意图，不静默覆盖。未知结果时刷新会丢失内存草稿，且不能撤销已发出的请求，界面有提示。
 - 独立预览 `/preview/:projectId/:versionId` 仍检查访客权限并复用受限 iframe，是私有页面而不是公开发布链接。
 - 工作台与独立预览在创建 iframe 前检查 ES2022 经典脚本语法，展示 SDK 启动与运行错误；点击“保存检查结果”可持久化当前版本报告，刷新后可读。UNKNOWN/PASSED/FAILED 与生成任务状态分开，历史版本不能创建新报告。结果未知时“重试原检查报告”复用原报告/幂等键，新观察需另存；报告不是功能或安全认证，见 [ADR-009](docs/decisions/009-preview-check-reports.md)。
-- 侧栏服务状态来自真实 `/api/health`；失败时可重试。未知路由有返回入口。
+- 欢迎/账号页底部和工作台侧栏的服务状态来自真实 `/api/health`；失败时可重试。未知路由有返回入口。
 - Vite 开发页面有 CSP/基础安全响应头；仅开发 HMR 放行本地 WebSocket 与内联样式。`npm run preview` 使用更严格 CSP，但它只是本地构建预览，不是正式部署方案。
 
 下一步在明确的单轮验收预算内完成云端生成/SSE/发布验收，不再接隧道；云端累计上限已随本地配置同步为 10000，本次配置变更未发起生成。活动任务重启演练和完整资源限制仍待完成。T24 要求的第二轮真实修改及 T31 多类型应用质量验证不能自动扩大预算或重置记账。用户自定义模型设置后续支持；T04/T29 未覆盖的远程验证保留待办。OAuth 暂缓；可选邮箱验证码账号已部署，访客模式仍保留。

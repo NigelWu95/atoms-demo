@@ -1,6 +1,6 @@
 # Spec: 欢迎页与独立账号入口
 
-状态：2026-10-17 用户已确认，并要求与旧未完成任务合并连续实施。执行索引见 `tasks/plan.md`、`tasks/todo.md` 的欢迎体验收口章节；不推送或部署。
+状态：2026-10-17 用户已确认并要求与旧任务合并连续实施；WE01–WE05 已完成本地实现与验收（280 单测、58 项不同浏览器用例通过）。执行索引见 `tasks/plan.md`、`tasks/todo.md`，证据见 `docs/welcome-experience-verification.md`；未推送或部署，人工评审和新增付费质量评测不代为勾选。
 
 ## 目标与范围
 
@@ -71,8 +71,8 @@ npm run typecheck
 npm run lint
 npm run format:check
 npm run build
-npm run test:e2e
-npm run test:e2e:runtime
+CI=1 npx playwright test --config playwright.entry.config.ts
+CI=1 npx playwright test --config playwright.runtime.config.ts
 ```
 
 浏览器按仓库测试配置使用隔离会话和测试后端，不向真实邮箱发信、不调用真实模型。检查四尺寸截图、键盘导航、axe 可访问性、控制台错误和路由刷新。Chrome DevTools MCP 不可用时使用项目已有 Playwright/Chrome，记录替代方式；不访问用户日常浏览器会话。
