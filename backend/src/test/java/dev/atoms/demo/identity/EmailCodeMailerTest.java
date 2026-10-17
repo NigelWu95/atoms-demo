@@ -28,6 +28,8 @@ class EmailCodeMailerTest {
             @Override public void send(SimpleMailMessage message) {
                 assertThat(message.getTo()).containsExactly("reader@example.com");
                 assertThat(message.getFrom()).isEqualTo("owner@qq.com");
+                assertThat(message.getSubject()).isEqualTo("Atoms Demo 账号验证码");
+                assertThat(message.getText()).contains("首次设置密码", "发起请求的页面").doesNotContain("首次验证将注册账号");
                 assertThat(message.getText()).contains("000012", "10 分钟").doesNotContain("smtp-secret-canary");
                 assertThat(message.getCc()).isNull();
                 assertThat(message.getBcc()).isNull();
