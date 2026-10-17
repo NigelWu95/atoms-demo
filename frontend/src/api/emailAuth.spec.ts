@@ -22,7 +22,7 @@ it('uses strict challenge/identity contracts and sends no ownership claims', asy
     )
   vi.stubGlobal('fetch', fetch)
   api.setCsrf({ token: 'test-token', headerName: 'X-CSRF-TOKEN' })
-  expect(await emailMethods()).toEqual({ emailCodeEnabled: true })
+  expect(await emailMethods()).toEqual({ emailCodeEnabled: true, passwordEnabled: false })
   const sent = await sendEmailCode('user@example.com')
   expect(await verifyEmailCode(sent.challengeId, '123456')).toMatchObject({ isGuest: false })
   expect(JSON.parse(fetch.mock.calls[1]![1].body)).toEqual({ email: 'user@example.com' })
