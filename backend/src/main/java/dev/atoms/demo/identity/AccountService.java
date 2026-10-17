@@ -22,4 +22,7 @@ public class AccountService {
     boolean exists(UUID user) {
         return Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM user_accounts WHERE user_id = ?)", Boolean.class, user));
     }
+    long version(UUID user) {
+        return jdbc.queryForObject("SELECT auth_version FROM user_accounts WHERE user_id=?", Long.class, user);
+    }
 }

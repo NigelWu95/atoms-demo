@@ -21,7 +21,12 @@ public class SessionAccess {
         UUID owner;
         try { owner = UUID.fromString(auth.getName()); } catch (IllegalArgumentException invalid) { return false; }
         String role = accounts.exists(owner) ? "ROLE_USER" : "ROLE_GUEST";
+        if (role.equals("ROLE_USER") && accounts.version(owner) != version(auth)) return false;
         return auth.getAuthorities().stream().anyMatch(value -> value.getAuthority().equals(role));
+    }
+    static long version(Authentication auth) {
+        // Pre-password authenticated sessions were issued at version zero.
+        return auth.getDetails() == null ? 0 : auth.getDetails() instanceof Long stamp ? stamp : -1;
     }
     public boolean streamValid(String sessionId, UUID owner) {
         // Read-only: an open SSE connection must not extend session lifetime.

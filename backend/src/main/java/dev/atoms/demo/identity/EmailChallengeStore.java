@@ -45,17 +45,17 @@ final class EmailChallengeStore {
             int changed = jdbc.update("UPDATE email_auth_challenges SET status = 'SENT' WHERE id = ? AND owner_id = ? AND session_hash = ? AND status = 'PENDING' AND expires_at > now() AND created_at > now() - interval '30 seconds'",
                     id, owner, SessionRevocations.hash(session));
             if (changed != 1) throw new ApiException(503, "EMAIL_DELIVERY_UNCONFIRMED", "邮件发送未确认，请重新获取验证码。");
-            jdbc.update("UPDATE email_auth_challenges SET status = 'REPLACED' WHERE session_hash = ? AND id <> ? AND status = 'SENT'", SessionRevocations.hash(session), id);
+            jdbc.update("UPDATE email_auth_challenges SET status = 'REPLACED' WHERE session_hash = ? AND id <> ? AND status = 'SENT' AND purpose='LOGIN'", SessionRevocations.hash(session), id);
             return null;
         });
     }
     void failed(UUID id) { jdbc.update("UPDATE email_auth_challenges SET status = 'FAILED' WHERE id = ? AND status = 'PENDING'", id); }
-    UUID verify(UUID owner, String session, String ip, UUID id, String code) {
-        UUID user = transactions.run(() -> {
+    VerifiedAccount verify(UUID owner, String session, String ip, UUID id, String code) {
+        VerifiedAccount user = transactions.run(() -> {
             requireGuest(owner, session);
             Instant now = Instant.now();
             budgets.verifying(session, ip, now);
-            var rows = jdbc.query("SELECT email, code_hash, status, attempts, expires_at FROM email_auth_challenges WHERE id = ? AND owner_id = ? AND session_hash = ?",
+            var rows = jdbc.query("SELECT email, code_hash, status, attempts, expires_at FROM email_auth_challenges WHERE id = ? AND owner_id = ? AND session_hash = ? AND purpose='LOGIN'",
                     (rs, row) -> new Stored(rs.getString(1), rs.getString(2), rs.getString(3), rs.getInt(4), rs.getTimestamp(5).toInstant()), id, owner, SessionRevocations.hash(session));
             if (rows.isEmpty()) return null;
             Stored stored = rows.get(0);
@@ -68,7 +68,7 @@ final class EmailChallengeStore {
             jdbc.update("UPDATE email_auth_challenges SET status = 'CONSUMED' WHERE id = ?", id);
             UUID target = accounts.claim(owner, stored.email);
             revocations.revoke(session);
-            return target;
+            return new VerifiedAccount(target, accounts.version(target));
         });
         if (user == null) throw new ApiException(422, "EMAIL_CODE_INVALID", "验证码无效、已过期或已使用，请重新获取。");
         return user;

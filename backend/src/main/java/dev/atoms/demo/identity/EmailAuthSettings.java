@@ -8,12 +8,14 @@ import org.springframework.stereotype.Component;
 public final class EmailAuthSettings {
     private final boolean enabled;
     private final boolean allowInsecureHttp;
+    private final boolean allowInsecurePasswordHttp;
     private final String host, username, password, key;
     private final int port;
     final int emailSends, sessionSends, ipSends, hourlySends, dailySends;
     public EmailAuthSettings(Environment env) {
         enabled = Boolean.parseBoolean(env.getProperty("EMAIL_AUTH_ENABLED", "false"));
         allowInsecureHttp = Boolean.parseBoolean(env.getProperty("EMAIL_AUTH_ALLOW_INSECURE_HTTP", "false"));
+        allowInsecurePasswordHttp = Boolean.parseBoolean(env.getProperty("PASSWORD_AUTH_ALLOW_INSECURE_HTTP", "false"));
         host = env.getProperty("SMTP_HOST", "smtp.qq.com");
         port = integer(env, "SMTP_PORT", 465, 465, 465);
         username = env.getProperty("SMTP_USERNAME", "");
@@ -42,6 +44,7 @@ public final class EmailAuthSettings {
     private static IllegalStateException bad(String name) { return new IllegalStateException("Invalid email configuration: " + name); }
     public boolean enabled() { return enabled; }
     boolean allowInsecureHttp() { return allowInsecureHttp; }
+    boolean allowInsecurePasswordHttp() { return allowInsecurePasswordHttp; }
     String host() { return host; }
     int port() { return port; }
     String username() { return username; }

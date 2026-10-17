@@ -27,10 +27,12 @@ final class AccountSessions {
         this.contexts = contexts; this.csrf = csrf; this.revocations = revocations; this.transactions = transactions;
         cookieName = env.getProperty("server.servlet.session.cookie.name", "ATOMS_SESSION");
     }
-    void authenticate(UUID previous, UUID target, HttpServletRequest request, HttpServletResponse response) {
+    void authenticate(UUID previous, VerifiedAccount verified, HttpServletRequest request, HttpServletResponse response) {
+        UUID target = verified.userId();
         if (!previous.equals(target)) request.getSession().invalidate();
         var authentication = UsernamePasswordAuthenticationToken.authenticated(target.toString(), null,
                 List.of(new SimpleGrantedAuthority("ROLE_USER")));
+        authentication.setDetails(verified.version());
         // https://docs.spring.io/spring-security/reference/6.5/servlet/authentication/session-management.html#store-authentication-manually
         new ChangeSessionIdAuthenticationStrategy().onAuthentication(authentication, request, response);
         new CsrfAuthenticationStrategy(csrf).onAuthentication(authentication, request, response);
