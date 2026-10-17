@@ -6,6 +6,15 @@ import org.springframework.mock.env.MockEnvironment;
 import static org.assertj.core.api.Assertions.*;
 
 class EmailTransportSecurityTest {
+    @Test void emailHttpOptInDoesNotAlsoEnablePasswords() {
+        var env = new MockEnvironment().withProperty("EMAIL_AUTH_ALLOW_INSECURE_HTTP", "true");
+        var request = new MockHttpServletRequest();
+        request.setServerName("198.51.100.20"); request.setRemoteAddr("198.51.100.10");
+        assertThat(EmailAuthController.allowsTransport(request,new EmailAuthSettings(env))).isTrue();
+        assertThat(EmailAuthController.allowsPasswordTransport(request,new EmailAuthSettings(env))).isFalse();
+        env.withProperty("PASSWORD_AUTH_ALLOW_INSECURE_HTTP","true");
+        assertThat(EmailAuthController.allowsPasswordTransport(request,new EmailAuthSettings(env))).isTrue();
+    }
     @Test void publicPlaintextCannotPretendToBeLocalUsingHostOrForwardedHeaders() {
         var settings = new EmailAuthSettings(new MockEnvironment());
         var request = new MockHttpServletRequest();

@@ -28,6 +28,9 @@ public class EmailAuthService {
         }
     }
     public UUID verify(UUID owner, String session, String ip, UUID challenge, String code) {
+        return verifyAccount(owner,session,ip,challenge,code).userId();
+    }
+    VerifiedAccount verifyAccount(UUID owner, String session, String ip, UUID challenge, String code) {
         requireEnabled();
         if (code == null || !code.matches("[0-9]{6}")) throw new ApiException(422, "INVALID_INPUT", "请输入六位数字验证码。");
         return challenges.verify(owner, session, ip, challenge, code);

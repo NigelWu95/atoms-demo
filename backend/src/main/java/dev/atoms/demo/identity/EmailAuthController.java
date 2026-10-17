@@ -27,7 +27,8 @@ public class EmailAuthController {
         this.settings = settings; this.emails = emails; this.sessions = sessions; this.identities = identities; this.json = json;
     }
     @GetMapping("/api/auth/methods")
-    Map<String, Boolean> methods(HttpServletRequest request) { return Map.of("emailCodeEnabled", settings.enabled() && allowsTransport(request, settings)); }
+    Map<String, Boolean> methods(HttpServletRequest request) { return Map.of("emailCodeEnabled", settings.enabled() && allowsTransport(request, settings),
+            "passwordEnabled",settings.enabled() && allowsPasswordTransport(request,settings)); }
 
     @PostMapping(value = "/api/auth/email/challenges", consumes = "application/json")
     ResponseEntity<EmailAuthService.Challenge> send(Principal principal, HttpServletRequest request) {
@@ -49,10 +50,10 @@ public class EmailAuthController {
         } catch (IllegalArgumentException invalid) { throw new ApiException(422, "INVALID_INPUT", "验证码请求无效，请重新获取。"); }
         UUID owner = UUID.fromString(principal.getName()); long started = System.nanoTime();
         try {
-            UUID target = emails.verify(owner, request.getSession().getId(), request.getRemoteAddr(), challenge, body.path("code").asText());
+            var target = emails.verifyAccount(owner, request.getSession().getId(), request.getRemoteAddr(), challenge, body.path("code").asText());
             sessions.authenticate(owner, target, request, response);
             event(request, "email_verify", "authenticated", started);
-            return identities.get(target.toString());
+            return identities.get(target.userId().toString());
         } catch (ApiException failure) { event(request, "email_verify", failure.code(), started); throw failure; }
     }
     @DeleteMapping("/api/session")
@@ -67,27 +68,24 @@ public class EmailAuthController {
                 .body(ApiError.of(request, failure.code(), failure.getMessage(), false));
     }
     private JsonNode body(HttpServletRequest request, Set<String> fields) {
-        try {
-            byte[] bytes = request.getInputStream().readNBytes(4097);
-            if (bytes.length > 4096) throw new ApiException(413, "REQUEST_TOO_LARGE", "认证请求过大。");
-            JsonNode value = json.reader().with(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
-                    .with(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_READING_DUP_TREE_KEY).readTree(bytes);
-            if (value == null || !value.isObject() || value.size() != fields.size()) throw invalid();
-            for (String field : fields) if (!value.path(field).isTextual()) throw invalid();
-            return value;
-        } catch (IOException invalid) { throw invalid(); }
+        return AuthRequest.fields(AuthRequest.read(request,json),fields);
     }
-    private static ApiException invalid() { return new ApiException(422, "INVALID_INPUT", "认证请求字段无效。"); }
     static boolean allowsTransport(HttpServletRequest request, EmailAuthSettings settings) {
+        return allowsTransport(request,settings.allowInsecureHttp());
+    }
+    static boolean allowsPasswordTransport(HttpServletRequest request,EmailAuthSettings settings) {
+        return allowsTransport(request,settings) && allowsTransport(request,settings.allowInsecurePasswordHttp());
+    }
+    private static boolean allowsTransport(HttpServletRequest request,boolean allowInsecureHttp) {
         Set<String> loopback = Set.of("localhost", "127.0.0.1", "::1", "[::1]", "0:0:0:0:0:0:0:1");
         // Explicit demo opt-in only; it does not encrypt HTTP or change SMTP/cookie settings.
-        return settings.allowInsecureHttp() || request.isSecure()
+        return allowInsecureHttp || request.isSecure()
                 || (loopback.contains(request.getServerName()) && loopback.contains(request.getRemoteAddr()));
     }
     private void requireTransport(HttpServletRequest request) {
         if (!allowsTransport(request, settings)) throw new ApiException(503, "EMAIL_AUTH_SECURE_TRANSPORT_REQUIRED", "请通过 HTTPS 使用邮箱注册登录。");
     }
-    private static void event(HttpServletRequest request, String event, String result, long started) {
+    static void event(HttpServletRequest request, String event, String result, long started) {
         LoggerFactory.getLogger(EmailAuthController.class).info("event={} entryPoint=http requestId={} result={} durationMs={}",
                 event, request.getAttribute("requestId"), result, (System.nanoTime() - started) / 1_000_000);
     }
