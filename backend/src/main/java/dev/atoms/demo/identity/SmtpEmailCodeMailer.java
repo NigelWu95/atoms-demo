@@ -40,9 +40,10 @@ public final class SmtpEmailCodeMailer implements EmailCodeMailer {
         try {
             var message = new SimpleMailMessage();
             message.setFrom(settings.username()); message.setTo(recipient);
-            message.setSubject("Atoms Demo 注册 / 登录验证码");
+            message.setSubject("Atoms Demo 账号验证码");
             message.setText("你的 Atoms Demo 验证码是：" + code + "\n\n验证码 10 分钟内有效，仅可使用一次。"
-                    + "\n首次验证将注册账号，再次验证将登录已有账号。\n请勿向他人透露验证码。如果不是你本人操作，请忽略此邮件。");
+                    + "\n请返回发起请求的页面，完成对应的注册、登录或首次设置密码操作。验证码仅限本次请求使用，不能混用。"
+                    + "\n请勿向他人透露验证码。如果不是你本人操作，请忽略此邮件。");
             sender.send(message);
         } catch (org.springframework.mail.MailException failure) {
             // Upstream exceptions may contain recipient, SMTP credentials or message text.
