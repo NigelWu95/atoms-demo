@@ -1,6 +1,6 @@
 # Spec: 欢迎页与独立账号入口
 
-状态：2026-10-17 用户已确认并要求与旧任务合并连续实施；WE01–WE05 已完成本地实现与验收（280 单测、58 项不同浏览器用例通过）。执行索引见 `tasks/plan.md`、`tasks/todo.md`，证据见 `docs/welcome-experience-verification.md`；未推送或部署，人工评审和新增付费质量评测不代为勾选。
+状态：2026-10-17 用户已确认并要求与旧任务合并连续实施；WE01–WE05 已完成本地实现与验收（首轮 280 单测、58 项不同浏览器用例通过），登录返回 AR01–AR03 完成后为 325 单测、58 项浏览器用例。执行索引见 `tasks/plan.md`、`tasks/todo.md`，证据见 `docs/welcome-experience-verification.md`。后经用户另行授权，于 16:07 部署源码 `dfa1697`；本轮未推送 GitHub，人工评审和新增付费质量评测不代为勾选。
 
 ## 目标与范围
 
@@ -53,7 +53,7 @@
 - 暂时无法检查项目时留在已登录账号页，允许重试返回或手动进入列表；离页、返回目标变化、身份切换后，迟到结果不能导航或恢复旧输入。
 - 不新增 API、数据库迁移、浏览器持久化或依赖。返回地址白名单拒绝站外 URL、API、账号页循环和任意 query/hash。验证码、邮箱、idea 不进入返回 URL。
 
-实施索引：`tasks/todo.md` 的 AR01–AR03；用户说明见[邮箱账号说明](https://github.com/NigelWu95/atoms-demo/blob/main/docs/email-accounts.md#登录后的返回与内容保留)。本次仍仅本地实现，不推送或部署。
+实施索引：`tasks/todo.md` 的 AR01–AR03；用户说明见[邮箱账号说明](https://github.com/NigelWu95/atoms-demo/blob/main/docs/email-accounts.md#登录后的返回与内容保留)。实现阶段仅本地验收；后续用户单独授权的部署已完成，见[部署记录](https://github.com/NigelWu95/atoms-demo/blob/main/docs/cloud-deployment.md)，没有沿用旧授权推送 GitHub。
 
 ## 技术栈、位置与代码约定
 
