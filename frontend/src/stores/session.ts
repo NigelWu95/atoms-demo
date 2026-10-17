@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { api, ApiFailure, errorMessage } from '../api/client'
 import { decodeIdentity, initializeSession, refreshCsrf, type Identity } from '../api/session'
 import { verifyEmailCode } from '../api/emailAuth'
+import { verifyPassword, updatePassword, type PasswordUpdate } from '../api/passwords'
 import { useDraftStore } from './draft'
 import { useGenerationStore } from './generation'
 
@@ -100,6 +101,33 @@ export const useSessionStore = defineStore('session', () => {
   function login(challengeId: string, code: string) {
     return transition(() => verifyEmailCode(challengeId, code))
   }
+  function loginPassword(email: string, password: string) {
+    return transition(() => verifyPassword(email, password))
+  }
+  async function changePassword(input: PasswordUpdate) {
+    if (changing || !ready.value || identity.value?.isGuest !== false) return null
+    changing = true
+    const epoch = revision.value
+    state.value = 'connecting'
+    try {
+      await refreshCsrf()
+      const result = await updatePassword(input)
+      await refreshCsrf()
+      if (epoch !== revision.value) return null
+      state.value = 'ready'
+      announce()
+      return result
+    } catch (failure) {
+      if (epoch === revision.value) {
+        if (failure instanceof ApiFailure && [409, 422, 429, 503].includes(failure.status))
+          state.value = 'ready'
+        else invalidate('密码操作结果未确认，请重新连接后查询状态，勿自动重复提交。')
+      }
+      throw failure
+    } finally {
+      changing = false
+    }
+  }
   function logout() {
     return transition(async () => {
       await api.request('/api/session', () => undefined, { method: 'DELETE' })
@@ -169,6 +197,8 @@ export const useSessionStore = defineStore('session', () => {
     initialize,
     invalidate,
     login,
+    loginPassword,
+    changePassword,
     logout,
     listen,
     reconcile,
