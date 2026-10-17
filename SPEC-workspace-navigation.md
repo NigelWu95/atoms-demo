@@ -2,7 +2,7 @@
 
 模块：`workspace-navigation`；索引：[能力地图](ACCOUNT-WORKSPACE-CAPABILITY-MAP.md)。
 
-状态：2026-10-18 根地址修正源码 `dc2aa3d` 已于 00:56 部署，未推送 GitHub。本地已实现用户要求的侧栏品牌返回首页及账号快捷退出，尚未推送/部署。依赖账号管理与登录页的路由契约，不依赖密码字段或凭据存储实现。证据见[本轮记录](https://github.com/NigelWu95/atoms-demo/blob/main/docs/account-workspace-verification.md)。
+状态：2026-10-18 根地址修正源码 `dc2aa3d` 于 00:56 部署；侧栏品牌返回首页及账号快捷退出源码 `6972940` 于 01:40 部署，本次未推送 GitHub。依赖账号管理与登录页的路由契约，不依赖密码字段或凭据存储实现。证据见[本轮记录](https://github.com/NigelWu95/atoms-demo/blob/main/docs/account-workspace-verification.md)。
 
 ## 目标与当前原因
 
