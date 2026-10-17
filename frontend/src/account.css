@@ -113,3 +113,13 @@
     padding: 20px;
   }
 }
+.login-options {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 16px 0;
+}
+.login-options [aria-pressed='true'] {
+  border-color: var(--accent);
+  color: var(--accent);
+}

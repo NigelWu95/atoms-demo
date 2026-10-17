@@ -6,14 +6,20 @@ import NotFoundPage from './pages/NotFoundPage.vue'
 import StandalonePreviewPage from './pages/StandalonePreviewPage.vue'
 import PublicAppPage from './pages/PublicAppPage.vue'
 import AccountPage from './pages/AccountPage.vue'
+import AccountSettingsPage from './pages/AccountSettingsPage.vue'
+import WorkspaceCreatePage from './pages/WorkspaceCreatePage.vue'
+import { workspaceEntry } from './runtime/workspaceEntry'
 
 export function createAppRouter(history: RouterHistory) {
+  const workspace = workspaceEntry()
   const router = createRouter({
     history,
     routes: [
       { path: '/a/:slug', component: PublicAppPage, meta: { title: '公开应用', publicApp: true } },
       { path: '/', component: HomePage, meta: { title: '开始创作', entryPage: true } },
+      { path: '/create', component: WorkspaceCreatePage, meta: { title: '开始创作' } },
       { path: '/account', component: AccountPage, meta: { title: '邮箱账号', entryPage: true } },
+      { path: '/settings/account', component: AccountSettingsPage, meta: { title: '账号管理' } },
       { path: '/workbench', component: WorkbenchPage, meta: { title: '工作台' } },
       { path: '/projects', component: ProjectsPage, meta: { title: '我的项目' } },
       { path: '/projects/:id', component: WorkbenchPage, meta: { title: '项目工作台' } },
@@ -26,7 +32,16 @@ export function createAppRouter(history: RouterHistory) {
     ],
     scrollBehavior: () => ({ top: 0 }),
   })
-  router.afterEach((route) => {
+  router.beforeEach((route) => {
+    if (route.path === '/' && workspace.hasEntered()) return { path: '/create', replace: true }
+  })
+  router.afterEach((route, _from, failure) => {
+    if (failure) return
+    if (
+      ['/create', '/projects', '/workbench', '/settings/account'].includes(route.path) ||
+      /^\/projects\/[^/]+$/.test(route.path)
+    )
+      workspace.enter()
     document.title = `${String(route.meta.title)} · Atoms Demo Studio`
   })
   return router

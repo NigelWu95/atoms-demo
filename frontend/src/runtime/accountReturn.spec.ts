@@ -3,9 +3,12 @@ import { accountReturnTarget } from './accountReturn'
 
 const id = '11111111-1111-4111-8111-111111111111'
 const version = '22222222-2222-4222-8222-222222222222'
-it.each(['/', '/projects', '/workbench'])('accepts the internal destination %s', (path) => {
-  expect(accountReturnTarget(path)).toEqual({ path, projectId: null })
-})
+it.each(['/', '/create', '/settings/account', '/projects', '/workbench'])(
+  'accepts the internal destination %s',
+  (path) => {
+    expect(accountReturnTarget(path)).toEqual({ path, projectId: null })
+  },
+)
 it.each([`/projects/${id}`, `/preview/${id}/${version}`])(
   'identifies the project to authorize for %s',
   (path) => expect(accountReturnTarget(path)).toEqual({ path, projectId: id }),

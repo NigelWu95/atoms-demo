@@ -7,6 +7,7 @@ defineProps<{ compact?: boolean }>()
 const session = useSessionStore()
 const route = useRoute()
 const accountLink = computed(() => {
+  if (session.ready && session.identity?.isGuest === false) return { path: '/settings/account' }
   const target = accountReturnTarget(route.path === '/account' ? route.query.returnTo : route.path)
   return { path: '/account', query: target ? { returnTo: target.path } : {} }
 })
