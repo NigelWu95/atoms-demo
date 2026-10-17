@@ -71,6 +71,47 @@ afterEach(() => {
 })
 
 describe('account and persistent workspace navigation', () => {
+  it.each([
+    ['returning guest', guest],
+    ['signed-in account', registered],
+  ] as const)(
+    'keeps the landing page at / for a %s despite the old entry marker',
+    async (_name, identity) => {
+      localStorage.setItem('atoms.workspace.entered.v1', '1')
+      vi.stubGlobal('fetch', mockApi(identity))
+      const { wrapper, router } = await openApp('/')
+      try {
+        expect(router.currentRoute.value.path).toBe('/')
+        expect(wrapper.find('.welcome-page').exists()).toBe(true)
+        expect(wrapper.find('.sidebar').exists()).toBe(false)
+        expect(wrapper.find('main textarea').exists()).toBe(true)
+        expect(wrapper.get('header .account-link').text()).toBe(
+          identity.isGuest ? '注册 / 登录' : '我的账号',
+        )
+      } finally {
+        wrapper.unmount()
+      }
+    },
+  )
+
+  it('returns to the landing page on browser back after entering the workspace', async () => {
+    vi.stubGlobal('fetch', mockApi(guest))
+    const { wrapper, router } = await openApp('/')
+    try {
+      await wrapper.get('header a[href="/projects"]').trigger('click')
+      await flushPromises()
+      expect(router.currentRoute.value.path).toBe('/projects')
+      expect(wrapper.find('.sidebar').exists()).toBe(true)
+      router.back()
+      await vi.waitFor(() => expect(router.currentRoute.value.path).toBe('/'))
+      await flushPromises()
+      expect(wrapper.find('.welcome-page').exists()).toBe(true)
+      expect(wrapper.find('.sidebar').exists()).toBe(false)
+    } finally {
+      wrapper.unmount()
+    }
+  })
+
   it('keeps the same sidebar when starting another creation from the workbench', async () => {
     vi.stubGlobal('fetch', mockApi(guest))
     const { wrapper, router } = await openApp('/workbench')

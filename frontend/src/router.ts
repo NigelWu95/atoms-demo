@@ -8,10 +8,8 @@ import PublicAppPage from './pages/PublicAppPage.vue'
 import AccountPage from './pages/AccountPage.vue'
 import AccountSettingsPage from './pages/AccountSettingsPage.vue'
 import WorkspaceCreatePage from './pages/WorkspaceCreatePage.vue'
-import { workspaceEntry } from './runtime/workspaceEntry'
 
 export function createAppRouter(history: RouterHistory) {
-  const workspace = workspaceEntry()
   const router = createRouter({
     history,
     routes: [
@@ -32,16 +30,8 @@ export function createAppRouter(history: RouterHistory) {
     ],
     scrollBehavior: () => ({ top: 0 }),
   })
-  router.beforeEach((route) => {
-    if (route.path === '/' && workspace.hasEntered()) return { path: '/create', replace: true }
-  })
   router.afterEach((route, _from, failure) => {
     if (failure) return
-    if (
-      ['/create', '/projects', '/workbench', '/settings/account'].includes(route.path) ||
-      /^\/projects\/[^/]+$/.test(route.path)
-    )
-      workspace.enter()
     document.title = `${String(route.meta.title)} · Atoms Demo Studio`
   })
   return router

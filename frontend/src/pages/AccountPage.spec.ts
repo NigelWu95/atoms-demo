@@ -218,7 +218,7 @@ it('carries only this tab’s homepage idea through explicit login, not private 
   drafts.attach(projectId, '旧身份私有项目输入', 'old-key')
   await wrapper.get('form').trigger('submit')
   await flushPromises()
-  expect(router.currentRoute.value.path).toBe('/create')
+  expect(router.currentRoute.value.path).toBe('/')
   expect(drafts.prompt).toBe('做一个 2048 游戏')
   expect(drafts.projectDrafts).toEqual({})
   wrapper.unmount()

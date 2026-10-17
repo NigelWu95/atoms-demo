@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { nextTick, watch } from 'vue'
-import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
+import { RouterLink, RouterView, useRoute } from 'vue-router'
 import ServiceStatus from './components/ServiceStatus.vue'
 import SessionStatus from './components/SessionStatus.vue'
 import EntryHeader from './components/EntryHeader.vue'
@@ -8,15 +8,6 @@ import { useSessionStore } from './stores/session'
 
 const route = useRoute()
 const session = useSessionStore()
-const router = useRouter()
-watch(
-  [() => route.path, () => session.ready, () => session.identity?.isGuest],
-  () => {
-    if (route.path === '/' && session.ready && session.identity?.isGuest === false)
-      void router.replace('/create')
-  },
-  { immediate: true },
-)
 watch(
   () => route.path,
   async () => {

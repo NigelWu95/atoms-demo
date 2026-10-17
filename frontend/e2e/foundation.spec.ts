@@ -1,6 +1,39 @@
 import { expect, test } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
 
+test('landing stays available after workspace entry, refresh and browser back', async ({
+  page,
+}, info) => {
+  const errors: string[] = []
+  page.on('pageerror', (error) => errors.push(error.message))
+  page.on('console', (message) => {
+    if (['error', 'warning'].includes(message.type())) errors.push(message.text())
+  })
+  await page.goto('/')
+  await expect(page.getByRole('link', { name: '注册 / 登录', exact: true })).toBeVisible()
+  await page.getByRole('link', { name: '我的项目', exact: true }).click()
+  await expect(page.locator('.sidebar')).toBeVisible()
+  await page.goBack()
+  await expect(page).toHaveURL('http://127.0.0.1:5174/')
+  await expect(page.locator('.welcome-page')).toBeVisible()
+  await expect(page.locator('.sidebar')).toHaveCount(0)
+  await page.getByRole('link', { name: '我的项目', exact: true }).click()
+  await page.getByRole('link', { name: '开始创作', exact: false }).click()
+  await expect(page).toHaveURL('http://127.0.0.1:5174/create')
+  await expect(page.locator('.sidebar')).toBeVisible()
+  await page.reload()
+  await expect(page.locator('.sidebar')).toBeVisible()
+  await page.goto('/')
+  await expect(page).toHaveURL('http://127.0.0.1:5174/')
+  await page.reload()
+  await expect(page.locator('.welcome-page')).toBeVisible()
+  await expect(page.locator('.sidebar')).toHaveCount(0)
+  await expect(page.getByRole('textbox', { name: '描述你的应用想法' })).toBeVisible()
+  await expect(page.getByRole('link', { name: '注册 / 登录', exact: true })).toBeVisible()
+  await page.screenshot({ path: info.outputPath('returning-guest-home.png'), fullPage: true })
+  expect(errors).toEqual([])
+})
+
 test('real API, project navigation, keyboard entry and disabled generation', async ({ page }) => {
   const errors: string[] = []
   page.on('pageerror', (error) => errors.push(error.message))

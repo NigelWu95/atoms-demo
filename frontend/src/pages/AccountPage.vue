@@ -145,8 +145,7 @@ async function returnToSource() {
   notice.value = '登录成功，正在返回…'
   try {
     if (target?.projectId) await getProject(target.projectId)
-    if (current())
-      await router.replace(target?.path === '/' ? '/create' : (target?.path ?? '/projects'))
+    if (current()) await router.replace(target?.path ?? '/projects')
   } catch (failure) {
     if (!current()) return
     if (failure instanceof ApiFailure && failure.status === 404) {
