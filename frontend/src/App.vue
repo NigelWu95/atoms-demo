@@ -29,7 +29,7 @@ watch(
   >
     <EntryHeader v-if="route.meta.entryPage" />
     <aside v-else class="sidebar">
-      <RouterLink class="brand" to="/create" aria-label="Atoms Demo Studio 创作页">
+      <RouterLink class="brand" to="/" aria-label="Atoms Demo Studio 首页">
         <span class="brand-mark" aria-hidden="true">✳</span>
         <span>atoms<span class="brand-subtitle">DEMO STUDIO</span></span>
       </RouterLink>

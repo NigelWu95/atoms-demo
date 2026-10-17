@@ -18,6 +18,80 @@ async function verify(page: Page, code: string, destination = '/projects') {
   await expect(page).toHaveURL(new URL(destination, page.url()).href)
 }
 
+for (const location of ['/', '/projects']) {
+  test(`workspace home link and direct logout from ${location}`, async ({ page }, info) => {
+    test.setTimeout(90000)
+    const errors: string[] = []
+    page.on('pageerror', (error) => errors.push(error.message))
+    page.on('console', (message) => {
+      if (['error', 'warning'].includes(message.type())) errors.push(message.text())
+    })
+    await page.goto('/account')
+    await expect(page.getByRole('textbox', { name: '邮箱地址', exact: true })).toBeEnabled()
+    await verify(page, await requestCode(page, `${crypto.randomUUID()}@example.com`))
+    const brand = page.locator('.sidebar').getByRole('link', { name: 'Atoms Demo Studio 首页' })
+    await expect(brand).toHaveAttribute('href', '/')
+    await brand.focus()
+    await page.keyboard.press('Enter')
+    await expect(page).toHaveURL('http://127.0.0.1:5174/')
+    await expect(page.locator('.welcome-page')).toBeVisible()
+    await expect(page.getByRole('link', { name: '我的账号', exact: true })).toBeVisible()
+    if (location === '/projects')
+      await page.getByRole('link', { name: '我的项目', exact: true }).click()
+
+    const csrf = (await (await page.request.get('/api/csrf')).json()).token
+    const created = await page.request.post('/api/projects', {
+      data: { name: '快捷退出隔离验收' },
+      headers: { 'X-CSRF-TOKEN': csrf, 'Idempotency-Key': crypto.randomUUID() },
+    })
+    expect(created.status()).toBe(201)
+    const projectPath = `/api/projects/${(await created.json()).id}`
+    const generation = await (await page.request.get('/api/generation')).json()
+    const logout = page
+      .locator('.session-status')
+      .getByRole('button', { name: '退出登录', exact: true })
+    for (const width of [320, 390, 768, 1024, 1440]) {
+      await page.setViewportSize({ width, height: 1000 })
+      await expect(logout).toBeVisible()
+      const bounds = await logout.boundingBox()
+      expect(bounds!.height).toBeGreaterThanOrEqual(44)
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+        true,
+      )
+      expect(
+        (await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze())
+          .violations,
+      ).toEqual([])
+      if ([390, 1440].includes(width))
+        await page.screenshot({
+          path: info.outputPath(`quick-logout-${width}.png`),
+          fullPage: true,
+        })
+    }
+    const sibling = await page.context().newPage()
+    await sibling.goto('/')
+    await sibling
+      .getByRole('textbox', { name: '描述你的应用想法' })
+      .fill('退出后不能保留的账号草稿')
+    const response = page.waitForResponse(
+      (reply) => reply.url().endsWith('/api/session') && reply.request().method() === 'DELETE',
+    )
+    await logout.focus()
+    await page.keyboard.press('Enter')
+    expect((await response).status()).toBe(204)
+    await expect(page).toHaveURL(`http://127.0.0.1:5174${location === '/' ? '/' : '/create'}`)
+    await expect(page.locator('.session-status')).toContainText('访客')
+    await expect(page.getByRole('button', { name: '退出登录', exact: true })).toHaveCount(0)
+    await expect(page.locator('.sidebar')).toHaveCount(location === '/' ? 0 : 1)
+    expect((await page.request.get(projectPath)).status()).toBe(404)
+    expect(await (await page.request.get('/api/generation')).json()).toEqual(generation)
+    await expect(sibling.getByRole('link', { name: '注册 / 登录', exact: true })).toBeVisible()
+    await expect(sibling.getByRole('textbox', { name: '描述你的应用想法' })).toHaveValue('')
+    await sibling.close()
+    expect(errors).toEqual([])
+  })
+}
+
 test('email verification survives visible-page session revalidation without resending', async ({
   page,
 }, info) => {

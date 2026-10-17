@@ -1,5 +1,7 @@
 # 邮箱账号：验证码注册登录与可选密码
 
+本地新增（尚未推送/部署）：已登录后可在首页右上角或工作区账号区域直接点击「退出登录」。首页/独立账号页的快捷退出回首页，工作区的快捷退出回 `/create` 并保留侧栏；访客不显示该按钮。退出结果不确定时隐藏私有视图并提示重连，不自动重复注销。工作区左上角品牌可主动返回介绍首页；「开始创作」仍在工作区内打开。
+
 2026-10-18 首页导航修正已部署：源码 `dc2aa3d`、发布包 `atoms-demo-<release-id>` 将 `/` 固定为介绍首页，`/create` 固定为带侧栏的创作页；登录按实际来源返回，不再将首页来源强制改写为工作区。本次未推送 GitHub，邮箱与密码的传输限制不变。
 
 2026-10-17 晚新增账号管理、设置/修改密码、密码登录和常驻工作区，源码 `80d0d06` 已推送 GitHub main，22:59 部署 `atoms-demo-<release-id>`，schema 升至 V017。**公网 HTTP 密码功能保持关闭，验证码入口继续开放；私有配置未修改，本次未发送真实邮件。** 本地功能验收见[账号与工作区记录](https://github.com/NigelWu95/atoms-demo/blob/main/docs/account-workspace-verification.md)，本次公网验证范围见[部署记录](https://github.com/NigelWu95/atoms-demo/blob/main/docs/cloud-deployment.md)。下方更早的带日期记录只作历史证据。

@@ -2,6 +2,8 @@
 
 提交说明：[实现思路、完成程度与后续优先级](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-summary.md)。
 
+2026-10-18 **本地新增：品牌回首页与快捷退出（尚未推送/部署）**：工作区左上角品牌返回介绍首页，侧栏“开始创作”仍到 `/create`。已登录时，首页右上角及工作区账号区域提供“退出登录”，无需先打开账号管理；复用服务端注销和私有状态清理，保留已保存项目。首页退出留在首页，工作区退出回带侧栏的创作页。[验收记录](https://github.com/NigelWu95/atoms-demo/blob/main/docs/account-workspace-verification.md)。
+
 2026-10-18 **首页导航修正已部署**：根地址 `/` 保留带 idea 输入框的介绍页，未登录显示注册/登录入口，已登录显示“我的账号”；不再因为进入过工作区或已登录就跳到 `/create`。工作区“开始创作”仍到 `/create` 并保留侧栏；首页来源登录回首页，工作区来源登录回工作区，均保留当前标签页内存 idea。00:56 部署源码 `dc2aa3d`、发布包 `atoms-demo-<release-id>` 至 **<http://192.0.2.10:8443/>**，数据及私有配置保留，无新增迁移；本次未推送 GitHub。下方 10 月 17 日版本为历史记录。
 
 2026-10-17 **账号管理、可选密码登录与常驻工作区已实现并推送部署**：管理页展示本人真实邮箱、账号 ID 和注册时间；首次设置密码需专用邮箱验证码，修改需原密码。登录页默认验证码（新邮箱注册、已有邮箱登录），也可选择已有账号密码登录。进入工作区后“开始创作”使用右侧 `/create`，保留导航；首页来源登录后同样带着 idea 进入工作区。密码变更撤销旧版本会话。**当前公网仍使用 HTTP，密码登录及设置/修改保持关闭；邮箱验证码入口继续开放。** 私有邮箱/模型配置未修改。[使用说明](https://github.com/NigelWu95/atoms-demo/blob/main/docs/email-accounts.md)、[本轮验收](https://github.com/NigelWu95/atoms-demo/blob/main/docs/account-workspace-verification.md)。

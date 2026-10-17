@@ -6,6 +6,8 @@ import App from './App.vue'
 import { api } from './api/client'
 import type { Identity } from './api/session'
 import { createAppRouter } from './router'
+import { useDraftStore } from './stores/draft'
+import { useSessionStore } from './stores/session'
 
 const guest: Identity = {
   userId: '11111111-1111-4111-8111-111111111111',
@@ -71,6 +73,144 @@ afterEach(() => {
 })
 
 describe('account and persistent workspace navigation', () => {
+  it.each(['/workbench', '/create', '/projects', '/settings/account'])(
+    'returns to the landing page through the workspace brand from %s',
+    async (path) => {
+      vi.stubGlobal('fetch', mockApi(guest))
+      const { wrapper, router } = await openApp(path)
+      try {
+        expect(wrapper.get('.sidebar .brand').attributes('href')).toBe('/')
+        expect(wrapper.get('.sidebar .brand').attributes('aria-label')).toContain('首页')
+        await wrapper.get('.sidebar .brand').trigger('click')
+        await flushPromises()
+        expect(router.currentRoute.value.path).toBe('/')
+        expect(wrapper.find('.welcome-page').exists()).toBe(true)
+        expect(wrapper.find('.sidebar').exists()).toBe(false)
+      } finally {
+        wrapper.unmount()
+      }
+    },
+  )
+
+  it.each(['/', '/projects'])('does not offer guest logout on %s', async (path) => {
+    vi.stubGlobal('fetch', mockApi(guest))
+    const { wrapper } = await openApp(path)
+    try {
+      expect(wrapper.find('.session-status .logout-button').exists()).toBe(false)
+    } finally {
+      wrapper.unmount()
+    }
+  })
+
+  it.each([
+    ['/', '/'],
+    ['/projects', '/create'],
+  ])('logs out directly from %s into %s with one protected request', async (path, target) => {
+    let signedIn = true
+    let finish!: () => void
+    const fetch = vi.fn((url: string, options?: RequestInit) => {
+      if (url === '/api/session' && options?.method === 'DELETE')
+        return new Promise<Response>((resolve) => {
+          finish = () => {
+            signedIn = false
+            resolve(new Response(null, { status: 204 }))
+          }
+        })
+      return mockApi(signedIn ? registered : guest)(url)
+    })
+    vi.stubGlobal('fetch', fetch)
+    const { wrapper, router } = await openApp(path)
+    try {
+      const draft = useDraftStore()
+      draft.prompt = '仅属于上一账号的未提交内容'
+      const button = wrapper.get('.session-status .logout-button')
+      expect(button.text()).toBe('退出登录')
+      await button.trigger('click')
+      await flushPromises()
+      expect(button.attributes('disabled')).toBeDefined()
+      expect(wrapper.text()).toContain('正在退出')
+      await button.trigger('click')
+      expect(fetch.mock.calls.filter(([, options]) => options?.method === 'DELETE')).toHaveLength(1)
+      finish()
+      await flushPromises()
+      expect(router.currentRoute.value.path).toBe(target)
+      expect(useSessionStore().identity).toEqual(guest)
+      expect(draft.prompt).toBe('')
+      expect(wrapper.find('.session-status .logout-button').exists()).toBe(false)
+      expect(wrapper.find('.sidebar').exists()).toBe(target === '/create')
+      expect(fetch).toHaveBeenCalledWith(
+        '/api/session',
+        expect.objectContaining({
+          method: 'DELETE',
+          headers: expect.objectContaining({ 'X-CSRF-TOKEN': 'test-token' }),
+        }),
+      )
+    } finally {
+      wrapper.unmount()
+    }
+  })
+
+  it('hides private account details and exposes reconnect after an unconfirmed logout', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string, options?: RequestInit) => {
+        if (url === '/api/session' && options?.method === 'DELETE')
+          return Promise.reject(new TypeError('Network unavailable'))
+        return mockApi(registered)(url)
+      }),
+    )
+    const { wrapper, router } = await openApp('/settings/account')
+    try {
+      expect(wrapper.text()).toContain(registered.email)
+      await wrapper.get('.session-status .logout-button').trigger('click')
+      await flushPromises()
+      expect(router.currentRoute.value.path).toBe('/settings/account')
+      expect(useSessionStore().state).toBe('failed')
+      expect(wrapper.find('.account-facts').exists()).toBe(false)
+      expect(wrapper.get('.session-status [role="alert"]').text()).not.toBe('')
+      expect(wrapper.get('.session-status button').text()).toBe('重新连接会话')
+      await wrapper.get('.session-status button').trigger('click')
+      await flushPromises()
+      expect(useSessionStore().state).toBe('ready')
+      expect(wrapper.text()).toContain(registered.email)
+      expect(wrapper.find('.session-status [role="alert"]').exists()).toBe(false)
+    } finally {
+      wrapper.unmount()
+    }
+  })
+
+  it('does not overwrite a new destination when logout finishes late', async () => {
+    let finish!: () => void
+    let signedIn = true
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string, options?: RequestInit) => {
+        if (url === '/api/session' && options?.method === 'DELETE')
+          return new Promise<Response>((resolve) => {
+            finish = () => {
+              signedIn = false
+              resolve(new Response(null, { status: 204 }))
+            }
+          })
+        return mockApi(signedIn ? registered : guest)(url)
+      }),
+    )
+    const { wrapper, router } = await openApp('/projects')
+    try {
+      await wrapper.get('.session-status .logout-button').trigger('click')
+      await flushPromises()
+      await wrapper.get('.sidebar .brand').trigger('click')
+      await flushPromises()
+      expect(router.currentRoute.value.path).toBe('/')
+      finish()
+      await flushPromises()
+      expect(router.currentRoute.value.path).toBe('/')
+      expect(wrapper.find('.welcome-page').exists()).toBe(true)
+    } finally {
+      wrapper.unmount()
+    }
+  })
+
   it.each([
     ['returning guest', guest],
     ['signed-in account', registered],

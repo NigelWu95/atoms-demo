@@ -1,11 +1,30 @@
 <script setup lang="ts">
-import { computed, onMounted, onBeforeUnmount } from 'vue'
-import { useRoute } from 'vue-router'
+import { computed, onMounted, onBeforeUnmount, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { errorMessage } from '../api/client'
 import { accountReturnTarget } from '../runtime/accountReturn'
 import { useSessionStore } from '../stores/session'
 defineProps<{ compact?: boolean }>()
 const session = useSessionStore()
 const route = useRoute()
+const router = useRouter()
+const loggingOut = ref(false)
+const logoutError = ref('')
+async function logout() {
+  if (loggingOut.value || !session.ready || session.identity?.isGuest !== false) return
+  const source = route.fullPath
+  const destination = route.meta.entryPage ? '/' : '/create'
+  loggingOut.value = true
+  logoutError.value = ''
+  try {
+    if ((await session.logout()) && route.fullPath === source) await router.replace(destination)
+  } catch (failure) {
+    // Session failures already have a reconnectable error owned by the session store.
+    if (session.state !== 'failed') logoutError.value = errorMessage(failure)
+  } finally {
+    loggingOut.value = false
+  }
+}
 const accountLink = computed(() => {
   if (session.ready && session.identity?.isGuest === false) return { path: '/settings/account' }
   const target = accountReturnTarget(route.path === '/account' ? route.query.returnTo : route.path)
@@ -21,7 +40,7 @@ onBeforeUnmount(() => stop?.())
 
 <template>
   <div class="session-status" :class="{ compact }" aria-live="polite">
-    <p v-if="session.state === 'connecting'">正在连接会话…</p>
+    <p v-if="session.state === 'connecting'">{{ loggingOut ? '正在退出…' : '正在连接会话…' }}</p>
     <template v-else-if="session.state === 'failed'">
       <p role="alert">{{ session.error }}</p>
       <button class="button secondary" type="button" @click="session.initialize">
@@ -46,6 +65,16 @@ onBeforeUnmount(() => stop?.())
             : '邮箱注册 / 登录'
       }}</RouterLink
     >
+    <button
+      v-if="session.identity?.isGuest === false"
+      class="button secondary logout-button"
+      type="button"
+      :disabled="loggingOut || !session.ready"
+      @click="logout"
+    >
+      {{ loggingOut ? '正在退出…' : '退出登录' }}
+    </button>
+    <p v-if="logoutError && session.state !== 'failed'" role="alert">{{ logoutError }}</p>
   </div>
 </template>
 
@@ -55,6 +84,14 @@ onBeforeUnmount(() => stop?.())
   align-items: center;
   min-height: 32px;
   color: var(--accent);
+}
+.logout-button {
+  min-height: 44px;
+  padding: 8px 12px;
+  margin-inline-start: 8px;
+}
+.compact .logout-button {
+  margin: 0;
 }
 .compact {
   display: flex;
