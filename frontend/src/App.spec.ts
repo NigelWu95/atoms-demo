@@ -116,7 +116,21 @@ describe('foundation website', () => {
       wrapper.unmount()
     }
   })
-  it.each(['/', '/projects'])('shows saved generation state on %s', async (path) => {
+  it('keeps welcome focused on idea creation without fetching project history', async () => {
+    const fetch = mockApi()
+    vi.stubGlobal('fetch', fetch)
+    const { wrapper } = await openApp()
+    try {
+      expect(wrapper.find('.welcome-page').exists()).toBe(true)
+      expect(wrapper.find('.project-row').exists()).toBe(false)
+      expect(fetch.mock.calls.some(([url]) => String(url).startsWith('/api/projects?'))).toBe(false)
+      expect(wrapper.get('textarea').attributes('aria-describedby')).toBe('prompt-hint')
+      expect(wrapper.text()).toContain('不会调用模型')
+    } finally {
+      wrapper.unmount()
+    }
+  })
+  it('shows saved generation state on the projects page', async () => {
     const fetch = mockApi()
     const original = fetch.getMockImplementation()!
     fetch.mockImplementation((url: string, options?: RequestInit) =>
@@ -133,7 +147,7 @@ describe('foundation website', () => {
         : original(url, options),
     )
     vi.stubGlobal('fetch', fetch)
-    const { wrapper } = await openApp(path)
+    const { wrapper } = await openApp('/projects')
     try {
       const rows = wrapper.findAll('.project-row')
       expect(rows[0]!.text()).toContain('已生成')

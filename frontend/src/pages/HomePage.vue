@@ -6,7 +6,6 @@ import { useDraftStore } from '../stores/draft'
 import { useSessionStore } from '../stores/session'
 import { createProject } from '../api/projects'
 import { errorMessage } from '../api/client'
-import ProjectList from '../components/ProjectList.vue'
 
 const router = useRouter()
 const draft = useDraftStore()
@@ -50,16 +49,13 @@ async function continueToWorkbench(prompt: string) {
 </script>
 
 <template>
-  <div class="home-page">
-    <header class="page-topline">
-      <span>你的下一个作品，从这里开始</span><span class="outline-badge">开发预览</span>
-    </header>
-    <section class="creation-space" aria-labelledby="home-title">
-      <div class="hero-symbol" aria-hidden="true">✳</div>
-      <p class="eyebrow">A LITTLE IDEA. A REAL POSSIBILITY.</p>
-      <h1 id="home-title" tabindex="-1">让想法，<br /><span>有一个可以运行的形状。</span></h1>
-      <p class="hero-description">
-        描述你想做什么。在同一个工作台里，整理需求、生成应用、查看结果。
+  <div class="welcome-page">
+    <section class="welcome-hero" aria-labelledby="home-title">
+      <p class="eyebrow"><span aria-hidden="true">✳</span> 从一句想法，到一个应用</p>
+      <h1 id="home-title" tabindex="-1">你有想法。<br /><span>让它运行起来。</span></h1>
+      <p class="welcome-description">
+        用自然语言描述需求，与 AI 一起生成、迭代和预览。<br class="desktop-break" />
+        你的下一个小游戏、实用工具或作品页面，从这里开始。
       </p>
       <PromptComposer
         v-model="draft.prompt"
@@ -81,19 +77,38 @@ async function continueToWorkbench(prompt: string) {
           >{{ example.name }}
         </button>
       </div>
-      <p class="development-note">
-        创建项目会保存名称，不会调用模型。进入工作台后点击“生成应用”开始生成；未提交的需求草稿仅在当前页面会话中保留。
+      <p class="welcome-note">
+        创建项目不会调用模型，进入工作台后点击“生成应用”开始。未提交的需求草稿仅在当前页面会话中保留。
       </p>
     </section>
-    <section class="recent-section" aria-labelledby="recent-title">
-      <div class="section-heading">
-        <h2 id="recent-title">你的创作空间</h2>
-        <RouterLink to="/projects" class="subtle-link">查看项目 ↗</RouterLink>
-      </div>
-      <ProjectList :limit="3" recent />
+    <section class="welcome-process" aria-labelledby="process-title">
+      <h2 id="process-title">把想法，一步步变成作品</h2>
+      <ol>
+        <li>
+          <span class="step-number">01</span>
+          <div>
+            <h3>说出想法</h3>
+            <p>描述目标和使用场景，自动创建你的项目。</p>
+          </div>
+        </li>
+        <li>
+          <span class="step-number">02</span>
+          <div>
+            <h3>一起打磨</h3>
+            <p>生成后直接预览，继续对话调整功能与细节。</p>
+          </div>
+        </li>
+        <li>
+          <span class="step-number">03</span>
+          <div>
+            <h3>带走作品</h3>
+            <p>保留历史版本，发布链接或下载工程继续开发。</p>
+          </div>
+        </li>
+      </ol>
     </section>
-    <footer class="page-footer">
-      <span>Atoms Demo Studio · 独立演示原型</span><span>构思 → 生成 → 预览 → 发布</span>
-    </footer>
+    <p class="welcome-footnote">Atoms Demo Studio · AI 应用创作原型</p>
   </div>
 </template>
+
+<style scoped src="../welcome.css"></style>
