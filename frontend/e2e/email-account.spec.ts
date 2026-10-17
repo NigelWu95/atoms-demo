@@ -18,6 +18,39 @@ async function verify(page: Page, code: string, destination = '/projects') {
   await expect(page).toHaveURL(new URL(destination, page.url()).href)
 }
 
+test('email verification survives visible-page session revalidation without resending', async ({
+  page,
+}, info) => {
+  const errors: string[] = []
+  let sends = 0
+  page.on('pageerror', (error) => errors.push(error.message))
+  page.on('request', (request) => {
+    if (request.method() === 'POST' && request.url().endsWith('/api/auth/email/challenges')) sends++
+  })
+  await page.goto('/account?returnTo=/')
+  await expect(page.getByRole('textbox', { name: '邮箱地址', exact: true })).toBeEnabled()
+  const email = `${crypto.randomUUID()}@example.com`
+  const code = await requestCode(page, email)
+  await page.getByRole('textbox', { name: '6 位验证码' }).fill(code.slice(0, 3))
+  for (let visit = 0; visit < 2; visit++) {
+    // Replay the return event: Playwright keeps background tabs visible by default.
+    // The production listener, session requests and verification still run unchanged.
+    const checked = page.waitForResponse('**/api/me')
+    await page.locator('body').dispatchEvent('visibilitychange')
+    expect((await checked).status()).toBe(200)
+    await expect(page.getByRole('textbox', { name: '邮箱地址', exact: true })).toBeEnabled()
+    await expect(page.getByRole('textbox', { name: '邮箱地址', exact: true })).toHaveValue(email)
+    await expect(page.getByRole('textbox', { name: '6 位验证码' })).toHaveValue(code.slice(0, 3))
+    await expect(page.getByRole('button', { name: '验证并登录', exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: /秒后可重发/ })).toBeDisabled()
+  }
+  await page.screenshot({ path: info.outputPath('code-after-revalidation.png'), fullPage: true })
+  await verify(page, code, '/')
+  await expect(page.getByRole('link', { name: '我的账号', exact: true })).toBeVisible()
+  expect(sends).toBe(1)
+  expect(errors).toEqual([])
+})
+
 test('email account preserves projects, synchronizes tabs, logs out and logs in from another browser', async ({
   page,
   browser,

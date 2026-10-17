@@ -168,7 +168,8 @@ function changeEmail() {
   error.value = ''
 }
 watch(
-  () => [session.identity?.userId, session.identity?.isGuest],
+  // Revalidation replaces the identity object even when the same user returns from their inbox.
+  [() => session.revision, () => session.identity?.userId, () => session.identity?.isGuest],
   () => {
     email.value = ''
     code.value = ''
