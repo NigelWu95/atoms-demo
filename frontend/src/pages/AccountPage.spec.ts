@@ -116,6 +116,50 @@ async function readyToVerify(returnTo?: string) {
   await wrapper.get('#account-code').setValue('123456')
   return { ...context, drafts, login }
 }
+it('keeps the email challenge and entered code when the same session is revalidated', async () => {
+  const { wrapper, session, login } = await readyToVerify()
+  const identity = { ...session.identity }
+  vi.stubGlobal(
+    'fetch',
+    vi.fn((path) =>
+      Promise.resolve(
+        Response.json(
+          path === '/api/me' ? identity : { token: 'renewed-test', headerName: 'X-CSRF-TOKEN' },
+        ),
+      ),
+    ),
+  )
+  for (let visit = 0; visit < 2; visit++) {
+    await session.reconcile()
+    await flushPromises()
+    expect(wrapper.get<HTMLInputElement>('#account-email').element.value).toBe('user@example.com')
+    expect(wrapper.get<HTMLInputElement>('#account-code').element.value).toBe('123456')
+    expect(wrapper.text()).toContain('验证码已发送')
+    expect(wrapper.get('[data-test="send-code"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.get('button[type="submit"]').attributes('disabled')).toBeUndefined()
+  }
+  await wrapper.get('form').trigger('submit')
+  await flushPromises()
+  expect(login).toHaveBeenCalledExactlyOnceWith(projectId, '123456')
+  wrapper.unmount()
+})
+it.each(['user', 'kind', 'revision'])(
+  'clears the email challenge when session %s changes',
+  async (change) => {
+    const { wrapper, session } = await readyToVerify()
+    if (change === 'user') session.identity = { ...session.identity!, userId: 'new-guest' }
+    else if (change === 'kind') session.identity = { ...session.identity!, isGuest: false }
+    else session.revision++
+    await flushPromises()
+    expect(wrapper.find('#account-code').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('验证码已发送')
+    if (change !== 'kind') {
+      expect(wrapper.get<HTMLInputElement>('#account-email').element.value).toBe('')
+      expect(wrapper.get('[data-test="send-code"]').attributes('disabled')).toBeDefined()
+    }
+    wrapper.unmount()
+  },
+)
 it.each([undefined, '//evil.example', '/account'])(
   'returns direct or unsafe entry %s to projects',
   async (target) => {
