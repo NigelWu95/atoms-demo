@@ -92,6 +92,13 @@ class SourceRepository {
                 operation.id());
         return operation(operation.projectId(), operation.id());
     }
+    void fence(UUID project) { jdbc.update("UPDATE project_sources SET status='NEEDS_RECONCILIATION' WHERE project_id=?", project); }
+    void clearReconciledFence(UUID project) {
+        jdbc.update("""
+                UPDATE project_sources SET status='READY' WHERE project_id=? AND NOT EXISTS
+                    (SELECT 1 FROM source_operations WHERE project_id=? AND status='NEEDS_RECONCILIATION')
+                """, project, project);
+    }
     private static UUID uuid(ResultSet result, String field) throws SQLException { return result.getObject(field, UUID.class); }
     private static Instant instant(ResultSet result, String field) throws SQLException {
         var value = result.getTimestamp(field); return value == null ? null : value.toInstant();

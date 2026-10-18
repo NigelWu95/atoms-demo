@@ -96,6 +96,27 @@ public class ProjectSourceService {
         });
     }
 
+    SourceOperation recovered(SourceOperation observed) {
+        return transaction.execute(status -> {
+            var current = lockedOperation(observed.projectId(), observed.id());
+            if (current.terminal()) return current;
+            if (!current.status().equals(observed.status()) || repository.version(current.projectId(), current.candidateVersionId()) != null)
+                throw conflict("SOURCE_NEEDS_RECONCILIATION");
+            var result = repository.finish(current, current.cancelRequested() ? "CANCELLED" : "FAILED",
+                    current.cancelRequested() ? "SOURCE_CANCELLED" : "SOURCE_INTERRUPTED");
+            repository.clearReconciledFence(current.projectId());
+            return result;
+        });
+    }
+
+    SourceOperation uncertain(SourceOperation observed) {
+        return transaction.execute(status -> {
+            var current = lockedOperation(observed.projectId(), observed.id());
+            repository.fence(current.projectId());
+            return current.terminal() ? current : repository.finish(current, "NEEDS_RECONCILIATION", "SOURCE_STORAGE_UNAVAILABLE");
+        });
+    }
+
     private SourceOperation lockedOperation(UUID project, UUID id) {
         repository.lockEvidence(project);
         var operation = repository.operation(project, id);
