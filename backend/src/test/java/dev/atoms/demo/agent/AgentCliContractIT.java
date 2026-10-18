@@ -19,6 +19,7 @@ class AgentCliContractIT {
             assertThat(result.exitCode()).isZero();
             assertThat(result.success()).isTrue();
             assertThat(result.permissionDenials()).isZero();
+            assertThat(result.initialTools()).containsExactlyInAnyOrder("Read", "Glob", "Grep", "Write", "Edit");
             assertThat(fixture.toolResults()).hasSize(7).allSatisfy((id, outcome) -> assertThat(outcome.error()).isFalse());
             assertThat(fixture.toolResults().get("tool_glob").content()).contains("hello.txt");
             assertThat(fixture.toolResults().get("tool_grep").content()).contains("before");

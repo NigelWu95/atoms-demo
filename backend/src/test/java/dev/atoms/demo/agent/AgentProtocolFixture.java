@@ -57,7 +57,7 @@ final class AgentProtocolFixture implements AutoCloseable {
     private record Step(String id, String name, Map<String, Object> input) {}
     record Request(String apiKey, String model, int maxTokens, List<String> tools, boolean stream,
                    Map<String, List<String>> toolFields) {}
-    record Result(int exitCode, boolean success, int permissionDenials) {}
+    record Result(int exitCode, boolean success, int permissionDenials, List<String> initialTools) {}
 
     Result edit(boolean separateToolArguments) throws Exception {
         steps = editSteps();
@@ -128,8 +128,11 @@ final class AgentProtocolFixture implements AutoCloseable {
             stderr.get(5, TimeUnit.SECONDS);
             if (failure != null) throw new AssertionError(failure);
             JsonNode result = null;
+            var initialTools = new ArrayList<String>();
             for (String line : output.lines().toList()) {
                 JsonNode event = json.readTree(line);
+                if (event.path("type").asText().equals("system") && event.path("subtype").asText().equals("init"))
+                    event.path("tools").forEach(tool -> initialTools.add(tool.asText()));
                 if (event.path("type").asText().equals("result")) {
                     if (result != null) throw new AssertionError("Conflicting CLI results");
                     result = event;
@@ -137,7 +140,7 @@ final class AgentProtocolFixture implements AutoCloseable {
             }
             if (result == null) throw new AssertionError("Missing CLI result; exit=" + process.exitValue());
             return new Result(process.exitValue(), result.path("subtype").asText().equals("success")
-                    && !result.path("is_error").asBoolean(true), result.path("permission_denials").size());
+                    && !result.path("is_error").asBoolean(true), result.path("permission_denials").size(), List.copyOf(initialTools));
         } finally {
             for (var child : process.descendants().toList()) if (child.isAlive()) child.destroyForcibly();
             if (process.isAlive()) process.destroyForcibly();
