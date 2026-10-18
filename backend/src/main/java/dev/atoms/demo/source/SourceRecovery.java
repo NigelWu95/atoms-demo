@@ -20,6 +20,7 @@ final class SourceRecovery {
         var operation = repository.operation(project, id);
         if (operation == null) throw ProjectSourceService.conflict("SOURCE_OPERATION_MISSING");
         if (operation.status().equals("FAILED") || operation.status().equals("CANCELLED")) return operation;
+        if (operation.executionPending()) return service.uncertain(operation);
         try {
             var settings = environment.settings();
             var store = new SourceGitStore(settings.paths(), new SourceGitProcess(settings.git()), new ProjectSourcePolicy());

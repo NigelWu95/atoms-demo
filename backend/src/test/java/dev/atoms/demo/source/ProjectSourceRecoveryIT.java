@@ -58,6 +58,23 @@ class ProjectSourceRecoveryIT extends SourceIntegrationSupport {
         assertThat(repository.operation(project, operation.id()).status()).isEqualTo("COMMITTED");
     }
 
+    @Test void anUnsettledExecutionCannotBeDeclaredStoppedFromFilesystemEvidence() throws Exception {
+        var operation = new SourceInitializer(service).request(owner, project, ProjectSourceInitializationIT.tree(), "unsettled");
+        // Simulated durable evidence only: this test never starts a child for this execution id.
+        jdbc.update("UPDATE source_operations SET execution_id=?,execution_pending=true WHERE id=?", UUID.randomUUID(), operation.id());
+        try {
+            reopenEnvironment();
+            var result = new SourceRecovery(service, repository, environment).reconcile(project, operation.id());
+            assertThat(result.status()).isEqualTo("NEEDS_RECONCILIATION");
+            assertThat(result.executionPending()).isTrue();
+            assertThat(repository.state(project).versionId()).isNull();
+            assertThat(repository.state(project).status()).isEqualTo("NEEDS_RECONCILIATION");
+        } finally {
+            // Clear only the synthetic test fence; production recovery has no such bypass.
+            jdbc.update("UPDATE source_operations SET execution_pending=false WHERE id=?", operation.id());
+        }
+    }
+
     private SourceGitStore store() {
         var settings = environment.settings();
         return new SourceGitStore(settings.paths(), new SourceGitProcess(settings.git()), new ProjectSourcePolicy());
