@@ -20,6 +20,14 @@ public final class ProjectSourceEnvironment implements AutoCloseable {
     public boolean enabled() { return configuration.getProperty("atoms.source.enabled", Boolean.class, false); }
     public record Settings(ProjectSourcePaths paths, Path git) {}
 
+    synchronized Settings existingSettings() {
+        if (closed) throw unavailable();
+        if (!enabled()) throw new ApiException(503, "SOURCE_DISABLED", "完整工程源码管理尚未启用。");
+        if (settings == null && (!Files.isDirectory(path("root"), LinkOption.NOFOLLOW_LINKS)
+                || !Files.isDirectory(path("work-root"), LinkOption.NOFOLLOW_LINKS))) throw unavailable();
+        return settings();
+    }
+
     public synchronized Settings settings() {
         if (closed) throw unavailable();
         if (!enabled()) throw new ApiException(503, "SOURCE_DISABLED", "完整工程源码管理尚未启用。");

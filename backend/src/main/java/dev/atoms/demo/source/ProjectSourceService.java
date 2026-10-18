@@ -50,6 +50,18 @@ public class ProjectSourceService {
         return value;
     }
 
+    void authorize(UUID owner, UUID project) {
+        requireEnabled();
+        projects.get(owner, project.toString());
+    }
+
+    void storageUnavailable(UUID owner, UUID project) {
+        transaction.executeWithoutResult(status -> {
+            projects.lock(owner, project.toString());
+            repository.fence(project);
+        });
+    }
+
     SourceOperation prepare(UUID project, UUID id) {
         return transaction.execute(status -> {
             var operation = lockedOperation(project, id);

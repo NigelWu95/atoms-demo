@@ -28,6 +28,12 @@ class SourceRepository {
     SourceVersion version(UUID project, UUID id) {
         return first(jdbc.query("SELECT * FROM source_versions WHERE project_id=? AND id=?", VERSION, project, id));
     }
+    List<SourceVersion> versions(UUID project, Long beforeVersion, int limit) {
+        return List.copyOf(beforeVersion == null
+                ? jdbc.query("SELECT * FROM source_versions WHERE project_id=? ORDER BY version_no DESC LIMIT ?", VERSION, project, limit)
+                : jdbc.query("SELECT * FROM source_versions WHERE project_id=? AND version_no<? ORDER BY version_no DESC LIMIT ?",
+                        VERSION, project, beforeVersion, limit));
+    }
     SourceOperation operation(UUID project, UUID id) {
         return first(jdbc.query("SELECT * FROM source_operations WHERE project_id=? AND id=?", OPERATION, project, id));
     }
