@@ -151,43 +151,45 @@ watch(
 </script>
 
 <template>
-  <section class="preview-panel" aria-labelledby="preview-title">
-    <div class="preview-toolbar">
-      <div role="group" aria-label="产物视图">
-        <button type="button" :aria-pressed="view === 'preview'" @click="view = 'preview'">
-          预览
-        </button>
-        <button type="button" :aria-pressed="view === 'code'" @click="view = 'code'">代码</button>
+  <section class="preview-panel" aria-labelledby="preview-title" tabindex="0">
+    <div class="artifact-toolbar">
+      <div class="preview-toolbar">
+        <div role="group" aria-label="产物视图">
+          <button type="button" :aria-pressed="view === 'preview'" @click="view = 'preview'">
+            预览
+          </button>
+          <button type="button" :aria-pressed="view === 'code'" @click="view = 'code'">代码</button>
+        </div>
+        <div role="group" aria-label="预览尺寸">
+          <button type="button" :aria-pressed="device === 'desktop'" @click="device = 'desktop'">
+            桌面
+          </button>
+          <button type="button" :aria-pressed="device === 'mobile'" @click="device = 'mobile'">
+            手机
+          </button>
+        </div>
       </div>
-      <div role="group" aria-label="预览尺寸">
-        <button type="button" :aria-pressed="device === 'desktop'" @click="device = 'desktop'">
-          桌面
+      <div v-if="project?.currentVersionId" class="version-toolbar">
+        <label
+          >代码版本
+          <select v-model="selected" aria-label="代码版本" :disabled="restorationLocked">
+            <option v-for="item in versions" :key="item.id" :value="item.id">
+              V{{ item.versionNo }} ·
+              {{ item.id === project.currentVersionId ? '当前版本' : '历史只读' }}
+            </option>
+          </select></label
+        >
+        <button v-if="cursor" class="button secondary" type="button" @click="loadVersions(true)">
+          更多版本
         </button>
-        <button type="button" :aria-pressed="device === 'mobile'" @click="device = 'mobile'">
-          手机
-        </button>
+        <RouterLink
+          v-if="version"
+          :to="`/preview/${project.id}/${version.id}`"
+          target="_blank"
+          rel="noopener noreferrer"
+          >共享预览新窗口 ↗</RouterLink
+        >
       </div>
-    </div>
-    <div v-if="project?.currentVersionId" class="version-toolbar">
-      <label
-        >代码版本
-        <select v-model="selected" aria-label="代码版本" :disabled="restorationLocked">
-          <option v-for="item in versions" :key="item.id" :value="item.id">
-            V{{ item.versionNo }} ·
-            {{ item.id === project.currentVersionId ? '当前版本' : '历史只读' }}
-          </option>
-        </select></label
-      >
-      <button v-if="cursor" class="button secondary" type="button" @click="loadVersions(true)">
-        更多版本
-      </button>
-      <RouterLink
-        v-if="version"
-        :to="`/preview/${project.id}/${version.id}`"
-        target="_blank"
-        rel="noopener noreferrer"
-        >共享预览新窗口 ↗</RouterLink
-      >
     </div>
     <ApplicationRunPanel
       :project-id="project?.id ?? null"
@@ -198,22 +200,26 @@ watch(
       @running="setRunning"
       @preview="showRunningPreview"
     >
-      <div v-if="version" class="preview-toolbar" role="group" aria-label="预览运行环境">
-        <button
-          type="button"
-          :aria-pressed="previewKind === 'shared'"
-          @click="previewKind = 'shared'"
-        >
-          平台共享预览
-        </button>
-        <button
-          type="button"
-          :aria-pressed="previewKind === 'instance'"
-          @click="previewKind = 'instance'"
-        >
-          本机运行预览
-        </button>
-      </div>
+      <template #preview-controls>
+        <div v-if="version" class="preview-environments" role="group" aria-label="预览运行环境">
+          <button
+            type="button"
+            aria-label="平台共享预览"
+            :aria-pressed="previewKind === 'shared'"
+            @click="previewKind = 'shared'"
+          >
+            共享预览
+          </button>
+          <button
+            type="button"
+            aria-label="本机运行预览"
+            :aria-pressed="previewKind === 'instance'"
+            @click="previewKind = 'instance'"
+          >
+            本机预览
+          </button>
+        </div>
+      </template>
       <RestorationPanel
         v-if="project?.currentVersionId"
         :key="project.id"
@@ -225,10 +231,7 @@ watch(
       <p v-if="error" class="inline-error" role="alert">{{ error }} 请重新打开项目。</p>
       <div class="preview-stage" :aria-busy="loading">
         <div class="preview-canvas" :class="{ 'mobile-canvas': device === 'mobile' }">
-          <div class="browser-decoration" aria-hidden="true"><i /><i /><i /></div>
           <template v-if="version">
-            <h2 id="preview-title" class="artifact-title">{{ version.artifact.manifest.title }}</h2>
-            <p class="artifact-summary">{{ version.artifact.manifest.summary }}</p>
             <PreviewFrame
               v-if="previewKind === 'shared'"
               v-show="view === 'preview'"
@@ -249,6 +252,15 @@ watch(
               当前版本没有运行中的本机应用。请构建并启动，或手动切换至平台共享预览。
             </p>
             <SourceViewer v-if="view === 'code'" :artifact="version.artifact" />
+            <details :key="version.id" class="artifact-description">
+              <summary>
+                <h2 id="preview-title" class="artifact-title">
+                  {{ version.artifact.manifest.title }}
+                </h2>
+                <span>应用说明 ▾</span>
+              </summary>
+              <p class="artifact-summary">{{ version.artifact.manifest.summary }}</p>
+            </details>
           </template>
           <div v-else class="preview-empty">
             <span class="preview-icon" aria-hidden="true">{{

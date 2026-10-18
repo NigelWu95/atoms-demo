@@ -134,7 +134,7 @@ watch(
   </section>
   <div v-else class="workbench-page">
     <header class="workbench-header">
-      <div>
+      <div class="workbench-identity">
         <RouterLink to="/" class="subtle-link">← 返回创作</RouterLink>
         <ProjectHeading v-if="project" :project="project" @renamed="project = $event" />
         <h1 v-else tabindex="-1">需求草稿 <span class="outline-badge">未保存</span></h1>
@@ -144,31 +144,36 @@ watch(
         发布应用 ↗
       </button>
     </header>
-    <p class="workbench-notice">
-      {{ project ? '项目名称已保存到数据库。' : '这是尚未保存的需求草稿。' }}
-      项目内未提交需求会自动保存草稿；首页尚未创建项目的输入仅在当前页面保留。发布仅开放应用，不开放创作工作台。
-    </p>
-    <div v-if="project" class="draft-status">
-      <span role="status" aria-live="polite">{{ draftStatus }}</span>
-      <p v-if="autosave.error.value" role="alert" class="inline-error">
-        {{ autosave.error.value }}
-      </p>
-      <button
-        v-if="autosave.status.value === 'error'"
-        type="button"
-        class="button secondary"
-        @click="autosave.retry"
-      >
-        重试草稿保存
-      </button>
-      <button
-        v-if="autosave.status.value === 'conflict'"
-        type="button"
-        class="button secondary"
-        @click="reloadDraft"
-      >
-        重新读取服务器草稿
-      </button>
+    <div class="workbench-meta">
+      <details class="workbench-help">
+        <summary>工作台说明</summary>
+        <p class="workbench-notice">
+          {{ project ? '项目名称已保存到数据库。' : '这是尚未保存的需求草稿。' }}
+          项目内未提交需求会自动保存草稿；首页尚未创建项目的输入仅在当前页面保留。发布仅开放应用，不开放创作工作台。
+        </p>
+      </details>
+      <div v-if="project" class="draft-status">
+        <span role="status" aria-live="polite">{{ draftStatus }}</span>
+        <p v-if="autosave.error.value" role="alert" class="inline-error">
+          {{ autosave.error.value }}
+        </p>
+        <button
+          v-if="autosave.status.value === 'error'"
+          type="button"
+          class="button secondary"
+          @click="autosave.retry"
+        >
+          重试草稿保存
+        </button>
+        <button
+          v-if="autosave.status.value === 'conflict'"
+          type="button"
+          class="button secondary"
+          @click="reloadDraft"
+        >
+          重新读取服务器草稿
+        </button>
+      </div>
     </div>
     <div class="mobile-view-controls" role="group" aria-label="工作台区域">
       <button
@@ -196,7 +201,7 @@ watch(
           <h2 id="conversation-title">需求与对话</h2>
           <span class="muted">尚未开始生成</span>
         </div>
-        <div class="conversation-body">
+        <div class="conversation-body" tabindex="0" role="region" aria-label="创作提示">
           <div class="agent-avatar" aria-hidden="true">✳</div>
           <h3>先把想法说清楚</h3>
           <p>你希望谁来使用这个应用？它需要完成什么？可以继续完善下方的需求。</p>
@@ -206,6 +211,7 @@ watch(
           <p class="muted">请先返回首页创建项目，再提交生成任务。</p>
         </div>
         <PromptComposer
+          compact
           v-model="prompt"
           disabled
           label="继续完善你的需求"
@@ -224,17 +230,10 @@ watch(
   flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem 1rem;
-  padding: 0.75rem 1.5rem;
-  border-bottom: 1px solid var(--border);
   color: var(--muted);
   font-size: 0.8125rem;
 }
 .draft-status .inline-error {
   flex-basis: 100%;
-}
-@media (max-width: 768px) {
-  .draft-status {
-    padding-inline: 1rem;
-  }
 }
 </style>

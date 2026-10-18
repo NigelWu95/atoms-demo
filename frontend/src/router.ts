@@ -18,9 +18,13 @@ export function createAppRouter(history: RouterHistory) {
       { path: '/create', component: WorkspaceCreatePage, meta: { title: '开始创作' } },
       { path: '/account', component: AccountPage, meta: { title: '邮箱账号', entryPage: true } },
       { path: '/settings/account', component: AccountSettingsPage, meta: { title: '账号管理' } },
-      { path: '/workbench', component: WorkbenchPage, meta: { title: '工作台' } },
+      { path: '/workbench', component: WorkbenchPage, meta: { title: '工作台', workbench: true } },
       { path: '/projects', component: ProjectsPage, meta: { title: '我的项目' } },
-      { path: '/projects/:id', component: WorkbenchPage, meta: { title: '项目工作台' } },
+      {
+        path: '/projects/:id',
+        component: WorkbenchPage,
+        meta: { title: '项目工作台', workbench: true },
+      },
       {
         path: '/preview/:id/:versionId',
         component: StandalonePreviewPage,

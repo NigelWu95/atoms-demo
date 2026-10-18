@@ -1,0 +1,241 @@
+/* Only the editor owns a viewport. Landing, account and standalone pages keep document scrolling. */
+.app-shell.workbench-shell {
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+}
+.workbench-shell > .main-content {
+  height: 100%;
+  min-height: 0;
+  overflow: auto;
+}
+.workbench-shell > .sidebar {
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.workbench-shell .workspace-navigation-toggle {
+  display: none;
+}
+.workbench-page > :not(.workbench-grid) {
+  flex-shrink: 0;
+}
+.workbench-page .workbench-header {
+  padding: 8px 16px;
+  max-height: 40%;
+  overflow: auto;
+}
+.workbench-identity {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+}
+.workbench-identity .project-heading {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+}
+.workbench-identity .project-heading h1 {
+  display: block;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.workbench-identity .rename-form {
+  flex-basis: 100%;
+}
+.workbench-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 16px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--border);
+  max-height: 25%;
+  overflow: auto;
+}
+.workbench-help {
+  font-size: 11px;
+  color: var(--muted);
+}
+.workbench-help summary {
+  min-height: 44px;
+  align-content: center;
+  cursor: pointer;
+}
+.workbench-help[open] {
+  flex-basis: 100%;
+}
+.workbench-help .workbench-notice {
+  padding: 8px 0;
+  background: transparent;
+  border: 0;
+}
+.artifact-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--border);
+}
+.artifact-toolbar .preview-toolbar {
+  padding: 4px 8px;
+  min-height: 0;
+  border: 0;
+  flex: 1;
+}
+.artifact-toolbar .version-toolbar {
+  padding: 4px 8px;
+  gap: 4px 12px;
+  flex: 1;
+}
+.workbench-page .preview-environments {
+  display: flex;
+  gap: 4px;
+  margin-left: auto;
+}
+.preview-environments button {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  min-height: 44px;
+  padding: 4px 8px;
+  font-size: 11px;
+  background: transparent;
+  color: var(--muted);
+}
+.preview-environments button[aria-pressed='true'] {
+  background: var(--surface-raised);
+  color: var(--text);
+}
+.workbench-page .preview-stage {
+  padding: 8px;
+}
+.workbench-page .preview-canvas {
+  min-height: 0;
+}
+.artifact-description summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  padding: 4px 12px;
+  cursor: pointer;
+}
+.artifact-description .artifact-title {
+  margin: 0;
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 13px;
+}
+.artifact-description summary > span {
+  color: var(--muted);
+  font-size: 11px;
+  flex-shrink: 0;
+}
+.workbench-page .runtime-controls {
+  padding: 4px 12px;
+}
+.workbench-page .runtime-container,
+.workbench-page .runtime-container iframe {
+  min-height: 320px;
+  height: max(320px, calc(100dvh - 320px));
+  flex: none;
+}
+.workbench-page .panel-heading {
+  padding: 8px 16px;
+  min-height: 44px;
+  flex-shrink: 0;
+}
+.workbench-page .conversation-panel .composer {
+  flex-shrink: 0;
+  margin: 8px;
+  padding: 12px;
+  max-height: 50%;
+  overflow: auto;
+}
+.workbench-page .composer textarea {
+  height: 72px;
+  min-height: 48px;
+  max-height: 112px;
+}
+.workbench-page .composer-footer {
+  align-items: center;
+  margin-top: 4px;
+}
+.composer-help {
+  min-width: 0;
+  flex: 1;
+}
+.composer-help summary {
+  min-height: 44px;
+  align-content: center;
+  cursor: pointer;
+  color: var(--muted);
+}
+.composer-help p {
+  line-height: 1.7;
+}
+.workbench-page .composer-footer > .button {
+  flex-shrink: 0;
+}
+.workbench-page :is([tabindex='0'], summary):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+@media (max-width: 767px) {
+  .app-shell.workbench-shell {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  .workbench-shell > .sidebar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+    padding: 8px 12px;
+    max-height: 40dvh;
+  }
+  .workbench-shell .workspace-navigation-toggle {
+    display: inline-flex;
+  }
+  .workbench-shell .primary-nav,
+  .workbench-shell .sidebar-footer {
+    display: none;
+    grid-column: 1 / -1;
+  }
+  .workbench-shell .navigation-open .primary-nav {
+    display: flex;
+    margin: 0;
+  }
+  .workbench-shell .navigation-open .sidebar-footer {
+    display: block;
+  }
+  .workbench-shell .sidebar .service-status {
+    position: static;
+  }
+  .workbench-page .mobile-view-controls {
+    padding: 0 8px;
+  }
+  .workbench-identity .project-heading-meta > span {
+    display: none;
+  }
+  .workbench-page .workbench-header .subtle-link {
+    display: none;
+  }
+  .workbench-page .workbench-header .text-button {
+    min-height: 44px;
+  }
+  .artifact-toolbar .version-toolbar {
+    flex-basis: 100%;
+  }
+  .workbench-page .runtime-container,
+  .workbench-page .runtime-container iframe {
+    height: max(320px, calc(100dvh - 400px));
+  }
+}

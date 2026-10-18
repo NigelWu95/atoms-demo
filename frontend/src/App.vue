@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { nextTick, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { RouterLink, RouterView, useRoute } from 'vue-router'
 import ServiceStatus from './components/ServiceStatus.vue'
 import SessionStatus from './components/SessionStatus.vue'
@@ -8,9 +8,12 @@ import { useSessionStore } from './stores/session'
 
 const route = useRoute()
 const session = useSessionStore()
+const isWorkbench = computed(() => route.meta.workbench === true)
+const navigationOpen = ref(false)
 watch(
   () => route.path,
   async () => {
+    navigationOpen.value = false
     await nextTick()
     document.querySelector<HTMLElement>('h1')?.focus({ preventScroll: true })
   },
@@ -24,22 +27,32 @@ watch(
     class="app-shell"
     :class="{
       'entry-shell': route.meta.entryPage,
-      'workbench-shell': route.path === '/workbench' || !!route.params.id,
+      'workbench-shell': isWorkbench,
     }"
   >
     <EntryHeader v-if="route.meta.entryPage" />
-    <aside v-else class="sidebar">
+    <aside v-else class="sidebar" :class="{ 'navigation-open': navigationOpen }">
       <RouterLink class="brand" to="/" aria-label="Atoms Demo Studio 首页">
         <span class="brand-mark" aria-hidden="true">✳</span>
         <span>atoms<span class="brand-subtitle">DEMO STUDIO</span></span>
       </RouterLink>
+      <button
+        v-if="isWorkbench"
+        type="button"
+        class="button secondary workspace-navigation-toggle"
+        :aria-expanded="navigationOpen"
+        aria-controls="workspace-navigation workspace-account"
+        @click="navigationOpen = !navigationOpen"
+      >
+        {{ navigationOpen ? '收起导航' : '导航与账号' }}
+      </button>
       <div class="workspace-name">
         <span class="workspace-avatar" aria-hidden="true">W</span>个人工作空间<span
           class="local-label"
           >本地</span
         >
       </div>
-      <nav class="primary-nav" aria-label="主要导航">
+      <nav id="workspace-navigation" class="primary-nav" aria-label="主要导航">
         <RouterLink to="/create" exact-active-class="active"
           ><span aria-hidden="true">＋</span>开始创作</RouterLink
         >
@@ -54,7 +67,7 @@ watch(
         <span class="eyebrow">LOCAL DEVELOPMENT</span>
         <p>每个应用，<br />从一个好想法开始。</p>
       </div>
-      <div class="sidebar-footer">
+      <div id="workspace-account" class="sidebar-footer">
         <ServiceStatus />
         <div class="profile">
           <span class="profile-avatar" aria-hidden="true">你</span>

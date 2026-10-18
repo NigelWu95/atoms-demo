@@ -3,6 +3,7 @@
 @import './projects.css';
 @import './generation.css';
 @import './publication.css';
+@import './workbench-layout.css';
 
 :root {
   color-scheme: dark;

@@ -8,12 +8,14 @@ const props = withDefaults(
     actionLabel?: string
     label?: string
     hint?: string
+    compact?: boolean
   }>(),
   {
     disabled: false,
     actionLabel: '进入工作台',
     label: '描述你的应用想法',
     hint: 'Enter 继续 · Shift + Enter 换行',
+    compact: false,
   },
 )
 const emit = defineEmits<{
@@ -44,7 +46,7 @@ function keydown(event: KeyboardEvent) {
 </script>
 
 <template>
-  <form class="composer" @submit.prevent="submit">
+  <form class="composer" :class="{ 'compact-composer': compact }" @submit.prevent="submit">
     <label class="input-label" for="prompt-input">{{ label }}</label>
     <textarea
       id="prompt-input"
@@ -59,7 +61,11 @@ function keydown(event: KeyboardEvent) {
       @keydown="keydown"
     />
     <div class="composer-footer">
-      <span id="prompt-hint" class="muted">{{ hint }}</span>
+      <details v-if="compact" class="composer-help">
+        <summary>数据与隐私说明</summary>
+        <p id="prompt-hint" class="muted">{{ hint }}</p>
+      </details>
+      <span v-else id="prompt-hint" class="muted">{{ hint }}</span>
       <button type="submit" class="button primary" :disabled="!canSubmit">
         {{ actionLabel }} <span aria-hidden="true">↗</span>
       </button>

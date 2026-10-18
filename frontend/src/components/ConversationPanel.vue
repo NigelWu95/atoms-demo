@@ -92,7 +92,7 @@ const connectionLabel = computed(
       <h2 id="conversation-title">需求与对话</h2>
       <span role="status" aria-live="polite" class="muted">{{ runLabel(run) }}</span>
     </div>
-    <div class="generation-conversation">
+    <div class="generation-conversation" tabindex="0" role="region" aria-label="对话记录">
       <p class="muted generation-config">{{ configuration }}</p>
       <RepairConfirmation
         v-if="repair && validRepair"
@@ -168,6 +168,7 @@ const connectionLabel = computed(
       </p>
     </div>
     <PromptComposer
+      compact
       :model-value="modelValue"
       :disabled="!canSubmit"
       label="继续完善你的需求"

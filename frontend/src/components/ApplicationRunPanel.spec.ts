@@ -82,7 +82,10 @@ function open() {
   const wrapper = mount(ApplicationRunPanel, {
     props: { projectId: id, ownerId: id, currentVersionId: id, version, loading: false },
     global: { plugins: [pinia], stubs: { BuildArchiveDownload: true } },
-    slots: { default: '<div data-preview-content>应用画面</div>' },
+    slots: {
+      default: '<div data-preview-content>应用画面</div>',
+      'preview-controls': '<button data-preview-mode>切换预览环境</button>',
+    },
   })
   wrappers.push(wrapper)
   return { wrapper, session }
@@ -95,6 +98,7 @@ it('places the preview slot between the primary action and advanced controls wit
   const primary = wrapper.get('[aria-label="运行应用流程"]').element
   const preview = wrapper.get('[data-preview-content]').element
   const advanced = wrapper.get('[aria-label="高级构建与进程管理"]').element
+  expect(primary.contains(wrapper.get('[data-preview-mode]').element)).toBe(true)
   expect(primary.compareDocumentPosition(preview) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   expect(preview.compareDocumentPosition(advanced) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   expect(listBuilds).toHaveBeenCalledTimes(1)

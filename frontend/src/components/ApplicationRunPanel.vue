@@ -54,6 +54,7 @@ const { canRun, canCancel, message, run, cancel } = useRunApplication(
       >
         运行应用
       </button>
+      <slot name="preview-controls" />
       <button
         v-if="canCancel"
         type="button"
@@ -93,7 +94,7 @@ const { canRun, canCancel, message, run, cancel } = useRunApplication(
 
 <style scoped>
 .application-run {
-  padding: 0.75rem 1rem;
+  padding: 0.5rem 0.75rem;
   border-bottom: 1px solid var(--border);
   font-size: 0.8125rem;
   line-height: 1.6;

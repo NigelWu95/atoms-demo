@@ -70,6 +70,10 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="runtime-preview">
+    <p v-if="status === 'unsaved'" class="inline-error">
+      请先在应用内解决保存失败。重新加载可能丢失输入，未确认的请求也可能已写入。
+    </p>
+    <div ref="container" class="runtime-container" />
     <div class="runtime-controls">
       <span v-if="mode === 'HISTORY'" class="outline-badge">历史只读 · 使用初始数据</span>
       <span v-else class="muted">私有预览 · 仅当前访客</span>
@@ -82,10 +86,6 @@ onBeforeUnmount(() => {
         重新加载
       </button>
     </div>
-    <p v-if="status === 'unsaved'" class="inline-error">
-      请先在应用内解决保存失败。重新加载可能丢失输入，未确认的请求也可能已写入。
-    </p>
-    <div ref="container" class="runtime-container" />
     <p
       class="runtime-feedback"
       :class="{ 'inline-error': status === 'error' || status === 'unsaved' }"
