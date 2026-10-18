@@ -2,7 +2,7 @@
 
 提交说明：[实现思路、完成程度与后续优先级](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-summary.md)。
 
-2026-10-18 **生成页内部滚动已在本地实现，尚未部署/推送**：工作台固定在视口内，左侧对话与右侧预览各自滚动，输入区留在底部；压缩顶部工具栏，长说明默认收起并让应用画面优先展示。手机导航/账号可展开，对话与预览切换保留输入。原下载、导出、版本恢复和发布入口保留；首页、账号及独立预览仍正常滚动。验证范围见 [WR06 验收记录](https://github.com/NigelWu95/atoms-demo/blob/main/docs/design/iteration-experience/verification.md#2026-10-18wr06-固定高度工作台与内部滚动)。
+2026-10-18 **生成页内部滚动已部署**：17:27 上线源码 `fbd54c7`、发布包 `atoms-demo-<release-id>`，本次未推送 GitHub。工作台固定在视口内，左侧对话与右侧预览各自滚动，输入区留在底部；压缩顶部工具栏，长说明默认收起并让应用画面优先展示。手机导航/账号可展开，对话与预览切换保留输入。原下载、导出、版本恢复和发布入口保留；首页、账号及独立预览仍正常滚动。数据与邮箱/模型配置保留，无新增迁移。验证范围见 [WR06 验收记录](https://github.com/NigelWu95/atoms-demo/blob/main/docs/design/iteration-experience/verification.md#2026-10-18wr06-固定高度工作台与内部滚动)和[部署记录](https://github.com/NigelWu95/atoms-demo/blob/main/docs/cloud-deployment.md)。
 
 2026-10-18 **品牌回首页与快捷退出已部署**：01:40 上线源码 `6972940`、发布包 `atoms-demo-<release-id>`，本次未推送 GitHub。工作区左上角品牌返回介绍首页，侧栏“开始创作”仍到 `/create`。已登录时，首页右上角及工作区账号区域提供“退出登录”，无需先打开账号管理；复用服务端注销和私有状态清理，保留已保存项目。首页退出留在首页，工作区退出回带侧栏的创作页。数据及邮箱/模型配置保留，无新增迁移。[验收记录](https://github.com/NigelWu95/atoms-demo/blob/main/docs/account-workspace-verification.md)、[部署记录](https://github.com/NigelWu95/atoms-demo/blob/main/docs/cloud-deployment.md)。
 

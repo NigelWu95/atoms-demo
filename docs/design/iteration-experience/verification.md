@@ -232,3 +232,11 @@ npm exec playwright -- test --config ../.local/iteration-browser.config.ts
 完整运行时 Chrome **49/49 通过**（5.8 分钟，无自动重试/跳过），其中新增布局回归 8 项。覆盖真实测试应用交互与保存、断网和未知响应、版本恢复保留数据与发布指针、源码 ZIP 下载、历史只读、预览修复和生成请求恢复，以及布局/键盘/axe 检查。桌面、手机和矮屏截图已实际查看，产物位于忽略目录 `frontend/test-results-runtime/workbench-layout-*`。浏览器控制台检查通过；测试运行器的 `NO_COLOR`/`FORCE_COLOR` 提示不属于页面日志。
 
 首页/账号/生成主流程 Chrome **22/22 通过**（4.0 分钟），包括邮箱与密码流程、快捷退出、返回首页、手机导航、生成取消和原生 SSE 重连；邮箱重发冷却未缩短。两套浏览器回归串行运行，没有共用测试库并发执行。复现命令（frontend 目录、Node 24.20.0）：`npm run test:e2e:runtime`、`npm exec playwright -- test --config playwright.entry.config.ts`。完成后 8081/5174 测试监听均已退出，原有日常 8080/5173 服务保留。代码审阅没有剩余阻断项；本次 UI 回归不代表重新验收真实模型效果或云端部署。
+
+### 后续授权部署（2026-10-18 17:27）
+
+用户随后要求“部署远程”，源码 `fbd54c7` / 发布包 `atoms-demo-<release-id>` 已上线。发布包 SHA-256 为 `ba93bdbfeee0ad8b0b7b104b98e5f770c1d67624be071d0d6ed965fbe2ec163f`；本轮未推送 GitHub，原实施阶段的“不部署”描述保留为历史边界。
+
+公网实际访客导航、健康和认证能力检查通过。对部署后的 JS/CSS 另用全 API 拦截的合成项目验证 20 条长消息/长摘要；1440×900、1024×768、1280×600、768×900、390×844、320×700 外层无纵横溢出，输入框完整可见，对话和预览分别内部滚动，iframe 首屏可见、固定应用交互及手机切换保留输入通过。第一轮手机脚本误要求隐藏预览的启动提示立即可见，修正前置条件后全脚本通过；没有改产品或放宽布局标准。控制台无 error/warning/pageerror，桌面、手机和矮屏截图已查看。这是部署前端的合成数据布局验收，不是云端真实生成/持久化/发布闭环，也未重新跑公网 axe。
+
+数据库与外部配置前后校验一致，QQ 邮箱/模型设置保留；没有访问既有用户项目、发信或调用模型，剩余额度 9954。归档/载荷校验、备份与兼容回退路径详见[云部署记录](https://github.com/NigelWu95/atoms-demo/blob/main/docs/cloud-deployment.md)。本地临时脚本和截图在 `.local/deploy-workbench-layout-20261018.jwOo7U/`，不提交 Git；日常本地服务未重启。
