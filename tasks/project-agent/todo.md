@@ -17,11 +17,12 @@
 
 ## PA02 · 固定 CLI 参数与环境
 
-- [ ] 完成 PA02。依赖：PA01。规模：M（4 文件）。
+- [x] 完成 PA02。依赖：PA01。规模：M（4 文件）。
 - 描述：将程序路径、argv 和环境组装为受控值，先验证能力。
 - 验收：不拼 shell、不重设 HOME、不继承平台秘密；拒绝未知版本/文件身份变化且不自动升级；没有 Shell/MCP/子 Agent/个人会话或 fallback 入口。
 - 验证：U(AgentInvocationTest,AgentCliProbeTest)；用 canary 环境断言白名单。
 - 主要文件：`A/AgentInvocation.java`；`A/AgentCliProbe.java`；`AT/AgentInvocationTest.java`；`AT/AgentCliProbeTest.java`。
+- 证据（2026-10-18）：新增测试先因缺类失败，实现后 U(AgentSettingsTest,AgentInvocationTest,AgentCliProbeTest) 11 通过、0 失败/错误/跳过。固定 argv、精确环境白名单、版本拒绝、同长度/时间戳内容篡改及文件权限反例通过；CLI 实际探测和工具往返在 PA03 验收，不以纯参数测试冒充。
 
 ## PA03 · 真实 CLI 的最短离线文件往返
 
