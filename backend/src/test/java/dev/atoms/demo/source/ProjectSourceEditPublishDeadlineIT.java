@@ -77,6 +77,6 @@ class ProjectSourceEditPublishDeadlineIT extends SourceIntegrationSupport {
         assertThatThrownBy(() -> new SourceAcceptance(service, candidates).prepare(owner, project, candidate,
                 "expired", null, deadline(new AtomicBoolean(true))))
                 .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.code()).isEqualTo("SOURCE_OPERATION_TIMEOUT"));
-        assertThat(repository.findByKey(project, "expired")).isNull();
+        assertThat(repository.findByKey(project, SourceRequest.key("expired"))).isNull();
     }
 }

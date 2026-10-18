@@ -13,6 +13,20 @@ import static org.assertj.core.api.Assertions.*;
 class AgentProcessTest {
     @TempDir Path temporary;
 
+    @Test void stoppedReceiptIsBoundToItsTaskExecutionAndWorkingDirectory() throws Exception {
+        var task = java.util.UUID.randomUUID(); var execution = java.util.UUID.randomUUID();
+        var result = new AgentProcess().run(command("success"), "test", new AgentDeadline(Duration.ofSeconds(8)),
+                () -> false, task, execution);
+        var proof = result.stopped();
+        assertThat(proof.matches(task, execution, temporary)).isTrue();
+        assertThat(proof.matches(java.util.UUID.randomUUID(), execution, temporary)).isFalse();
+        assertThat(proof.matches(task, java.util.UUID.randomUUID(), temporary)).isFalse();
+        assertThat(proof.matches(task, execution, temporary.resolve("different"))).isFalse();
+        assertThat(proof.digest()).matches("[a-f0-9]{64}");
+        assertThat(proof.toString()).doesNotContain(temporary.toString(), "test");
+        assertThat(proof.getClass().getConstructors()).isEmpty();
+    }
+
     @Test void requiresSuccessfulProtocolAndProcessExitAndProducesOwnedReceipt() throws Exception {
         var result = execute("success", Duration.ofSeconds(8));
         assertThat(result.summary().events()).isEqualTo(2);
