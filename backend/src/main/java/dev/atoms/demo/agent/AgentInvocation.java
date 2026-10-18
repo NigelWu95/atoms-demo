@@ -21,7 +21,7 @@ final class AgentInvocation {
         var command = new ArrayList<String>();
         command.add(executable.toString());
         // https://code.claude.com/docs/en/cli-reference: available tools != auto-approved tools.
-        command.addAll(List.of("--bare", "--restricted", "--print", "--input-format", "text",
+        command.addAll(List.of("--safe-mode", "--restricted", "--print", "--input-format", "text",
                 "--output-format", "stream-json", "--verbose", "--no-session-persistence",
                 "--disable-slash-commands", "--no-chrome", "--setting-sources", "", "--strict-mcp-config",
                 "--mcp-config", "{\"mcpServers\":{}}", "--tools", TOOLS, "--allowedTools", TOOLS,
@@ -31,8 +31,9 @@ final class AgentInvocation {
         builder.environment().clear();
         builder.environment().putAll(probeEnvironment(config, temporary));
         var environment = builder.environment();
-        // Bare mode never uses personal OAuth; only this subprocess receives the supplied key.
-        // https://code.claude.com/docs/en/headless#start-faster-with-bare-mode
+        // Explicit API authentication in a private config directory; never inherit OAuth variables.
+        // Safe mode disables customizations, NOT managed policy or OS permissions.
+        // https://code.claude.com/docs/en/cli-reference
         environment.put("ANTHROPIC_API_KEY", apiKey);
         environment.put("ANTHROPIC_BASE_URL", "https://api.deepseek.com/anthropic");
         for (String role : List.of("ANTHROPIC_MODEL", "ANTHROPIC_DEFAULT_OPUS_MODEL",

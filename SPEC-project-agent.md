@@ -1,10 +1,10 @@
 # Spec: project-agent · Claude Code + DeepSeek 完整工程编辑
 
-状态：2026-10-18～19，用户已确认规格、[实施计划](tasks/project-agent/plan.md)与[任务清单](tasks/project-agent/todo.md)，授权连续实施 PA01–PA33。检查点用于汇报证据，不重复请求逐项批准；真实付费模型 PA-LIVE、执行生成应用、公开入口和部署仍需另行授权。PA01/PA02 已完成，PA03 离线兼容性检查未通过，尚未完成接入。
+状态：2026-10-18～19，用户已确认规格、[实施计划](tasks/project-agent/plan.md)与[任务清单](tasks/project-agent/todo.md)，并将范围扩展至完整本地开发闭环（§10）。检查点用于汇报证据，不重复请求逐项批准；真实付费模型 PA-LIVE 与部署仍需另行授权。PA01/PA02 已完成，PA03 替代启动方式的离线文件能力已通过，整体接入仍在实施。
 
 模块索引：[完整工程能力地图](FULL-PROJECT-CAPABILITY-MAP.md)。上游：[源码模块](SPEC-project-source.md)。总体方向：[ADR-016](docs/decisions/016-full-project-source-and-coding-agent.md)。本文不是整个工程改造的完成声明，也不是执行生成后端的授权。
 
-实施验证补充（2026-10-18）：PA01/PA02 已实现；PA03 已实测本机 2.1.302 能通过 loopback 假接口完成已有文件读改，实际输出参数为 128000。但 §4.1 当前组合只暴露 Read/Edit，没有 Glob/Grep/Write，尚不满足已确认契约。规格参数保留原批准值，不静默改成更宽权限或更少功能；后续模式调整待确认。见 [完整验证记录](docs/project-agent-verification.md)。
+实施验证补充（2026-10-19）：原 `bare + restricted` 只暴露 Read/Edit；经用户批准验证替代方式，`safe-mode + restricted` 在真实本机 CLI + loopback 下暴露完整五种工具，并通过搜索、新增 Vue/Java/SQL、目录外读写和软链接越界拒绝测试。仅测试假密钥，不代表真实模型或完整运行链路已验收。见 [完整验证记录](docs/project-agent-verification.md)。
 
 ## 1. 目标与范围
 
@@ -85,7 +85,7 @@ Agent 任务始终绑定非空源码版本和修订号。新项目先完成无�
 以下是拟采用的参数数组，不是本轮应执行的模型命令。提示通过 stdin 一次写入后关闭，不拼到 shell 或进程参数；工作目录由源码门面给出：
 
 ```text
---bare --restricted --print
+--safe-mode --restricted --print
 --input-format text --output-format stream-json --verbose
 --no-session-persistence --disable-slash-commands --no-chrome
 --setting-sources "" --strict-mcp-config --mcp-config {"mcpServers":{}}
@@ -251,3 +251,13 @@ npm run build
 真实调用的具体项目、启动次数和费用约束可在离线适配完成后单独确认，不阻塞确定性实现。第三方模型组合及对外托管的适用条款仍是正式开放前核查项，沿用 ADR-016 的边界，不将技术连通性等同于商业授权。
 
 下一步形成实施计划与任务；批准本规格不自动开启真实调用、执行生成代码或远程部署。
+
+## 10. 2026-10-19 完整闭环实施授权
+
+用户在了解 npm 安装、构建错误反馈与文件编辑的区别后，要求“一次性按照完整实现来完成”。本节更新先前只交付文件编辑模块的范围：继续完成完整源码编辑，并衔接受控依赖安装、构建/测试、错误反馈修复、本机进程运行、同快照预览/下载及工作台入口。按现有能力地图顺序推进，不逐小项重复请求开始，也不把内部文件编辑通过当作整体交付。
+
+先验证 `--safe-mode --restricted` 候选启动组合，保留独立配置、空环境、文件工具白名单及无 Shell/MCP 边界。只有真实已安装 CLI 的离线行为测试通过才更新正式调用参数；不因为文档列出参数就宣布兼容，不修改个人认证或机器受管策略。
+
+后续执行器将安装依赖与构建作为平台动作，不接受模型提供的任意命令字符串。锁文件归工程源码，node_modules、构建产物与运行秘密不进入源码版本。新增依赖先解析并审核来源/安装脚本，构建日志脱敏后反馈；失败不得替换上一可用预览。独立目录与进程不等于安全沙箱，新模式仍仅向明确允许的维护者开放。
+
+本次不授权推送/远程部署、修改个人配置或放宽既有安全验收。真实付费模型仍须确定试验项目与次数预算后再执行；在此之前通过离线协议和受控工程夹具验收，并明确区分“离线通过”与“真实模型通过”。

@@ -15,6 +15,7 @@
   <name>Atoms Demo Studio</name>
   <properties>
     <java.version>17</java.version>
+    <agent.excluded-test-groups>agent-cli-contract</agent.excluded-test-groups>
   </properties>
   <dependencies>
     <dependency>
@@ -204,11 +205,21 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-failsafe-plugin</artifactId>
-        <configuration><failIfNoTests>true</failIfNoTests></configuration>
+        <configuration>
+          <failIfNoTests>true</failIfNoTests>
+          <!-- Installed CLI is exercised only by the explicit offline contract profile. -->
+          <excludedGroups>${agent.excluded-test-groups}</excludedGroups>
+        </configuration>
         <executions>
           <execution><goals><goal>integration-test</goal><goal>verify</goal></goals></execution>
         </executions>
       </plugin>
     </plugins>
   </build>
+  <profiles>
+    <profile>
+      <id>agent-cli-contract</id>
+      <properties><agent.excluded-test-groups>none</agent.excluded-test-groups></properties>
+    </profile>
+  </profiles>
 </project>

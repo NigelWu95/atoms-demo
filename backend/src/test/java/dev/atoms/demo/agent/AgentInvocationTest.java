@@ -15,7 +15,7 @@ class AgentInvocationTest {
 
     @Test void fixedArgvDoesNotIncludePromptsShellOrFallbacks() {
         var builder = invocation();
-        assertThat(builder.command()).containsExactly("/opt/cli/claude", "--bare", "--restricted", "--print",
+        assertThat(builder.command()).containsExactly("/opt/cli/claude", "--safe-mode", "--restricted", "--print",
                 "--input-format", "text", "--output-format", "stream-json", "--verbose", "--no-session-persistence",
                 "--disable-slash-commands", "--no-chrome", "--setting-sources", "", "--strict-mcp-config",
                 "--mcp-config", "{\"mcpServers\":{}}", "--tools", "Read,Glob,Grep,Write,Edit",

@@ -1,6 +1,6 @@
 # project-agent · 开发任务
 
-状态：2026-10-18，用户已批准连续实施 PA01–PA33，PA01/PA02 完成；PA03 在真实 CLI 工具集合兼容性验证中阻断，未进入 PA04。PA-LIVE 尚未授权。唯一依据为 [已确认规格](../../SPEC-project-agent.md)和[本模块计划](plan.md)。不重复使用旧 EB/PS 清单，不将旧人工验收勾为完成。
+状态：2026-10-19，用户要求一次完成完整本地开发闭环，范围更新见规格 §10。PA01/PA02 完成；PA03 替代模式的四项离线能力检查通过，正式调用参数回归进行中。PA-LIVE 尚未授权。唯一依据为 [已确认规格](../../SPEC-project-agent.md)和[本模块计划](plan.md)。不重复使用旧 EB/PS 清单，不将旧人工验收勾为完成。
 
 每项 S=1–2、M=3–5 个主要文件（含测试）；实际超出先拆子任务，不藏进巨型文件。路径缩写：A=backend/src/main/java/dev/atoms/demo/agent，AT=backend/src/test/java/dev/atoms/demo/agent，S/ST=对应 source 包，M=backend/src/main/resources/db/migration，T=templates/full-project-v1。Agent 包已创建，模板目录尚待创建。U/I/CLI/ALL/PY/FRONT/BROWSER/DOC 命令定义在计划 §6。
 
@@ -26,17 +26,17 @@
 
 ## PA03 · 真实 CLI 的最短离线文件往返
 
-- [ ] 完成 PA03。依赖：PA02。规模：M（3 文件）。
+- [x] 完成 PA03。依赖：PA02。规模：M（3 个夹具/profile 文件，另更新 PA02 调用参数及单测）。
 - 描述：用本机 CLI 和 loopback 假 Anthropic 服务验证一次 Read→Edit→成功结果。
 - 验收：使用假 Key 与新临时副本，真实文件发生预期修改；捕获认证方式、模型、工具列表和有效 max_tokens，未达目标即失败而非改期望；仅显式测试 profile 运行，测试夹具不进正式 JAR。
 - 验证：CLI；检查实际请求及文件字节；缺 CLI 或协议不兼容不得跳过算通过。
 - 主要文件：`AT/AgentProtocolFixture.java`；`AT/AgentCliContractIT.java`；`backend/pom.xml`。
 - 阻断证据（2026-10-18）：真实 CLI 2.1.302、假 Key、仅 loopback 服务，逗号分隔及分立 argv 两种写法均完成 Read→Edit→成功 result/退出，文件由 `before\n` 变成 `after\n`，无 permission_denials。每次 3 个请求，认证为 x-api-key、模型 deepseek-flash、max_tokens=128000。但每个请求只包含 Edit/Read，缺少计划要求的 Glob/Grep/Write；CLI 契约测试 **2 失败、0 错误/跳过**，不得下调期望冒充通过。11 个 Agent 单元测试通过；完整旧后端单元回归 224 通过。详细命令与后续选择见 [离线验证记录](../../docs/project-agent-verification.md)。
-- 处理：保留失败测试与 profile 为未提交开发现场；不删除 bare、不开放 Shell/MCP、不安装/升级 CLI、不修改个人配置。更换启动模式或缩减搜索/新增文件契约需要先确认，再重验能力与隔离边界。
+- 处理更新（2026-10-19）：用户批准完整闭环实施，正式 `safe-mode + restricted` 已通过四项真实 CLI 离线测试：两种参数格式、五种文件工具的实际执行、目录外/链接访问拒绝；项目和私有配置 CLAUDE.md canary 未进入请求。保留全部五种工具要求，不开放 Shell/MCP，不安装/升级 CLI。224 单元 + 4 CLI 集成测试通过，0 失败/错误/跳过，构建成功；命令及限制见验证记录。
 
 ### C-PA01 · CLI 最短往返
 
-- [ ] 前三项实际通过，补记具体命令、数量、失败/跳过、进程和版本证据；检查未扩大权限并审阅变更。向用户汇报，按批准的连续实施范围推进；验收不成立则暂停该切片，不扩大权限或把未测项记为通过。
+- [x] C-PA01：前三项实际通过，保留原 bare 失败证据，正式参数完成 224 单元 + 4 CLI 集成测试及构建。启动方式调整已获批准；未新增 Shell/MCP 权限。完整隔离和真实模型尚未验收，继续 PA04。
 
 ## PA04 · 任务私有目录
 
