@@ -14,6 +14,7 @@ import org.springframework.stereotype.Repository;
 class SourceRepository {
     private final JdbcTemplate jdbc;
     SourceRepository(JdbcTemplate jdbc) { this.jdbc = jdbc; }
+    SourceEditLeaseRepository edits() { return new SourceEditLeaseRepository(jdbc, this); }
     static final RowMapper<SourceVersion> VERSION = (r, n) -> new SourceVersion(uuid(r, "id"), uuid(r, "project_id"),
             r.getLong("version_no"), r.getString("commit_id"), r.getString("tree_sha256"), r.getInt("file_count"), r.getLong("tree_bytes"),
             uuid(r, "based_on_id"), uuid(r, "restored_from_id"), uuid(r, "legacy_version_id"), r.getString("template_id"),
@@ -23,7 +24,7 @@ class SourceRepository {
             uuid(r, "expected_version_id"), r.getLong("expected_revision"), uuid(r, "candidate_version_id"), uuid(r, "target_version_id"),
             uuid(r, "legacy_version_id"), r.getString("template_id"), r.getString("template_digest"), r.getString("candidate_sha256"),
             r.getString("status"), r.getBoolean("cancel_requested"), uuid(r, "result_version_id"), r.getString("error_code"),
-            instant(r, "created_at"), instant(r, "finished_at"), uuid(r, "execution_id"), r.getBoolean("execution_pending"));
+            instant(r, "created_at"), instant(r, "finished_at"), uuid(r, "execution_id"), r.getBoolean("execution_pending"), uuid(r, "edit_lease_id"));
 
     SourceVersion version(UUID project, UUID id) {
         return first(jdbc.query("SELECT * FROM source_versions WHERE project_id=? AND id=?", VERSION, project, id));
@@ -60,12 +61,15 @@ class SourceRepository {
         if (pending == null || pending >= 64) throw ProjectSourceService.conflict("SOURCE_CAPACITY_EXCEEDED");
     }
     SourceOperation insertIntent(UUID owner, UUID project, SourceRequest request, String key) {
+        return insertIntent(owner, project, request, key, null);
+    }
+    SourceOperation insertIntent(UUID owner, UUID project, SourceRequest request, String key, UUID editLease) {
         return jdbc.queryForObject("""
                 INSERT INTO source_operations(id,project_id,owner_id,kind,idempotency_sha256,request_sha256,expected_version_id,
-                    expected_revision,candidate_version_id,target_version_id,legacy_version_id,template_id,template_digest,candidate_sha256)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?) RETURNING *
+                    expected_revision,candidate_version_id,target_version_id,legacy_version_id,template_id,template_digest,candidate_sha256,edit_lease_id)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) RETURNING *
                 """, OPERATION, UUID.randomUUID(), project, owner, request.kind(), key, request.digest(), request.expectedVersionId(),
-                request.expectedRevision(), UUID.randomUUID(), request.targetVersionId(), request.legacyVersionId(), request.templateId(), request.templateDigest(), request.treeSha256());
+                request.expectedRevision(), UUID.randomUUID(), request.targetVersionId(), request.legacyVersionId(), request.templateId(), request.templateDigest(), request.treeSha256(), editLease);
     }
     void lockEvidence(UUID project) {
         jdbc.execute("SET LOCAL lock_timeout='3s'");

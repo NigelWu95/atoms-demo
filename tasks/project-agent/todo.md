@@ -1,6 +1,6 @@
 # project-agent · 开发任务
 
-状态：2026-10-19，用户要求一次完成完整本地开发闭环，范围更新见规格 §10。PA01–PA07 完成，继续 PA08 写入口互斥。PA-LIVE 尚未授权。唯一依据为 [已确认规格](../../SPEC-project-agent.md)和[本模块计划](plan.md)。不重复使用旧 EB/PS 清单，不将旧人工验收勾为完成。
+状态：2026-10-19，用户要求一次完成完整本地开发闭环，范围更新见规格 §10。PA01–PA08 完成，继续 PA09 受控工作副本。PA-LIVE 已发出非阻塞授权询问，尚无答复，不作已授权处理。唯一依据为 [已确认规格](../../SPEC-project-agent.md)和[本模块计划](plan.md)。不重复使用旧 EB/PS 清单，不将旧人工验收勾为完成。
 
 每项 S=1–2、M=3–5 个主要文件（含测试）；实际超出先拆子任务，不藏进巨型文件。路径缩写：A=backend/src/main/java/dev/atoms/demo/agent，AT=backend/src/test/java/dev/atoms/demo/agent，S/ST=对应 source 包，M=backend/src/main/resources/db/migration，T=templates/full-project-v1。Agent 包已创建，模板目录尚待创建。U/I/CLI/ALL/PY/FRONT/BROWSER/DOC 命令定义在计划 §6。
 
@@ -80,11 +80,12 @@
 
 ## PA08 · 所有源码写入口检查租约
 
-- [ ] 完成 PA08。依赖：PA07。规模：M（5 文件）。
+- [x] 完成 PA08。依赖：PA07。规模：M（5 文件）。
 - 描述：避免其他接受、恢复或导入从 Agent 编辑旁路写入。
 - 验收：统一项目行锁顺序后检查租约；已排队旧操作也不能在 Worker 发布时越过新租约；持有者绑定明确而非以 task UUID 自报放行，纯读取不受影响。
 - 验证：I(ProjectSourceEditGuardIT,ProjectSourceAdmissionIT,ProjectSourceRestorationIT)；两连接竞态及旧无租约行为。
 - 主要文件：`S/ProjectSourceService.java`；`S/SourceRepository.java`；`S/SourceOperation.java`；`S/SourceEditLeaseRepository.java`；`ST/ProjectSourceEditGuardIT.java`。
+- 证据：3 项反例先失败，包含两个竞争任务均成功；接入项目锁内租约校验后通过。新增仅已停写且绑定租约的接受操作实际写入 Git 的正例，共 4 项 guard 测试。源码/Agent 相关 107 单元 + 全部 67 源码集成通过，0 失败/错误/跳过；历史读取和取消仍可用，旧无租约行为回归通过。
 
 ## PA09 · 发行受控工作副本句柄
 

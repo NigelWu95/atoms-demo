@@ -82,6 +82,26 @@ class SourceEditLeaseRepository {
         jdbc.update("UPDATE source_edit_leases SET status='RELEASED',released_at=now() WHERE id=?", lease.id());
     }
 
+    void requireNoActive(UUID project) {
+        if (active(project) != null) throw ProjectSourceService.conflict("SOURCE_EDIT_BUSY");
+    }
+
+    void requirePermit(UUID owner, UUID project, UUID base, long revision, Lease permit, boolean stopped) {
+        Lease current = active(project);
+        if (permit == null || current == null || !current.id().equals(permit.id()) || !current.taskId().equals(permit.taskId())
+                || !current.ownerId().equals(owner) || !current.baseVersionId().equals(base) || current.baseRevision()!=revision
+                || !current.status().equals("ACTIVE")
+                || stopped && (current.executionPending() || current.stoppedSha256() == null))
+            throw ProjectSourceService.conflict("SOURCE_EDIT_BUSY");
+    }
+
+    void requireOperation(SourceOperation operation) {
+        Lease current = active(operation.projectId());
+        if (current == null && operation.editLeaseId() == null) return;
+        if (current == null || !current.id().equals(operation.editLeaseId())) throw ProjectSourceService.conflict("SOURCE_EDIT_BUSY");
+        requirePermit(operation.ownerId(), operation.projectId(), operation.expectedVersionId(), operation.expectedRevision(), current, true);
+    }
+
     private void locked(UUID project) {
         if (!TransactionSynchronizationManager.isActualTransactionActive()) throw new IllegalStateException("Source edit requires a transaction");
         sources.lockEvidence(project);

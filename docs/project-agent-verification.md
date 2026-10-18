@@ -96,3 +96,16 @@ V020 新增 source_edit_leases 和 source_operations 的可空关联，不引用
 红绿：新增测试先缺类失败；沙箱禁止连接 PG 后按权限重跑。V020 仅应用到非超级用户 atoms_test 使用的 atoms_demo_test。Spring 实例化发现 Repository final 与 CGLIB 不兼容，修正类声明后 2026-10-19 01:32 命令 `./mvnw -B -Dit.test=ProjectSourceEditLeaseIT test-compile failsafe:integration-test failsafe:verify` **6 测试通过、0 失败/错误/跳过**。此前已应用的迁移不重写。
 
 回退是关闭新入口、保留表/锁/历史，而非 DROP 数据：测试验证关闭源码开关后原版本指针及租约证据保留，旧 projects 指针不变。仅有表和 DAO 尚不能阻止旧代码的全部写入口，PA08 继续接入；不得在此启用日常 Agent。
+
+## PA08：统一写入口互斥
+
+提交/幂等重放、工作副本基线、Worker 准备/启动/ready/发布和恢复结算均在项目行锁下检查当前编辑租约。普通写入口遇到活动编辑拒绝；专用接受入口要求同项目/所有者/基线/任务绑定且停止已确认，源码操作持久保存 edit_lease_id。历史版本读取、查询状态、请求取消和保守失败标记不被锁死。
+
+3 项反例先实际失败：普通写未阻止、已排队写绕过、两个连接同时获准。实现后通过，并增加已停写租约的真实 Git 发布正例，共 4 项 guard 检查通过。2026-10-19 01:41：
+
+```sh
+env PATH=/Users/wubingheng/.nvm/versions/node/v24.20.0/bin:$PATH ./mvnw -B \
+  '-Dtest=Agent*Test,ProjectSource*Test' '-Dit.test=ProjectSource*IT' verify
+```
+
+**107 单元 + 67 源码集成通过，0 失败/错误/跳过**。包含旧导入、恢复、回滚、工作副本、取消和源码旅程。测试中的 Coordinator 争抢连接警告是拒绝第二个拥有者的故障注入用例；该测试通过。尚非新 Agent 到 UI 的完整旅程。

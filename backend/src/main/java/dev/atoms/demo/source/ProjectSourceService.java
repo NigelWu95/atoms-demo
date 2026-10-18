@@ -15,21 +15,29 @@ public class ProjectSourceService {
     private final SourceRepository repository;
     private final TransactionTemplate transaction;
     private final ProjectSourceEnvironment environment;
+    private final SourceEditLeaseRepository edits;
 
     ProjectSourceService(ProjectService projects, SourceRepository repository, PlatformTransactionManager transactions,
             ProjectSourceEnvironment environment) {
         this.projects = projects; this.repository = repository; this.transaction = new TransactionTemplate(transactions); this.environment = environment;
+        this.edits = repository.edits();
     }
 
     SourceOperation admit(UUID owner, UUID projectId, SourceRequest request, String idempotencyKey) {
+        return admit(owner, projectId, request, idempotencyKey, null);
+    }
+
+    SourceOperation admit(UUID owner, UUID projectId, SourceRequest request, String idempotencyKey, SourceEditLeaseRepository.Lease permit) {
         requireEnabled();
         String key = SourceRequest.key(idempotencyKey), digest = request.digest();
         return transaction.execute(status -> {
             Project project = projects.lock(owner, projectId.toString());
             writable(project);
+            checkEdit(owner, projectId, request.expectedVersionId(), request.expectedRevision(), permit, true);
             SourceOperation existing = repository.findByKey(projectId, key);
             if (existing != null) {
-                if (!existing.requestSha256().equals(digest)) throw conflict("SOURCE_IDEMPOTENCY_CONFLICT");
+                if (!existing.requestSha256().equals(digest) || !java.util.Objects.equals(existing.editLeaseId(), permit == null ? null : permit.id()))
+                    throw conflict("SOURCE_IDEMPOTENCY_CONFLICT");
                 return existing;
             }
             repository.ensureSource(projectId);
@@ -38,7 +46,7 @@ public class ProjectSourceService {
             if (request.targetVersionId() != null && repository.version(projectId, request.targetVersionId()) == null)
                 throw conflict("SOURCE_VERSION_MISSING");
             repository.reserveQueueSlot();
-            return repository.insertIntent(owner, projectId, request, key);
+            return repository.insertIntent(owner, projectId, request, key, permit == null ? null : permit.id());
         });
     }
 
@@ -51,12 +59,18 @@ public class ProjectSourceService {
     }
 
     SourceOperation replay(UUID owner, UUID project, SourceRequest request, String idempotencyKey) {
+        return replay(owner, project, request, idempotencyKey, null);
+    }
+
+    SourceOperation replay(UUID owner, UUID project, SourceRequest request, String idempotencyKey, SourceEditLeaseRepository.Lease permit) {
         requireEnabled();
         String key = SourceRequest.key(idempotencyKey);
         return transaction.execute(status -> {
             writable(projects.lock(owner, project.toString()));
+            checkEdit(owner, project, request.expectedVersionId(), request.expectedRevision(), permit, true);
             var existing = repository.findByKey(project, key);
-            if (existing != null && !existing.requestSha256().equals(request.digest())) throw conflict("SOURCE_IDEMPOTENCY_CONFLICT");
+            if (existing != null && (!existing.requestSha256().equals(request.digest())
+                    || !java.util.Objects.equals(existing.editLeaseId(), permit == null ? null : permit.id()))) throw conflict("SOURCE_IDEMPOTENCY_CONFLICT");
             return existing;
         });
     }
@@ -80,9 +94,14 @@ public class ProjectSourceService {
     }
 
     void writableBase(UUID owner, UUID project, UUID version, long revision) {
+        writableBase(owner, project, version, revision, null);
+    }
+
+    void writableBase(UUID owner, UUID project, UUID version, long revision, SourceEditLeaseRepository.Lease permit) {
         requireEnabled();
         transaction.executeWithoutResult(status -> {
             writable(projects.lock(owner, project.toString()));
+            checkEdit(owner, project, version, revision, permit, false);
             var state = repository.state(project);
             if (state == null || version == null || revision < 1) throw conflict("SOURCE_BASE_CONFLICT");
             requireBase(state, version, revision);
@@ -100,6 +119,7 @@ public class ProjectSourceService {
         return transaction.execute(status -> {
             var operation = lockedOperation(project, id);
             if (operation.terminal()) return operation;
+            edits.requireOperation(operation);
             writable(projects.lock(operation.ownerId(), project.toString()));
             requireBase(repository.state(project), operation.expectedVersionId(), operation.expectedRevision());
             if (!operation.status().equals("PREPARING") || operation.executionId() != null) throw conflict("SOURCE_NEEDS_RECONCILIATION");
@@ -111,6 +131,7 @@ public class ProjectSourceService {
         return transaction.execute(status -> {
             var operation = lockedOperation(project, id);
             if (operation.terminal()) return operation;
+            edits.requireOperation(operation);
             writable(projects.lock(operation.ownerId(), project.toString()));
             requireBase(repository.state(project), operation.expectedVersionId(), operation.expectedRevision());
             if (operation.cancelRequested()) return repository.finish(operation, "CANCELLED", "SOURCE_CANCELLED");
@@ -122,6 +143,7 @@ public class ProjectSourceService {
         return transaction.execute(status -> {
             var operation = lockedOperation(project, id);
             if (operation.terminal()) return operation;
+            edits.requireOperation(operation);
             writable(projects.lock(operation.ownerId(), project.toString()));
             requireBase(repository.state(project), operation.expectedVersionId(), operation.expectedRevision());
             if (operation.cancelRequested()) return repository.finish(operation, "CANCELLED", "SOURCE_CANCELLED");
@@ -142,6 +164,7 @@ public class ProjectSourceService {
         return transaction.execute(status -> {
             var operation = lockedOperation(project, id);
             if (operation.terminal()) return operation;
+            edits.requireOperation(operation);
             writable(projects.lock(operation.ownerId(), project.toString()));
             requireBase(repository.state(project), operation.expectedVersionId(), operation.expectedRevision());
             if (operation.cancelRequested()) return repository.finish(operation, "CANCELLED", "SOURCE_CANCELLED");
@@ -166,6 +189,7 @@ public class ProjectSourceService {
         return transaction.execute(status -> {
             var current = lockedOperation(observed.projectId(), observed.id());
             if (current.terminal()) return current;
+            edits.requireOperation(current);
             if (current.executionPending() || !current.status().equals(observed.status()) || repository.version(current.projectId(), current.candidateVersionId()) != null)
                 throw conflict("SOURCE_NEEDS_RECONCILIATION");
             var result = repository.finish(current, current.cancelRequested() ? "CANCELLED" : "FAILED",
@@ -192,6 +216,10 @@ public class ProjectSourceService {
 
     private void requireEnabled() {
         if (!environment.enabled()) throw new ApiException(503, "SOURCE_DISABLED", "完整工程源码管理尚未启用。");
+    }
+    private void checkEdit(UUID owner, UUID project, UUID base, long revision, SourceEditLeaseRepository.Lease permit, boolean stopped) {
+        if (permit == null) edits.requireNoActive(project);
+        else edits.requirePermit(owner, project, base, revision, permit, stopped);
     }
     static void writable(Project project) {
         if (project.archived()) throw conflict("SOURCE_PROJECT_ARCHIVED");
