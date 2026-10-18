@@ -54,14 +54,22 @@ class AgentTaskLifecycle {
     }
 
     AgentTask fail(UUID id, String code, boolean uncertain) {
-        return transaction.execute(status -> {
+        var result = transaction.execute(status -> {
             var task = repository.lock(id);
             if (task.terminal()) return task;
+            var operation = source.operationFact(requireHandle(id));
+            if (operation != null && operation.status().equals("COMMITTED")) {
+                requireMatchingSource(task, operation);
+                task = repository.bindSource(task, operation.id());
+                return repository.sourceSaved(task, operation.resultVersionId());
+            }
             if (uncertain) return repository.finish(task, "NEEDS_RECONCILIATION", code);
-            String terminal = code.equals("AGENT_CANCELLED") ? "CANCELLED"
+            String terminal = task.cancelRequested() || code.equals("AGENT_CANCELLED") ? "CANCELLED"
                     : code.equals("AGENT_TIMEOUT") || code.equals("SOURCE_OPERATION_TIMEOUT") ? "TIMED_OUT" : "FAILED";
-            return finish(task, terminal, code);
+            return finish(task, terminal, terminal.equals("CANCELLED") ? "AGENT_CANCELLED" : code);
         });
+        if (result.status().equals("SOURCE_SAVED")) releaseSaved(result);
+        return result;
     }
 
     AgentTask phase(UUID id, String expected, String next) {
@@ -98,6 +106,13 @@ class AgentTaskLifecycle {
             task = repository.bindSource(task, operation.id());
             return repository.sourceSaved(task, operation.resultVersionId());
         });
+        releaseSaved(result);
+        return result;
+    }
+
+    private void releaseSaved(AgentTask result) {
+        UUID id = result.id();
+        if (service.handle(id) == null) return;
         // A cleanup failure cannot undo or misreport an already committed source version.
         try {
             transaction.executeWithoutResult(status -> {
@@ -107,7 +122,6 @@ class AgentTaskLifecycle {
             LOG.warn("{\"event\":\"agent_saved_edit_retained\",\"entryPoint\":\"{}\",\"requestId\":\"{}\",\"errorCode\":\"AGENT_EDIT_RELEASE_PENDING\"}",
                     result.entryPoint(), id);
         }
-        return result;
     }
 
     private void requireMatchingSource(AgentTask task, dev.atoms.demo.source.SourceOperation operation) {

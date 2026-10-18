@@ -70,6 +70,11 @@ class AgentTaskRepository {
                 next, task.id(), expected) != 1) throw AgentTask.conflict("AGENT_TASK_CONFLICT");
         return get(task.id());
     }
+    AgentTask requestCancel(AgentTask task) {
+        requireTransaction();
+        if (!task.terminal()) jdbc.update("UPDATE agent_tasks SET cancel_requested=true WHERE id=?", task.id());
+        return get(task.id());
+    }
     AgentTask bindSource(AgentTask task, UUID operation) {
         requireTransaction();
         if (task.sourceOperationId() != null && !task.sourceOperationId().equals(operation)) throw AgentTask.conflict("AGENT_TASK_CONFLICT");

@@ -55,7 +55,10 @@ public final class SourceAgentFixture implements AutoCloseable {
     }
     public ProjectSourceEditGateway gateway() { return gateway; }
     public void start(DataSource database) {
-        coordinator = new SourceCoordinator(source, repository, environment, database); coordinator.start();
+        start(database, stage -> {});
+    }
+    public void start(DataSource database, java.util.function.Consumer<String> observer) {
+        coordinator = new SourceCoordinator(source, repository, environment, database, stage -> observer.accept(stage.name())); coordinator.start();
         assertThat(coordinator.isRunning()).isTrue();
     }
     public byte[] file(UUID owner, UUID project, UUID version, String path) {

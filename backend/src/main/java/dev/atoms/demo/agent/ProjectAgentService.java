@@ -64,6 +64,32 @@ public class ProjectAgentService {
         if (task == null || !task.projectId().equals(project)) throw new ApiException(404, "AGENT_TASK_MISSING", "任务不存在或当前账号无权访问。");
         return view(task);
     }
+
+    public TaskView cancel(UUID owner, UUID project, UUID taskId) {
+        authorizeMaintainer(owner);
+        return transaction.execute(status -> {
+            projects.lock(owner, project.toString());
+            var task = repository.get(taskId);
+            if (task == null || !task.projectId().equals(project))
+                throw new ApiException(404, "AGENT_TASK_MISSING", "任务不存在或当前账号无权访问。");
+            task = repository.lock(taskId);
+            if (task.terminal()) return view(task);
+            var edit = handles.get(taskId);
+            if (edit == null) throw AgentTask.conflict("AGENT_EDIT_UNAVAILABLE");
+            task = repository.requestCancel(task);
+            var cancelled = source.cancelEdit(owner, edit);
+            if (cancelled.operation() != null && cancelled.operation().status().equals("COMMITTED")) {
+                task = repository.bindSource(task, cancelled.operation().id());
+                return view(repository.sourceSaved(task, cancelled.operation().resultVersionId()));
+            }
+            // Only QUEUED is known to have no active preparation. A running owner must confirm its own exit.
+            if (task.status().equals("QUEUED") && !cancelled.executionPending()) {
+                source.releaseEdit(edit); forgetAfterCommit(taskId);
+                return view(repository.finish(task, "CANCELLED", "AGENT_CANCELLED"));
+            }
+            return view(task);
+        });
+    }
     AgentSettings.Configuration authorizeMaintainer(UUID owner) {
         var config = settings.load();
         if (owner == null || !config.maintainerIds().contains(owner))
