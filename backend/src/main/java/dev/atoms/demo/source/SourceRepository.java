@@ -34,6 +34,11 @@ class SourceRepository {
     SourceOperation findByKey(UUID project, String key) {
         return first(jdbc.query("SELECT * FROM source_operations WHERE project_id=? AND idempotency_sha256=?", OPERATION, project, key));
     }
+    List<SourceOperation> pending() {
+        var rows = jdbc.query("SELECT * FROM source_operations WHERE status IN ('PREPARING','CANDIDATE_READY','NEEDS_RECONCILIATION') ORDER BY created_at,id LIMIT 65", OPERATION);
+        if (rows.size() > 64) throw ProjectSourceService.conflict("SOURCE_CAPACITY_EXCEEDED");
+        return rows;
+    }
     record State(UUID projectId, UUID versionId, long revision, String status) {}
     State state(UUID project) {
         return first(jdbc.query("SELECT * FROM project_sources WHERE project_id=?", (r, n) -> new State(uuid(r, "project_id"),
