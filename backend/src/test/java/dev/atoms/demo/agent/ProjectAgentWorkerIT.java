@@ -54,6 +54,12 @@ class ProjectAgentWorkerIT extends AgentIntegrationSupport {
         var task = service.submit(owner, base.projectId(), new ProjectAgentService.Input("no changes", base.versionId().toString(), 1), "none");
         var result = new AgentWorker(service, repository, lifecycle, source.gateway(), adapter).execute(task.id());
         assertThat(result.status()).isEqualTo("NO_CHANGES");
+        var query = new AgentQuery(settings, projects, repository, new AgentEventRepository(jdbc), transactions);
+        var history = query.events(owner, base.projectId(), task.id(), 0, 100);
+        assertThat(history.events().stream().filter(event -> !event.kind().equals("USAGE")).map(event -> event.payload().get("status")))
+                .containsExactly("QUEUED", "PREPARING", "RUNNING", "VALIDATING", "ACCEPTING", "NO_CHANGES");
+        assertThat(history.events().stream().filter(event -> event.kind().equals("USAGE"))).hasSize(1);
+        assertThat(history.nextCursor()).isEqualTo(7);
         assertThat(result.resultVersionId()).isNull();
         assertThat(jdbc.queryForObject("SELECT count(*) FROM source_versions WHERE project_id=?", Integer.class, base.projectId())).isEqualTo(1);
         assertThat(service.handle(task.id())).isNull();

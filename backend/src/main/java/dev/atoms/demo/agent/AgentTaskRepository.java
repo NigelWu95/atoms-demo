@@ -44,7 +44,7 @@ class AgentTaskRepository {
         requireTransaction();
         if (!task.status().equals("QUEUED")) throw AgentTask.conflict("AGENT_TASK_CONFLICT");
         jdbc.update("UPDATE agent_tasks SET status='PREPARING',started_at=now() WHERE id=? AND status='QUEUED'", task.id());
-        return get(task.id());
+        return changed(task.id());
     }
     void reserveLive(long maximum) {
         requireTransaction();
@@ -57,7 +57,7 @@ class AgentTaskRepository {
                 UPDATE agent_tasks SET status='RUNNING',execution_id=?,live_reserved=?
                 WHERE id=? AND status='PREPARING' AND execution_id IS NULL AND NOT cancel_requested
                 """, execution, live, task.id()) != 1) throw AgentTask.conflict("AGENT_TASK_CONFLICT");
-        return get(task.id());
+        return changed(task.id());
     }
     AgentTask finish(AgentTask task, String status, String error) {
         requireTransaction();
@@ -66,18 +66,18 @@ class AgentTaskRepository {
                 || error != null && !error.matches("(AGENT|SOURCE)_[A-Z_]{1,80}")) throw new IllegalArgumentException("Invalid task result");
         jdbc.update("UPDATE agent_tasks SET status=?,error_code=?,finished_at=CASE WHEN ? THEN now() ELSE NULL END WHERE id=?",
                 status, error, AgentTask.TERMINAL.contains(status), task.id());
-        return get(task.id());
+        return changed(task.id());
     }
     AgentTask phase(AgentTask task, String expected, String next) {
         requireTransaction();
         if (jdbc.update("UPDATE agent_tasks SET status=? WHERE id=? AND status=? AND NOT cancel_requested",
                 next, task.id(), expected) != 1) throw AgentTask.conflict("AGENT_TASK_CONFLICT");
-        return get(task.id());
+        return changed(task.id());
     }
     AgentTask requestCancel(AgentTask task) {
         requireTransaction();
         if (!task.terminal()) jdbc.update("UPDATE agent_tasks SET cancel_requested=true WHERE id=?", task.id());
-        return get(task.id());
+        return changed(task.id());
     }
     AgentTask bindSource(AgentTask task, UUID operation) {
         requireTransaction();
@@ -89,7 +89,16 @@ class AgentTaskRepository {
         requireTransaction();
         jdbc.update("UPDATE agent_tasks SET status='SOURCE_SAVED',result_version_id=?,error_code=NULL,finished_at=now() WHERE id=?",
                 version, task.id());
-        return get(task.id());
+        return changed(task.id());
+    }
+    void usage(AgentTask task, AgentStreamDecoder.Summary summary) {
+        requireTransaction();
+        new AgentEventRepository(jdbc).usage(task.id(), summary.inputTokens(), summary.outputTokens(), summary.paths().size());
+    }
+    private AgentTask changed(UUID id) {
+        var task = get(id);
+        new AgentEventRepository(jdbc).stage(task);
+        return task;
     }
     boolean stopRequested(UUID id, UUID owner) {
         return !Boolean.TRUE.equals(jdbc.queryForObject("""
@@ -105,12 +114,14 @@ class AgentTaskRepository {
     }
     AgentTask insert(UUID id, UUID owner, UUID project, UUID edit, AgentTask.Request request) {
         requireTransaction();
-        return jdbc.queryForObject("""
+        var inserted = jdbc.queryForObject("""
                 INSERT INTO agent_tasks(id,project_id,owner_id,edit_lease_id,base_version_id,base_revision,
                     idempotency_sha256,request_sha256,prompt,max_tokens,max_turns,task_timeout_seconds,queue_timeout_seconds)
                 VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?) RETURNING *
                 """, ROW, id, project, owner, edit, request.base(), request.revision(), request.key(), request.digest(),
                 request.prompt(), request.tokens(), request.turns(), request.taskSeconds(), request.queueSeconds());
+        new AgentEventRepository(jdbc).stage(inserted);
+        return inserted;
     }
     private static UUID uuid(ResultSet row, String column) throws SQLException { return row.getObject(column, UUID.class); }
     private static Instant instant(ResultSet row, String column) throws SQLException {

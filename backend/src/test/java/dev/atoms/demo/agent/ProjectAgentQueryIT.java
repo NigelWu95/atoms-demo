@@ -61,7 +61,7 @@ class ProjectAgentQueryIT extends AgentIntegrationSupport {
         var task = submit("edit");
         jdbc.update("UPDATE agent_tasks SET last_event_seq=4095,event_bytes=261120 WHERE id=?", task.id());
         stage(task.id());
-        assertThat(jdbc.queryForObject("SELECT count(*) FROM agent_events WHERE task_id=?", Integer.class, task.id())).isZero();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM agent_events WHERE task_id=?", Integer.class, task.id())).isEqualTo(1);
         service.cancel(owner, task.projectId(), task.id()); stage(task.id());
         var page = query.events(owner, task.projectId(), task.id(), 4095, 100);
         assertThat(page.events()).hasSize(1);
@@ -75,7 +75,8 @@ class ProjectAgentQueryIT extends AgentIntegrationSupport {
         new TransactionTemplate(transactions).executeWithoutResult(s -> {
             repository.lock(task.id()); events.usage(task.id(), 1, 2, 3);
         });
-        var usage = query.events(owner, task.projectId(), task.id(), 0, 100).events().get(0);
+        var usage = query.events(owner, task.projectId(), task.id(), 0, 100).events().stream()
+                .filter(event -> event.kind().equals("USAGE")).findFirst().orElseThrow();
         assertThat(usage.payload()).containsEntry("observedPaths", 3).doesNotContainKey("changedFiles");
         service.cancel(owner, task.projectId(), task.id());
         new TransactionTemplate(transactions).executeWithoutResult(s -> {

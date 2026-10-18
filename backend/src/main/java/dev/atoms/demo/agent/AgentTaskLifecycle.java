@@ -82,6 +82,13 @@ class AgentTaskLifecycle {
         });
     }
 
+    void usage(UUID id, AgentStreamDecoder.Summary summary) {
+        transaction.executeWithoutResult(status -> {
+            var task = repository.lock(id);
+            if (!task.terminal()) repository.usage(task, summary);
+        });
+    }
+
     AgentTask noChanges(UUID id) {
         return transaction.execute(status -> {
             var task = repository.lock(id); authorize(task);

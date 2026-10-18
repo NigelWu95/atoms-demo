@@ -45,6 +45,7 @@ final class AgentWorker {
         var deadline = new AgentDeadline(Duration.ofSeconds(task.taskTimeoutSeconds()));
         boolean executionStarted = false, stopped = false;
         try {
+            AgentStreamDecoder.Summary usage;
             source.prepareEdit(handle, deadline::remaining);
             var cancellation = new Cancellation(task);
             try (var session = agent.prepare(task, source.workPath(handle), deadline)) {
@@ -58,8 +59,10 @@ final class AgentWorker {
                     throw error;
                 }
                 confirmStopped(handle, edited.stopped()); stopped = true;
+                usage = edited.summary();
             }
             if (Thread.currentThread().isInterrupted()) throw new IOException("AGENT_CANCELLED");
+            lifecycle.usage(task.id(), usage);
             lifecycle.phase(task.id(), "RUNNING", "VALIDATING"); deadline.remaining();
             lifecycle.phase(task.id(), "VALIDATING", "ACCEPTING");
             var accepted = source.sealAndAccept(handle, "agent-task-" + task.id());
