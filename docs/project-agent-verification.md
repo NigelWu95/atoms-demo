@@ -144,3 +144,5 @@ env PATH=/Users/wubingheng/.nvm/versions/node/v24.20.0/bin:$PATH ./mvnw -B \
 **44 单元 + 5 真实 CLI 离线集成通过，0 失败/错误/跳过，BUILD SUCCESS**。仍只使用假 Key 和 loopback 假服务；尚非真实 DeepSeek 或用户功能验收。
 
 PA14c（02:38）：新增 Worker 先缺类红测。`./mvnw -B '-Dit.test=ProjectAgentWorkerIT,ProjectAgentLifecycleIT,ProjectAgentAdmissionIT' test-compile failsafe:integration-test failsafe:verify` **11 项通过、0 失败/错误/跳过**。受控 Java 编辑进程实际修改 Vue/Java/SQL，经正式进程拥有者、源码门面和 Git 协调者保存两轮连续版本；README 和旧 SQL 等未改内容逐字节一致。重复调度不再执行，NO_CHANGES 无新版本，非法 .env 与缺结果的进程不能覆盖旧版，已确认停止后释放租约。结构化任务日志只记录 ID/阶段/稳定码/耗时。尚未接自动调度、取消、恢复或公开入口，也没有编译/启动生成工程。
+
+PA15a（02:44）：新增 V022 持久取消标记，只迁移测试库，不重写 V020/V021。领取/启动意图/停止确认/取消等数据库动作不再获取文件 I/O 的全局监视器，容量采用 64 个非阻塞许可；取消标记与项目行锁阻止后续接受/发布。源操作已提交时只返回持久事实。先缺接口红测，`./mvnw -B '-Dit.test=ProjectSourceEditCancellationIT,ProjectSourceEditAcceptanceIT,ProjectSourceEditWorkspaceIT,ProjectSourceCancellationIT' test-compile failsafe:integration-test failsafe:verify` **17 项通过、0 失败/错误/跳过**。受控复制阻塞下，持有项目行锁的取消 2 秒内完成；提交前/后竞争分别得到 CANCELLED / COMMITTED，原取消回归通过。

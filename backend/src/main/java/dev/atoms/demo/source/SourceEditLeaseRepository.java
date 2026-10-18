@@ -93,13 +93,27 @@ class SourceEditLeaseRepository {
                 || !current.status().equals("ACTIVE")
                 || stopped && (current.executionPending() || current.stoppedSha256() == null))
             throw ProjectSourceService.conflict("SOURCE_EDIT_BUSY");
+        if (Boolean.TRUE.equals(jdbc.queryForObject("SELECT cancel_requested FROM source_edit_leases WHERE id=?", Boolean.class, current.id())))
+            throw ProjectSourceService.conflict("SOURCE_EDIT_CANCELLED");
     }
 
     void requireOperation(SourceOperation operation) {
+        // A confirmed-stopped, cancelled source operation may settle without permission to publish new content.
+        if (operation.cancelRequested() && !operation.executionPending()) return;
         Lease current = active(operation.projectId());
         if (current == null && operation.editLeaseId() == null) return;
         if (current == null || !current.id().equals(operation.editLeaseId())) throw ProjectSourceService.conflict("SOURCE_EDIT_BUSY");
         requirePermit(operation.ownerId(), operation.projectId(), operation.expectedVersionId(), operation.expectedRevision(), current, true);
+    }
+
+    void requestCancel(Lease lease) {
+        locked(lease.projectId());
+        jdbc.update("UPDATE source_edit_leases SET cancel_requested=true WHERE id=? AND status<>'RELEASED'", lease.id());
+    }
+
+    SourceOperation operation(Lease lease) {
+        var ids = jdbc.query("SELECT id FROM source_operations WHERE edit_lease_id=?", (r,n) -> r.getObject(1, UUID.class), lease.id());
+        return ids.isEmpty() ? null : sources.operation(lease.projectId(), ids.get(0));
     }
 
     private void locked(UUID project) {

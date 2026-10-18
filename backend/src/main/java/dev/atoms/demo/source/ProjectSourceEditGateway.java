@@ -2,9 +2,11 @@ package dev.atoms.demo.source;
 
 import dev.atoms.demo.execution.OwnedProcess;
 import java.nio.file.Path;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -22,7 +24,8 @@ public class ProjectSourceEditGateway {
     private final java.util.function.Supplier<SourceCoordinator> coordinator;
     private final TransactionTemplate transaction;
     private final ProjectSourceEnvironment environment;
-    private final Map<UUID, EditHandle> issued = new HashMap<>();
+    private final Map<UUID, EditHandle> issued = new ConcurrentHashMap<>();
+    private final Semaphore capacity = new Semaphore(64);
 
     ProjectSourceEditGateway(ProjectSourceService service, SourceRepository repository, ProjectSourceEnvironment environment,
                             PlatformTransactionManager transactions) {
@@ -45,24 +48,26 @@ public class ProjectSourceEditGateway {
         this.transaction = new TransactionTemplate(transactions);
     }
 
-    public synchronized EditHandle claimEdit(UUID owner, UUID project, UUID base, long revision, UUID task) {
+    public EditHandle claimEdit(UUID owner, UUID project, UUID base, long revision, UUID task) {
         java.util.Objects.requireNonNull(task);
-        if (issued.size() >= 64) throw ProjectSourceService.conflict("SOURCE_CAPACITY_EXCEEDED");
-        return transaction.execute(status -> {
+        if (!capacity.tryAcquire()) throw ProjectSourceService.conflict("SOURCE_CAPACITY_EXCEEDED");
+        var slotReleased = new AtomicBoolean();
+        try { return transaction.execute(status -> {
             service.writableBase(owner, project, base, revision);
             var lease = leases.claim(owner, project, base, revision, task);
-            var handle = new EditHandle(lease);
+            var handle = new EditHandle(lease, slotReleased);
             issued.put(lease.id(), handle);
             // Agent admission can join this transaction; a failed task insert must revoke its handle too.
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override public void afterCompletion(int completion) {
-                    if (completion != STATUS_COMMITTED) synchronized (ProjectSourceEditGateway.this) {
+                    if (completion != STATUS_COMMITTED) {
                         issued.remove(lease.id(), handle);
+                        releaseCapacity(slotReleased);
                     }
                 }
             });
             return handle;
-        });
+        }); } catch (RuntimeException | Error error) { releaseCapacity(slotReleased); throw error; }
     }
 
     public synchronized void prepareEdit(EditHandle handle) {
@@ -88,7 +93,7 @@ public class ProjectSourceEditGateway {
     }
 
     /** Durable intent is committed before the caller starts its process. May join Agent admission's transaction. */
-    public synchronized void markExecutionStarted(EditHandle handle, UUID execution) {
+    public void markExecutionStarted(EditHandle handle, UUID execution) {
         owned(handle);
         if (handle.workspace == null || handle.directory == null) throw ProjectSourceService.conflict("SOURCE_EDIT_UNAVAILABLE");
         transaction.executeWithoutResult(status -> {
@@ -99,7 +104,7 @@ public class ProjectSourceEditGateway {
     }
 
     /** Stop facts may be recorded after timeout or ownership changes; they do not authorize new source publication. */
-    public synchronized void confirmExecutionStopped(EditHandle handle, OwnedProcess.Stopped evidence) {
+    public void confirmExecutionStopped(EditHandle handle, OwnedProcess.Stopped evidence) {
         owned(handle);
         transaction.executeWithoutResult(status -> {
             repository.lockEvidence(handle.projectId());
@@ -149,7 +154,26 @@ public class ProjectSourceEditGateway {
         return handle.accepted;
     }
 
-    public synchronized void releaseEdit(EditHandle handle) {
+    /** DB-only cancellation must never wait for the file-I/O monitor while holding a project row lock. */
+    public Cancellation cancelEdit(UUID owner, EditHandle handle) {
+        owned(handle);
+        return transaction.execute(status -> {
+            repository.lockEvidence(handle.projectId()); service.authorize(owner, handle.projectId());
+            var operation = leases.operation(handle.lease);
+            if (operation != null && operation.status().equals("COMMITTED")) return new Cancellation(false, operation);
+            leases.requestCancel(handle.lease);
+            if (operation != null) operation = service.cancel(owner, handle.projectId(), operation.id());
+            return new Cancellation(leases.get(handle.projectId(), handle.leaseId()).executionPending(), operation);
+        });
+    }
+    public record Cancellation(boolean executionPending, SourceOperation operation) {}
+
+    /** Trusted held-capability fact lookup for settlement, even if owner or deadline changed after publication. */
+    public SourceOperation operationFact(EditHandle handle) {
+        owned(handle); return leases.operation(handle.lease);
+    }
+
+    public void releaseEdit(EditHandle handle) {
         owned(handle);
         transaction.executeWithoutResult(status -> {
             repository.lockEvidence(handle.lease.projectId());
@@ -160,7 +184,7 @@ public class ProjectSourceEditGateway {
                     synchronized (ProjectSourceEditGateway.this) {
                         candidates.release(handle.candidate);
                         workspaces.release(handle.workspace);
-                        issued.remove(handle.lease.id(), handle);
+                        if (issued.remove(handle.lease.id(), handle)) releaseCapacity(handle.slotReleased);
                     }
                 }
             });
@@ -170,6 +194,7 @@ public class ProjectSourceEditGateway {
     private void owned(EditHandle handle) {
         if (handle == null || issued.get(handle.lease.id()) != handle) throw ProjectSourceService.conflict("SOURCE_EDIT_UNAVAILABLE");
     }
+    private void releaseCapacity(AtomicBoolean released) { if (released.compareAndSet(false, true)) capacity.release(); }
     private SourceDeadline deadline(EditHandle handle) {
         return new SourceDeadline(environment.operationTimeout(), System::nanoTime, handle.budget);
     }
@@ -180,14 +205,17 @@ public class ProjectSourceEditGateway {
 
     public static final class EditHandle {
         private final SourceEditLeaseRepository.Lease lease;
-        private SourceWorkspace workspace;
-        private Path directory;
+        private final AtomicBoolean slotReleased;
+        private volatile SourceWorkspace workspace;
+        private volatile Path directory;
         private SourceCandidate candidate;
         private String acceptanceKey;
         private Acceptance accepted;
         private SourceExecutionBudget budget;
         private boolean budgetAssigned;
-        private EditHandle(SourceEditLeaseRepository.Lease lease) { this.lease = lease; }
+        private EditHandle(SourceEditLeaseRepository.Lease lease, AtomicBoolean slotReleased) {
+            this.lease = lease; this.slotReleased = slotReleased;
+        }
         public UUID leaseId() { return lease.id(); }
         public UUID taskId() { return lease.taskId(); }
         public UUID projectId() { return lease.projectId(); }
