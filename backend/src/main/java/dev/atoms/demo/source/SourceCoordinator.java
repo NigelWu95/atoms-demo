@@ -104,7 +104,7 @@ final class SourceCoordinator implements SmartLifecycle, AutoCloseable {
         environment.settings();
     }
     @Override public boolean isRunning() { return running.get(); }
-    @Override public int getPhase() { return Integer.MAX_VALUE; }
+    @Override public int getPhase() { return Integer.MAX_VALUE - 100; }
     @Override public void stop() { close(); }
     @Override public void close() {
         ThreadPoolExecutor worker;

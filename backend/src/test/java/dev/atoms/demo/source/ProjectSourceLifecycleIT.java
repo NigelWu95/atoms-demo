@@ -15,8 +15,13 @@ class ProjectSourceLifecycleIT extends SourceIntegrationSupport {
 
     @Test void singleWorkerPublishesAndClosePermanentlyStopsAdmission() throws Exception {
         var coordinator = new SourceCoordinator(service, repository, environment, dataSource);
+        var gateway = new ProjectSourceEditGateway(service, repository, environment, transactions,
+                (java.util.function.Supplier<SourceCoordinator>) () -> coordinator);
+        assertThat(coordinator.getPhase()).isLessThan(Integer.MAX_VALUE);
+        assertThat(gateway.readyForAgent()).isFalse();
         try {
             coordinator.start();
+            assertThat(gateway.readyForAgent()).isTrue();
             var submitted = coordinator.initialize(owner, project, ProjectSourceInitializationIT.tree(), "worker");
             assertThat(submitted.completion().get(30, TimeUnit.SECONDS).status()).isEqualTo("COMMITTED");
             assertThat(coordinator.initialize(owner, project, ProjectSourceInitializationIT.tree(), "worker").operation().id())
@@ -25,6 +30,7 @@ class ProjectSourceLifecycleIT extends SourceIntegrationSupport {
         assertThatThrownBy(() -> coordinator.initialize(owner, project, ProjectSourceInitializationIT.tree(), "after-close"))
                 .isInstanceOf(dev.atoms.demo.common.ApiException.class);
         assertThat(coordinator.isRunning()).isFalse();
+        assertThat(gateway.readyForAgent()).isFalse();
     }
 
     @Test void disabledCoordinatorDoesNotAcquireStorageOrCreateAnyWorker() throws Exception {

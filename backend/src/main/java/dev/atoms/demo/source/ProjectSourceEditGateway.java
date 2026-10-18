@@ -27,6 +27,12 @@ public class ProjectSourceEditGateway {
     private final Map<UUID, EditHandle> issued = new ConcurrentHashMap<>();
     private final Semaphore capacity = new Semaphore(64);
 
+    /** Lifecycle readiness only; each publication still verifies the coordinator's database lease. */
+    public boolean readyForAgent() {
+        var scheduler = coordinator.get();
+        return scheduler != null && scheduler.isRunning();
+    }
+
     ProjectSourceEditGateway(ProjectSourceService service, SourceRepository repository, ProjectSourceEnvironment environment,
                             PlatformTransactionManager transactions) {
         this(service, repository, environment, transactions, (java.util.function.Supplier<SourceCoordinator>) () -> null);
