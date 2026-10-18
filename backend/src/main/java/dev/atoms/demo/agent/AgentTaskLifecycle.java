@@ -12,6 +12,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 /** Short state transitions. CLI and filesystem work must always happen outside these transactions. */
 @Component
 class AgentTaskLifecycle {
+    private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(AgentTaskLifecycle.class);
     private final ProjectAgentService service;
     private final AgentTaskRepository repository;
     private final ProjectService projects;
@@ -61,6 +62,57 @@ class AgentTaskLifecycle {
                     : code.equals("AGENT_TIMEOUT") || code.equals("SOURCE_OPERATION_TIMEOUT") ? "TIMED_OUT" : "FAILED";
             return finish(task, terminal, code);
         });
+    }
+
+    AgentTask phase(UUID id, String expected, String next) {
+        if (!(expected.equals("RUNNING") && next.equals("VALIDATING")
+                || expected.equals("VALIDATING") && next.equals("ACCEPTING"))) throw new IllegalArgumentException("Invalid Agent phase");
+        return transaction.execute(status -> {
+            var task = repository.lock(id); authorize(task);
+            if (task.cancelRequested()) throw AgentTask.conflict("AGENT_CANCELLED");
+            return repository.phase(task, expected, next);
+        });
+    }
+
+    AgentTask noChanges(UUID id) {
+        return transaction.execute(status -> {
+            var task = repository.lock(id); authorize(task);
+            if (!task.status().equals("ACCEPTING")) throw AgentTask.conflict("AGENT_TASK_CONFLICT");
+            if (task.cancelRequested()) return finish(task, "CANCELLED", "AGENT_CANCELLED");
+            return finish(task, "NO_CHANGES", null);
+        });
+    }
+
+    void bindSource(UUID id, dev.atoms.demo.source.SourceOperation operation) {
+        transaction.executeWithoutResult(status -> {
+            var task = repository.lock(id); requireMatchingSource(task, operation);
+            repository.bindSource(task, operation.id());
+        });
+    }
+
+    AgentTask sourceSaved(UUID id, dev.atoms.demo.source.SourceOperation operation) {
+        if (!operation.status().equals("COMMITTED")) throw AgentTask.conflict("AGENT_SOURCE_NOT_SAVED");
+        var result = transaction.execute(status -> {
+            var task = repository.lock(id); requireMatchingSource(task, operation);
+            if (task.terminal()) return task;
+            task = repository.bindSource(task, operation.id());
+            return repository.sourceSaved(task, operation.resultVersionId());
+        });
+        // A cleanup failure cannot undo or misreport an already committed source version.
+        try {
+            transaction.executeWithoutResult(status -> {
+                source.releaseEdit(requireHandle(id)); service.forgetAfterCommit(id);
+            });
+        } catch (RuntimeException error) {
+            LOG.warn("{\"event\":\"agent_saved_edit_retained\",\"entryPoint\":\"{}\",\"requestId\":\"{}\",\"errorCode\":\"AGENT_EDIT_RELEASE_PENDING\"}",
+                    result.entryPoint(), id);
+        }
+        return result;
+    }
+
+    private void requireMatchingSource(AgentTask task, dev.atoms.demo.source.SourceOperation operation) {
+        if (!task.projectId().equals(operation.projectId()) || !task.editLeaseId().equals(operation.editLeaseId()))
+            throw AgentTask.conflict("AGENT_SOURCE_MISMATCH");
     }
 
     private AgentSettings.Configuration authorize(AgentTask task) {

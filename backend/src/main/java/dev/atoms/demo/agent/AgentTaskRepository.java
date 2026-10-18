@@ -64,6 +64,30 @@ class AgentTaskRepository {
                 status, error, AgentTask.TERMINAL.contains(status), task.id());
         return get(task.id());
     }
+    AgentTask phase(AgentTask task, String expected, String next) {
+        requireTransaction();
+        if (jdbc.update("UPDATE agent_tasks SET status=? WHERE id=? AND status=? AND NOT cancel_requested",
+                next, task.id(), expected) != 1) throw AgentTask.conflict("AGENT_TASK_CONFLICT");
+        return get(task.id());
+    }
+    AgentTask bindSource(AgentTask task, UUID operation) {
+        requireTransaction();
+        if (task.sourceOperationId() != null && !task.sourceOperationId().equals(operation)) throw AgentTask.conflict("AGENT_TASK_CONFLICT");
+        jdbc.update("UPDATE agent_tasks SET source_operation_id=? WHERE id=?", operation, task.id());
+        return get(task.id());
+    }
+    AgentTask sourceSaved(AgentTask task, UUID version) {
+        requireTransaction();
+        jdbc.update("UPDATE agent_tasks SET status='SOURCE_SAVED',result_version_id=?,error_code=NULL,finished_at=now() WHERE id=?",
+                version, task.id());
+        return get(task.id());
+    }
+    boolean stopRequested(UUID id, UUID owner) {
+        return !Boolean.TRUE.equals(jdbc.queryForObject("""
+                SELECT EXISTS(SELECT 1 FROM agent_tasks a JOIN projects p ON p.id=a.project_id
+                    WHERE a.id=? AND p.owner_id=? AND NOT p.archived AND NOT a.cancel_requested)
+                """, Boolean.class, id, owner));
+    }
     void reserveQueueSlot() {
         requireTransaction();
         jdbc.execute("SELECT pg_catalog.pg_advisory_xact_lock(718395201)");

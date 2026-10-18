@@ -11,6 +11,18 @@ public final class AgentChildFixture {
     public static void main(String[] args) throws Exception {
         if (args.length > 1) Files.writeString(Path.of(args[1]), Long.toString(ProcessHandle.current().pid()));
         switch (args[0]) {
+            case "project-edit" -> {
+                System.in.readAllBytes();
+                int round = Integer.parseInt(args[2]);
+                Files.writeString(Path.of("frontend/App.vue"), "<template>round-" + round + "</template>");
+                Files.writeString(Path.of("backend/App.java"), "class App { int value() { return " + round + "; } }");
+                Files.writeString(Path.of("backend/db/V00" + (round+1) + ".sql"), "alter table items add column value" + round + " integer;");
+                System.out.println(INIT); System.out.println(RESULT);
+            }
+            case "invalid-source" -> {
+                System.in.readAllBytes(); Files.writeString(Path.of(".env"), "PRIVATE_FIXTURE_SECRET=canary");
+                System.out.println(INIT); System.out.println(RESULT);
+            }
             case "success", "exit-error" -> {
                 System.in.readAllBytes();
                 System.out.println(INIT); System.out.println(RESULT);
