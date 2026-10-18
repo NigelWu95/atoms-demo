@@ -23,14 +23,19 @@ final class SourceGitProcess {
     private final Path executable;
     private final Duration timeout;
     private final java.util.function.Consumer<ProcessHandle> started;
+    private final SourceDeadline deadline;
 
     SourceGitProcess(Path executable) { this(executable, Duration.ofSeconds(60)); }
     SourceGitProcess(Path executable, Duration timeout) { this(executable, timeout, handle -> {}); }
     SourceGitProcess(Path executable, Duration timeout, java.util.function.Consumer<ProcessHandle> started) {
+        this(executable, timeout, started, null);
+    }
+    SourceGitProcess(Path executable, Duration timeout, java.util.function.Consumer<ProcessHandle> started, SourceDeadline deadline) {
         this.executable = executable;
         if (timeout.isNegative() || timeout.isZero()) throw new IllegalArgumentException("Invalid Git timeout");
         this.timeout = timeout;
         this.started = java.util.Objects.requireNonNull(started);
+        this.deadline = deadline;
     }
 
     byte[] run(Path directory, List<String> arguments, byte[] input, int outputLimit) throws IOException {
@@ -58,6 +63,7 @@ final class SourceGitProcess {
                 "GIT_ATTR_NOSYSTEM", "1", "GIT_TERMINAL_PROMPT", "0", "GIT_NO_REPLACE_OBJECTS", "1"));
         environment.put("GIT_AUTHOR_NAME", "Atoms Demo"); environment.put("GIT_COMMITTER_NAME", "Atoms Demo");
         environment.put("GIT_AUTHOR_EMAIL", "source@atoms.invalid"); environment.put("GIT_COMMITTER_EMAIL", "source@atoms.invalid");
+        Duration remaining = deadline == null ? timeout : deadline.remaining(timeout);
         Process process = builder.start();
         var streams = Executors.newFixedThreadPool(3, task -> new Thread(task, "atoms-source-git-io"));
         try {
@@ -68,7 +74,7 @@ final class SourceGitProcess {
                 try (var output = process.getOutputStream()) { output.write(input); }
                 catch (IOException error) { throw new java.io.UncheckedIOException(error); }
             });
-            if (!process.waitFor(timeout.toMillis(), TimeUnit.MILLISECONDS)) throw failure("GIT_TIMEOUT");
+            if (!process.waitFor(remaining.toNanos(), TimeUnit.NANOSECONDS)) throw failure("GIT_TIMEOUT");
             byte[] output = result(stdout); result(stderr);
             if (process.exitValue() != 0) throw failure("GIT_FAILED");
             result(stdin);
@@ -102,17 +108,29 @@ final class SourceGitProcess {
     }
 
     private static void stop(Process process) throws IOException {
+        stop(process, owned -> owned.descendants().toList());
+    }
+
+    static void stop(Process process, java.util.function.Function<Process, List<ProcessHandle>> descendants) throws IOException {
         boolean interrupted = Thread.interrupted();
         try {
             // Only handles observed beneath this live owned process; never scan/kill by cached PID or name.
-            var children = process.descendants().toList();
-            for (var child : children) if (child.isAlive()) child.destroyForcibly();
-            if (process.isAlive()) process.destroyForcibly();
+            List<ProcessHandle> children = List.of();
+            boolean uncertain = false;
+            try { children = descendants.apply(process); }
+            catch (RuntimeException error) { uncertain = true; }
+            for (var child : children) {
+                try { if (child.isAlive()) child.destroyForcibly(); }
+                catch (RuntimeException error) { uncertain = true; }
+            }
+            try { if (process.isAlive()) process.destroyForcibly(); }
+            catch (RuntimeException error) { uncertain = true; }
             if (!process.waitFor(5, TimeUnit.SECONDS)) throw failure("GIT_PROCESS_UNSETTLED");
             for (var child : children) {
                 try { child.onExit().get(5, TimeUnit.SECONDS); }
-                catch (ExecutionException | TimeoutException error) { throw failure("GIT_PROCESS_UNSETTLED"); }
+                catch (ExecutionException | TimeoutException | RuntimeException error) { uncertain = true; }
             }
+            if (uncertain) throw failure("GIT_PROCESS_UNSETTLED");
         } catch (InterruptedException error) {
             interrupted = true;
             throw failure("GIT_PROCESS_UNSETTLED");

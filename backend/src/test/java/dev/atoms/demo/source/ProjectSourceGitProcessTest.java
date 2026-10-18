@@ -82,4 +82,39 @@ class ProjectSourceGitProcessTest {
         Files.setPosixFilePermissions(file, PosixFilePermissions.fromString("rwx------"));
         return file;
     }
+
+    @Test void expiredOperationDoesNotStartAnotherGitProcess() throws Exception {
+        var clock = new java.util.concurrent.atomic.AtomicLong();
+        var deadline = new SourceDeadline(Duration.ofSeconds(300), clock::get);
+        var started = new java.util.concurrent.atomic.AtomicBoolean();
+        var git = new SourceGitProcess(Path.of("/usr/bin/git"), Duration.ofSeconds(60), handle -> started.set(true), deadline);
+        clock.set(Duration.ofSeconds(301).toNanos());
+        assertThatThrownBy(() -> git.run(temporary.toRealPath(), List.of("--version"), new byte[0], 1024))
+                .isInstanceOf(SourceDeadline.Expired.class);
+        assertThat(started).isFalse();
+    }
+
+    @Test void failedChildEnumerationStillStopsTheOwnedParentAndReportsUncertainty() throws Exception {
+        var builder = new ProcessBuilder("/bin/sleep", "30");
+        builder.environment().clear();
+        var process = builder.start();
+        try {
+            assertThatThrownBy(() -> SourceGitProcess.stop(process, ignored -> { throw new IllegalStateException("native enumeration failed"); }))
+                    .isInstanceOf(IOException.class).hasMessage("GIT_PROCESS_UNSETTLED");
+            assertThat(process.isAlive()).isFalse();
+        } finally { process.destroyForcibly(); process.waitFor(5, java.util.concurrent.TimeUnit.SECONDS); }
+    }
+
+    @Test void failedChildInspectionStillStopsTheOwnedParent() throws Exception {
+        var child = org.mockito.Mockito.mock(ProcessHandle.class);
+        org.mockito.Mockito.when(child.isAlive()).thenThrow(new IllegalStateException("native child lookup failed"));
+        var builder = new ProcessBuilder("/bin/sleep", "30");
+        builder.environment().clear();
+        var process = builder.start();
+        try {
+            assertThatThrownBy(() -> SourceGitProcess.stop(process, ignored -> List.of(child)))
+                    .isInstanceOf(IOException.class).hasMessage("GIT_PROCESS_UNSETTLED");
+            assertThat(process.isAlive()).isFalse();
+        } finally { process.destroyForcibly(); process.waitFor(5, java.util.concurrent.TimeUnit.SECONDS); }
+    }
 }
