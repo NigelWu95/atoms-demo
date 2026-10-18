@@ -129,3 +129,16 @@ PA12b（02:04）：源码门面新增持久启动意图、持有者凭据确认�
 PA13 准入部分（02:11）：输入先缺类红测，`AgentTaskTest` 2 项通过；新增任务服务先缺类红测，再以 `./mvnw -B -Dit.test=ProjectAgentAdmissionIT test-compile failsafe:integration-test failsafe:verify` 5 项通过，0 失败/错误/跳过。V021 只迁移 atoms_demo_test，保留新任务/事件/额度表与源码租约组合 FK，不修改旧迁移。真实两连接同键仅一个任务，跨账号/归档/归属切换拒绝，事务回滚不遗留源码锁或内存句柄，队列 8 项限制和数据库不可变身份通过。测试专用源码桥接不放宽正式包内部可见性。任务额度表尚未接启动预留，PA13 仍保持未完成，随 PA14a 验证；没有调用真实模型。
 
 PA14a（02:17）：先缺生命周期类红测，再以 `./mvnw -B '-Dit.test=ProjectAgentLifecycleIT,ProjectAgentAdmissionIT' test-compile failsafe:integration-test failsafe:verify` **8 项通过、0 失败/错误/跳过**。源码执行意图、任务 RUNNING 和额度增量在一个短事务中提交；超额整个回滚，双启动拒绝，已记录的付费意图在失败后不退额度。测试只模拟预算预留，实际只运行本地 Java 夹具，没有请求 DeepSeek；测试库预算计数保留，不借用旧 generation_budget。未知退出保留 NEEDS_RECONCILIATION，确认证据后才能结算和释放。由此完成 PA13 剩余额度验收，Worker/真实适配器仍未接入。
+
+PA14b 及探测修复（02:31）：原版本探测在主进程退出后同步 readNBytes，存在后代占管道的无界等待风险；新增反例先缺接口失败，再复用 OwnedProcess 有界读流/收尾，hash 扫描也检查同一预算。通用进程允许空 stdin 用于无交互版本探测，Agent 提示仍拒绝空输入。CLI Session 使用固定端点和私有配置，拒绝未授权/关闭/已超时/预算改变时不碰状态或密钥；终止时清空父进程持有的 builder 环境。不改变个人配置。
+
+首次实测命令误写 `atoms.agent.test-cli`，42 单元通过但 5 CLI 测试因缺显式路径失败，未计兼容性通过。修正 `CodingAgent.Result` 在 interface 中的 public 构造器后，使用正确命令：
+
+```sh
+env PATH=/Users/wubingheng/.nvm/versions/node/v24.20.0/bin:$PATH ./mvnw -B \
+  -Pagent-cli-contract \
+  -Datoms.agent.test.cli=/Users/wubingheng/.nvm/versions/node/v20.15.0/lib/node_modules/@anthropic-ai/claude-code/bin/claude.exe \
+  '-Dtest=Agent*Test,ClaudeCodeAgentTest' -Dit.test=AgentCliContractIT verify
+```
+
+**44 单元 + 5 真实 CLI 离线集成通过，0 失败/错误/跳过，BUILD SUCCESS**。仍只使用假 Key 和 loopback 假服务；尚非真实 DeepSeek 或用户功能验收。
