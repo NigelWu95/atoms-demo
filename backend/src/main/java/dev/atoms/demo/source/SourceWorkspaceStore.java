@@ -31,7 +31,11 @@ final class SourceWorkspaceStore {
     }
 
     synchronized SourceWorkspace prepare(UUID owner, UUID project, UUID version, long revision, UUID task, SourceEditLeaseRepository.Lease permit) {
-        var deadline = new SourceDeadline(environment.operationTimeout());
+        return prepare(owner, project, version, revision, task, permit, new SourceDeadline(environment.operationTimeout()));
+    }
+
+    synchronized SourceWorkspace prepare(UUID owner, UUID project, UUID version, long revision, UUID task,
+                                         SourceEditLeaseRepository.Lease permit, SourceDeadline deadline) {
         service.writableBase(owner, project, version, revision, permit);
         if (issued.size() >= capacity) throw ProjectSourceService.conflict("SOURCE_CAPACITY_EXCEEDED");
         var snapshot = query.snapshot(owner, project, version, deadline);

@@ -48,6 +48,9 @@ final class SourceQuery {
             tree = store.read(project, versionId);
             if (!version.treeSha256().equals(tree.sha256()) || version.fileCount() != tree.files().size()
                     || version.treeBytes() != tree.totalBytes()) throw new IOException("Source metadata mismatch");
+        } catch (SourceDeadline.Expired error) {
+            // A caller's expired read budget does not establish that immutable source storage is corrupt.
+            throw new ApiException(408, "SOURCE_OPERATION_TIMEOUT", "源码操作已超时，请检查任务状态。");
         } catch (IOException | IllegalArgumentException | ApiException error) {
             service.storageUnavailable(owner, project);
             throw ProjectSourceEnvironment.unavailable();

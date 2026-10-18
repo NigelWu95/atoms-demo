@@ -24,7 +24,10 @@ final class SourceCandidateStore {
     }
 
     synchronized SourceCandidate seal(SourceWorkspace workspace) {
-        var deadline = new SourceDeadline(environment.operationTimeout());
+        return seal(workspace, new SourceDeadline(environment.operationTimeout()));
+    }
+
+    synchronized SourceCandidate seal(SourceWorkspace workspace, SourceDeadline deadline) {
         var boundedFiles = files.withDeadline(deadline);
         workspaces.authorize(workspace);
         if (issued.size() >= capacity) throw ProjectSourceService.conflict("SOURCE_CAPACITY_EXCEEDED");
@@ -56,7 +59,10 @@ final class SourceCandidateStore {
     }
 
     synchronized SourceTree read(UUID owner, UUID project, SourceCandidate candidate) {
-        var deadline = new SourceDeadline(environment.operationTimeout());
+        return read(owner, project, candidate, new SourceDeadline(environment.operationTimeout()));
+    }
+
+    synchronized SourceTree read(UUID owner, UUID project, SourceCandidate candidate, SourceDeadline deadline) {
         var entry = checked(owner, project, candidate);
         try {
             workspaces.checked(entry.workspace(), deadline);

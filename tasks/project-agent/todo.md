@@ -1,6 +1,6 @@
 # project-agent · 开发任务
 
-状态：2026-10-19，用户要求一次完成完整本地开发闭环，范围更新见规格 §10。PA01–PA09 完成，继续 PA10 共享执行期限。PA-LIVE 已发出非阻塞授权询问，尚无答复，不作已授权处理。唯一依据为 [已确认规格](../../SPEC-project-agent.md)和[本模块计划](plan.md)。不重复使用旧 EB/PS 清单，不将旧人工验收勾为完成。
+状态：2026-10-19，用户要求一次完成完整本地开发闭环，范围更新见规格 §10。PA01–PA10 完成，继续 PA11 发布期限。PA-LIVE 已发出非阻塞授权询问，尚无答复，不作已授权处理。唯一依据为 [已确认规格](../../SPEC-project-agent.md)和[本模块计划](plan.md)。不重复使用旧 EB/PS 清单，不将旧人工验收勾为完成。
 
 每项 S=1–2、M=3–5 个主要文件（含测试）；实际超出先拆子任务，不藏进巨型文件。路径缩写：A=backend/src/main/java/dev/atoms/demo/agent，AT=backend/src/test/java/dev/atoms/demo/agent，S/ST=对应 source 包，M=backend/src/main/resources/db/migration，T=templates/full-project-v1。Agent 包已创建，模板目录尚待创建。U/I/CLI/ALL/PY/FRONT/BROWSER/DOC 命令定义在计划 §6。
 
@@ -102,12 +102,13 @@
 
 ## PA10 · 副本与封存继承任务期限
 
-- [ ] 完成 PA10。依赖：PA09。拆为 PA10a 预算契约（3 文件）与 PA10b 副本/封存传递（4 文件），不把超出 5 文件的变更隐藏为单一切片。
+- [x] 完成 PA10。依赖：PA09。拆为 PA10a 预算契约（3 文件）与 PA10b 副本/封存传递（5 文件），不把超出 5 文件的变更隐藏为单一切片。
 - 描述：给物化、扫描及候选读取提供共享剩余预算，保留旧调用重载。
 - 验收：每次步骤使用任务剩余与源码 300 秒上限中更小者；复制/检查/重读不重置时间；既有源码调用的默认时限不变。
 - 验证：I(ProjectSourceEditDeadlineIT)；PY；短预算/慢文件工具注入。
 - 主要文件：PA10a `S/SourceExecutionBudget.java`、`S/SourceDeadline.java`、`ST/ProjectSourceDeadlineTest.java`；PA10b `S/SourceWorkspaceStore.java`、`S/SourceCandidateStore.java`、`S/ProjectSourceEditGateway.java`、`S/SourceQuery.java`、`ST/ProjectSourceEditDeadlineIT.java`。
 - [x] PA10a：预算契约与本地/上游时限取最小值，3 单元测试通过；仍需 PA10b 将契约传入实际复制与封存。异常上游预算不泄漏原始内容。
+- [x] PA10b：先缺少重载编译失败，再通过 17 项副本/封存/接受集成（含 3 项期限反例），Python 文件工具 11 项通过。任务过期不创建副本、不封存/读取候选，也不把健康源码误标为存储故障；已发行句柄不能换新预算重置期限。
 
 ## PA11 · 发布队列继承任务期限
 
