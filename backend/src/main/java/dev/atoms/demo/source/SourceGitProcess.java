@@ -19,7 +19,7 @@ import java.util.concurrent.TimeoutException;
 /** Local plumbing only. Callers supply validated object ids/UUID refs, never user command lines. */
 final class SourceGitProcess {
     private static final Set<String> COMMANDS = Set.of("--version", "init", "hash-object", "mktree", "commit-tree",
-            "update-ref", "cat-file", "ls-tree", "rev-parse", "diff", "show-ref");
+            "update-ref", "cat-file", "ls-tree", "rev-parse", "diff", "show-ref", "for-each-ref");
     private final Path executable;
     private final Duration timeout;
     private final java.util.function.Consumer<ProcessHandle> started;
