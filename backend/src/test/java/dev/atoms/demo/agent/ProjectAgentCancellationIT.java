@@ -83,4 +83,32 @@ class ProjectAgentCancellationIT extends AgentIntegrationSupport {
             assertThat(adapter.calls.get()).isEqualTo(1);
         } finally { unblock.countDown(); thread.shutdownNow(); }
     }
+
+    @Test void interruptStillRecordsStoppedEvidenceAndRestoresInterruptFlag() throws Exception {
+        var task = submit(); var adapter = new AgentFixtureAdapter(temporary, "hang");
+        var result = new java.util.concurrent.CompletableFuture<AgentTask>();
+        var interrupted = new java.util.concurrent.atomic.AtomicBoolean();
+        var settlement = new AgentTaskLifecycle(service, repository, projects, source.gateway(), transactions) {
+            @Override AgentTask fail(UUID id, String code, boolean uncertain) {
+                assertThat(Thread.currentThread().isInterrupted()).as("JDBC settlement must be allowed to acquire a connection").isFalse();
+                return super.fail(id, code, uncertain);
+            }
+        };
+        var thread = new Thread(() -> {
+            try { var value = new AgentWorker(service, repository, settlement, source.gateway(), adapter).execute(task.id());
+                interrupted.set(Thread.currentThread().isInterrupted()); result.complete(value); }
+            catch (Throwable error) { result.completeExceptionally(error); }
+        });
+        thread.start();
+        try {
+            long end = System.nanoTime()+TimeUnit.SECONDS.toNanos(10);
+            while (!Files.exists(adapter.pid(task.id())) && System.nanoTime()<end) Thread.sleep(10);
+            assertThat(adapter.pid(task.id())).isRegularFile();
+            thread.interrupt();
+            assertThat(result.get(15, TimeUnit.SECONDS).status()).isEqualTo("CANCELLED");
+            assertThat(interrupted).isTrue();
+            assertThat(jdbc.queryForObject("SELECT execution_pending FROM source_edit_leases WHERE task_id=?", Boolean.class, task.id())).isFalse();
+            assertThat(ProcessHandle.of(Long.parseLong(Files.readString(adapter.pid(task.id())))).map(ProcessHandle::isAlive).orElse(false)).isFalse();
+        } finally { thread.interrupt(); thread.join(15000); }
+    }
 }

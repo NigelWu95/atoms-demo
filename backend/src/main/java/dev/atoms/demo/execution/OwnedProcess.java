@@ -19,6 +19,8 @@ import java.util.function.BooleanSupplier;
 public final class OwnedProcess {
     private static final Set<String> STREAM_FAILURES = Set.of("AGENT_PROTOCOL_INVALID", "AGENT_CLI_UNSUPPORTED",
             "AGENT_TOOL_FAILED", "AGENT_TOOL_PATH_REJECTED", "AGENT_OUTPUT_LIMIT", "AGENT_MODEL_INCOMPLETE");
+    private static final Set<String> PREFLIGHT_FAILURES = Set.of("AGENT_CANCELLED", "AGENT_TIMEOUT",
+            "AGENT_CLI_CHANGED", "AGENT_STATE_UNAVAILABLE", "AGENT_STATE_CAPACITY");
     private final java.util.function.Function<Process, List<ProcessHandle>> descendants;
 
     public OwnedProcess() { this(process -> process.descendants().limit(129).toList()); }
@@ -28,6 +30,7 @@ public final class OwnedProcess {
 
     @FunctionalInterface public interface Budget { Duration remaining() throws IOException; }
     @FunctionalInterface public interface Decoder<T> { T read(InputStream stream) throws IOException; }
+    @FunctionalInterface public interface Preflight { void check() throws IOException; }
     public record Result<T>(T summary, Stopped stopped) {}
     /** Issued only after this owner's processes and I/O have settled; never reconstructed from a PID. */
     public static final class Stopped {
@@ -56,8 +59,13 @@ public final class OwnedProcess {
 
     public <T> Result<T> run(ProcessBuilder builder, String prompt, Budget deadline, BooleanSupplier cancelled,
                              java.util.UUID task, java.util.UUID execution, Decoder<T> decoder) throws IOException {
+        return run(builder, prompt, deadline, cancelled, task, execution, decoder, () -> {});
+    }
+
+    public <T> Result<T> run(ProcessBuilder builder, String prompt, Budget deadline, BooleanSupplier cancelled,
+                             java.util.UUID task, java.util.UUID execution, Decoder<T> decoder, Preflight preflight) throws IOException {
         java.util.Objects.requireNonNull(task); java.util.Objects.requireNonNull(execution);
-        java.util.Objects.requireNonNull(decoder);
+        java.util.Objects.requireNonNull(decoder); java.util.Objects.requireNonNull(preflight);
         byte[] input = prompt.getBytes(StandardCharsets.UTF_8);
         if (input.length > (1 << 20) || prompt.indexOf('\0') >= 0
                 || builder.directory() == null || !builder.directory().isAbsolute()
@@ -65,7 +73,13 @@ public final class OwnedProcess {
                 || builder.redirectOutput() != ProcessBuilder.Redirect.PIPE
                 || builder.redirectError() != ProcessBuilder.Redirect.PIPE || builder.redirectErrorStream())
             throw new Failure("AGENT_INVOCATION_REJECTED", null);
-        check(deadline, cancelled);
+        // No launch has occurred: cancellation/preflight failure has positive no-process evidence.
+        try { check(deadline, cancelled); preflight.check(); check(deadline, cancelled); }
+        catch (IOException | RuntimeException error) {
+            String code = error.getMessage();
+            throw new Failure(PREFLIGHT_FAILURES.contains(code == null ? "" : code) ? code : "AGENT_PREFLIGHT_FAILED",
+                    new Stopped(task, execution, builder.directory().toPath()));
+        }
         final Process process;
         try { process = builder.start(); }
         catch (IOException error) { throw new Failure("AGENT_START_FAILED", null); }

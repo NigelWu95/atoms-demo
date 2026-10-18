@@ -54,11 +54,12 @@ final class AgentWorker {
                 final CodingAgent.Result edited;
                 try { edited = session.execute(task.executionId(), cancellation); }
                 catch (CodingAgent.Failure error) {
-                    if (error.stopped() != null) { source.confirmExecutionStopped(handle, error.stopped()); stopped = true; }
+                    if (error.stopped() != null) { confirmStopped(handle, error.stopped()); stopped = true; }
                     throw error;
                 }
-                source.confirmExecutionStopped(handle, edited.stopped()); stopped = true;
+                confirmStopped(handle, edited.stopped()); stopped = true;
             }
+            if (Thread.currentThread().isInterrupted()) throw new IOException("AGENT_CANCELLED");
             lifecycle.phase(task.id(), "RUNNING", "VALIDATING"); deadline.remaining();
             lifecycle.phase(task.id(), "VALIDATING", "ACCEPTING");
             var accepted = source.sealAndAccept(handle, "agent-task-" + task.id());
@@ -80,8 +81,18 @@ final class AgentWorker {
     }
 
     private AgentTask fail(UUID id, String code, boolean uncertain) {
-        try { return lifecycle.fail(id, code, uncertain); }
-        catch (RuntimeException error) { return lifecycle.fail(id, "AGENT_EXECUTION_UNCERTAIN", true); }
+        boolean interrupted = Thread.interrupted();
+        try {
+            try { return lifecycle.fail(id, code, uncertain); }
+            catch (RuntimeException error) { return lifecycle.fail(id, "AGENT_EXECUTION_UNCERTAIN", true); }
+        } finally { if (interrupted) Thread.currentThread().interrupt(); }
+    }
+
+    private void confirmStopped(ProjectSourceEditGateway.EditHandle handle, dev.atoms.demo.execution.OwnedProcess.Stopped proof) {
+        // Let bounded JDBC acquisition persist the proof even when shutdown interrupted the worker.
+        boolean interrupted = Thread.interrupted();
+        try { source.confirmExecutionStopped(handle, proof); }
+        finally { if (interrupted) Thread.currentThread().interrupt(); }
     }
 
     /** Bounded-rate DB cancellation/ownership observation; it never extends the execution deadline. */

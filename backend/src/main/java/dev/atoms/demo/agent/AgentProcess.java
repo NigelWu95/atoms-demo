@@ -24,10 +24,14 @@ final class AgentProcess {
     }
     Result run(ProcessBuilder builder, String prompt, AgentDeadline deadline, BooleanSupplier cancelled,
                UUID task, UUID execution) throws IOException {
+        return run(builder, prompt, deadline, cancelled, task, execution, () -> {});
+    }
+    Result run(ProcessBuilder builder, String prompt, AgentDeadline deadline, BooleanSupplier cancelled,
+               UUID task, UUID execution, OwnedProcess.Preflight preflight) throws IOException {
         if (prompt == null || prompt.isEmpty()) throw new Failure("AGENT_INVOCATION_REJECTED", null);
         try {
             var result = owner.run(builder, prompt, deadline::remaining, cancelled, task, execution,
-                    stream -> new AgentStreamDecoder(builder.directory().toPath()).read(stream));
+                    stream -> new AgentStreamDecoder(builder.directory().toPath()).read(stream), preflight);
             return new Result(result.summary(), result.stopped());
         } catch (OwnedProcess.Failure error) { throw new Failure(error.getMessage(), error.stopped()); }
     }

@@ -39,8 +39,8 @@ final class ClaudeCodeAgent implements CodingAgent {
             @Override public Result execute(UUID execution, BooleanSupplier cancelled) throws IOException {
                 if (closed.get() || !used.compareAndSet(false, true)) throw new IOException("AGENT_SESSION_USED");
                 try {
-                    state.verify(privateState); identity.verifyUnchanged(deadline::remaining);
-                    var result = new AgentProcess().run(builder, instructions(task), deadline, cancelled, task.id(), execution);
+                    var result = new AgentProcess().run(builder, instructions(task), deadline, cancelled, task.id(), execution,
+                            () -> { state.verify(privateState); identity.verifyUnchanged(deadline::remaining); });
                     return new Result(result.summary(), result.stopped());
                 } catch (AgentProcess.Failure error) { throw new CodingAgent.Failure(error.getMessage(), error.stopped()); }
                 finally { close(); }

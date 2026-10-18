@@ -13,6 +13,18 @@ import static org.assertj.core.api.Assertions.*;
 class AgentProcessTest {
     @TempDir Path temporary;
 
+    @Test void failedPreflightIssuesBoundProofThatNoProcessWasLaunched() {
+        var task = java.util.UUID.randomUUID(); var execution = java.util.UUID.randomUUID();
+        assertThatThrownBy(() -> new AgentProcess().run(command("success"), "test", new AgentDeadline(Duration.ofSeconds(8)),
+                () -> false, task, execution, () -> { throw new java.io.IOException("AGENT_CLI_CHANGED"); }))
+                .isInstanceOfSatisfying(AgentProcess.Failure.class, error -> {
+                    assertThat(error.getMessage()).isEqualTo("AGENT_CLI_CHANGED");
+                    assertThat(error.stopped()).isNotNull();
+                    assertThat(error.stopped().matches(task, execution, temporary)).isTrue();
+                });
+        assertThat(temporary.resolve("parent.pid")).doesNotExist();
+    }
+
     @Test void stoppedReceiptIsBoundToItsTaskExecutionAndWorkingDirectory() throws Exception {
         var task = java.util.UUID.randomUUID(); var execution = java.util.UUID.randomUUID();
         var result = new AgentProcess().run(command("success"), "test", new AgentDeadline(Duration.ofSeconds(8)),
@@ -53,6 +65,7 @@ class AgentProcessTest {
         var deadline = new AgentDeadline(Duration.ofNanos(1), now::get);
         now.incrementAndGet();
         assertThatThrownBy(() -> new AgentProcess().run(command("success"), "test", deadline, () -> false))
+                .isInstanceOfSatisfying(AgentProcess.Failure.class, error -> assertThat(error.stopped()).isNotNull())
                 .hasMessage("AGENT_TIMEOUT");
         assertThatThrownBy(() -> new AgentProcess().run(command("success"), "test", new AgentDeadline(Duration.ofSeconds(8)), () -> true))
                 .hasMessage("AGENT_CANCELLED");
