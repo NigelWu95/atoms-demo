@@ -160,3 +160,5 @@ env PATH=/Users/wubingheng/.nvm/versions/node/v24.20.0/bin:$PATH ./mvnw -B \
 **18 单元 + 15 集成通过，0 失败/错误/跳过，BUILD SUCCESS**。包括提交后超时和 Agent 尚未记下源码操作 ID 的恢复，均保留唯一提交版本、不追加预算。真实模型未调用，自动调度尚未接入。
 
 PA17a（03:06）：新增调度器独占会话租约，与 Worker 并发数无关。先缺类红测；`./mvnw -B -Dit.test=AgentCoordinatorLeaseIT test-compile failsafe:integration-test failsafe:verify` **2 项通过、0 失败/错误/跳过**。双连接拒绝第二调度者，关闭后可重新领取；连接仍存活但释放 advisory lock 时健康检查失败。连接中止警告来自受控争抢失败会话的主动丢弃，不能把可能持锁的会话还给连接池。调度循环尚未完成。
+
+PA18a（03:12）：独立完成授权列表和有界阶段事件存储，不依赖尚未完成的调度循环。先缺类红测；`./mvnw -B -Dit.test=ProjectAgentQueryIT test-compile failsafe:integration-test failsafe:verify` **5 项通过、0 失败/错误/跳过**。每次读取在项目行锁下核对当前维护者/归属，页长至多 100，序号连续；总量 4096 项/256 KiB，保留 1 项/1 KiB 给终态。白名单字段不包括提示、源码和原始输出，损坏/过期明确报错。工具访问路径数命名 observedPaths，不冒充实际修改文件数；终态后不追加用量。阶段自动写入和真实模型用量验收仍待接通。

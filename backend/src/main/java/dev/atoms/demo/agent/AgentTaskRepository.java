@@ -28,6 +28,10 @@ class AgentTaskRepository {
         var rows = jdbc.query("SELECT * FROM agent_tasks WHERE project_id=? AND idempotency_sha256=?", ROW, project, key);
         return rows.isEmpty() ? null : rows.get(0);
     }
+    java.util.List<AgentTask> list(UUID project, int limit) {
+        if (limit<1 || limit>100) throw AgentTask.invalid();
+        return jdbc.query("SELECT * FROM agent_tasks WHERE project_id=? ORDER BY created_at DESC,id DESC LIMIT ?", ROW, project, limit);
+    }
     AgentTask lock(UUID id) {
         requireTransaction();
         var task = get(id);
