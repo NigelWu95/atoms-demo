@@ -55,6 +55,14 @@ final class SourceQuery {
                 .map(file -> new Entry(file.path(), file.mode(), file.size(), hash(file.content()))).toList();
     }
 
+    SourceDiff.Result diff(UUID owner, UUID project, UUID before, UUID after) {
+        var oldTree = snapshot(owner, project, before).tree();
+        var newTree = snapshot(owner, project, after).tree();
+        var result = new SourceDiff().compare(oldTree, newTree);
+        service.authorize(owner, project);
+        return result;
+    }
+
     SourceTree.File file(UUID owner, UUID project, UUID version, String path) {
         service.authorize(owner, project);
         new ProjectSourcePolicy().validatePath(path);
