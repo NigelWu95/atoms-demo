@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { expect, test, type Page } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
+import { openTool } from '../e2e-runtime/tools'
 
 async function openHistory(page: Page) {
   await page.goto('http://127.0.0.1:8081/test-lab')
@@ -10,6 +11,7 @@ async function openHistory(page: Page) {
   await page.getByRole('button', { name: '装载测试产物' }).click()
   await page.getByRole('link', { name: '打开测试工作台' }).click()
   await expect(page.getByText('应用已启动', { exact: true })).toBeVisible()
+  await openTool(page, '构建与进程')
   return page.getByRole('region', { name: '本机构建工程' })
 }
 
@@ -38,6 +40,7 @@ test('real native build survives refresh; its frozen ZIP, history and responsive
   const { buildId } = await response.json()
   await expect(panel).toContainText(buildId.slice(0, 8))
   await page.reload()
+  await openTool(page, '构建与进程')
   await expect(panel).toContainText(buildId.slice(0, 8))
   await expect
     .poll(
@@ -76,9 +79,11 @@ test('real native build survives refresh; its frozen ZIP, history and responsive
   expect(report.loadedRuntimeId).toBe(build.loadedRuntimeId)
   expect(report.jarSha256).toBe(build.jarSha256)
   await page.getByLabel('代码版本', { exact: true }).selectOption({ label: 'V1 · 历史只读' })
+  await openTool(page, '构建与进程')
   await expect(panel).toContainText('该版本尚无构建记录。')
   await expect(panel.getByRole('button', { name: '构建 V1 工程', exact: true })).toBeEnabled()
   await page.getByLabel('代码版本', { exact: true }).selectOption(build.versionId)
+  await openTool(page, '构建与进程')
   await expect(panel).toContainText(buildId.slice(0, 8))
   for (const width of [320, 390, 768, 1440]) {
     await page.setViewportSize({ width, height: 1000 })
@@ -87,6 +92,7 @@ test('real native build survives refresh; its frozen ZIP, history and responsive
         .getByRole('group', { name: '工作台区域' })
         .getByRole('button', { name: '预览', exact: true })
         .click()
+    await openTool(page, '构建与进程')
     await expect(
       panel.getByRole('button', { name: `下载构建 ${buildId.slice(0, 8)} 的工程 ZIP` }),
     ).toBeVisible()
@@ -121,13 +127,16 @@ test('lost acceptance confirms the same intent; cancellation retains preview and
   await panel.getByRole('button', { name: '构建 V2 工程', exact: true }).click()
   await expect(panel.getByRole('button', { name: '确认上次构建请求' })).toBeVisible()
   await page.reload()
+  await openTool(page, '构建与进程')
   await panel.getByRole('button', { name: '确认上次构建请求' }).click()
   await expect(panel).toContainText(buildId.slice(0, 8))
   expect(keys).toHaveLength(2)
   expect(keys[0]).toBeTruthy()
   expect(keys[1]).toBe(keys[0])
   const frame = page.frameLocator('iframe')
+  await page.getByText('构建与进程', { exact: true }).press('Escape')
   await frame.getByLabel('新待办').fill('取消构建仍保留草稿')
+  await openTool(page, '构建与进程')
   await panel.getByRole('button', { name: '取消构建', exact: true }).click()
   await expect(panel.getByRole('status').first()).toContainText('构建已取消', { timeout: 30000 })
   await expect(frame.getByLabel('新待办')).toHaveValue('取消构建仍保留草稿')

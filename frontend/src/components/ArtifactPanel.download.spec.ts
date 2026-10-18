@@ -113,6 +113,17 @@ it('keeps the existing version export directly visible, outside any disclosure',
   const { wrapper } = open()
   await flushPromises()
   expect(wrapper.get('engineering-download-stub').element.closest('details')).toBeNull()
+  expect(
+    wrapper
+      .get('.artifact-actions')
+      .element.contains(wrapper.get('engineering-download-stub').element),
+  ).toBe(true)
+  expect(
+    wrapper
+      .get('.artifact-actions')
+      .element.compareDocumentPosition(wrapper.get('.preview-stage').element) &
+      Node.DOCUMENT_POSITION_FOLLOWING,
+  ).toBeTruthy()
 })
 it('downloads running build A, never the newly selected build B or a version re-export', async () => {
   const { wrapper } = open()

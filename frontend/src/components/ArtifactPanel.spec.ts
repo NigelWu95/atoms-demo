@@ -69,17 +69,17 @@ async function open() {
   await flushPromises()
   return wrapper
 }
-it('prioritizes the preview while keeping downloads visible and advanced controls afterward', async () => {
+it('keeps downloads direct and advanced tools collapsed above the preserved preview', async () => {
   const wrapper = await open()
   try {
     const order = [
       '[aria-label="运行应用流程"]',
       '[aria-label="预览运行环境"]',
-      '.preview-stage',
+      '[aria-label="高级构建与进程管理"]',
       '[aria-label="预览工程下载"]',
       '[aria-label="版本源码导出"]',
-      '[aria-label="高级构建与进程管理"]',
       '[aria-label="版本修改记录"]',
+      '.preview-stage',
     ].map((selector) => wrapper.get(selector).element)
     for (let i = 1; i < order.length; i++) {
       expect(
@@ -87,6 +87,10 @@ it('prioritizes the preview while keeping downloads visible and advanced control
       ).toBeTruthy()
     }
     expect(wrapper.get('[aria-label="版本源码导出"]').element.closest('details')).toBeNull()
+    expect(wrapper.get('[aria-label="预览工程下载"]').element.closest('details')).toBeNull()
+    expect(wrapper.get('[aria-label="高级构建与进程管理"]').element.closest('details')?.open).toBe(
+      false,
+    )
     const frame = wrapper.get('preview-frame-stub').element
     await wrapper
       .findAll('button')

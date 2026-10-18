@@ -33,7 +33,9 @@ test('downloads real current and historical engineering ZIPs with keyboard acces
   for (const number of [2, 1]) {
     if (number === 1)
       await page.getByLabel('代码版本', { exact: true }).selectOption({ label: 'V1 · 历史只读' })
-    await expect(panel).toContainText(`选中 V${number}`)
+    await expect(
+      page.getByLabel('代码版本', { exact: true }).locator('option:checked'),
+    ).toContainText(`V${number}`)
     const versionId = await page.getByLabel('代码版本', { exact: true }).inputValue()
     const button = panel.getByRole('button', { name: '导出版本源码 ZIP', exact: true })
     await button.focus()

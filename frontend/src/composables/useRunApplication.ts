@@ -25,7 +25,7 @@ export function useRunApplication(
     builds.error.value ||
     runtime.error.value ||
     (builds.pending.value || runtime.pending.value
-      ? '上次请求结果尚未确认，请先使用下方确认入口。'
+      ? '上次请求结果尚未确认，请打开「构建与进程」确认。'
       : '')
   const canRun = computed(
     () =>
@@ -46,7 +46,8 @@ export function useRunApplication(
     if (show) preview()
   }
   function cancel() {
-    if (canCancel.value) finish('已取消后续自动启动；已提交的构建继续执行，可在下方取消构建。')
+    if (canCancel.value)
+      finish('已取消后续自动启动；已提交的构建继续执行，可在「构建与进程」取消构建。')
   }
   async function launch(own: Attempt, buildId: string) {
     own.phase = 'launching'
@@ -54,7 +55,7 @@ export function useRunApplication(
     await runtime.refresh()
     if (!current(own)) return
     if (problem() || !runtime.canStart.value) {
-      finish(problem() || '已有活动进程或状态尚未确认，请先检查下方运行状态。')
+      finish(problem() || '已有活动进程或状态尚未确认，请打开「构建与进程」检查。')
       return
     }
     await runtime.start(buildId)
@@ -76,7 +77,7 @@ export function useRunApplication(
         return finish('构建记录已变化，未启动应用；请重新确认。')
       if (build.status === 'SUCCEEDED') void launch(own, build.id)
       else if (!buildActive(build) || build.status === 'CANCELLING')
-        finish('构建未成功或已取消，未启动应用。请检查下方构建记录。')
+        finish('构建未成功或已取消，未启动应用。请打开「构建与进程」检查。')
     } else {
       const instance = runtime.instance.value
       if (
@@ -87,7 +88,7 @@ export function useRunApplication(
         return finish('运行记录已变化，请刷新并确认当前进程。')
       if (instance.status === 'RUNNING') finish('应用进程运行中，已切换至本机预览。', true)
       else if (!['QUEUED', 'STARTING'].includes(instance.status))
-        finish('进程未就绪或已停止，请检查下方运行状态。')
+        finish('进程未就绪或已停止，请打开「构建与进程」检查。')
     }
   }
   async function run() {
@@ -144,5 +145,5 @@ export function useRunApplication(
   onBeforeUnmount(() => {
     attempt.value = null
   })
-  return { canRun, canCancel, message, run, cancel }
+  return { active: computed(() => !!attempt.value), canRun, canCancel, message, run, cancel }
 }

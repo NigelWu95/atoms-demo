@@ -10,6 +10,7 @@ import ProjectHeading from '../components/ProjectHeading.vue'
 import ArtifactPanel from '../components/ArtifactPanel.vue'
 import ConversationPanel from '../components/ConversationPanel.vue'
 import PublicationPanel from '../components/PublicationPanel.vue'
+import ToolDisclosure from '../components/ToolDisclosure.vue'
 import { useProjectDraft } from '../composables/useProjectDraft'
 import { matchesRepair, type RepairProposal } from '../runtime/previewRepair'
 
@@ -139,42 +140,41 @@ watch(
         <ProjectHeading v-if="project" :project="project" @renamed="project = $event" />
         <h1 v-else tabindex="-1">需求草稿 <span class="outline-badge">未保存</span></h1>
       </div>
+      <div class="workbench-meta">
+        <ToolDisclosure class="workbench-help" label="工作台说明">
+          <p class="workbench-notice">
+            {{ project ? '项目名称已保存到数据库。' : '这是尚未保存的需求草稿。' }}
+            项目内未提交需求会自动保存草稿；首页尚未创建项目的输入仅在当前页面保留。发布仅开放应用，不开放创作工作台。
+          </p>
+        </ToolDisclosure>
+        <div v-if="project" class="draft-status">
+          <span role="status" aria-live="polite">{{ draftStatus }}</span>
+          <p v-if="autosave.error.value" role="alert" class="inline-error">
+            {{ autosave.error.value }}
+          </p>
+          <button
+            v-if="autosave.status.value === 'error'"
+            type="button"
+            class="button secondary"
+            @click="autosave.retry"
+          >
+            重试草稿保存
+          </button>
+          <button
+            v-if="autosave.status.value === 'conflict'"
+            type="button"
+            class="button secondary"
+            @click="reloadDraft"
+          >
+            重新读取服务器草稿
+          </button>
+        </div>
+      </div>
       <PublicationPanel v-if="project?.currentVersionId" :key="project.id" :project="project" />
       <button v-else class="button primary" type="button" disabled title="应用生成后才能发布">
         发布应用 ↗
       </button>
     </header>
-    <div class="workbench-meta">
-      <details class="workbench-help">
-        <summary>工作台说明</summary>
-        <p class="workbench-notice">
-          {{ project ? '项目名称已保存到数据库。' : '这是尚未保存的需求草稿。' }}
-          项目内未提交需求会自动保存草稿；首页尚未创建项目的输入仅在当前页面保留。发布仅开放应用，不开放创作工作台。
-        </p>
-      </details>
-      <div v-if="project" class="draft-status">
-        <span role="status" aria-live="polite">{{ draftStatus }}</span>
-        <p v-if="autosave.error.value" role="alert" class="inline-error">
-          {{ autosave.error.value }}
-        </p>
-        <button
-          v-if="autosave.status.value === 'error'"
-          type="button"
-          class="button secondary"
-          @click="autosave.retry"
-        >
-          重试草稿保存
-        </button>
-        <button
-          v-if="autosave.status.value === 'conflict'"
-          type="button"
-          class="button secondary"
-          @click="reloadDraft"
-        >
-          重新读取服务器草稿
-        </button>
-      </div>
-    </div>
     <div class="mobile-view-controls" role="group" aria-label="工作台区域">
       <button
         type="button"

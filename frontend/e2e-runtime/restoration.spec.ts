@@ -10,7 +10,7 @@ async function openHistory(page: Page) {
 }
 async function confirmRestore(page: Page) {
   await page.getByLabel('代码版本', { exact: true }).selectOption({ label: 'V1 · 历史只读' })
-  await expect(page.getByText('历史只读 · 使用初始数据')).toBeVisible()
+  await expect(page.locator('.runtime-feedback')).toContainText('历史只读 · 使用初始数据')
   await page.getByRole('button', { name: '恢复此版本', exact: true }).click()
   const panel = page.getByRole('region', { name: '代码版本恢复' })
   await expect(panel).toContainText('不回滚业务数据，不自动发布')
@@ -32,6 +32,7 @@ test('restores V1 as V3 while retaining application data, V2 history and the pub
   await frame.getByRole('button', { name: '添加待办' }).click()
   await expect(page.getByText('已保存到数据库', { exact: true })).toBeVisible()
   const checks = page.getByRole('region', { name: '版本预览检查' })
+  await page.getByText('预览检查', { exact: true }).click()
   await expect(checks).toContainText('本次观察：检查通过')
   await checks.getByRole('button', { name: '保存检查结果' }).click()
   await expect(checks).toContainText('已保存报告：检查通过')
@@ -62,6 +63,7 @@ test('restores V1 as V3 while retaining application data, V2 history and the pub
     page.getByLabel('代码版本', { exact: true }).locator('option:checked'),
   ).toContainText('V3 · 当前版本')
   await expect(frame.getByText('恢复代码后保留的数据', { exact: true })).toBeVisible()
+  await page.getByText('预览检查', { exact: true }).click()
   await expect(checks).toContainText('已保存报告：尚未完成')
   await page.getByRole('button', { name: '发布应用 ↗' }).click()
   await expect(publication).toContainText('当前版本 V3 · 上次发布 V2')

@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
+import { openTool } from './tools'
 
 test('project drafts survive reload, detect another tab, and projects can be archived and restored', async ({
   page,
@@ -79,12 +80,14 @@ test('workbench shows real version comparison while preserving preview and expor
       const advanced = document.querySelector('[aria-label="高级构建与进程管理"]')!
       const downloads = document.querySelector('[aria-label="版本源码导出"]')!
       return (
-        Boolean(element.compareDocumentPosition(downloads) & Node.DOCUMENT_POSITION_FOLLOWING) &&
-        Boolean(downloads.compareDocumentPosition(advanced) & Node.DOCUMENT_POSITION_FOLLOWING) &&
+        Boolean(downloads.compareDocumentPosition(element) & Node.DOCUMENT_POSITION_FOLLOWING) &&
+        Boolean(advanced.compareDocumentPosition(element) & Node.DOCUMENT_POSITION_FOLLOWING) &&
+        advanced.closest('details')?.open === false &&
         !downloads.closest('details')
       )
     }),
   ).toBe(true)
+  await openTool(page, '应用说明与修改记录')
   await page.getByRole('button', { name: '查看修改记录与差异' }).click()
   const review = page.getByRole('region', { name: '版本修改记录' })
   await expect(review).toContainText('相对 V1')
@@ -116,6 +119,7 @@ test('workbench shows real version comparison while preserving preview and expor
         path: testInfo.outputPath('version-review-mobile.png'),
         fullPage: true,
       })
+    await openTool(page, '应用说明与修改记录')
     await diff.scrollIntoViewIfNeeded()
     await expect(diff).toBeVisible()
     expect(
@@ -124,6 +128,7 @@ test('workbench shows real version comparison while preserving preview and expor
     ).toEqual([])
   }
   // Scroll the host iframe: cross-origin child scrolling can stall in headless Chrome.
+  await diff.press('Escape')
   await page.locator('iframe').scrollIntoViewIfNeeded()
   await expect(preview.getByRole('heading', { name: '把想法，一件件完成。' })).toBeVisible()
   await page.screenshot({ path: testInfo.outputPath('version-review.png'), fullPage: true })

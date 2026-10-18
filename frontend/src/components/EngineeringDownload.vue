@@ -9,6 +9,7 @@ const props = defineProps<{
   projectId: string | null
   version: VersionSummary | null
   loading: boolean
+  compact?: boolean
 }>()
 const session = useSessionStore()
 const descriptionId = useId()
@@ -83,7 +84,7 @@ async function download() {
 </script>
 
 <template>
-  <section class="engineering-download" aria-label="版本源码导出">
+  <section class="engineering-download" :class="{ compact }" aria-label="版本源码导出">
     <div class="download-actions">
       <button
         class="button secondary"
@@ -95,22 +96,26 @@ async function download() {
       >
         {{ busy ? '正在准备源码…' : error ? '重试导出版本源码 ZIP' : '导出版本源码 ZIP' }}
       </button>
-      <span v-if="version && !unavailable"
+      <span v-if="version && !unavailable && !compact"
         >选中 V{{ version.versionNo }} · Vue + Spring Boot 17 + PostgreSQL</span
       >
     </div>
-    <p :id="descriptionId" class="muted">
+    <p :id="descriptionId" class="muted" :class="{ 'visually-hidden': compact }">
       使用当前模板重新组装所选版本，不保证与正在预览的构建相同。如需预览同款，请使用「下载预览工程
       ZIP」。
       包含源码与初始数据，不包含平台账号、对话、线上业务数据和密钥。需自行配置独立数据库并构建启动。
     </p>
-    <p v-if="unavailable" class="muted">{{ unavailable }}</p>
+    <p v-if="unavailable && !compact" class="muted">{{ unavailable }}</p>
     <p v-if="notice" role="status">{{ notice }}</p>
     <p v-if="error" class="inline-error" role="alert">{{ error }}</p>
   </section>
 </template>
 
 <style scoped>
+.engineering-download.compact {
+  padding: 0;
+  border: 0;
+}
 .engineering-download {
   padding: 0.75rem 1rem;
   border-bottom: 1px solid var(--border);

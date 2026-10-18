@@ -57,6 +57,56 @@ beforeEach(() => {
   vi.mocked(savePreviewReport).mockResolvedValue({ reportId: 'report-1', status: 'PASSED' })
 })
 afterEach(() => wrappers.splice(0).forEach((wrapper) => wrapper.unmount()))
+it('moves tools into the toolbar without restarting the frame or losing observations', async () => {
+  const wrapper = setup()
+  const target = document.createElement('div')
+  document.body.append(target)
+  try {
+    await flushPromises()
+    const frame = wrapper.get('iframe').element
+    vi.mocked(createRuntimeBridge).mock.calls[0]![3]('ready', '应用已启动')
+    await wrapper.setProps({ toolsTarget: target })
+    expect(target.textContent).toContain('本次观察：检查通过')
+    expect(wrapper.get('iframe').element).toBe(frame)
+    expect(createRuntimeBridge).toHaveBeenCalledTimes(1)
+    await wrapper.setProps({ toolsTarget: null })
+    expect(wrapper.text()).toContain('本次观察：检查通过')
+    expect(wrapper.get('iframe').element).toBe(frame)
+    expect(createRuntimeBridge).toHaveBeenCalledTimes(1)
+  } finally {
+    target.remove()
+  }
+})
+it('keeps report failures visible when report controls are moved to a collapsed tool', async () => {
+  vi.mocked(getPreviewReport).mockRejectedValue(new ApiFailure('NETWORK_ERROR', '读取报告失败'))
+  const wrapper = setup()
+  const target = document.createElement('div')
+  document.body.append(target)
+  try {
+    await wrapper.setProps({ toolsTarget: target })
+    await flushPromises()
+    expect(wrapper.text()).toContain('读取报告失败')
+    expect(target.textContent).toContain('读取报告失败')
+  } finally {
+    target.remove()
+  }
+})
+it('keeps observed errors visible outside tools even after a later successful data save', async () => {
+  const wrapper = setup()
+  const target = document.createElement('div')
+  document.body.append(target)
+  try {
+    await wrapper.setProps({ toolsTarget: target })
+    await flushPromises()
+    const report = vi.mocked(createRuntimeBridge).mock.calls[0]![3]
+    report('error', '先前观察到的错误')
+    report('saved', '数据已保存')
+    await flushPromises()
+    expect(wrapper.text()).toContain('先前观察到的错误')
+  } finally {
+    target.remove()
+  }
+})
 it('does not mount or execute an invalid script and allows saving a failure report', async () => {
   const wrapper = setup('const broken = ;')
   await flushPromises()

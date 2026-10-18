@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { ApiFailure, errorMessage } from '../api/client'
 import { randomId } from '../runtime/randomId'
 import {
@@ -19,6 +19,16 @@ const saved = ref<Observation | null>(null)
 const error = ref('')
 const busy = ref(false)
 const pending = ref<{ body: PreviewReport; key: string } | null>(null)
+const emit = defineEmits<{ warning: [message: string] }>()
+watch([error, pending, busy], () =>
+  emit(
+    'warning',
+    error.value ||
+      (pending.value && !busy.value
+        ? '上次检查报告保存结果尚未确认，请打开「预览检查」重试原报告。'
+        : ''),
+  ),
+)
 let active = true
 let revision = 0
 const label = (status: Observation['status']) =>

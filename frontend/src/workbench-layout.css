@@ -21,15 +21,19 @@
   flex-shrink: 0;
 }
 .workbench-page .workbench-header {
+  position: relative;
+  z-index: 9;
+  flex-wrap: wrap;
   padding: 8px 16px;
-  max-height: 40%;
-  overflow: auto;
+  gap: 4px 12px;
 }
 .workbench-identity {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 4px 16px;
+  flex: 1;
+  min-width: 0;
 }
 .workbench-identity .project-heading {
   display: flex;
@@ -49,27 +53,16 @@
 .workbench-identity .rename-form {
   flex-basis: 100%;
 }
-.workbench-meta {
+.workbench-header > .workbench-meta {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 4px 16px;
-  padding: 0 16px;
-  border-bottom: 1px solid var(--border);
-  max-height: 25%;
-  overflow: auto;
+  gap: 4px 8px;
+  flex: 0 0 auto;
 }
 .workbench-help {
   font-size: 11px;
   color: var(--muted);
-}
-.workbench-help summary {
-  min-height: 44px;
-  align-content: center;
-  cursor: pointer;
-}
-.workbench-help[open] {
-  flex-basis: 100%;
 }
 .workbench-help .workbench-notice {
   padding: 8px 0;
@@ -116,30 +109,17 @@
 .workbench-page .preview-canvas {
   min-height: 0;
 }
-.artifact-description summary {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-height: 44px;
-  padding: 4px 12px;
-  cursor: pointer;
-}
-.artifact-description .artifact-title {
-  margin: 0;
-  min-width: 0;
-  flex: 1;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  font-size: 13px;
-}
-.artifact-description summary > span {
-  color: var(--muted);
-  font-size: 11px;
-  flex-shrink: 0;
-}
 .workbench-page .runtime-controls {
   padding: 4px 12px;
+}
+.workbench-page .runtime-feedback {
+  order: -1;
+  padding: 4px 12px;
+  min-height: 28px;
+}
+.workbench-page .runtime-preview > .inline-error,
+.workbench-page .runtime-preview > .runtime-controls {
+  order: -1;
 }
 .workbench-page .runtime-container,
 .workbench-page .runtime-container iframe {
@@ -231,8 +211,35 @@
   .workbench-page .workbench-header .text-button {
     min-height: 44px;
   }
+  .workbench-page .workbench-header {
+    padding: 4px 8px;
+  }
   .artifact-toolbar .version-toolbar {
+    flex: 0 0 auto;
+    padding: 4px;
+    gap: 4px;
+  }
+  .artifact-toolbar .preview-toolbar {
+    padding: 4px;
+    gap: 0;
+  }
+  .artifact-toolbar .preview-toolbar button {
+    padding: 4px 6px;
+    min-width: 40px;
+  }
+  .artifact-toolbar .version-label {
+    display: none;
+  }
+  .artifact-toolbar select {
+    max-width: 116px;
+    padding: 4px;
+  }
+  .workbench-header > .workbench-meta {
+    order: 3;
     flex-basis: 100%;
+  }
+  .workbench-meta .draft-status {
+    margin-left: auto;
   }
   .workbench-page .runtime-container,
   .workbench-page .runtime-container iframe {

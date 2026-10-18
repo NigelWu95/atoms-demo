@@ -85,6 +85,7 @@ test('todo adds, completes, survives reload and shows real source in a private w
     path: testInfo.outputPath('workbench-preview-mobile.png'),
     fullPage: true,
   })
+  await page.getByText('应用说明与修改记录', { exact: true }).click()
   const href = await page.getByRole('link', { name: '共享预览新窗口' }).getAttribute('href')
   const tab = await context.newPage()
   await tab.goto(`http://127.0.0.1:5174${href}`)
@@ -163,7 +164,7 @@ test('history uses initial state only and refuses saving', async ({ page }) => {
     if (request.url().includes('/preview-state')) requests.push(request.url())
   })
   await page.getByLabel('代码版本', { exact: true }).selectOption({ label: 'V1 · 历史只读' })
-  await expect(page.getByText('历史只读 · 使用初始数据')).toBeVisible()
+  await expect(page.locator('.runtime-feedback')).toContainText('历史只读 · 使用初始数据')
   await expect(page.getByText('应用已启动', { exact: true })).toBeVisible()
   await expect(frame.getByRole('checkbox')).toHaveCount(0)
   await frame.getByLabel('新待办').fill('不能保存历史数据')

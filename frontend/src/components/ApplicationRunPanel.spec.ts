@@ -92,7 +92,14 @@ function open() {
 }
 const run = (wrapper: ReturnType<typeof open>['wrapper']) =>
   wrapper.get('[data-action="run-application"]')
-it('places the preview slot between the primary action and advanced controls without extra controllers', async () => {
+it('keeps build read failures visible outside the closed advanced panel', async () => {
+  vi.mocked(listBuilds).mockRejectedValue(new ApiFailure('NETWORK_ERROR', '读取构建失败'))
+  const { wrapper } = open()
+  await flushPromises()
+  expect(wrapper.get('.application-run > [role="status"]').text()).toContain('读取构建失败')
+  expect(wrapper.get('details').element.open).toBe(false)
+})
+it('keeps advanced controls in a top disclosure without remounting controllers or the preview slot', async () => {
   const { wrapper } = open()
   await flushPromises()
   const primary = wrapper.get('[aria-label="运行应用流程"]').element
@@ -100,7 +107,9 @@ it('places the preview slot between the primary action and advanced controls wit
   const advanced = wrapper.get('[aria-label="高级构建与进程管理"]').element
   expect(primary.contains(wrapper.get('[data-preview-mode]').element)).toBe(true)
   expect(primary.compareDocumentPosition(preview) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-  expect(preview.compareDocumentPosition(advanced) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  expect(advanced.closest('details')).not.toBeNull()
+  expect(primary.contains(advanced)).toBe(true)
+  expect(primary.compareDocumentPosition(preview) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   expect(listBuilds).toHaveBeenCalledTimes(1)
   expect(listInstances).toHaveBeenCalledTimes(1)
   expect(submitBuild).not.toHaveBeenCalled()

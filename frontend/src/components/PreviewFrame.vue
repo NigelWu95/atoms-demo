@@ -10,11 +10,17 @@ import PreviewChecks from './PreviewChecks.vue'
 import { diagnosePreview, type PreviewDiagnosis } from '../runtime/previewRepair'
 
 // The parent keys this component by project/version/mode; a reload replaces the iframe entirely.
-const props = defineProps<{ version: Version; mode: PreviewMode; repairable?: boolean }>()
+const props = defineProps<{
+  version: Version
+  mode: PreviewMode
+  repairable?: boolean
+  toolsTarget?: HTMLElement | null
+}>()
 const emit = defineEmits<{ repair: [diagnosis: PreviewDiagnosis] }>()
 const container = ref<HTMLDivElement | null>(null)
 const status = ref<BridgeStatus>('connecting')
 const message = ref('正在加载预览…')
+const reportWarning = ref('')
 const observation = ref<Observation>({ status: 'UNKNOWN', checks: [], errors: [] })
 const diagnosis = computed(() => diagnosePreview(observation.value))
 let cleanup: (() => void) | undefined
@@ -74,32 +80,43 @@ onBeforeUnmount(() => {
       请先在应用内解决保存失败。重新加载可能丢失输入，未确认的请求也可能已写入。
     </p>
     <div ref="container" class="runtime-container" />
-    <div class="runtime-controls">
-      <span v-if="mode === 'HISTORY'" class="outline-badge">历史只读 · 使用初始数据</span>
-      <span v-else class="muted">私有预览 · 仅当前访客</span>
-      <button
-        class="button secondary"
-        type="button"
-        :disabled="status === 'saving'"
-        @click="reload"
-      >
-        重新加载
-      </button>
-    </div>
+    <Teleport :to="toolsTarget ?? 'body'" :disabled="!toolsTarget">
+      <div class="runtime-controls">
+        <span v-if="mode === 'HISTORY'" class="outline-badge">历史只读 · 使用初始数据</span>
+        <span v-else class="muted">私有预览 · 仅当前访客</span>
+        <button
+          class="button secondary"
+          type="button"
+          :disabled="status === 'saving'"
+          @click="reload"
+        >
+          重新加载
+        </button>
+      </div>
+      <PreviewChecks
+        :project-id="version.projectId"
+        :version-id="version.id"
+        :observation="observation"
+        :read-only="mode === 'HISTORY'"
+        @warning="reportWarning = $event"
+      />
+    </Teleport>
+    <p v-if="toolsTarget && reportWarning" class="inline-error" role="alert">{{ reportWarning }}</p>
+    <p
+      v-if="toolsTarget && observation.status === 'FAILED' && status !== 'error'"
+      class="inline-error"
+      role="alert"
+    >
+      本次预览检查未通过：{{ observation.errors[0] }}。请打开「预览检查」查看。
+    </p>
     <p
       class="runtime-feedback"
       :class="{ 'inline-error': status === 'error' || status === 'unsaved' }"
       role="status"
       aria-live="polite"
     >
-      {{ message }}
+      <span v-if="mode === 'HISTORY'">历史只读 · 使用初始数据 · </span><span>{{ message }}</span>
     </p>
-    <PreviewChecks
-      :project-id="version.projectId"
-      :version-id="version.id"
-      :observation="observation"
-      :read-only="mode === 'HISTORY'"
-    />
     <div v-if="repairable && mode === 'CURRENT' && diagnosis" class="runtime-controls">
       <button
         type="button"

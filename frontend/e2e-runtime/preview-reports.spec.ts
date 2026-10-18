@@ -1,11 +1,13 @@
 import { expect, test, type Page } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
+import { openTool } from './tools'
 
 async function openTodo(page: Page) {
   await page.goto('http://127.0.0.1:8081/test-lab')
   await page.getByLabel('测试产物').selectOption('todo')
   await page.getByRole('button', { name: '装载测试产物' }).click()
   await page.getByRole('link', { name: '打开测试工作台' }).click()
+  await openTool(page, '预览检查')
   return page.getByRole('region', { name: '版本预览检查' })
 }
 
@@ -68,8 +70,10 @@ test('saves a version report, replays an unknown response and restores it after 
   expect(intents[0]!.key).toBeTruthy()
   expect(intents[0]!.reportId).toBeTruthy()
   await page.reload()
+  await openTool(page, '预览检查')
   await expect(checks).toContainText('本次观察：检查通过')
   await expect(checks).toContainText('已保存报告：检查通过')
+  await page.getByText('预览检查', { exact: true }).press('Escape')
   const input = page.frameLocator('iframe').getByLabel('新待办')
   await input.fill('检查报告浏览器验收')
   await expect(input).toHaveValue('检查报告浏览器验收')
@@ -88,6 +92,7 @@ for (const width of [320, 768, 1024, 1440]) {
     await checks.getByRole('button', { name: '保存检查结果' }).click()
     await expect(checks).toContainText('已保存报告：检查通过')
     await page.reload()
+    await openTool(page, '预览检查')
     await expect(checks).toContainText('已保存报告：检查通过')
     await page.setViewportSize({ width, height: 900 })
     if (width === 320)
@@ -95,6 +100,7 @@ for (const width of [320, 768, 1024, 1440]) {
         .getByRole('group', { name: '工作台区域' })
         .getByRole('button', { name: '预览', exact: true })
         .click()
+    await openTool(page, '预览检查')
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
     expect(
       (await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze())
@@ -119,6 +125,7 @@ test('blocks malformed scripts before fetching a runtime document and persists t
   await checks.getByRole('button', { name: '保存检查结果' }).click()
   await expect(checks).toContainText('已保存报告：检查失败')
   await page.reload()
+  await openTool(page, '预览检查')
   await expect(checks).toContainText('已保存报告：检查失败')
 })
 

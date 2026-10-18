@@ -32,6 +32,7 @@ test('packaged preview, path publication and isolated visitor state work through
   expect(projectPath).toMatch(/^\/projects\/[0-9a-f-]+$/)
   await page.goto(projectPath)
   const checks = page.getByRole('region', { name: '版本预览检查' })
+  await page.getByText('预览检查', { exact: true }).click()
   await expect(checks).toContainText('本次观察：检查通过')
   await checks.getByRole('button', { name: '保存检查结果' }).click()
   await expect(checks).toContainText('已保存报告：检查通过')

@@ -9,6 +9,7 @@ import { useAppInstance } from '../composables/useAppInstance'
 import { useRunApplication } from '../composables/useRunApplication'
 import EngineeringBuild from './EngineeringBuild.vue'
 import InstancePanel from './InstancePanel.vue'
+import ToolDisclosure from './ToolDisclosure.vue'
 
 const props = defineProps<{
   projectId: string | null
@@ -33,7 +34,7 @@ const target = computed(() =>
 const builds = useEngineeringBuild(() => target.value)
 const runtime = useAppInstance(() => target.value)
 const { build } = builds
-const { canRun, canCancel, message, run, cancel } = useRunApplication(
+const { active, canRun, canCancel, message, run, cancel } = useRunApplication(
   () => (props.version?.id === props.currentVersionId ? target.value : null),
   builds,
   runtime,
@@ -55,6 +56,26 @@ const { canRun, canCancel, message, run, cancel } = useRunApplication(
         运行应用
       </button>
       <slot name="preview-controls" />
+      <ToolDisclosure label="构建与进程">
+        <p :id="descriptionId">{{ message }}</p>
+        <section class="advanced-runtime" aria-label="高级构建与进程管理">
+          <EngineeringBuild
+            :project-id="projectId"
+            :version="version"
+            :loading="loading"
+            :controller="builds"
+            @selected="emit('selected', $event)"
+          />
+          <InstancePanel
+            :project-id="projectId"
+            :version-id="version?.id ?? null"
+            :current-version-id="currentVersionId"
+            :build="build"
+            :controller="runtime"
+            @running="emit('running', $event)"
+          />
+        </section>
+      </ToolDisclosure>
       <button
         v-if="canCancel"
         type="button"
@@ -65,35 +86,37 @@ const { canRun, canCancel, message, run, cancel } = useRunApplication(
         取消自动启动
       </button>
     </div>
-    <p :id="descriptionId" role="status">{{ message }}</p>
+    <p
+      v-if="
+        active ||
+        build ||
+        runtime.instance.value ||
+        builds.error.value ||
+        runtime.error.value ||
+        builds.pending.value ||
+        runtime.pending.value
+      "
+      role="status"
+    >
+      {{
+        builds.error.value ||
+        runtime.error.value ||
+        (builds.pending.value || runtime.pending.value
+          ? '上次请求结果尚未确认，请打开「构建与进程」确认。'
+          : message)
+      }}
+    </p>
     <p v-if="version && version.id !== currentVersionId" class="muted">
       历史版本请先恢复为当前版本，再运行应用。
     </p>
     <p v-else-if="!version" class="muted">生成并保存首个版本后可运行应用。</p>
   </section>
   <slot />
-  <section class="advanced-runtime" aria-label="高级构建与进程管理">
-    <h3>构建与进程管理</h3>
-    <EngineeringBuild
-      :project-id="projectId"
-      :version="version"
-      :loading="loading"
-      :controller="builds"
-      @selected="emit('selected', $event)"
-    />
-    <InstancePanel
-      :project-id="projectId"
-      :version-id="version?.id ?? null"
-      :current-version-id="currentVersionId"
-      :build="build"
-      :controller="runtime"
-      @running="emit('running', $event)"
-    />
-  </section>
 </template>
 
 <style scoped>
 .application-run {
+  position: relative;
   padding: 0.5rem 0.75rem;
   border-bottom: 1px solid var(--border);
   font-size: 0.8125rem;
@@ -115,5 +138,16 @@ const { canRun, canCancel, message, run, cancel } = useRunApplication(
   padding: 1rem 1rem 0;
   font-size: 0.875rem;
   font-weight: 500;
+}
+@media (max-width: 767px) {
+  .application-run {
+    padding: 4px 8px;
+  }
+  .run-actions {
+    gap: 4px;
+  }
+  .run-actions > .button {
+    padding: 4px 8px;
+  }
 }
 </style>

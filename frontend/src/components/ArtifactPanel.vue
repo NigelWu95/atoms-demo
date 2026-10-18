@@ -12,6 +12,7 @@ import ApplicationRunPanel from './ApplicationRunPanel.vue'
 import type { AppInstance } from '../api/instances'
 import InstancePreviewFrame from './InstancePreviewFrame.vue'
 import BuildArchiveDownload from './BuildArchiveDownload.vue'
+import ToolDisclosure from './ToolDisclosure.vue'
 import { useSessionStore } from '../stores/session'
 import type { PreviewDiagnosis, RepairProposal } from '../runtime/previewRepair'
 
@@ -26,6 +27,7 @@ const selected = ref('')
 const version = ref<Version | null>(null)
 const loading = ref(false)
 const error = ref('')
+const previewTools = ref<HTMLElement | null>(null)
 const running = ref<AppInstance | null>(null)
 const previewKind = ref<'shared' | 'instance'>('shared')
 const session = useSessionStore()
@@ -151,7 +153,7 @@ watch(
 </script>
 
 <template>
-  <section class="preview-panel" aria-labelledby="preview-title" tabindex="0">
+  <section class="preview-panel" aria-label="应用预览与工具" tabindex="0">
     <div class="artifact-toolbar">
       <div class="preview-toolbar">
         <div role="group" aria-label="产物视图">
@@ -171,7 +173,7 @@ watch(
       </div>
       <div v-if="project?.currentVersionId" class="version-toolbar">
         <label
-          >代码版本
+          ><span class="version-label">代码版本</span>
           <select v-model="selected" aria-label="代码版本" :disabled="restorationLocked">
             <option v-for="item in versions" :key="item.id" :value="item.id">
               V{{ item.versionNo }} ·
@@ -182,13 +184,6 @@ watch(
         <button v-if="cursor" class="button secondary" type="button" @click="loadVersions(true)">
           更多版本
         </button>
-        <RouterLink
-          v-if="version"
-          :to="`/preview/${project.id}/${version.id}`"
-          target="_blank"
-          rel="noopener noreferrer"
-          >共享预览新窗口 ↗</RouterLink
-        >
       </div>
     </div>
     <ApplicationRunPanel
@@ -220,6 +215,76 @@ watch(
           </button>
         </div>
       </template>
+      <div class="artifact-actions">
+        <section class="preview-download" aria-label="预览工程下载">
+          <BuildArchiveDownload
+            v-if="previewDownload"
+            :target="previewDownload"
+            label="下载预览工程 ZIP"
+          />
+          <button
+            v-else
+            type="button"
+            class="button secondary"
+            disabled
+            title="先构建并启动，等待本机运行预览就绪"
+          >
+            下载预览工程 ZIP
+          </button>
+        </section>
+        <EngineeringDownload
+          compact
+          :project-id="project?.id ?? null"
+          :version="version"
+          :loading="loading"
+        />
+        <div class="artifact-tool-links">
+          <ToolDisclosure label="预览检查">
+            <div ref="previewTools" />
+            <p v-if="previewKind !== 'shared' || !version" class="muted">
+              共享预览开启后可查看检查报告。
+            </p>
+          </ToolDisclosure>
+          <ToolDisclosure label="应用说明与修改记录" class="artifact-description">
+            <template v-if="version">
+              <h2 class="artifact-title">{{ version.artifact.manifest.title }}</h2>
+              <p class="artifact-summary">{{ version.artifact.manifest.summary }}</p>
+              <p class="muted">
+                V{{ version.versionNo }} · 数据与源码分别保存 · 受限浏览器运行，非安全认证
+              </p>
+              <RouterLink
+                :to="`/preview/${version.projectId}/${version.id}`"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="subtle-link"
+                >共享预览新窗口 ↗</RouterLink
+              >
+              <VersionReview
+                :key="version.projectId"
+                :project-id="version.projectId"
+                :version-id="version.id"
+              />
+            </template>
+            <p v-else>生成并保存版本后查看应用说明。</p>
+          </ToolDisclosure>
+          <ToolDisclosure label="下载说明">
+            <p v-if="previewDownload">
+              当前预览：V{{ version?.versionNo }} · 构建
+              {{ previewDownload.id.slice(0, 8) }}。下载其冻结的完整工程源码。
+            </p>
+            <p v-else>
+              下载预览工程需先构建并启动，等待本机运行预览就绪；共享预览不作为工程一致性验收。
+            </p>
+            <p>
+              导出版本源码 ZIP 使用当前模板重新组装所选版本，包含 Vue + Spring Boot 17 + PostgreSQL
+              源码，不保证与正在预览的构建相同。
+            </p>
+            <p>
+              两种下载只带初始数据，不包含平台账号、对话、线上业务数据和密钥。按包内说明配置独立数据库并构建启动。
+            </p>
+          </ToolDisclosure>
+        </div>
+      </div>
       <RestorationPanel
         v-if="project?.currentVersionId"
         :key="project.id"
@@ -239,6 +304,7 @@ watch(
               :version="version"
               :mode="mode"
               :repairable="canRepair"
+              :tools-target="previewTools"
               @repair="prepareRepair"
             />
             <InstancePreviewFrame
@@ -252,15 +318,6 @@ watch(
               当前版本没有运行中的本机应用。请构建并启动，或手动切换至平台共享预览。
             </p>
             <SourceViewer v-if="view === 'code'" :artifact="version.artifact" />
-            <details :key="version.id" class="artifact-description">
-              <summary>
-                <h2 id="preview-title" class="artifact-title">
-                  {{ version.artifact.manifest.title }}
-                </h2>
-                <span>应用说明 ▾</span>
-              </summary>
-              <p class="artifact-summary">{{ version.artifact.manifest.summary }}</p>
-            </details>
           </template>
           <div v-else class="preview-empty">
             <span class="preview-icon" aria-hidden="true">{{
@@ -286,49 +343,38 @@ watch(
           </div>
         </div>
       </div>
-      <footer class="preview-status">
-        <span>{{ version ? `V${version.versionNo} · 数据与源码分别保存` : '暂无产物' }}</span
-        ><span>{{ version ? '受限浏览器运行 · 非安全认证' : '未执行预览检查' }}</span>
-      </footer>
-      <section class="preview-download" aria-label="预览工程下载">
-        <BuildArchiveDownload
-          v-if="previewDownload"
-          :target="previewDownload"
-          label="下载预览工程 ZIP"
-        />
-        <button v-else type="button" class="button secondary" disabled>下载预览工程 ZIP</button>
-        <p v-if="previewDownload" role="status">
-          当前预览：V{{ version?.versionNo }} · 构建 {{ previewDownload.id.slice(0, 8) }}。
-          下载其冻结的完整工程源码；按包内说明构建启动。只带初始数据，不复制当前业务数据或凭据。
-        </p>
-        <p v-else class="muted">
-          请先构建并启动应用，等待本机运行预览就绪后下载。共享预览不作为工程一致性验收。
-        </p>
-      </section>
-      <EngineeringDownload
-        :project-id="project?.id ?? null"
-        :version="version"
-        :loading="loading"
-      />
     </ApplicationRunPanel>
-    <VersionReview
-      v-if="project && version"
-      :key="project.id"
-      :project-id="project.id"
-      :version-id="version.id"
-    />
   </section>
 </template>
 
 <style scoped>
-.preview-download {
-  padding: 0.75rem 1rem;
+.artifact-actions {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  padding: 4px 8px;
   border-bottom: 1px solid var(--border);
-  font-size: 0.8125rem;
-  line-height: 1.6;
-  overflow-wrap: anywhere;
 }
-.preview-download p {
-  margin: 0.5rem 0 0;
+.artifact-tool-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.preview-download :deep(.build-archive-download) {
+  margin: 0;
+}
+.preview-download :deep(button) {
+  margin: 0;
+}
+@media (max-width: 767px) {
+  .artifact-actions {
+    gap: 0 8px;
+  }
+  .artifact-actions :deep(.button) {
+    font-size: 11px;
+    padding: 8px;
+  }
 }
 </style>
