@@ -109,3 +109,9 @@ env PATH=/Users/wubingheng/.nvm/versions/node/v24.20.0/bin:$PATH ./mvnw -B \
 ```
 
 **107 单元 + 67 源码集成通过，0 失败/错误/跳过**。包含旧导入、恢复、回滚、工作副本、取消和源码旅程。测试中的 Coordinator 争抢连接警告是拒绝第二个拥有者的故障注入用例；该测试通过。尚非新 Agent 到 UI 的完整旅程。
+
+## PA09：受控编辑工作副本
+
+新增源模块门面 ProjectSourceEditGateway。句柄私有构造，绑定发行实例及持久租约，不从路径/UUID 重建。准备副本前后核对当前账号与基线，工作副本保留租约许可；纯副本不暴露 canonical Git 仓库。数据库事务内拒绝文件 I/O，外层任务准入事务回滚时撤销内存句柄。释放仅在允许的持久状态下执行，不删除工程文件或未知目录。
+
+先因缺类编译失败，4 项新集成通过。2026-10-19 01:45，以 `./mvnw -B '-Dit.test=ProjectSourceEdit*IT,ProjectSourceWorkspaceIT,ProjectSourceAcceptanceIT' test-compile failsafe:integration-test failsafe:verify` 得到 **24 集成通过、0 失败/错误/跳过**，包含原工作副本/候选接受流程。此时仅可领取、准备、核对及释放，执行确认和封存接受仍在 PA10–PA12。

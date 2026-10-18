@@ -1,6 +1,6 @@
 # project-agent · 开发任务
 
-状态：2026-10-19，用户要求一次完成完整本地开发闭环，范围更新见规格 §10。PA01–PA08 完成，继续 PA09 受控工作副本。PA-LIVE 已发出非阻塞授权询问，尚无答复，不作已授权处理。唯一依据为 [已确认规格](../../SPEC-project-agent.md)和[本模块计划](plan.md)。不重复使用旧 EB/PS 清单，不将旧人工验收勾为完成。
+状态：2026-10-19，用户要求一次完成完整本地开发闭环，范围更新见规格 §10。PA01–PA09 完成，继续 PA10 共享执行期限。PA-LIVE 已发出非阻塞授权询问，尚无答复，不作已授权处理。唯一依据为 [已确认规格](../../SPEC-project-agent.md)和[本模块计划](plan.md)。不重复使用旧 EB/PS 清单，不将旧人工验收勾为完成。
 
 每项 S=1–2、M=3–5 个主要文件（含测试）；实际超出先拆子任务，不藏进巨型文件。路径缩写：A=backend/src/main/java/dev/atoms/demo/agent，AT=backend/src/test/java/dev/atoms/demo/agent，S/ST=对应 source 包，M=backend/src/main/resources/db/migration，T=templates/full-project-v1。Agent 包已创建，模板目录尚待创建。U/I/CLI/ALL/PY/FRONT/BROWSER/DOC 命令定义在计划 §6。
 
@@ -89,23 +89,24 @@
 
 ## PA09 · 发行受控工作副本句柄
 
-- [ ] 完成 PA09。依赖：PA08。规模：M（4 文件）。
+- [x] 完成 PA09。依赖：PA08。规模：M（3 文件，复用已完成租约 DAO）。
 - 描述：向 Agent 提供窄门面，不公开整套源码包内实现。
 - 验收：句柄不可由外部路径/UUID 重建，绑定 owner/project/base/lease；领取和准备期间反复核对权限与基线；无模型时可释放未启动租约，释放不自动删除目录。
 - 验证：I(ProjectSourceEditWorkspaceIT)；伪造句柄、交叉账号、旧基线及工作目录替换。
 - 主要文件：`S/ProjectSourceEditGateway.java`；`S/SourceWorkspaceStore.java`；`S/SourceEditLeaseRepository.java`；`ST/ProjectSourceEditWorkspaceIT.java`。
+- 证据：先缺类失败，4 项真实 Git/PG 检查通过；工作副本/接受/编辑锁组合 24 集成通过，0 失败/错误/跳过。私有构造句柄按发行实例校验，拒绝跨账号、旧基线、其他发行者和替换目录；外层事务回滚撤销句柄；执行中拒绝释放，释放后文件仍保留。
 
 ### C-PA03 · 编辑互斥
 
-- [ ] 前三项实际通过，补记具体命令、数量、失败/跳过、进程和版本证据；检查未扩大权限并审阅变更。向用户汇报，按批准的连续实施范围推进；验收不成立则暂停该切片，不扩大权限或把未测项记为通过。
+- [x] C-PA03：PA07–PA09 通过，写入互斥的 107 单元/67 源码集成及副本接入后的 24 组合集成通过；仍未启动 Agent Worker 或真实模型。继续 PA10。
 
 ## PA10 · 副本与封存继承任务期限
 
-- [ ] 完成 PA10。依赖：PA09。规模：M（4 文件）。
+- [ ] 完成 PA10。依赖：PA09。拆为 PA10a 预算契约（3 文件）与 PA10b 副本/封存传递（4 文件），不把超出 5 文件的变更隐藏为单一切片。
 - 描述：给物化、扫描及候选读取提供共享剩余预算，保留旧调用重载。
 - 验收：每次步骤使用任务剩余与源码 300 秒上限中更小者；复制/检查/重读不重置时间；既有源码调用的默认时限不变。
 - 验证：I(ProjectSourceEditDeadlineIT)；PY；短预算/慢文件工具注入。
-- 主要文件：`S/SourceDeadline.java`；`S/SourceWorkspaceStore.java`；`S/SourceCandidateStore.java`；`ST/ProjectSourceEditDeadlineIT.java`。
+- 主要文件：PA10a `S/SourceExecutionBudget.java`、`S/SourceDeadline.java`、`ST/ProjectSourceDeadlineTest.java`；PA10b `S/SourceWorkspaceStore.java`、`S/SourceCandidateStore.java`、`S/ProjectSourceEditGateway.java`、`ST/ProjectSourceEditDeadlineIT.java`。
 
 ## PA11 · 发布队列继承任务期限
 

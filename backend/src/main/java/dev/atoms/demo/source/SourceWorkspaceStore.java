@@ -27,16 +27,20 @@ final class SourceWorkspaceStore {
     }
 
     synchronized SourceWorkspace prepare(UUID owner, UUID project, UUID version, long revision, UUID task) {
+        return prepare(owner, project, version, revision, task, null);
+    }
+
+    synchronized SourceWorkspace prepare(UUID owner, UUID project, UUID version, long revision, UUID task, SourceEditLeaseRepository.Lease permit) {
         var deadline = new SourceDeadline(environment.operationTimeout());
-        service.writableBase(owner, project, version, revision);
+        service.writableBase(owner, project, version, revision, permit);
         if (issued.size() >= capacity) throw ProjectSourceService.conflict("SOURCE_CAPACITY_EXCEEDED");
         var snapshot = query.snapshot(owner, project, version, deadline);
-        service.writableBase(owner, project, version, revision);
+        service.writableBase(owner, project, version, revision, permit);
         var handle = new SourceWorkspace(owner, project, java.util.Objects.requireNonNull(task), version, revision, snapshot.tree().sha256());
         try {
             var copy = files.withDeadline(deadline).create(null, task, marker(handle), snapshot.tree());
-            var evidence = new Evidence(handle, copy);
-            service.writableBase(owner, project, version, revision);
+            var evidence = new Evidence(handle, copy, permit);
+            service.writableBase(owner, project, version, revision, permit);
             issued.put(task, evidence);
             return handle;
         } catch (IOException | IllegalArgumentException error) { throw unavailable(); }
@@ -48,7 +52,7 @@ final class SourceWorkspaceStore {
 
     synchronized Path checked(SourceWorkspace workspace, SourceDeadline deadline) {
         var evidence = authorized(workspace);
-        service.writableBase(workspace.ownerId(), workspace.projectId(), workspace.versionId(), workspace.revision());
+        service.writableBase(workspace.ownerId(), workspace.projectId(), workspace.versionId(), workspace.revision(), evidence.permit());
         try {
             files.withDeadline(deadline).check(evidence.snapshot());
             return environment.existingSettings().paths().workRoot().resolve(workspace.taskId().toString()).resolve("project");
@@ -90,5 +94,5 @@ final class SourceWorkspaceStore {
     }
 
     private static ApiException unavailable() { return new ApiException(409, "SOURCE_WORKSPACE_UNAVAILABLE", "任务工作副本不可用，请重新准备任务。"); }
-    private record Evidence(SourceWorkspace workspace, SourceFileSnapshotStore.Snapshot snapshot) {}
+    private record Evidence(SourceWorkspace workspace, SourceFileSnapshotStore.Snapshot snapshot, SourceEditLeaseRepository.Lease permit) {}
 }
