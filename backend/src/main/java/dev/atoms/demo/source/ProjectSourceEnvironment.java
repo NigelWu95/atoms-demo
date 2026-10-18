@@ -29,6 +29,19 @@ public final class ProjectSourceEnvironment implements AutoCloseable {
         } catch (IOException | IllegalArgumentException error) { throw unavailable(); }
     }
 
+    SourceStorageBudget storageBudget() {
+        try {
+            return new SourceStorageBudget(settings().paths(), configuration.getProperty("atoms.source.max-bytes", Long.class, 8L << 30),
+                    configuration.getProperty("atoms.source.reserve-bytes", Long.class, 512L << 20));
+        } catch (IllegalArgumentException error) { throw unavailable(); }
+    }
+
+    java.time.Duration operationTimeout() {
+        long seconds = configuration.getProperty("atoms.source.operation-timeout-seconds", Long.class, 300L);
+        if (seconds < 1 || seconds > 300) throw unavailable();
+        return java.time.Duration.ofSeconds(seconds);
+    }
+
     synchronized Settings existingSettings() {
         if (closed) throw unavailable();
         if (!enabled()) throw new ApiException(503, "SOURCE_DISABLED", "完整工程源码管理尚未启用。");
