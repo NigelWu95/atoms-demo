@@ -243,6 +243,8 @@
 
 实施拆分：PS18a 为共享操作时限、Git 子进程清理故障防护及测试（`SourceDeadline`、`SourceGitProcess`、`ProjectSourceDeadlineTest`、`ProjectSourceGitProcessTest`，4 个文件）；PS18b 为容量检查器、环境配置及小预算测试（`SourceStorageBudget`、`ProjectSourceEnvironment`、`ProjectSourceStorageBudgetTest`，3 个文件）；PS18c 接入 Worker/副本与失败集成测试（`SourceWorker`、`SourceFileSnapshotStore`、`ProjectSourceFailureIT`，3 个文件）；PS18d 单协调者接线、句柄生命周期与服务旅程测试单独列出后实施。
 
+实际 PS18c 另更新共用测试配置 `SourceIntegrationSupport` 与读取时限 `SourceQuery`，共 5 个文件。PS18d1：候选读取完成后释放内存句柄、保留磁盘证据，重复请求先查询持久记录（`ProjectSourceService`、`SourceAcceptance`、`SourceWorkspaceStore`、`SourceCandidateStore`、`ProjectSourceAcceptanceIT`，5 个文件）。PS18d2：统一调度提交入口与真实旅程（`SourceCoordinator`、`ProjectSourceJourneyIT`，2 个文件）。
+
 - [ ] 队列/根容量/空间准入生效；模拟磁盘写失败不发布损坏版本；不自动删历史或未知目录。
 - [ ] 日志包含项目/操作标识、阶段、耗时和稳定错误码，不含源码、个人路径、邮箱/模型凭据；待核对状态可经内部查询诊断。
 - 验证：`./mvnw -B -Dit.test=ProjectSourceFailureIT verify`；小预算夹具触发上限而非填满本机磁盘，秘密 canary 在产物和日志中均不存在。

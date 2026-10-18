@@ -63,10 +63,20 @@ final class SourceCoordinator implements SmartLifecycle, AutoCloseable {
     synchronized Submission initialize(UUID owner, UUID project, SourceTree input, String key) {
         requireRunning();
         var operation = new SourceInitializer(service).request(owner, project, input, key);
+        return enqueue(operation, input);
+    }
+
+    synchronized Submission submit(UUID owner, UUID project, UUID operationId, SourceTree input) {
+        requireRunning();
+        return enqueue(service.operation(owner, project, operationId), input);
+    }
+
+    private Submission enqueue(SourceOperation operation, SourceTree input) {
         var previous = jobs.get(operation.id());
         if (previous != null) return new Submission(operation, previous.completion);
-        if (!operation.status().equals("PREPARING") || operation.executionId() != null)
+        if (!operation.status().equals("PREPARING") || operation.executionId() != null || input == null)
             return new Submission(operation, CompletableFuture.completedFuture(operation));
+        if (!operation.candidateSha256().equals(input.sha256())) throw ProjectSourceService.conflict("SOURCE_INPUT_CHANGED");
         var job = new Job(operation, input);
         jobs.put(operation.id(), job);
         try { executor.execute(job); }
