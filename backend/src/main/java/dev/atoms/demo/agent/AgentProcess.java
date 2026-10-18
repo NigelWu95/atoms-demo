@@ -24,6 +24,7 @@ final class AgentProcess {
     }
     Result run(ProcessBuilder builder, String prompt, AgentDeadline deadline, BooleanSupplier cancelled,
                UUID task, UUID execution) throws IOException {
+        if (prompt == null || prompt.isEmpty()) throw new Failure("AGENT_INVOCATION_REJECTED", null);
         try {
             var result = owner.run(builder, prompt, deadline::remaining, cancelled, task, execution,
                     stream -> new AgentStreamDecoder(builder.directory().toPath()).read(stream));

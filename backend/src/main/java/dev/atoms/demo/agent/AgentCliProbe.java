@@ -1,5 +1,6 @@
 package dev.atoms.demo.agent;
 
+import dev.atoms.demo.execution.OwnedProcess;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -11,37 +12,36 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 import java.util.Objects;
-import java.util.concurrent.TimeUnit;
 
 /** Version probing is explicit and credential-free; no update or personal configuration commands. */
 final class AgentCliProbe {
     private AgentCliProbe() {}
 
     static Identity verify(Path executable, Path config, Path temporary) throws IOException {
-        Identity identity = inspect(executable);
+        return verify(executable, config, temporary, new AgentDeadline(java.time.Duration.ofSeconds(10))::remaining);
+    }
+
+    static Identity verify(Path executable, Path config, Path temporary, OwnedProcess.Budget budget) throws IOException {
+        budget.remaining();
+        Identity identity = inspect(executable, budget);
         var builder = new ProcessBuilder(identity.path.toString(), "--bare", "--restricted", "--version")
-                .directory(temporary.toFile()).redirectError(ProcessBuilder.Redirect.DISCARD);
+                .directory(temporary.toFile());
         builder.environment().clear();
         builder.environment().putAll(AgentInvocation.probeEnvironment(config, temporary));
-        Process process = builder.start();
+        execute(builder, budget);
+        identity.verifyUnchanged(budget);
+        return identity;
+    }
+
+    static void execute(ProcessBuilder builder, OwnedProcess.Budget budget) throws IOException {
         try {
-            process.getOutputStream().close();
-            // Expected output is one short version line. A filled pipe times out, never grows memory.
-            if (!process.waitFor(10, TimeUnit.SECONDS)) throw unsupported();
-            requireVersion(process.exitValue(), process.getInputStream().readNBytes(4097));
-            identity.verifyUnchanged();
-            return identity;
-        } catch (InterruptedException error) {
-            Thread.currentThread().interrupt(); throw new IOException("AGENT_CLI_PROBE_INTERRUPTED");
-        } finally {
-            boolean interrupted = Thread.interrupted();
-            try {
-                if (process.isAlive()) process.destroyForcibly();
-                if (!process.waitFor(10, TimeUnit.SECONDS)) throw new IOException("AGENT_CLI_PROBE_UNSETTLED");
-                process.getInputStream().close();
-            } catch (InterruptedException error) {
-                interrupted = true; throw new IOException("AGENT_CLI_PROBE_UNSETTLED");
-            } finally { if (interrupted) Thread.currentThread().interrupt(); }
+            new OwnedProcess().run(builder, "", budget, () -> false, java.util.UUID.randomUUID(), java.util.UUID.randomUUID(), stream -> {
+                requireVersion(0, stream.readNBytes(4097)); return Boolean.TRUE;
+            });
+        } catch (OwnedProcess.Failure error) {
+            if (error.stopped() == null) throw new IOException("AGENT_CLI_PROBE_UNSETTLED");
+            if ("AGENT_TIMEOUT".equals(error.getMessage())) throw new IOException("AGENT_TIMEOUT");
+            throw unsupported();
         }
     }
 
@@ -51,6 +51,11 @@ final class AgentCliProbe {
     }
 
     static Identity inspect(Path executable) throws IOException {
+        return inspect(executable, new AgentDeadline(java.time.Duration.ofSeconds(10))::remaining);
+    }
+
+    static Identity inspect(Path executable, OwnedProcess.Budget budget) throws IOException {
+        budget.remaining();
         if (!executable.isAbsolute()) throw unsupported();
         Path real = executable.toRealPath();
         var attributes = Files.readAttributes(real, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
@@ -64,6 +69,7 @@ final class AgentCliProbe {
             try (var input = Files.newInputStream(real, LinkOption.NOFOLLOW_LINKS)) {
                 byte[] buffer = new byte[65536]; int count; long total = 0;
                 while ((count = input.read(buffer)) != -1) {
+                    budget.remaining();
                     if ((total += count) > attributes.size()) throw unsupported();
                     digest.update(buffer, 0, count);
                 }
@@ -86,9 +92,15 @@ final class AgentCliProbe {
         }
         Path path() { return path; }
         void verifyUnchanged() throws IOException {
+            verifyUnchanged(new AgentDeadline(java.time.Duration.ofSeconds(10))::remaining);
+        }
+        void verifyUnchanged(OwnedProcess.Budget budget) throws IOException {
             Identity current;
-            try { current = inspect(path); }
-            catch (IOException error) { throw new IOException("AGENT_CLI_CHANGED"); }
+            try { current = inspect(path, budget); }
+            catch (IOException error) {
+                if ("AGENT_TIMEOUT".equals(error.getMessage())) throw error;
+                throw new IOException("AGENT_CLI_CHANGED");
+            }
             if (!path.equals(current.path) || !fileKey.equals(current.fileKey) || size != current.size
                     || !MessageDigest.isEqual(digest, current.digest)) throw new IOException("AGENT_CLI_CHANGED");
         }

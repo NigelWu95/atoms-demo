@@ -47,6 +47,8 @@ class AgentProcessTest {
     }
 
     @Test void expiredOrCancelledTasksNeverStartAProcess() {
+        assertThatThrownBy(() -> new AgentProcess().run(command("success"), "", new AgentDeadline(Duration.ofSeconds(8)), () -> false))
+                .hasMessage("AGENT_INVOCATION_REJECTED");
         var now = new AtomicLong();
         var deadline = new AgentDeadline(Duration.ofNanos(1), now::get);
         now.incrementAndGet();

@@ -11,6 +11,28 @@ import static org.assertj.core.api.Assertions.*;
 class AgentCliProbeTest {
     @TempDir Path temporary;
 
+    @Test void expiredTaskCannotLaunchEvenAVersionProbe() throws Exception {
+        Path binary = Files.writeString(temporary.resolve("not-executed"), "not a program");
+        Files.setPosixFilePermissions(binary, PosixFilePermissions.fromString("rwx------"));
+        assertThatThrownBy(() -> AgentCliProbe.verify(binary, temporary, temporary,
+                () -> { throw new java.io.IOException("AGENT_TIMEOUT"); })).hasMessage("AGENT_TIMEOUT");
+    }
+
+    @Test void probeCannotHangOnAChildHoldingItsOutputPipe() throws Exception {
+        var parent = temporary.resolve("parent.pid"); var child = temporary.resolve("child.pid");
+        var command = new ProcessBuilder(Path.of(System.getProperty("java.home"), "bin/java").toString(), "-cp",
+                Path.of("target/test-classes").toAbsolutePath().toString(), AgentChildFixture.class.getName(),
+                "child-pipe", parent.toString(), child.toString()).directory(temporary.toFile());
+        command.environment().clear();
+        long start = System.nanoTime(); var budget = new AgentDeadline(java.time.Duration.ofSeconds(3));
+        assertThatThrownBy(() -> AgentCliProbe.execute(command, budget::remaining)).isInstanceOf(java.io.IOException.class);
+        assertThat(java.time.Duration.ofNanos(System.nanoTime()-start)).isLessThan(java.time.Duration.ofSeconds(14));
+        for (var file : new Path[] {parent, child}) {
+            assertThat(file).isRegularFile();
+            assertThat(ProcessHandle.of(Long.parseLong(Files.readString(file))).map(ProcessHandle::isAlive).orElse(false)).isFalse();
+        }
+    }
+
     @Test void acceptsOnlyThePinnedVersionAndSuccessfulExit() throws Exception {
         AgentCliProbe.requireVersion(0, "2.1.302 (Claude Code)\n".getBytes(StandardCharsets.UTF_8));
         for (String value : new String[] {"2.1.301 (Claude Code)\n", "2.1.303 (Claude Code)\n", "2.1.302\n",

@@ -59,7 +59,7 @@ public final class OwnedProcess {
         java.util.Objects.requireNonNull(task); java.util.Objects.requireNonNull(execution);
         java.util.Objects.requireNonNull(decoder);
         byte[] input = prompt.getBytes(StandardCharsets.UTF_8);
-        if (input.length == 0 || input.length > (1 << 20) || prompt.indexOf('\0') >= 0
+        if (input.length > (1 << 20) || prompt.indexOf('\0') >= 0
                 || builder.directory() == null || !builder.directory().isAbsolute()
                 || builder.redirectInput() != ProcessBuilder.Redirect.PIPE
                 || builder.redirectOutput() != ProcessBuilder.Redirect.PIPE
