@@ -1,6 +1,6 @@
 # project-source · 开发任务
 
-状态：2026-10-18，用户已授权连续实施；PS01–PS09（含执行阻断补充）、C-PS01/02/03 已验证，PS10 正在开发，其余未开始。证据见 [验证记录](../../docs/project-source-verification.md)。唯一计划入口为 [plan.md](plan.md)，规格见 [SPEC-project-source.md](../../SPEC-project-source.md)。原任务清单不变。
+状态：2026-10-18，用户已授权连续实施；PS01–PS11（含执行阻断补充）、C-PS01/02/03 已验证。PS12 的本机兼容性测试失败，待确认新增受控文件系统适配依赖；PS12 不计完成，其余未开始。证据见 [验证记录](../../docs/project-source-verification.md)。唯一计划入口为 [plan.md](plan.md)，规格见 [SPEC-project-source.md](../../SPEC-project-source.md)。原任务清单不变。
 
 路径缩写：`S` = `backend/src/main/java/dev/atoms/demo/source/`；`T` = `backend/src/test/java/dev/atoms/demo/source/`；`R` = `backend/src/main/resources/`。所有缩写文件名均为拟新增/修改位置，不代表已存在。每项列出的主实现和测试文件不超过五个，若实际超出，先拆分任务。
 
@@ -133,25 +133,27 @@
 
 复用授权工程快照入口导入指定旧版本，固化模板与来源，不替换旧预览。
 
-- [ ] 按所有者、指定旧版本和模板摘要创建新模式首版；模板变化拒绝继续，重试不生成重复版本。
-- [ ] 只含源码及初始数据；历史 `source_json`、PREVIEW/LIVE 数据、旧指针不变；旧派生清单不成为新版本树校验依据。
+- [x] 按所有者、指定旧版本和模板摘要创建新模式首版；模板变化拒绝继续，重试不生成重复版本。
+- [x] 只含源码及初始数据；历史 `source_json`、PREVIEW/LIVE 数据、旧指针不变；旧派生清单不成为新版本树校验依据。
 - 验证：`./mvnw -B -Dit.test=ProjectSourceLegacyImportIT verify`；测试前后对旧数据快照逐项断言。
 - 依赖：C-PS03。
-- 文件（4）：`S/LegacySourceImporter.java`、`S/SourceInitializer.java`、`S/ProjectSourceService.java`、`T/ProjectSourceLegacyImportIT.java`。
+- 实际文件（4）：`S/LegacySourceImporter.java`、`S/ProjectSourcePolicy.java`、`T/ProjectSourceLegacyImportIT.java`、`T/ProjectSourcePolicyTest.java`；增加固定模板占位符识别，不放宽旧 TemplatePolicy。
 
 ### PS11 · 授权源码读取（M）
 
 提供模块内部的版本列表、树及文件读取，供后续工作台使用，不新增公开文件接口。
 
-- [ ] 仅允许平台版本 UUID 和规范相对路径；拒绝跨项目/跨账号/任意 SHA；当前权限变化后立即生效。
-- [ ] 列表最多 100 项、有界分页；文件缺失、对象损坏或摘要不符明确失败；读取不隐式初始化或修改仓库。
+- [x] 仅允许平台版本 UUID 和规范相对路径；拒绝跨项目/跨账号/任意 SHA；当前权限变化后立即生效。
+- [x] 列表最多 100 项、有界分页；文件缺失、对象损坏或摘要不符明确失败；读取不隐式初始化或修改仓库。
 - 验证：`./mvnw -B -Dit.test=ProjectSourceQueryIT verify`；分页边界、历史版本与未授权读取均覆盖。
 - 依赖：PS07、PS10。
-- 文件（4）：`S/SourceQuery.java`、`S/SourceRepository.java`、`S/ProjectSourceService.java`、`T/ProjectSourceQueryIT.java`。
+- 文件（5）：`S/SourceQuery.java`、`S/SourceRepository.java`、`S/ProjectSourceService.java`、`S/ProjectSourceEnvironment.java`（读取不得创建缺失存储根）、`T/ProjectSourceQueryIT.java`。
 
 ### PS12 · 物化任务工作副本（M）
 
 从授权不可变版本创建普通文件副本，作为后续 Agent 的唯一项目输入。
+
+2026-10-18 实施阻碍：本机 Oracle Java 17.0.5 返回 `UnixDirectoryStream`，不提供 `SecureDirectoryStream`，当前描述符相对访问实现的 3 项测试均未通过；独立能力探测也已确认。未以普通路径操作替代安全要求。拟议采用小型 Python 3 POSIX 文件工具（本机已有 3.11.2，只读能力检查通过），保留 Java 17 主流程；该新增运行依赖尚未获批，未实现、安装或启用。相关工作副本代码保持未提交 WIP，不能作为已通过能力交付。
 
 - [ ] 副本绑定项目、任务及源码基线；不含 `.git`、正式仓库指针、平台密钥或私有配置；不接管已有目录。
 - [ ] 文件内容与模式对应版本摘要；修改/删除副本不改变正式版本；过期权限/基线拒绝准备。

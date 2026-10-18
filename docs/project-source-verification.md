@@ -21,6 +21,7 @@
 | PS09a | 同上 | 194 项单元、累计 19 项集成通过；数据库单协调者租约、真实租约连接丢失检查 |
 | PS09b 第一轮 | 同上 | 194 项单元、累计 22 项集成通过；独立测试 JVM 在 Git 写完后 `halt(71)`，重启恢复不发布旧候选，显式重试成功；禁用无 Worker、正常结束后拒绝再准入 |
 | PS09b 队列及关闭、存储复核 | 同上 | 195 项单元、累计 23 项集成通过；第 65 个待处理请求拒绝，活动中关闭停止该任务并结束队列；根目录中途替换时下一条 Git 命令前停止 |
+| PS10/11 | `./mvnw -B -Dtest=ProjectSourcePolicyTest,ProjectSourceLegacyImportIT,ProjectSourceQueryIT test` | 39 项通过（34 策略、2 导入、3 查询）；完整旧工程导入保留所有旧版本/指针/PREVIEW/LIVE 数据；跨项目/账号读取拒绝、分页有界、缺失存储根不重建 |
 
 ## 红绿阶段与异常
 
@@ -33,6 +34,8 @@
 - 数据库租约测试主动断开了它自己的测试连接，连接池可产生 closed-connection 警告；测试通过，没有停止数据库进程或其他连接。
 - Docker CLI 的只读状态查询没有及时返回，但 TCP 检查和真实 JDBC 测试证实测试数据库正常；没有因此重启 Docker、退出登录或触碰容器。
 - 根目录替换回归用例先观察到外来仓库被写入 15 个对象；改为每条 Git 命令前复核根身份后对象数为零。随后完整源码模块测试通过。
+- PS10 导入首先被模板示例密码和测试占位符拦截。现在只增加四个模板已有的精确占位符，不豁免测试文件；同一行里的其他凭据仍检测，shell 变量展开不误作赋值。导入测试逐一验证受控模板文件。
+- 一次全量重跑中，Java 17 的 `ProcessHandle.descendants()` 抛出系统 `Cannot allocate memory`，该次结果计为失败；随后独立真实 Git 的 7 项测试通过。最终全量复验仍需包含此检查，不通过重试抹去异常证据。
 
 ## 实现依据
 
@@ -42,7 +45,15 @@
 
 ## 仍待验证
 
-PS10 起的导入、文件读取权限、工作副本、取消竞态与磁盘容量检查，以及新旧完整集成/浏览器回归。V018/V019 的回退方式是关闭新功能、保留新增表及 Git 证据，不做破坏性删表降级；迁移后的旧链路完整回归仍待 PS19。源码树扫描不是任意文本无秘密的证明；目录和环境分离不是操作系统沙箱。当前新模块默认关闭。
+PS12 起的工作副本、取消竞态与磁盘容量检查，以及新旧完整集成/浏览器回归。V018/V019 的回退方式是关闭新功能、保留新增表及 Git 证据，不做破坏性删表降级；迁移后的旧链路完整回归仍待 PS19。源码树扫描不是任意文本无秘密的证明；目录和环境分离不是操作系统沙箱。当前新模块默认关闭。
+
+## PS12 本机兼容性阻碍
+
+- `./mvnw -B -Dtest=ProjectSourceWorkspaceIT test`：3 项均因工作副本目录接口不可用失败，未计为通过。
+- `./mvnw -B -Dtest=ProjectSourceWorkspaceIT#localProviderSupportsDescriptorRelativeWorkspaceAccess test`：1 项失败，实际 provider 返回 `sun.nio.fs.UnixDirectoryStream`，不是 `SecureDirectoryStream`。这是当前 macOS + Oracle Java 17.0.5 的实际观察，不宣称所有 Java 17 平台均不支持。
+- [Java 17 官方接口](https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/nio/file/SecureDirectoryStream.html) 明确此能力依赖底层支持；[OpenJDK 17 provider 实现](https://github.com/openjdk/jdk17u/blob/master/src/java.base/unix/classes/sun/nio/fs/UnixFileSystemProvider.java) 在相关能力不可用时回退普通目录流。
+- 只读探测确认本机 Python 3.11.2 提供 `open/mkdir/stat` 的 `dir_fd`、目录 fd 枚举和 `O_NOFOLLOW`。这仅表明可评估受控文件工具方案，并非已经实现或验证；加入此运行依赖须按规格 §8 请求确认。
+- 未使用跳过测试、反射访问 JDK 内部 API 或放松链接/目录替换检查来绕过失败。PS12 的两个新生产类、工作副本测试及服务基线检查仍为未提交 WIP。PS01–PS11 的已验证切片已作本地提交；未推送、部署或更改日常运行配置。
 
 ## 调度器运行记录
 
