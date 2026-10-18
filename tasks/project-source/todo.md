@@ -1,6 +1,6 @@
 # project-source · 开发任务
 
-状态：2026-10-18，用户已授权连续实施；PS01–PS11（含执行阻断补充）、C-PS01/02/03 已验证。PS12 的本机兼容性测试失败，待确认新增受控文件系统适配依赖；PS12 不计完成，其余未开始。证据见 [验证记录](../../docs/project-source-verification.md)。唯一计划入口为 [plan.md](plan.md)，规格见 [SPEC-project-source.md](../../SPEC-project-source.md)。原任务清单不变。
+状态：2026-10-18，用户已授权连续实施；PS01–PS12（含执行阻断补充）、C-PS01/02/03/04 已验证。用户批准的 Python 文件工具已解决 PS12 本机兼容性问题；PS13 实施中，其余未开始。证据见 [验证记录](../../docs/project-source-verification.md)。唯一计划入口为 [plan.md](plan.md)，规格见 [SPEC-project-source.md](../../SPEC-project-source.md)。原任务清单不变。
 
 路径缩写：`S` = `backend/src/main/java/dev/atoms/demo/source/`；`T` = `backend/src/test/java/dev/atoms/demo/source/`；`R` = `backend/src/main/resources/`。所有缩写文件名均为拟新增/修改位置，不代表已存在。每项列出的主实现和测试文件不超过五个，若实际超出，先拆分任务。
 
@@ -153,24 +153,30 @@
 
 从授权不可变版本创建普通文件副本，作为后续 Agent 的唯一项目输入。
 
-2026-10-18 实施阻碍：本机 Oracle Java 17.0.5 返回 `UnixDirectoryStream`，不提供 `SecureDirectoryStream`，当前描述符相对访问实现的 3 项测试均未通过；独立能力探测也已确认。未以普通路径操作替代安全要求。拟议采用小型 Python 3 POSIX 文件工具（本机已有 3.11.2，只读能力检查通过），保留 Java 17 主流程；该新增运行依赖尚未获批，未实现、安装或启用。相关工作副本代码保持未提交 WIP，不能作为已通过能力交付。
+2026-10-18：本机 Oracle Java 17.0.5 不提供 `SecureDirectoryStream`，原实现的 3 项功能测试及独立能力探测失败。用户已批准采用 Python 3 POSIX 文件工具（本机已有 3.11.2），保留 Java 17 主流程。工具只处理文件，不执行生成工程，不更改个人配置。按以下子切片实施，完成前不计入已交付：
 
-- [ ] 副本绑定项目、任务及源码基线；不含 `.git`、正式仓库指针、平台密钥或私有配置；不接管已有目录。
-- [ ] 文件内容与模式对应版本摘要；修改/删除副本不改变正式版本；过期权限/基线拒绝准备。
+- PS12a：标准库文件工具与真实文件系统测试（`R/source/workspace_helper.py`、`backend/src/test/python/test_workspace_helper.py`）。
+- PS12b：Java 有界隔离调用器、配置入口及测试（`S/SourceFileProcess.java`、`S/ProjectSourceEnvironment.java`、`T/ProjectSourceFileProcessTest.java`）。
+- PS12c：替换工作副本的目录访问实现并运行集成验收（本节原列出的 4 个文件）。
+
+- [x] 副本绑定项目、任务及源码基线；不含 `.git`、正式仓库指针、平台密钥或私有配置；不接管已有目录。
+- [x] 文件内容与模式对应版本摘要；修改/删除副本不改变正式版本；过期权限/基线拒绝准备。
 - 验证：`./mvnw -B -Dit.test=ProjectSourceWorkspaceIT verify`；两项目副本互不混淆，旧版本读回不受修改影响。
 - 依赖：PS11、PS01。
 - 文件（4）：`S/SourceWorkspace.java`、`S/SourceWorkspaceStore.java`、`S/ProjectSourceService.java`、`T/ProjectSourceWorkspaceIT.java`。
 
 ### C-PS04 · 兼容与副本检查点
 
-- [ ] 指定旧版本可导入；授权文件读取和任务副本均通过；旧数据保持原样。
-- [ ] 没有将“可导入完整工程”描述为“已能生成业务后端”或“已能安全运行任意工程”。
+- [x] 指定旧版本可导入；授权文件读取和任务副本均通过；旧数据保持原样。
+- [x] 没有将“可导入完整工程”描述为“已能生成业务后端”或“已能安全运行任意工程”。
 
 ## E · 增量接受与取消
 
 ### PS13 · 候选内容封存（M）
 
 将任务修改复制到平台受控 staging 并重新校验，产生内部候选句柄。
+
+实施拆分：PS13a 为 Python 有界扫描及替换/增长测试（2 个文件）；PS13b 为描述符相对 staging 存取及单测（文件工具、Python 测试、Java 存取适配器及其测试，共 4 个文件）；PS13c 为候选身份、工作副本扫描入口与封存测试（本节原列 4 个文件）。
 
 - [ ] 仅接受平台创建且项目/任务/基线匹配的工作副本；封存后再改副本不会改变候选；模型自报路径和 hash 无效。
 - [ ] 读取中链接替换、硬链接、越界、文件增长及秘密 canary 被拒绝；封存前不执行工程脚本。

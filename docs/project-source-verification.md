@@ -47,13 +47,16 @@
 
 PS12 起的工作副本、取消竞态与磁盘容量检查，以及新旧完整集成/浏览器回归。V018/V019 的回退方式是关闭新功能、保留新增表及 Git 证据，不做破坏性删表降级；迁移后的旧链路完整回归仍待 PS19。源码树扫描不是任意文本无秘密的证明；目录和环境分离不是操作系统沙箱。当前新模块默认关闭。
 
-## PS12 本机兼容性阻碍
+## PS12 本机兼容性阻碍（已解决，保留原失败证据）
 
 - `./mvnw -B -Dtest=ProjectSourceWorkspaceIT test`：3 项均因工作副本目录接口不可用失败，未计为通过。
 - `./mvnw -B -Dtest=ProjectSourceWorkspaceIT#localProviderSupportsDescriptorRelativeWorkspaceAccess test`：1 项失败，实际 provider 返回 `sun.nio.fs.UnixDirectoryStream`，不是 `SecureDirectoryStream`。这是当前 macOS + Oracle Java 17.0.5 的实际观察，不宣称所有 Java 17 平台均不支持。
 - [Java 17 官方接口](https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/nio/file/SecureDirectoryStream.html) 明确此能力依赖底层支持；[OpenJDK 17 provider 实现](https://github.com/openjdk/jdk17u/blob/master/src/java.base/unix/classes/sun/nio/fs/UnixFileSystemProvider.java) 在相关能力不可用时回退普通目录流。
-- 只读探测确认本机 Python 3.11.2 提供 `open/mkdir/stat` 的 `dir_fd`、目录 fd 枚举和 `O_NOFOLLOW`。这仅表明可评估受控文件工具方案，并非已经实现或验证；加入此运行依赖须按规格 §8 请求确认。
-- 未使用跳过测试、反射访问 JDK 内部 API 或放松链接/目录替换检查来绕过失败。PS12 的两个新生产类、工作副本测试及服务基线检查仍为未提交 WIP。PS01–PS11 的已验证切片已作本地提交；未推送、部署或更改日常运行配置。
+- 只读探测确认本机 Python 3.11.2 提供 `open/mkdir/stat` 的 `dir_fd`、目录 fd 枚举和 `O_NOFOLLOW`。用户随后批准此运行依赖；未安装/升级解释器。
+- 已以随平台发布的 Python 标准库工具替换 Java 不支持的目录流。没有跳过测试、访问 JDK 内部 API 或放松链接检查。实现参数数组、受控脚本、清空环境、stdin 数据传输、24 MiB 协议限制、60 秒默认工具超时及退出确认。
+- `python3 -I -S -B backend/src/test/python/test_workspace_helper.py`：6 项通过。新增 64 文件句柄上限下 128 目录用例先复现 `Too many open files`，改为按层关闭后通过。临时移除硬链接拒绝条件时相应用例失败，恢复后全绿。
+- `./mvnw -B -Dtest=ProjectSourceFileProcessTest,ProjectSourceEnvironmentTest,ProjectSourceWorkspaceIT test`：2026-10-18 21:19:46，10 项通过（0 失败/错误/跳过）。包括真实 Python/Git/专用 PostgreSQL、任务副本与正式版本分离、跨所有者/项目/过期基线拒绝、已有任务目录及替换副本拒绝、超时进程退出。
+- 未推送、部署、更改日常运行配置或调用真实模型/邮箱。候选封存及完整回归仍待后续切片，不把以上测试当作完整 Agent 能力验收。
 
 ## 调度器运行记录
 

@@ -29,6 +29,7 @@ atoms:
     root: ${PROJECT_SOURCE_ROOT:}
     work-root: ${PROJECT_SOURCE_WORK_ROOT:}
     git: ${PROJECT_SOURCE_GIT:}
+    python: ${PROJECT_SOURCE_PYTHON:}
   runtime:
     enabled: ${APP_RUNTIME_ENABLED:false}
     root: ${APP_RUNTIME_ROOT:}

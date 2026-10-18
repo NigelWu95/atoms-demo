@@ -71,7 +71,7 @@ PS19–PS20  全链路与旧功能回归 → 使用文档及交接
 - 差异正文最多 128 KiB，并返回 `truncated` 与完整文件变更统计；读原文件不依赖截断差异。
 - 新源码根预算 8 GiB、写入前至少保留 512 MiB 可用空间。超限停止接收新操作，不删除历史；并发之外的外部写盘仍可能耗尽磁盘，所以必须测试 I/O 失败，不能宣称这是硬配额。
 
-配置使用 `atoms.source.*` / `PROJECT_SOURCE_*` 命名，默认关闭，未启用时不探测 Git 或创建目录。源码根、工作副本根和 Git 路径均由维护者显式提供；不修改 `.env.local`。
+配置使用 `atoms.source.*` / `PROJECT_SOURCE_*` 命名，默认关闭，未启用时不探测 Git 或创建目录。源码根、工作副本根和 Git 路径均由维护者显式提供；不修改 `.env.local`。2026-10-18 用户批准 Python 文件操作适配器：准备副本需配置 `PROJECT_SOURCE_PYTHON`，本机验证版本 3.11.2，不安装/升级解释器。Python 用例另运行 `python3 -I -S -B src/test/python/test_workspace_helper.py`（在 backend 内），不得因 Maven 未运行这些用例而省略。
 
 ## 5. 测试与证据规则
 
