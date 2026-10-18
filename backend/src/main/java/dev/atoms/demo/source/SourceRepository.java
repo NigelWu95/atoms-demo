@@ -84,6 +84,10 @@ class SourceRepository {
         jdbc.update("UPDATE source_operations SET status='CANDIDATE_READY' WHERE id=? AND status='PREPARING'", operation.id());
         return operation(operation.projectId(), operation.id());
     }
+    SourceOperation requestCancel(SourceOperation operation) {
+        jdbc.update("UPDATE source_operations SET cancel_requested=true WHERE id=?", operation.id());
+        return operation(operation.projectId(), operation.id());
+    }
     SourceOperation finish(SourceOperation operation, String status, String code) {
         boolean uncertain = status.equals("NEEDS_RECONCILIATION");
         if (uncertain) jdbc.update("UPDATE project_sources SET status='NEEDS_RECONCILIATION' WHERE project_id=?", operation.projectId());

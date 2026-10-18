@@ -55,6 +55,19 @@ public class ProjectSourceService {
         projects.get(owner, project.toString());
     }
 
+    SourceOperation cancel(UUID owner, UUID project, UUID id) {
+        requireEnabled();
+        return transaction.execute(status -> {
+            // Current owners may stop pending work even after archiving; cancellation is not a new edit.
+            projects.lock(owner, project.toString());
+            var operation = lockedOperation(project, id);
+            if (operation.terminal()) return operation;
+            operation = repository.requestCancel(operation);
+            if (operation.executionPending() || operation.status().equals("NEEDS_RECONCILIATION")) return operation;
+            return repository.finish(operation, "CANCELLED", "SOURCE_CANCELLED");
+        });
+    }
+
     void writableBase(UUID owner, UUID project, UUID version, long revision) {
         requireEnabled();
         transaction.executeWithoutResult(status -> {

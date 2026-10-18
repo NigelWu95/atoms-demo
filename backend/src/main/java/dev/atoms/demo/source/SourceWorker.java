@@ -9,7 +9,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 
 /** Runs only controlled snapshot I/O, never project build or application code. */
 final class SourceWorker {
-    enum Stage { BEFORE_GIT, AFTER_GIT, AFTER_COMMIT }
+    enum Stage { BEFORE_GIT, GIT_STARTED, AFTER_GIT, BEFORE_PUBLISH, AFTER_COMMIT }
     private final ProjectSourceService service;
     private final SourceRepository repository;
     private final ProjectSourceEnvironment environment;
@@ -31,7 +31,9 @@ final class SourceWorker {
                 throw ProjectSourceService.conflict("SOURCE_INPUT_CHANGED");
             observer.accept(Stage.BEFORE_GIT);
             var settings = environment.settings();
-            var store = new SourceGitStore(settings.paths(), new SourceGitProcess(settings.git()), new ProjectSourcePolicy());
+            var process = new SourceGitProcess(settings.git(), java.time.Duration.ofSeconds(60),
+                    handle -> observer.accept(Stage.GIT_STARTED));
+            var store = new SourceGitStore(settings.paths(), process, new ProjectSourcePolicy());
             operation = service.beginExecution(operation.projectId(), operation.id());
             if (operation.terminal()) return operation;
             final SourceGitStore.Stored stored;
@@ -50,6 +52,7 @@ final class SourceWorker {
             observer.accept(Stage.AFTER_GIT);
             operation = service.ready(operation.projectId(), operation.id());
             if (operation.terminal()) return operation;
+            observer.accept(Stage.BEFORE_PUBLISH);
             SourceOperation result = service.publish(operation.projectId(), operation.id(), stored, tree);
             observer.accept(Stage.AFTER_COMMIT);
             return result;
