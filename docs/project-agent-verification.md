@@ -125,3 +125,5 @@ PA11（01:57）：SourceAcceptance/Coordinator/Worker 传递同一 deadline，�
 PA12a（01:59）：将已验证的生命周期抽为 `execution/OwnedProcess`，Agent 保留协议适配器。结束凭据构造器私有，绑定本次 task/execution/work directory 并生成稳定停止摘要；其他任务、执行或目录不能匹配。先缺重载红测，`./mvnw -B -Dtest=AgentProcessTest test` 10 项通过、0 失败/错误/跳过。另外审阅时修正 PA11 的无准入断言，使用真实哈希幂等键查询；组合回归随后重跑。
 
 PA12b（02:04）：源码门面新增持久启动意图、持有者凭据确认、封存/接受与无变更结果。采用基础进程拥有者而非 source→agent 反向依赖；停止证据可在期限到达后记录，但不能因此授权发布。先缺少接口红测，`./mvnw -B '-Dit.test=ProjectSourceEditAcceptanceIT,ProjectSourceEditPublishDeadlineIT,ProjectSourceEditWorkspaceIT' test-compile failsafe:integration-test failsafe:verify` **11 项通过、0 失败/错误/跳过**。使用真实受控 Java 子进程、Git 和专用 PG；无真实模型。并发重试仅一次提交，已提交结果不因重试变成失败，无实际变更无新版本，执行意图外层事务回滚后可安全重试。PA11 修正后的幂等键断言也通过。
+
+PA13 准入部分（02:11）：输入先缺类红测，`AgentTaskTest` 2 项通过；新增任务服务先缺类红测，再以 `./mvnw -B -Dit.test=ProjectAgentAdmissionIT test-compile failsafe:integration-test failsafe:verify` 5 项通过，0 失败/错误/跳过。V021 只迁移 atoms_demo_test，保留新任务/事件/额度表与源码租约组合 FK，不修改旧迁移。真实两连接同键仅一个任务，跨账号/归档/归属切换拒绝，事务回滚不遗留源码锁或内存句柄，队列 8 项限制和数据库不可变身份通过。测试专用源码桥接不放宽正式包内部可见性。任务额度表尚未接启动预留，PA13 仍保持未完成，随 PA14a 验证；没有调用真实模型。
