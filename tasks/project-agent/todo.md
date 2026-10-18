@@ -1,6 +1,6 @@
 # project-agent · 开发任务
 
-状态：2026-10-19，用户要求一次完成完整本地开发闭环，范围更新见规格 §10。PA01–PA06 完成，继续 PA07 源码编辑租约。PA-LIVE 尚未授权。唯一依据为 [已确认规格](../../SPEC-project-agent.md)和[本模块计划](plan.md)。不重复使用旧 EB/PS 清单，不将旧人工验收勾为完成。
+状态：2026-10-19，用户要求一次完成完整本地开发闭环，范围更新见规格 §10。PA01–PA07 完成，继续 PA08 写入口互斥。PA-LIVE 尚未授权。唯一依据为 [已确认规格](../../SPEC-project-agent.md)和[本模块计划](plan.md)。不重复使用旧 EB/PS 清单，不将旧人工验收勾为完成。
 
 每项 S=1–2、M=3–5 个主要文件（含测试）；实际超出先拆子任务，不藏进巨型文件。路径缩写：A=backend/src/main/java/dev/atoms/demo/agent，AT=backend/src/test/java/dev/atoms/demo/agent，S/ST=对应 source 包，M=backend/src/main/resources/db/migration，T=templates/full-project-v1。Agent 包已创建，模板目录尚待创建。U/I/CLI/ALL/PY/FRONT/BROWSER/DOC 命令定义在计划 §6。
 
@@ -71,11 +71,12 @@
 
 ## PA07 · 源码编辑租约持久化
 
-- [ ] 完成 PA07。依赖：PA06。规模：M（3 文件）。
+- [x] 完成 PA07。依赖：PA06。规模：M（3 文件）。
 - 描述：给项目完整编辑周期建立源模块所有的持久阻断。
 - 验收：同项目仅一条活动租约且执行身份不可替换；来源、基线、任务与结束证据约束由数据库保证；预留 source_operations 到租约的可空关联，V018/V019 不改。
 - 验证：I(ProjectSourceEditLeaseIT)；真实 PG 并发领取、非法更新、回退关闭验证。
 - 主要文件：`M/V020__source_edit_leases.sql`；`S/SourceEditLeaseRepository.java`；`ST/ProjectSourceEditLeaseIT.java`。
+- 证据：新增 V020，仅应用至 atoms_demo_test；6 项 PG 集成测试通过，覆盖两连接竞争、归属/基线、不可替换执行身份、未停写/未结算拒绝释放、数据库基线 FK 与伪造初始停止证据拒绝、开关关闭保留证据。先缺类失败；修正 Repository 不可为 final 的 Spring 代理问题后通过。旧 V018/V019 未改。
 
 ## PA08 · 所有源码写入口检查租约
 
