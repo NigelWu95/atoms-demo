@@ -67,17 +67,25 @@ final class SourceCoordinator implements SmartLifecycle, AutoCloseable {
     }
 
     synchronized Submission submit(UUID owner, UUID project, UUID operationId, SourceTree input) {
+        return submit(owner, project, operationId, input, new SourceDeadline(environment.operationTimeout()));
+    }
+
+    synchronized Submission submit(UUID owner, UUID project, UUID operationId, SourceTree input, SourceDeadline deadline) {
         requireRunning();
-        return enqueue(service.operation(owner, project, operationId), input);
+        return enqueue(service.operation(owner, project, operationId), input, deadline);
     }
 
     private Submission enqueue(SourceOperation operation, SourceTree input) {
+        return enqueue(operation, input, new SourceDeadline(environment.operationTimeout()));
+    }
+
+    private Submission enqueue(SourceOperation operation, SourceTree input, SourceDeadline deadline) {
         var previous = jobs.get(operation.id());
         if (previous != null) return new Submission(operation, previous.completion);
         if (!operation.status().equals("PREPARING") || operation.executionId() != null || input == null)
             return new Submission(operation, CompletableFuture.completedFuture(operation));
         if (!operation.candidateSha256().equals(input.sha256())) throw ProjectSourceService.conflict("SOURCE_INPUT_CHANGED");
-        var job = new Job(operation, input);
+        var job = new Job(operation, input, java.util.Objects.requireNonNull(deadline));
         jobs.put(operation.id(), job);
         try { executor.execute(job); }
         catch (java.util.concurrent.RejectedExecutionException error) {
@@ -128,13 +136,17 @@ final class SourceCoordinator implements SmartLifecycle, AutoCloseable {
     private final class Job implements Runnable {
         final SourceOperation operation;
         final SourceTree tree;
+        final SourceDeadline deadline;
         final CompletableFuture<SourceOperation> completion = new CompletableFuture<>();
-        Job(SourceOperation operation, SourceTree tree) { this.operation = operation; this.tree = tree; }
+        Job(SourceOperation operation, SourceTree tree, SourceDeadline deadline) {
+            this.operation = operation; this.tree = tree; this.deadline = deadline;
+        }
         @Override public void run() {
             long started = System.nanoTime();
             try {
                 requireRunning();
-                var result = new SourceWorker(service, repository, environment, stage -> { requireRunning(); observer.accept(stage); }).execute(operation, tree);
+                var result = new SourceWorker(service, repository, environment, stage -> { requireRunning(); observer.accept(stage); })
+                        .execute(operation, tree, deadline);
                 completion.complete(result);
                 LOG.info("{\"event\":\"source_operation_finished\",\"entryPoint\":\"source_coordinator\",\"requestId\":\"{}\",\"projectId\":\"{}\",\"status\":\"{}\",\"errorCode\":\"{}\",\"durationMs\":{}}",
                         operation.id(), operation.projectId(), result.status(), result.errorCode() == null ? "NONE" : result.errorCode(),

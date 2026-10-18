@@ -161,6 +161,10 @@ public class ProjectSourceService {
     }
 
     SourceOperation publish(UUID project, UUID id, SourceGitStore.Stored stored, SourceTree tree) {
+        return publish(project, id, stored, tree, null);
+    }
+
+    SourceOperation publish(UUID project, UUID id, SourceGitStore.Stored stored, SourceTree tree, SourceDeadline deadline) {
         return transaction.execute(status -> {
             var operation = lockedOperation(project, id);
             if (operation.terminal()) return operation;
@@ -171,6 +175,11 @@ public class ProjectSourceService {
             if (!operation.status().equals("CANDIDATE_READY") || !operation.candidateVersionId().equals(stored.versionId())
                     || !operation.candidateSha256().equals(stored.treeSha256()) || !tree.sha256().equals(stored.treeSha256()))
                 throw conflict("SOURCE_INPUT_CHANGED");
+            // Check again after acquiring the database lock: waiting for it consumes the caller's budget too.
+            if (deadline != null) {
+                try { deadline.remaining(java.time.Duration.ofSeconds(60)); }
+                catch (SourceDeadline.Expired error) { throw new ApiException(408, "SOURCE_OPERATION_TIMEOUT", "源码操作超时。"); }
+            }
             repository.insertVersion(operation, stored, tree);
             repository.publishPointer(operation);
             return repository.committed(operation);

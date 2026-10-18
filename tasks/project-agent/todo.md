@@ -112,15 +112,17 @@
 
 ## PA11 · 发布队列继承任务期限
 
-- [ ] 完成 PA11。依赖：PA10。规模：M（4 文件）。
+- [x] 完成 PA11。依赖：PA10。规模：M（5 文件，增加 ProjectSourceService 在数据库锁内再次检查期限，不能只在锁外检查）。
 - 描述：让等待源码队列的时间也计入同一任务期限。
 - 验收：封存到接受再到 Git 发布共享期限且排队不重置；过期未提交时不更换当前指针；提交已发生则报告事实，不因响应超时伪报失败或删除版本。
 - 验证：I(ProjectSourceEditPublishDeadlineIT,ProjectSourceCancellationIT)；U(ProjectSourceDeadlineTest)；检查排队消耗同一 deadline。
 - 主要文件：`S/SourceCoordinator.java`；`S/SourceWorker.java`；`S/SourceAcceptance.java`；`ST/ProjectSourceEditPublishDeadlineIT.java`。
+- 证据：缺重载红测后，19 项队列期限/取消/接受/生命周期集成通过。排队过期不启动 Git；提交前过期保留旧指针，提交后过期重试仍返回 COMMITTED。发布事务取得行锁后再次检查预算。未启动 Agent。
 
 ## PA12 · 结束证据到新源码版本
 
-- [ ] 完成 PA12。依赖：PA06、PA09、PA11。规模：M（3 文件）。
+- [ ] 完成 PA12。依赖：PA06、PA09、PA11。拆为 PA12a 进程凭据绑定（执行拥有者、Agent 适配层及测试，3 文件）与 PA12b 源码接受门面（3–5 文件）。
+- 接口细化：进程生命周期抽为 `execution/OwnedProcess`，由它在自有进程和 I/O 确认结束后发行私有构造的凭据，绑定 task/execution/work directory。Agent 与源码依赖该基础类，源码不反向引用 Agent；不是裸 UUID/PID/布尔 stopped，也不允许从 HTTP 创建凭据。
 - 描述：实现执行标记、停写确认、封存接受与幂等结果交接。
 - 验收：CLI 启动前持久记录执行意图，模型自报结束不能解锁；确认退出后才接受且重试返回同一源码操作；CLI 和 Git 未决标记分别保留，源操作结算后才能释放活动租约。
 - 验证：I(ProjectSourceEditAcceptanceIT)；未退出封存拒绝、并发重复接受及提交响应丢失。

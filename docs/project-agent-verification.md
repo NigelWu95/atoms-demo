@@ -119,3 +119,5 @@ env PATH=/Users/wubingheng/.nvm/versions/node/v24.20.0/bin:$PATH ./mvnw -B \
 PA10a（01:47）：增加 SourceExecutionBudget 内部契约，SourceDeadline 同时服从本地操作、单步和调用者剩余任务预算。先缺类/构造器失败，`./mvnw -B -Dtest=ProjectSourceDeadlineTest test` 3 项通过；异常预算只返回 SOURCE_OPERATION_TIMEOUT，不暴露调用者错误正文。实际文件操作传递待 PA10b。
 
 PA10b（01:50）：预算传入副本准备、再次核对、封存与候选读取；句柄绑定预算实例，不允许换一个新计时器。查询中的正常超时不再错误地锁成存储损坏。先缺重载编译失败，再运行 `./mvnw -B '-Dit.test=ProjectSourceEditDeadlineIT,ProjectSourceWorkspaceIT,ProjectSourceAcceptanceIT,ProjectSourceEditWorkspaceIT' test-compile failsafe:integration-test failsafe:verify`，17 项通过（包含新期限用例 3 项），0 失败/错误/跳过。`python3 -I -S -B src/test/python/test_workspace_helper.py` 11 项通过。没有真实模型调用或运行用户应用。
+
+PA11（01:57）：SourceAcceptance/Coordinator/Worker 传递同一 deadline，队列等待不重置；publish 在数据库行锁内再检查期限。缺重载红测后，`./mvnw -B '-Dit.test=ProjectSourceEditPublishDeadlineIT,ProjectSourceCancellationIT,ProjectSourceLifecycleIT,ProjectSourceAcceptanceIT' test-compile failsafe:integration-test failsafe:verify` 19 项通过、0 失败/错误/跳过。过期排队没有 Git execution_id，提交前过期无新当前指针，提交后过期重试保持 COMMITTED。

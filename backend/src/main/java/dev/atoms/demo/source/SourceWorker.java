@@ -22,9 +22,13 @@ final class SourceWorker {
     }
 
     synchronized SourceOperation execute(SourceOperation requested, SourceTree input) {
+        return execute(requested, input, new SourceDeadline(environment.operationTimeout()));
+    }
+
+    synchronized SourceOperation execute(SourceOperation requested, SourceTree input, SourceDeadline deadline) {
         if (TransactionSynchronizationManager.isActualTransactionActive()) throw new IllegalStateException("Source I/O cannot run in a database transaction");
         try {
-            var deadline = new SourceDeadline(environment.operationTimeout());
+            deadline.remaining(java.time.Duration.ofSeconds(60));
             SourceOperation operation = service.prepare(requested.projectId(), requested.id());
             if (operation.terminal()) return operation;
             SourceTree tree = new ProjectSourcePolicy().validate(input.files());
@@ -58,7 +62,7 @@ final class SourceWorker {
             if (operation.terminal()) return operation;
             observer.accept(Stage.BEFORE_PUBLISH);
             deadline.remaining(java.time.Duration.ofSeconds(60));
-            SourceOperation result = service.publish(operation.projectId(), operation.id(), stored, tree);
+            SourceOperation result = service.publish(operation.projectId(), operation.id(), stored, tree, deadline);
             observer.accept(Stage.AFTER_COMMIT);
             return result;
         } catch (ApiException error) {
