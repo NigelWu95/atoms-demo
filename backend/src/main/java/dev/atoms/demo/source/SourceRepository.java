@@ -56,6 +56,42 @@ class SourceRepository {
                 """, OPERATION, UUID.randomUUID(), project, owner, request.kind(), key, request.digest(), request.expectedVersionId(),
                 request.expectedRevision(), UUID.randomUUID(), request.targetVersionId(), request.legacyVersionId(), request.templateId(), request.templateDigest(), request.treeSha256());
     }
+    void lockEvidence(UUID project) {
+        jdbc.execute("SET LOCAL lock_timeout='3s'");
+        jdbc.queryForList("SELECT id FROM projects WHERE id=? FOR UPDATE", UUID.class, project);
+    }
+    SourceOperation ready(SourceOperation operation) {
+        jdbc.update("UPDATE source_operations SET status='CANDIDATE_READY' WHERE id=? AND status='PREPARING'", operation.id());
+        return operation(operation.projectId(), operation.id());
+    }
+    SourceOperation finish(SourceOperation operation, String status, String code) {
+        boolean uncertain = status.equals("NEEDS_RECONCILIATION");
+        if (uncertain) jdbc.update("UPDATE project_sources SET status='NEEDS_RECONCILIATION' WHERE project_id=?", operation.projectId());
+        jdbc.update("UPDATE source_operations SET status=?,error_code=?,finished_at=CASE WHEN ? THEN NULL ELSE now() END WHERE id=?",
+                status, code, uncertain, operation.id());
+        return operation(operation.projectId(), operation.id());
+    }
+    void insertVersion(SourceOperation operation, SourceGitStore.Stored stored, SourceTree tree) {
+        jdbc.update("""
+                INSERT INTO source_versions(id,project_id,version_no,commit_id,tree_sha256,file_count,tree_bytes,based_on_id,
+                    restored_from_id,legacy_version_id,template_id,template_digest)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+                """, operation.candidateVersionId(), operation.projectId(), operation.expectedRevision() + 1,
+                stored.commitId(), tree.sha256(), tree.files().size(), tree.totalBytes(), operation.expectedVersionId(),
+                operation.targetVersionId(), operation.legacyVersionId(), operation.templateId(), operation.templateDigest());
+    }
+    void publishPointer(SourceOperation operation) {
+        int updated = jdbc.update("""
+                UPDATE project_sources SET current_source_version_id=?,source_revision=source_revision+1
+                WHERE project_id=? AND source_revision=? AND current_source_version_id IS NOT DISTINCT FROM ? AND status='READY'
+                """, operation.candidateVersionId(), operation.projectId(), operation.expectedRevision(), operation.expectedVersionId());
+        if (updated != 1) throw ProjectSourceService.conflict("SOURCE_BASE_CONFLICT");
+    }
+    SourceOperation committed(SourceOperation operation) {
+        jdbc.update("UPDATE source_operations SET status='COMMITTED',result_version_id=candidate_version_id,finished_at=now() WHERE id=?",
+                operation.id());
+        return operation(operation.projectId(), operation.id());
+    }
     private static UUID uuid(ResultSet result, String field) throws SQLException { return result.getObject(field, UUID.class); }
     private static Instant instant(ResultSet result, String field) throws SQLException {
         var value = result.getTimestamp(field); return value == null ? null : value.toInstant();

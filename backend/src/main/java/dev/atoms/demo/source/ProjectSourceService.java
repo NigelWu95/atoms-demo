@@ -50,6 +50,59 @@ public class ProjectSourceService {
         return value;
     }
 
+    SourceOperation prepare(UUID project, UUID id) {
+        return transaction.execute(status -> {
+            var operation = lockedOperation(project, id);
+            if (operation.terminal()) return operation;
+            writable(projects.lock(operation.ownerId(), project.toString()));
+            requireBase(repository.state(project), operation.expectedVersionId(), operation.expectedRevision());
+            if (!operation.status().equals("PREPARING")) throw conflict("SOURCE_NEEDS_RECONCILIATION");
+            return operation.cancelRequested() ? repository.finish(operation, "CANCELLED", "SOURCE_CANCELLED") : operation;
+        });
+    }
+
+    SourceOperation ready(UUID project, UUID id) {
+        return transaction.execute(status -> {
+            var operation = lockedOperation(project, id);
+            if (operation.terminal()) return operation;
+            writable(projects.lock(operation.ownerId(), project.toString()));
+            requireBase(repository.state(project), operation.expectedVersionId(), operation.expectedRevision());
+            if (operation.cancelRequested()) return repository.finish(operation, "CANCELLED", "SOURCE_CANCELLED");
+            return repository.ready(operation);
+        });
+    }
+
+    SourceOperation publish(UUID project, UUID id, SourceGitStore.Stored stored, SourceTree tree) {
+        return transaction.execute(status -> {
+            var operation = lockedOperation(project, id);
+            if (operation.terminal()) return operation;
+            writable(projects.lock(operation.ownerId(), project.toString()));
+            requireBase(repository.state(project), operation.expectedVersionId(), operation.expectedRevision());
+            if (operation.cancelRequested()) return repository.finish(operation, "CANCELLED", "SOURCE_CANCELLED");
+            if (!operation.status().equals("CANDIDATE_READY") || !operation.candidateVersionId().equals(stored.versionId())
+                    || !operation.candidateSha256().equals(stored.treeSha256()) || !tree.sha256().equals(stored.treeSha256()))
+                throw conflict("SOURCE_INPUT_CHANGED");
+            repository.insertVersion(operation, stored, tree);
+            repository.publishPointer(operation);
+            return repository.committed(operation);
+        });
+    }
+
+    SourceOperation fail(UUID project, UUID id, String code, boolean uncertain) {
+        return transaction.execute(status -> {
+            var operation = lockedOperation(project, id);
+            if (operation.terminal()) return operation;
+            return repository.finish(operation, uncertain ? "NEEDS_RECONCILIATION" : "FAILED", code);
+        });
+    }
+
+    private SourceOperation lockedOperation(UUID project, UUID id) {
+        repository.lockEvidence(project);
+        var operation = repository.operation(project, id);
+        if (operation == null) throw new ApiException(404, "SOURCE_OPERATION_MISSING", "源码操作不存在。");
+        return operation;
+    }
+
     private void requireEnabled() {
         if (!environment.enabled()) throw new ApiException(503, "SOURCE_DISABLED", "完整工程源码管理尚未启用。");
     }
