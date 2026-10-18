@@ -31,8 +31,11 @@ public final class ProjectSourcePolicy {
             "node_modules", "target", "dist", "coverage", "test-results", "playwright-report", "logs");
     private static final Pattern RESERVED = Pattern.compile("(?i)(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\\..*)?");
     private static final String KEY = "[\\w.-]*(?:password|passwd|secret|api[_-]?key|access[_-]?token|auth[_-]?token)";
-    private static final Pattern CONFIG_SECRET = Pattern.compile("(?im)^\\s*(?:" + KEY + ")\\s*[:=]\\s*([^\\r\\n]+)");
+    private static final Pattern CONFIG_SECRET = Pattern.compile("(?im)(?:^\\s*|,\\s*|(?<!\\$)\\{\\s*)(?:" + KEY
+            + ")\\s*[:=]\\s*(\"[^\"\\r\\n]*\"|'[^'\\r\\n]*'|[^\\r\\n,]+)");
     private static final Pattern JSON_SECRET = Pattern.compile("(?i)[\"'](?:" + KEY + ")[\"']\\s*:\\s*[\"']([^\"']*)[\"']");
+    // Literal placeholders already present in the controlled template, not a blanket exemption for tests.
+    private static final Set<String> TEMPLATE_PLACEHOLDERS = Set.of("REPLACE_WITH_DATABASE_PASSWORD", "RUNTIME_CANARY", "MODEL_CANARY", "PRIVATE_CANARY");
     private final Limits limits;
 
     public ProjectSourcePolicy() { this(DEFAULTS); }
@@ -96,6 +99,7 @@ public final class ProjectSourcePolicy {
             while (match.find()) {
                 String candidate = match.group(1).strip().replaceAll("^[\"']|[\"']$", "");
                 if (!candidate.isEmpty() && !candidate.matches("\\$\\{[A-Z_][A-Z_0-9]*}")
+                        && !TEMPLATE_PLACEHOLDERS.contains(candidate)
                         && !candidate.matches("(?i)(CHANGE_ME|REPLACE_ME|YOUR_[A-Z_]+|<[^>]+>)")) throw rejected();
             }
         }

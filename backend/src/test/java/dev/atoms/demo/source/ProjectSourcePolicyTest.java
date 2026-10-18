@@ -82,6 +82,24 @@ class ProjectSourcePolicyTest {
         assertThatThrownBy(() -> tree.files().clear()).isInstanceOf(UnsupportedOperationException.class);
     }
 
+    @Test void allowsTheControlledTemplateDatabasePlaceholderButNotRealValuesWithThatPrefix() {
+        assertThat(policy.validate(List.of(file("config/application.properties.example",
+                "STANDALONE_DB_PASSWORD=REPLACE_WITH_DATABASE_PASSWORD"))).files()).hasSize(1);
+        for (String value : List.of("REPLACE_WITH_DATABASE_PASSWORD-and-canary", "replace_with_canary-secret")) {
+            assertThatThrownBy(() -> policy.validate(List.of(file("config/application.properties.example",
+                    "STANDALONE_DB_PASSWORD=" + value)))).isInstanceOf(IllegalArgumentException.class);
+        }
+    }
+
+    @Test void acceptsExplicitTemplateTestPlaceholdersWithoutIgnoringOtherFieldsOnTheSameLine() {
+        String fixture = "  STANDALONE_DB_PASSWORD: 'RUNTIME_CANARY', DEEPSEEK_API_KEY: 'MODEL_CANARY',\n"
+                + "  STANDALONE_DB_PASSWORD: 'PRIVATE_CANARY', DEEPSEEK_API_KEY: 'PRIVATE_CANARY',";
+        assertThat(policy.validate(List.of(file("scripts/process.test.mjs", fixture))).files()).hasSize(1);
+        assertThat(policy.validate(List.of(file("backend/mvnw", "case \"${MVNW_PASSWORD:+has-password}\" in"))).files()).hasSize(1);
+        assertThatThrownBy(() -> policy.validate(List.of(file("scripts/process.test.mjs",
+                fixture.replace("'MODEL_CANARY'", "'canary-do-not-save'"))))).isInstanceOf(IllegalArgumentException.class);
+    }
+
     static SourceTree.File file(String path, String value) {
         return new SourceTree.File(path, value.getBytes(StandardCharsets.UTF_8), 0100644);
     }
