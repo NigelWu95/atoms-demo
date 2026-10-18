@@ -178,8 +178,8 @@
 
 实施拆分：PS13a 为 Python 有界扫描及替换/增长测试（2 个文件）；PS13b 为描述符相对 staging 存取及单测（文件工具、Python 测试、Java 存取适配器及其测试，共 4 个文件）；PS13c 为候选身份、工作副本扫描入口与封存测试（本节原列 4 个文件）。
 
-- [ ] 仅接受平台创建且项目/任务/基线匹配的工作副本；封存后再改副本不会改变候选；模型自报路径和 hash 无效。
-- [ ] 读取中链接替换、硬链接、越界、文件增长及秘密 canary 被拒绝；封存前不执行工程脚本。
+- [x] 仅接受平台创建且项目/任务/基线匹配的工作副本；封存后再改副本不会改变候选；模型自报路径和 hash 无效。
+- [x] 读取中链接替换、硬链接、越界、文件增长及秘密 canary 被拒绝；封存前不执行工程脚本。
 - 验证：`./mvnw -B -Dtest=ProjectSourceCandidateTest test`；含受控并发文件替换测试及 staging 不可变性检查。
 - 依赖：PS12、PS02。
 - 文件（4）：`S/SourceCandidate.java`、`S/SourceCandidateStore.java`、`S/SourceWorkspaceStore.java`、`T/ProjectSourceCandidateTest.java`。
@@ -188,8 +188,10 @@
 
 将封存候选接入既有持久操作流程，完成第二轮源码修改。
 
-- [ ] 修改 Java/Vue/SQL 文件后生成新版本，记录父版本；未改文件不变，旧版本仍可完整读回。
-- [ ] 同基线并发提交最多一次成功；同键重试返回同结果；归属/归档变化拒绝发布，不能强制覆盖。
+实施收敛：已有 `ProjectSourceService`、`SourceWorker`、`SourceRepository` 已提供 CAS/幂等/父版本写入，不重复改写；新增窄职责 `S/SourceAcceptance.java` 做候选授权、准入和读取衔接，测试仍为 `T/ProjectSourceAcceptanceIT.java`（2 个文件）。调度接线随综合验收完成。
+
+- [x] 修改 Java/Vue/SQL 文件后生成新版本，记录父版本；未改文件不变，旧版本仍可完整读回。
+- [x] 同基线并发提交最多一次成功；同键重试返回同结果；归属/归档变化拒绝发布，不能强制覆盖。
 - 验证：`./mvnw -B -Dit.test=ProjectSourceAcceptanceIT verify`；真实并发事务与 Git 引用检查，拒绝结果不移动指针。
 - 依赖：PS13、PS06、PS08。
 - 文件（4）：`S/ProjectSourceService.java`、`S/SourceWorker.java`、`S/SourceRepository.java`、`T/ProjectSourceAcceptanceIT.java`。
@@ -198,16 +200,16 @@
 
 让取消结果反映实际发布事实，未确认结束的操作不释放准入。
 
-- [ ] Git 前、Git 中、发布事务前取消阻止新版本可见；已提交后返回已提交，绝不删除已发布版本来伪装取消。
-- [ ] 取消不终止其他任务、不删历史；无法确认进程或写入状态时进入待核对，重启后仍保持正确阻断。
+- [x] Git 前、Git 中、发布事务前取消阻止新版本可见；已提交后返回已提交，绝不删除已发布版本来伪装取消。
+- [x] 取消不终止其他任务、不删历史；无法确认进程或写入状态时进入待核对，重启后仍保持正确阻断。
 - 验证：`./mvnw -B -Dit.test=ProjectSourceCancellationIT verify`；使用确定性屏障覆盖取消/提交两种先后结果。
 - 依赖：PS14、PS09。
 - 文件（4）：`S/ProjectSourceService.java`、`S/SourceWorker.java`、`S/SourceRepository.java`、`T/ProjectSourceCancellationIT.java`。
 
 ### C-PS05 · 增量开发底座检查点
 
-- [ ] 第二轮修改、同基线冲突、幂等和取消均有完整服务路径证据。
-- [ ] 失败或取消不覆盖当前版本；日志、源码及暂存区未写入平台秘密。
+- [x] 第二轮修改、同基线冲突、幂等和取消均有完整服务路径证据。
+- [x] 失败或取消不覆盖当前版本；日志、源码及暂存区未写入平台秘密。
 
 ## F · 恢复、差异与运行防护
 
@@ -215,8 +217,10 @@
 
 恢复历史源码树时保持完整历史和正确父子关系，不运行 SQL。
 
-- [ ] V1 → V2 → 恢复 V1 得到 V3：树与 V1 一致，父版本是 V2，并记录恢复来源；V1/V2 不被修改。
-- [ ] 恢复重新授权并比较基线；幂等/取消复用同一操作流程；业务数据及旧模式指针不变。
+实施收敛：复用持久准入与 Worker；新增 `S/SourceRestoration.java` 负责已授权目标版本读取，配合 `T/ProjectSourceRestorationIT.java`，不重复修改提交逻辑（2 个文件）。
+
+- [x] V1 → V2 → 恢复 V1 得到 V3：树与 V1 一致，父版本是 V2，并记录恢复来源；V1/V2 不被修改。
+- [x] 恢复重新授权并比较基线；幂等/取消复用同一操作流程；业务数据及旧模式指针不变。
 - 验证：`./mvnw -B -Dit.test=ProjectSourceRestorationIT verify`；比较 Git 树、元数据及业务数据前后值。
 - 依赖：PS14、PS15。
 - 文件（3）：`S/ProjectSourceService.java`、`S/SourceWorker.java`、`T/ProjectSourceRestorationIT.java`。
@@ -225,8 +229,10 @@
 
 提供版本间文件增删改统计和文本差异，供后续 UI 展示。
 
-- [ ] 两个版本都需属于授权项目；返回路径、变更类型和内容摘要；不调用外部 diff/textconv。
-- [ ] 大差异返回真实截断标志和完整变更文件统计，不将截断输出用于候选完整性校验。
+实施细化：不启动 Git diff，直接比较授权读回的不可变树，保留完整文件统计及 128 KiB UTF-8 文本展示预算。普通文本差异采用共同前后缀之间的替换块，不承诺最小编辑距离；输出只用于展示，不能当作可应用补丁或候选源码。文件为 `SourceDiff.java`、`SourceQuery.java`、`ProjectSourceDiffTest.java`、`ProjectSourceDiffIT.java`（4 个文件）。
+
+- [x] 两个版本都需属于授权项目；返回路径、变更类型和内容摘要；不调用外部 diff/textconv。
+- [x] 大差异返回真实截断标志和完整变更文件统计，不将截断输出用于候选完整性校验。
 - 验证：`./mvnw -B -Dit.test=ProjectSourceDiffIT verify`；包含增加、删除、修改、模式变化、空差异及跨权限读取。
 - 依赖：PS11、PS14。
 - 文件（4）：`S/SourceDiff.java`、`S/SourceQuery.java`、`S/SourceGitStore.java`、`T/ProjectSourceDiffIT.java`。
@@ -234,6 +240,8 @@
 ### PS18 · 容量和失败可观测性（M）
 
 对真实磁盘异常、预算拒绝及状态卡住提供有限诊断，不记录源码或凭据。
+
+实施拆分：PS18a 为共享操作时限、Git 子进程清理故障防护及测试（`SourceDeadline`、`SourceGitProcess`、`ProjectSourceDeadlineTest`、`ProjectSourceGitProcessTest`，4 个文件）；PS18b 为容量检查器、环境配置及小预算测试（`SourceStorageBudget`、`ProjectSourceEnvironment`、`ProjectSourceStorageBudgetTest`，3 个文件）；PS18c 接入 Worker/副本与失败集成测试（`SourceWorker`、`SourceFileSnapshotStore`、`ProjectSourceFailureIT`，3 个文件）；PS18d 单协调者接线、句柄生命周期与服务旅程测试单独列出后实施。
 
 - [ ] 队列/根容量/空间准入生效；模拟磁盘写失败不发布损坏版本；不自动删历史或未知目录。
 - [ ] 日志包含项目/操作标识、阶段、耗时和稳定错误码，不含源码、个人路径、邮箱/模型凭据；待核对状态可经内部查询诊断。

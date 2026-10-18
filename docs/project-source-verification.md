@@ -58,6 +58,19 @@ PS12 起的工作副本、取消竞态与磁盘容量检查，以及新旧完整
 - `./mvnw -B -Dtest=ProjectSourceFileProcessTest,ProjectSourceEnvironmentTest,ProjectSourceWorkspaceIT test`：2026-10-18 21:19:46，10 项通过（0 失败/错误/跳过）。包括真实 Python/Git/专用 PostgreSQL、任务副本与正式版本分离、跨所有者/项目/过期基线拒绝、已有任务目录及替换副本拒绝、超时进程退出。
 - 未推送、部署、更改日常运行配置或调用真实模型/邮箱。候选封存及完整回归仍待后续切片，不把以上测试当作完整 Agent 能力验收。
 
+## PS13–PS15 候选封存、增量提交及取消
+
+- Python 文件系统用例扩展至 **11 项通过**：新增扫描增删、符号/硬链接/FIFO、文件超限、读取期间替换/增长、独立 staging 与拒绝接管无标识目录。
+- `ProjectSourceFileSnapshotTest,ProjectSourceFileProcessTest`：21:25:06 **5 项通过**；`ProjectSourceCandidateTest,ProjectSourceWorkspaceIT`：21:28:12 **6 项通过**。封存后修改副本不影响候选；暂存区篡改、陌生句柄、错误账号/项目、秘密文件均拒绝。候选单测的授权依赖使用 mock，真实授权由 WorkspaceIT 与 AcceptanceIT 验证，不混称全链路。
+- `ProjectSourceAcceptanceIT`：21:32:00 **3 项通过**，真实 Git/专用 PG；Vue、Java、SQL 修改产生第二版，未改文件与旧历史仍可读回，父版本正确；同基线提交只成功一次；幂等重试和发布前归属变化覆盖。
+- `ProjectSourceCancellationIT`：21:34:39 **7 项通过**。覆盖 Git 前、实际 Git 子进程启动、Git 完成后、发布事务前、提交后五个窗口，以及归档后取消/越权拒绝、未确认执行的取消与恢复阻断。活动 Git 不通过旧 PID 或名称终止；取消请求在其结束后确认，未知执行继续待核对。
+- 以上全部 0 失败/错误/跳过，未运行项目脚本。完整新旧回归与容量/总时间预算尚未完成；同系统用户原生进程隔离仍不是沙箱。
+
+## PS16–PS17 恢复与差异
+
+- `ProjectSourceRestorationIT`：21:37:16 **2 项通过**。V1 → V2 → 恢复 V1 生成 V3，树相同、父版本为 V2、恢复来源为 V1，旧历史、项目记录及 PREVIEW/LIVE 数据未变。覆盖越权、缺失目标、过期基线、取消及幂等重试；SQL 只保存不执行。
+- `ProjectSourceDiffTest,ProjectSourceDiffIT`：21:40:13 **3 项通过**。增删改、可执行位变化、空差异、128 KiB UTF-8 截断及完整文件统计；两端版本必须属于当前授权项目，账号归属变化后重新授权。不调用 Git diff/textconv，文本是展示用替换块，不是可执行补丁。
+
 ## 调度器运行记录
 
 运维问题及证据对应如下，不引入新的遥测依赖或对外监控入口：
