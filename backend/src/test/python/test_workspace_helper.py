@@ -7,6 +7,7 @@ import resource
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 import uuid
 
 MODULE = Path(__file__).resolve().parents[2] / "main/resources/source/workspace_helper.py"
@@ -93,6 +94,65 @@ class WorkspaceHelperTest(unittest.TestCase):
         os.link(project.parent / ".atoms-source-workspace", project.parent / "alias")
         with self.assertRaises(ValueError):
             self.helper.handle(self.request)
+
+    def scan(self):
+        self.request["operation"] = "scan"
+        return self.helper.handle(self.request)["files"]
+
+    def test_scans_current_files_including_additions_and_deletions(self):
+        project = self.create()
+        (project / "src/main.txt").unlink()
+        (project / "src/second.txt").write_text("two", encoding="utf-8")
+        self.assertEqual([self.file("src/second.txt", b"two")], self.scan())
+
+    def test_scan_rejects_symlinks_hardlinks_fifo_and_growth_over_limit(self):
+        project = self.create()
+        target = project / "src/main.txt"
+        for kind in ("symlink", "hardlink", "fifo", "oversize"):
+            with self.subTest(kind=kind):
+                extra = project / "extra"
+                if kind == "symlink":
+                    extra.symlink_to(target)
+                elif kind == "hardlink":
+                    os.link(target, extra)
+                elif kind == "fifo":
+                    os.mkfifo(extra)
+                else:
+                    extra.write_bytes(b"x" * ((2 << 20) + 1))
+                try:
+                    with self.assertRaises((OSError, ValueError)):
+                        self.scan()
+                finally:
+                    extra.unlink()
+
+    def test_scan_rejects_a_file_replaced_or_grown_during_its_read(self):
+        project = self.create()
+        target = project / "src/main.txt"
+        original_read = os.read
+        for kind in ("replace", "grow"):
+            inode = target.stat().st_ino
+            changed = False
+
+            def mutate(fd, count):
+                nonlocal changed
+                data = original_read(fd, count)
+                if os.fstat(fd).st_ino == inode and not changed:
+                    changed = True
+                    if kind == "replace":
+                        target.rename(target.with_name("old"))
+                        target.symlink_to(target.with_name("old"))
+                    else:
+                        with target.open("ab") as output:
+                            output.write(b"changed during scan")
+                return data
+
+            with patch.object(self.helper.os, "read", side_effect=mutate):
+                with self.assertRaises((OSError, ValueError)):
+                    self.scan()
+            self.assertTrue(changed)
+            if kind == "replace":
+                target.unlink()
+                target.with_name("old").rename(target)
 
 
 if __name__ == "__main__":

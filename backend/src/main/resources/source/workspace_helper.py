@@ -149,9 +149,56 @@ def checked(stack, root, request, marker):
     return result, project
 
 
+def stamp(info):
+    return (info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns, info.st_ctime_ns,
+            info.st_mode, info.st_nlink, info.st_uid)
+
+
+def scan(directory, prefix, result, budget):
+    before = os.fstat(directory)
+    require(stat.S_ISDIR(before.st_mode) and before.st_uid == os.geteuid() and not before.st_mode & 0o022)
+    names = []
+    with os.scandir(directory) as entries:
+        for entry in entries:
+            budget[0] += 1
+            require(budget[0] <= 8192)
+            names.append(entry.name)
+    for name in sorted(names):
+        path = "/".join((*prefix, name))
+        relative(path)
+        info = os.stat(name, dir_fd=directory, follow_symlinks=False)
+        if stat.S_ISDIR(info.st_mode):
+            with ExitStack() as children:
+                child = held(children, name, DIRECTORY_FLAGS, directory)
+                require(stamp(info) == stamp(os.fstat(child)))
+                scan(child, (*prefix, name), result, budget)
+                linked(directory, name, child)
+        else:
+            own(info)
+            require(info.st_size <= FILE_LIMIT and not info.st_mode & 0o022 and len(result) < 512)
+            with ExitStack() as files:
+                fd = held(files, name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC, directory)
+                require(stamp(info) == stamp(os.fstat(fd)))
+                data = bytearray()
+                while True:
+                    part = os.read(fd, min(65536, FILE_LIMIT + 1 - len(data)))
+                    if not part:
+                        break
+                    data.extend(part)
+                    require(len(data) <= FILE_LIMIT)
+                require(len(data) == info.st_size and stamp(info) == stamp(os.fstat(fd)))
+                own(os.fstat(fd))
+                linked(directory, name, fd)
+            budget[1] += len(data)
+            require(budget[1] <= TREE_LIMIT)
+            result.append(dict(path=path, content=base64.b64encode(data).decode("ascii"),
+                               mode=0o100755 if info.st_mode & 0o111 else 0o100644))
+    require(stamp(before) == stamp(os.fstat(directory)))
+
+
 def handle(request):
     require(sys.version_info >= (3, 11) and os.open in os.supports_dir_fd and os.listdir in os.supports_fd)
-    require(request["operation"] in ("create", "check"))
+    require(request["operation"] in ("create", "check", "scan"))
     require(str(uuid.UUID(request["task"])) == request["task"])
     marker = request["marker"].encode("utf-8")
     require(1 <= len(marker) <= 4096)
@@ -159,6 +206,12 @@ def handle(request):
     with ExitStack() as stack:
         root = root_fd(stack, request)
         result = create(stack, root, request, files, marker) if files is not None else checked(stack, root, request, marker)[0]
+        if request["operation"] == "scan":
+            evidence, project = checked(stack, root, request, marker)
+            contents = []
+            scan(project, (), contents, [0, 0])
+            checked(stack, root, request, marker)
+            result = dict(evidence=evidence, files=contents)
         # Reopen the absolute chain: a renamed root must not be reported as a successful workspace.
         root_fd(stack, request)
         return result
