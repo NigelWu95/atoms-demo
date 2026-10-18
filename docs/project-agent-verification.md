@@ -115,3 +115,5 @@ env PATH=/Users/wubingheng/.nvm/versions/node/v24.20.0/bin:$PATH ./mvnw -B \
 新增源模块门面 ProjectSourceEditGateway。句柄私有构造，绑定发行实例及持久租约，不从路径/UUID 重建。准备副本前后核对当前账号与基线，工作副本保留租约许可；纯副本不暴露 canonical Git 仓库。数据库事务内拒绝文件 I/O，外层任务准入事务回滚时撤销内存句柄。释放仅在允许的持久状态下执行，不删除工程文件或未知目录。
 
 先因缺类编译失败，4 项新集成通过。2026-10-19 01:45，以 `./mvnw -B '-Dit.test=ProjectSourceEdit*IT,ProjectSourceWorkspaceIT,ProjectSourceAcceptanceIT' test-compile failsafe:integration-test failsafe:verify` 得到 **24 集成通过、0 失败/错误/跳过**，包含原工作副本/候选接受流程。此时仅可领取、准备、核对及释放，执行确认和封存接受仍在 PA10–PA12。
+
+PA10a（01:47）：增加 SourceExecutionBudget 内部契约，SourceDeadline 同时服从本地操作、单步和调用者剩余任务预算。先缺类/构造器失败，`./mvnw -B -Dtest=ProjectSourceDeadlineTest test` 3 项通过；异常预算只返回 SOURCE_OPERATION_TIMEOUT，不暴露调用者错误正文。实际文件操作传递待 PA10b。
