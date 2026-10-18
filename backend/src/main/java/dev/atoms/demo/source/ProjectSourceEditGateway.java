@@ -1,5 +1,6 @@
 package dev.atoms.demo.source;
 
+import dev.atoms.demo.execution.OwnedProcess;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
@@ -17,15 +18,30 @@ public class ProjectSourceEditGateway {
     private final SourceRepository repository;
     private final SourceEditLeaseRepository leases;
     private final SourceWorkspaceStore workspaces;
+    private final SourceCandidateStore candidates;
+    private final java.util.function.Supplier<SourceCoordinator> coordinator;
     private final TransactionTemplate transaction;
     private final ProjectSourceEnvironment environment;
     private final Map<UUID, EditHandle> issued = new HashMap<>();
 
     ProjectSourceEditGateway(ProjectSourceService service, SourceRepository repository, ProjectSourceEnvironment environment,
                             PlatformTransactionManager transactions) {
+        this(service, repository, environment, transactions, (java.util.function.Supplier<SourceCoordinator>) () -> null);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    ProjectSourceEditGateway(ProjectSourceService service, SourceRepository repository, ProjectSourceEnvironment environment,
+                            PlatformTransactionManager transactions, org.springframework.beans.factory.ObjectProvider<SourceCoordinator> coordinator) {
+        this(service, repository, environment, transactions, (java.util.function.Supplier<SourceCoordinator>) coordinator::getIfAvailable);
+    }
+
+    ProjectSourceEditGateway(ProjectSourceService service, SourceRepository repository, ProjectSourceEnvironment environment,
+                            PlatformTransactionManager transactions, java.util.function.Supplier<SourceCoordinator> coordinator) {
         this.service = service; this.repository = repository; this.leases = repository.edits();
         this.environment = environment;
         this.workspaces = new SourceWorkspaceStore(service, new SourceQuery(service, repository, environment), environment);
+        this.candidates = new SourceCandidateStore(workspaces, environment);
+        this.coordinator = coordinator;
         this.transaction = new TransactionTemplate(transactions);
     }
 
@@ -61,6 +77,7 @@ public class ProjectSourceEditGateway {
         if (handle.workspace != null) { workspaces.checked(handle.workspace, deadline); return; }
         var lease = handle.lease;
         handle.workspace = workspaces.prepare(lease.ownerId(), lease.projectId(), lease.baseVersionId(), lease.baseRevision(), lease.taskId(), lease, deadline);
+        handle.directory = workspaces.checked(handle.workspace, deadline);
     }
 
     /** For the trusted process adapter only, not an HTTP DTO or a path editable by the model. */
@@ -68,6 +85,68 @@ public class ProjectSourceEditGateway {
         requireOutsideTransaction(); owned(handle);
         if (handle.workspace == null) throw ProjectSourceService.conflict("SOURCE_EDIT_UNAVAILABLE");
         return workspaces.checked(handle.workspace, deadline(handle));
+    }
+
+    /** Durable intent is committed before the caller starts its process. May join Agent admission's transaction. */
+    public synchronized void markExecutionStarted(EditHandle handle, UUID execution) {
+        owned(handle);
+        if (handle.workspace == null || handle.directory == null) throw ProjectSourceService.conflict("SOURCE_EDIT_UNAVAILABLE");
+        transaction.executeWithoutResult(status -> {
+            var lease = handle.lease;
+            service.writableBase(lease.ownerId(), lease.projectId(), lease.baseVersionId(), lease.baseRevision(), lease);
+            leases.beginExecution(lease, execution);
+        });
+    }
+
+    /** Stop facts may be recorded after timeout or ownership changes; they do not authorize new source publication. */
+    public synchronized void confirmExecutionStopped(EditHandle handle, OwnedProcess.Stopped evidence) {
+        owned(handle);
+        transaction.executeWithoutResult(status -> {
+            repository.lockEvidence(handle.projectId());
+            var current = leases.get(handle.projectId(), handle.lease.id());
+            if (evidence == null || !evidence.matches(handle.taskId(), current.executionId(), handle.directory))
+                throw ProjectSourceService.conflict("SOURCE_EDIT_UNAVAILABLE");
+            leases.confirmStopped(handle.lease, current.executionId(), evidence.digest());
+        });
+    }
+
+    public sealed interface Acceptance permits NoChanges, Submitted {}
+    public record NoChanges(UUID versionId) implements Acceptance {}
+    public record Submitted(SourceOperation operation, java.util.concurrent.CompletableFuture<SourceOperation> completion) implements Acceptance {}
+
+    /** Only a stopped task can freeze files. Replays return the durable operation, not a second Git write. */
+    public synchronized Acceptance sealAndAccept(EditHandle handle, String idempotencyKey) {
+        requireOutsideTransaction(); owned(handle);
+        String key = SourceRequest.key(idempotencyKey);
+        var lease = handle.lease;
+        service.authorize(lease.ownerId(), lease.projectId());
+        if (handle.acceptanceKey != null && !handle.acceptanceKey.equals(key))
+            throw ProjectSourceService.conflict("SOURCE_IDEMPOTENCY_CONFLICT");
+        if (handle.accepted instanceof Submitted submitted) {
+            var current = service.operation(lease.ownerId(), lease.projectId(), submitted.operation().id());
+            return new Submitted(current, submitted.completion());
+        }
+        if (handle.accepted instanceof NoChanges) return handle.accepted;
+        transaction.executeWithoutResult(status -> {
+            repository.lockEvidence(lease.projectId());
+            leases.requirePermit(lease.ownerId(), lease.projectId(), lease.baseVersionId(), lease.baseRevision(), lease, true);
+        });
+        var deadline = deadline(handle);
+        if (handle.candidate == null) handle.candidate = candidates.seal(handle.workspace, deadline);
+        if (handle.candidate.treeSha256().equals(repository.version(lease.projectId(), lease.baseVersionId()).treeSha256())) {
+            handle.acceptanceKey = key;
+            handle.accepted = new NoChanges(lease.baseVersionId());
+            candidates.release(handle.candidate);
+            return handle.accepted;
+        }
+        var scheduler = coordinator.get();
+        if (scheduler == null || !scheduler.isRunning()) throw ProjectSourceService.conflict("SOURCE_COORDINATOR_UNAVAILABLE");
+        var prepared = new SourceAcceptance(service, candidates).prepare(lease.ownerId(), lease.projectId(),
+                handle.candidate, idempotencyKey, lease, deadline);
+        handle.acceptanceKey = key;
+        var submission = scheduler.submit(lease.ownerId(), lease.projectId(), prepared.operation().id(), prepared.tree(), deadline);
+        handle.accepted = new Submitted(submission.operation(), submission.completion());
+        return handle.accepted;
     }
 
     public synchronized void releaseEdit(EditHandle handle) {
@@ -79,6 +158,7 @@ public class ProjectSourceEditGateway {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override public void afterCommit() {
                     synchronized (ProjectSourceEditGateway.this) {
+                        candidates.release(handle.candidate);
                         workspaces.release(handle.workspace);
                         issued.remove(handle.lease.id(), handle);
                     }
@@ -101,6 +181,10 @@ public class ProjectSourceEditGateway {
     public static final class EditHandle {
         private final SourceEditLeaseRepository.Lease lease;
         private SourceWorkspace workspace;
+        private Path directory;
+        private SourceCandidate candidate;
+        private String acceptanceKey;
+        private Acceptance accepted;
         private SourceExecutionBudget budget;
         private boolean budgetAssigned;
         private EditHandle(SourceEditLeaseRepository.Lease lease) { this.lease = lease; }
