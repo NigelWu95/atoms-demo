@@ -1,6 +1,6 @@
 # project-source · 开发任务
 
-状态：2026-10-18，用户已授权连续实施；PS01 正在开发，其余未开始。唯一计划入口为 [plan.md](plan.md)，规格见 [SPEC-project-source.md](../../SPEC-project-source.md)。原任务清单不变。
+状态：2026-10-18，用户已授权连续实施；PS01–PS09（含执行阻断补充）、C-PS01/02/03 已验证，PS10 正在开发，其余未开始。证据见 [验证记录](../../docs/project-source-verification.md)。唯一计划入口为 [plan.md](plan.md)，规格见 [SPEC-project-source.md](../../SPEC-project-source.md)。原任务清单不变。
 
 路径缩写：`S` = `backend/src/main/java/dev/atoms/demo/source/`；`T` = `backend/src/test/java/dev/atoms/demo/source/`；`R` = `backend/src/main/resources/`。所有缩写文件名均为拟新增/修改位置，不代表已存在。每项列出的主实现和测试文件不超过五个，若实际超出，先拆分任务。
 
@@ -12,8 +12,8 @@
 
 建立源码配置和私有根管理，确保新模块不会因启动平台而擅自写盘。
 
-- [ ] 开关关闭时不启动 Git、不创建根目录；启用必须显式指定私有源码/工作副本根和 Git 路径。
-- [ ] 拒绝链接根、工作区根、非平台已有目录、同根第二个写入者；根租约丢失后停止写入，关闭不删除稳定锁文件。
+- [x] 开关关闭时不启动 Git、不创建根目录；启用必须显式指定私有源码/工作副本根和 Git 路径。
+- [x] 拒绝链接根、工作区根、非平台已有目录、同根第二个写入者；根租约丢失后停止写入，关闭不删除稳定锁文件。
 - 验证：`./mvnw -B -Dtest=ProjectSourceEnvironmentTest,ProjectSourcePathsTest test`；用临时目录确认拒绝操作前后原文件及锁不被改写。
 - 依赖：无。
 - 文件（5）：`S/ProjectSourceEnvironment.java`、`S/ProjectSourcePaths.java`、`R/application.yml`、`T/ProjectSourceEnvironmentTest.java`、`T/ProjectSourcePathsTest.java`。
@@ -22,8 +22,8 @@
 
 实现新源码树的数据模型、独立文件策略及稳定内容摘要，不修改旧三文件协议。
 
-- [ ] Vue、Java、SQL、非敏感配置可以共同存储；大小/数量/深度按规格精确计量；超限拒绝而非截断。
-- [ ] 覆盖路径穿越、大小写冲突、非法 UTF-8、链接/异常文件类型、秘密文件与可执行位；摘要对顺序无关、对内容/路径/模式变化敏感。
+- [x] Vue、Java、SQL、非敏感配置可以共同存储；大小/数量/深度按规格精确计量；超限拒绝而非截断。
+- [x] 覆盖路径穿越、大小写冲突、非法 UTF-8、链接/异常文件类型、秘密文件与可执行位；摘要对顺序无关、对内容/路径/模式变化敏感。
 - 验证：`./mvnw -B -Dtest=ProjectSourcePolicyTest test`；包含每项边界前后值及大于 120 KiB 的完整树。
 - 依赖：PS01。
 - 文件（3）：`S/SourceTree.java`、`S/ProjectSourcePolicy.java`、`T/ProjectSourcePolicyTest.java`。
@@ -32,16 +32,16 @@
 
 建立唯一 Git 子进程适配器，执行前核对官方文档和本机 Git 所需命令支持情况；不安装或升级工具。
 
-- [ ] 固定可执行路径及参数数组、环境白名单；不加载用户/系统配置、模板钩子、外部过滤器、凭据助手或网络远端。
-- [ ] 数据输出与错误诊断分别限流；超时/取消确认自有进程结束；日志不含文件内容、环境和 canary 秘密。
+- [x] 固定可执行路径及参数数组、环境白名单；不加载用户/系统配置、模板钩子、外部过滤器、凭据助手或网络远端。
+- [x] 数据输出与错误诊断分别限流；超时/取消确认自有进程结束；日志不含文件内容、环境和 canary 秘密。
 - 验证：`./mvnw -B -Dtest=ProjectSourceGitProcessTest test`；真实 Git 与测试用超时进程验证不执行钩子、不遗留自有任务。
 - 依赖：PS01。
 - 文件（2）：`S/SourceGitProcess.java`、`T/ProjectSourceGitProcessTest.java`。
 
 ### C-PS01 · 基础约束检查点
 
-- [ ] PS01–PS03 针对性测试通过；平台原配置/个人 Git/Claude 设置未修改。
-- [ ] 审阅失败路径和进程结束证据；无法确认终止时不继续写入。
+- [x] PS01–PS03 针对性测试通过；平台原配置/个人 Git/Claude 设置未修改。
+- [x] 审阅失败路径和进程结束证据；无法确认终止时不继续写入。
 
 ## B · 不可变树与持久操作
 
@@ -49,36 +49,36 @@
 
 将已校验树保存为 Git 对象并按平台版本 UUID 读取，先独立证明存储字节一致性。
 
-- [ ] 支持完整树保存/物化及不可变引用；重复同一候选可核对重放，不覆盖不同内容的既有引用。
-- [ ] 修改一个文件形成第二版，未改文件 blob 保持一致；读回核对模式、长度及整树摘要；异常引用/缺失对象返回明确错误。
+- [x] 支持完整树保存/读回及不可变引用；重复同一候选可核对重放，不覆盖不同内容的既有引用。磁盘任务副本按 PS12 实现。
+- [x] 修改一个文件形成第二版，未改文件 blob 保持一致；读回核对模式、长度及整树摘要；异常引用/缺失对象返回明确错误。
 - 验证：`./mvnw -B -Dtest=ProjectSourceGitStoreTest test`；临时真实 bare 仓库关闭后重开读回，两版均完整保留。
 - 依赖：PS02、PS03。
-- 文件（3）：`S/SourceGitStore.java`、`S/SourceVersion.java`、`T/ProjectSourceGitStoreTest.java`。
+- 文件（3）：`S/SourceGitStore.java`、`S/SourceGitProcess.java`（增加只读引用查询）、`T/ProjectSourceGitStoreTest.java`。数据库版本 DTO 随 PS05 实现。
 
 ### PS05 · 源码元数据增量迁移（M）
 
 新增规格定义的三张表及最小 JDBC 映射，不改变旧产物表。
 
-- [ ] 新表具备同项目引用、版本编号唯一、不可变版本及操作幂等约束；源码内容不写入表字段。
-- [ ] 迁移在已有数据的专用测试库可应用；旧指针、版本内容和原迁移文件未变化。
+- [x] 新表具备同项目引用、版本编号唯一、不可变版本及操作幂等约束；源码内容不写入表字段。
+- [x] 迁移在已有数据的专用测试库可应用；旧指针、版本内容和原迁移文件未变化。
 - 验证：`./mvnw -B -Dit.test=ProjectSourceRepositoryIT verify`；核对库/角色身份、跨项目外键及不可变触发器拒绝非法写入。
 - 依赖：PS04。
-- 文件（4）：`R/db/migration/V018__project_sources.sql`（落地前复核编号）、`S/SourceRepository.java`、`S/SourceOperation.java`、`T/ProjectSourceRepositoryIT.java`。
+- 文件（5）：`R/db/migration/V018__project_sources.sql`（已复核编号）、`S/SourceRepository.java`、`S/SourceOperation.java`、`S/SourceVersion.java`、`T/ProjectSourceRepositoryIT.java`。
 
 ### PS06 · 持久准入与幂等键（M）
 
 先落操作意图再触发文件操作，建立可恢复且重新授权的任务入口。
 
-- [ ] 所有者、未归档、基线和容量合格才创建意图；同键同请求返回同操作，同键异体拒绝，未经授权不产生目录。
-- [ ] 请求摘要和候选 ID 不可变；权限变化后旧调用者不能读幂等结果；源码修订号独立于旧项目修订号。
+- [x] 所有者、未归档、基线和队列准入合格才创建意图；同键同请求返回同操作，同键异体拒绝，未经授权不产生目录。磁盘容量由 PS18 验证。
+- [x] 请求摘要和候选 ID 不可变；权限变化后旧调用者不能读幂等结果；源码修订号独立于旧项目修订号。
 - 验证：`./mvnw -B -Dit.test=ProjectSourceAdmissionIT verify`；并发准入和幂等冲突使用真实数据库断言。
 - 依赖：PS05。
-- 文件（4）：`S/ProjectSourceService.java`、`S/SourceRepository.java`、`S/SourceRequest.java`、`T/ProjectSourceAdmissionIT.java`。
+- 文件（5）：`S/ProjectSourceService.java`、`S/SourceRepository.java`、`S/SourceRequest.java`、`T/ProjectSourceAdmissionIT.java`、`T/SourceIntegrationSupport.java`（共用真实数据库身份检查及本测试收尾）。
 
 ### C-PS02 · 存储及数据库检查点
 
-- [ ] PS04–PS06 通过；大于旧上限的树可读回，数据库仅含元数据。
-- [ ] 未出现提前发布版本、旧版本变更、隐式目录接管或测试库越界。
+- [x] PS04–PS06 通过；大于旧上限的树可读回，数据库仅含元数据。
+- [x] 未出现提前发布版本、旧版本变更、隐式目录接管或测试库越界。
 
 ## C · 首个可靠初始化闭环
 
@@ -86,8 +86,8 @@
 
 从受控文件树完成意图、Git 存储和数据库发布的最小服务闭环；此时不连接模型。
 
-- [ ] 首次初始化生成一个源码版本及来源信息；已有工程不可被不同初始化请求静默重置。
-- [ ] Git 在事务外处理，发布事务复查所有权/归档/基线；失败不影响旧当前版本或其他成功操作。
+- [x] 首次初始化生成一个源码版本；已有工程不可被不同初始化请求静默重置。导入来源与模板摘要在 PS10 绑定。
+- [x] Git 在事务外处理，发布事务复查所有权/归档/基线；失败不影响旧当前版本或其他成功操作。
 - 验证：`./mvnw -B -Dit.test=ProjectSourceInitializationIT verify`；测试用完整树含 Vue/Java/SQL，检查授权到读回的完整服务路径。
 - 依赖：PS04、PS06。
 - 文件（5）：`S/SourceInitializer.java`、`S/SourceWorker.java`、`S/SourceRepository.java`、`S/ProjectSourceService.java`、`T/ProjectSourceInitializationIT.java`。
@@ -96,26 +96,36 @@
 
 优先证明跨 Git/数据库失败可解释，再开放更多写入方式。
 
-- [ ] 三个故障窗口分别验证：对象前失败、Git 引用已写但 DB 未发布、DB 已发布但响应丢失；未发布候选不成为当前版本。
-- [ ] 已提交返回原结果；无法确认进入待核对状态并封锁项目，不能靠重新执行掩盖；不自动清理残留引用。
+- [x] 三个故障窗口分别验证：对象前失败、Git 引用已写但 DB 未发布、DB 已发布但响应丢失；未发布候选不成为当前版本。
+- [x] 已提交返回原结果；无法确认进入待核对状态并封锁项目，不能靠重新执行掩盖；不自动清理残留引用。
 - 验证：`./mvnw -B -Dit.test=ProjectSourceRecoveryIT verify`；数据库事务与真实 Git，重建服务对象后检查持久事实。
 - 依赖：PS07。
-- 文件（4）：`S/SourceRecovery.java`、`S/SourceRepository.java`、`S/SourceWorker.java`、`T/ProjectSourceRecoveryIT.java`。
+- 文件（4）：`S/SourceRecovery.java`、`S/SourceRepository.java`、`S/ProjectSourceService.java`、`T/ProjectSourceRecoveryIT.java`。
 
 ### PS09 · 有界调度与平台重启恢复（M）
 
+实施前补充两项 PS08 子切片：代码审阅发现数据库/Git 内容核对不足以证明孤儿 Git 进程已退出，必须持久化执行阻断，不以文件存在代替进程结束。
+
+- [x] PS08a：新增 V019 执行标识/未结束标记及约束、DTO/JDBC 映射；真实数据库证明不可换执行标识、未确认结束不能提交/取消。文件：迁移、`SourceOperation`、`SourceRepository`、`ProjectSourceRepositoryIT`。
+- [x] PS08b1：恢复遇到未结束标记保持待核对，禁止自动重跑。文件：`SourceRecovery`、`ProjectSourceRecoveryIT`。
+- [x] PS08b2：Worker 在 Git 前持久化执行标记，只在本次自有进程确认结束后清除；事务边界也拒绝未结束执行的自动恢复。文件：`SourceWorker`、`ProjectSourceService`、`SourceRepository`、`ProjectSourceInitializationIT`。
+
+以下调度任务依赖 PS08a/b 完成；原进程结束、未知状态停止写入的要求不变。
+
+拆分 PS09a：先实现数据库级单协调者租约及真实连接丢失测试（`SourceCoordinatorLease.java`、`ProjectSourceCoordinatorLeaseIT.java`），避免不同源码根的两个平台误处理同一数据库队列；PS09b 再接调度、队列、停止及测试子进程。后者文件为 `SourceCoordinator.java`、`SourceRepository.java`、`ProjectSourceLifecycleIT.java`、`SourceProcessProbe.java`。
+
 将服务闭环接到单 Worker 生命周期，未完成操作从持久记录识别，不依赖内存 Future。
 
-- [ ] 启用时取得租约并先完成遗留操作核对，再接收新写入；队列满拒绝；关闭不接收新工作且等待自有活动结束。
-- [ ] 模拟执行进程中断并重新启动后仍能解释版本与操作状态；不依据旧 PID 杀进程，不把停止请求当作已停止。
+- [x] 启用时取得租约并先完成遗留操作核对，再接收新写入；队列满拒绝；关闭不接收新工作且等待自有活动结束。
+- [x] 模拟执行进程中断并重新启动后仍能解释版本与操作状态；不依据旧 PID 杀进程，不把停止请求当作已停止。
 - 验证：`./mvnw -B -Dit.test=ProjectSourceLifecycleIT verify`；使用受控 Java 测试子进程和专用临时根，不终止日常平台。
 - 依赖：PS08、PS01。
 - 文件（5）：`S/SourceCoordinator.java`、`S/ProjectSourceService.java`、`S/SourceWorker.java`、`T/ProjectSourceLifecycleIT.java`、`T/SourceProcessProbe.java`。
 
 ### C-PS03 · 持久化闭环检查点
 
-- [ ] 初始化、响应丢失和重启恢复均有真实 Git/数据库证据。
-- [ ] 初始化关闭或失败时旧链路不变；无模型调用、用户工程执行或远程写入。
+- [x] 初始化、响应丢失和重启恢复均有真实 Git/数据库证据。
+- [x] 初始化关闭或失败时旧链路不变；无模型调用、用户工程执行或远程写入。
 
 ## D · 导入、读取与工作副本
 
