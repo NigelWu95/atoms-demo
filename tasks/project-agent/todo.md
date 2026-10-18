@@ -40,11 +40,12 @@
 
 ## PA04 · 任务私有目录
 
-- [ ] 完成 PA04。依赖：PA01、PA03。规模：M（4 文件）。
+- [x] 完成 PA04。依赖：PA01、PA03。规模：M（4 文件）。
 - 描述：建立 config/tmp 与所有权标记，分离源码和运行资料。
 - 验收：专用绝对根、目录 0700/文件 0600，不接管未知目录；拒绝重叠根、链接/替换及 root 真实执行；容量不足拒绝新任务，不自动删除证据。
 - 验证：U(AgentStateDirectoryTest,AgentEnvironmentTest)；临时目录权限与替换反例。
 - 主要文件：`A/AgentStateDirectory.java`；`A/AgentEnvironment.java`；`AT/AgentStateDirectoryTest.java`；`AT/AgentEnvironmentTest.java`。
+- 证据（2026-10-19）：两组测试先因缺类失败；实现后 5 个目录测试 + 3 个环境测试通过。连同已有 Agent/源码环境共 22 单元、4 真实 CLI 离线测试通过，构建成功。覆盖关闭无 I/O/密钥读取、0700/0600、未知/重叠/链接根、目录替换、伪造句柄、重复任务、标记篡改、容量拒绝保留证据和 root 真实执行拒绝。配置与任务目录不构成 OS 沙箱。
 
 ## PA05 · 有界事件解析
 
