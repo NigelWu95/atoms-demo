@@ -21,6 +21,20 @@ class ProjectSourceRecoveryIT extends SourceIntegrationSupport {
             assertThat(recovered.status()).isEqualTo("COMMITTED");
             assertThat(repository.state(project).versionId()).isEqualTo(intent.candidateVersionId());
             assertThat(new SourceInitializer(service).request(owner, project, tree, "crash-window").id()).isEqualTo(intent.id());
+        } else if (crash == SourceWorker.Stage.GIT_STARTED) {
+            try {
+                // A fatal Error escaped before the worker persisted its exit acknowledgement.
+                assertThat(recovered.status()).isEqualTo("NEEDS_RECONCILIATION");
+                assertThat(recovered.executionPending()).isTrue();
+                assertThat(repository.state(project).versionId()).isNull();
+                assertThat(repository.version(project, intent.candidateVersionId())).isNull();
+                assertThatThrownBy(() -> new SourceInitializer(service).request(owner, project, tree, "blocked-retry"))
+                        .isInstanceOf(dev.atoms.demo.common.ApiException.class);
+            } finally {
+                // This in-process test observed Crash after GitProcess.finally confirmed child exit.
+                // Production restart cannot infer that evidence and has no automatic bypass.
+                jdbc.update("UPDATE source_operations SET execution_pending=false WHERE id=?", intent.id());
+            }
         } else {
             assertThat(recovered.status()).isEqualTo("FAILED");
             assertThat(recovered.errorCode()).isEqualTo("SOURCE_INTERRUPTED");
