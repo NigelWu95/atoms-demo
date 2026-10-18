@@ -13,7 +13,7 @@
 | 稳定模块 ID | 职责 | 依赖 | 规格状态 |
 |---|---|---|---|
 | `project-source` | 每项目完整源码 Git 仓库、不可变版本、工作副本、元数据、旧产物显式导入 | 现有项目身份与所有权 | 内部模块已验收、默认关闭；[使用说明](docs/project-source.md)、[测试证据](docs/project-source-verification.md)、[任务清单](tasks/project-source/todo.md) |
-| `project-agent` | Claude Code + DeepSeek 在任务副本中读取及修改 Vue、Java、SQL 等文件，提交可检查的变更 | `project-source` | 待规格评审 |
+| `project-agent` | Claude Code + DeepSeek 在任务副本中读取及修改 Vue、Java、SQL 等文件，提交可检查的变更 | `project-source` | [规格](SPEC-project-agent.md)、[实施计划](tasks/project-agent/plan.md)及[任务清单](tasks/project-agent/todo.md)已确认，开始本地实施；CLI 仅完成非模型探测，尚未完成接入 |
 | `project-execution` | 对固定源码版本测试、构建、启动本机进程；失败保留上一可用结果 | `project-source` | 待规格评审 |
 | `project-delivery` | 实际应用预览、同快照下载、代码版本恢复；明确业务数据边界 | `project-source`、`project-execution` | 待规格评审 |
 | `project-workbench` | 文件树、差异、任务与构建状态、实际进程预览及增量开发入口 | 以上模块 | 待规格评审 |
