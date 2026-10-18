@@ -1,8 +1,8 @@
 # project-agent · 开发任务
 
-状态：2026-10-18，用户已批准连续实施 PA01–PA33，PA01 完成，继续 PA02；PA-LIVE 尚未授权。唯一依据为 [已确认规格](../../SPEC-project-agent.md)和[本模块计划](plan.md)。不重复使用旧 EB/PS 清单，不将旧人工验收勾为完成。
+状态：2026-10-18，用户已批准连续实施 PA01–PA33，PA01/PA02 完成；PA03 在真实 CLI 工具集合兼容性验证中阻断，未进入 PA04。PA-LIVE 尚未授权。唯一依据为 [已确认规格](../../SPEC-project-agent.md)和[本模块计划](plan.md)。不重复使用旧 EB/PS 清单，不将旧人工验收勾为完成。
 
-每项 S=1–2、M=3–5 个主要文件（含测试）；实际超出先拆子任务，不藏进巨型文件。路径缩写：A=backend/src/main/java/dev/atoms/demo/agent，AT=backend/src/test/java/dev/atoms/demo/agent，S/ST=对应 source 包，M=backend/src/main/resources/db/migration，T=templates/full-project-v1。以上新 Agent/模板路径尚待创建。U/I/CLI/ALL/PY/FRONT/BROWSER/DOC 命令定义在计划 §6。
+每项 S=1–2、M=3–5 个主要文件（含测试）；实际超出先拆子任务，不藏进巨型文件。路径缩写：A=backend/src/main/java/dev/atoms/demo/agent，AT=backend/src/test/java/dev/atoms/demo/agent，S/ST=对应 source 包，M=backend/src/main/resources/db/migration，T=templates/full-project-v1。Agent 包已创建，模板目录尚待创建。U/I/CLI/ALL/PY/FRONT/BROWSER/DOC 命令定义在计划 §6。
 
 每项还需满足项目 Definition of Done：新行为有红绿测试、运行证据与失败路径、原功能回归、不泄漏秘密、记录限制。模板静态测试和假模型不是应用可运行证明。检查点不授权新费用、执行用户代码、合并或部署。
 
@@ -31,6 +31,8 @@
 - 验收：使用假 Key 与新临时副本，真实文件发生预期修改；捕获认证方式、模型、工具列表和有效 max_tokens，未达目标即失败而非改期望；仅显式测试 profile 运行，测试夹具不进正式 JAR。
 - 验证：CLI；检查实际请求及文件字节；缺 CLI 或协议不兼容不得跳过算通过。
 - 主要文件：`AT/AgentProtocolFixture.java`；`AT/AgentCliContractIT.java`；`backend/pom.xml`。
+- 阻断证据（2026-10-18）：真实 CLI 2.1.302、假 Key、仅 loopback 服务，逗号分隔及分立 argv 两种写法均完成 Read→Edit→成功 result/退出，文件由 `before\n` 变成 `after\n`，无 permission_denials。每次 3 个请求，认证为 x-api-key、模型 deepseek-flash、max_tokens=128000。但每个请求只包含 Edit/Read，缺少计划要求的 Glob/Grep/Write；CLI 契约测试 **2 失败、0 错误/跳过**，不得下调期望冒充通过。11 个 Agent 单元测试通过；完整旧后端单元回归 224 通过。详细命令与后续选择见 [离线验证记录](../../docs/project-agent-verification.md)。
+- 处理：保留失败测试与 profile 为未提交开发现场；不删除 bare、不开放 Shell/MCP、不安装/升级 CLI、不修改个人配置。更换启动模式或缩减搜索/新增文件契约需要先确认，再重验能力与隔离边界。
 
 ### C-PA01 · CLI 最短往返
 

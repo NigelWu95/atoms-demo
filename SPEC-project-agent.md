@@ -1,8 +1,10 @@
 # Spec: project-agent · Claude Code + DeepSeek 完整工程编辑
 
-状态：2026-10-18，用户已确认规格、[实施计划](tasks/project-agent/plan.md)与[任务清单](tasks/project-agent/todo.md)，开始连续实施 PA01–PA33。检查点用于汇报证据，不重复请求逐项批准；真实付费模型 PA-LIVE、执行生成应用、公开入口和部署仍需另行授权。当前仅完成本机 CLI 非模型探测，不代表接入完成。
+状态：2026-10-18～19，用户已确认规格、[实施计划](tasks/project-agent/plan.md)与[任务清单](tasks/project-agent/todo.md)，授权连续实施 PA01–PA33。检查点用于汇报证据，不重复请求逐项批准；真实付费模型 PA-LIVE、执行生成应用、公开入口和部署仍需另行授权。PA01/PA02 已完成，PA03 离线兼容性检查未通过，尚未完成接入。
 
 模块索引：[完整工程能力地图](FULL-PROJECT-CAPABILITY-MAP.md)。上游：[源码模块](SPEC-project-source.md)。总体方向：[ADR-016](docs/decisions/016-full-project-source-and-coding-agent.md)。本文不是整个工程改造的完成声明，也不是执行生成后端的授权。
+
+实施验证补充（2026-10-18）：PA01/PA02 已实现；PA03 已实测本机 2.1.302 能通过 loopback 假接口完成已有文件读改，实际输出参数为 128000。但 §4.1 当前组合只暴露 Read/Edit，没有 Glob/Grep/Write，尚不满足已确认契约。规格参数保留原批准值，不静默改成更宽权限或更少功能；后续模式调整待确认。见 [完整验证记录](docs/project-agent-verification.md)。
 
 ## 1. 目标与范围
 

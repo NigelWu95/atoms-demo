@@ -2,6 +2,8 @@
 
 状态：2026-10-18，用户已确认本计划，按 [规格](../../SPEC-project-agent.md)连续实施 PA01–PA33；检查点汇报证据，仅遇到新授权需求或兼容性阻断才暂停。PA-LIVE 仍需另行授权。当前分支为 `feature/standalone-engineering`。这不是功能完成、模型联调通过或部署声明。
 
+当前执行位置：PA01/PA02 已通过；PA03 实测 `bare + restricted` 组合只有 Read/Edit，缺少规定的 Glob/Grep/Write，两种参数写法均不满足完整工具契约。依本计划检查点规则暂停该切片，等待启动模式/能力契约调整确认；见 [验证记录](../../docs/project-agent-verification.md)。
+
 ## 1. 交付范围与任务入口
 
 本轮要交付内部的 Claude Code 文件编辑链路：完整源码版 → 工作副本 → Agent 修改 → 确认结束 → 校验封存 → 新源码版，覆盖连续两轮开发、取消、超时、并发冲突与重启恢复。采用已安装 CLI 2.1.302、DeepSeek Anthropic 兼容协议、Java 17 和已有 Git/PG 源码模块；不增加 Agent SDK。
