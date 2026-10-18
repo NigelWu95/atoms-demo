@@ -154,6 +154,34 @@ class WorkspaceHelperTest(unittest.TestCase):
                 target.unlink()
                 target.with_name("old").rename(target)
 
+    def test_staging_requires_existing_project_and_keeps_workspaces_separate(self):
+        project_id = str(uuid.uuid4())
+        self.request["scopeProject"] = project_id
+        with self.assertRaises(OSError):
+            self.helper.handle(self.request)
+        (self.root / project_id).mkdir(mode=0o700)
+        self.request["evidence"] = self.helper.handle(self.request)
+        project = self.root / project_id / "staging" / self.request["task"] / "project"
+        self.assertEqual(b"one", (project / "src/main.txt").read_bytes())
+        self.assertFalse((self.root / self.request["task"]).exists())
+        self.assertEqual([self.file("src/main.txt", b"one")], self.scan())
+        staging = project.parent.parent
+        staging.rename(staging.with_name("old-staging"))
+        staging.mkdir(mode=0o700)
+        with self.assertRaises((OSError, ValueError)):
+            self.scan()
+
+    def test_staging_does_not_adopt_unmarked_existing_container(self):
+        project_id = str(uuid.uuid4())
+        self.request["scopeProject"] = project_id
+        project = self.root / project_id
+        project.mkdir(mode=0o700)
+        (project / "staging").mkdir(mode=0o700)
+        (project / "staging/user-file").write_text("keep")
+        with self.assertRaises((OSError, ValueError)):
+            self.helper.handle(self.request)
+        self.assertEqual(["user-file"], os.listdir(project / "staging"))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -131,7 +131,7 @@ def create(stack, root, request, files, marker):
     return dict(task=identity(os.fstat(task)), project=identity(os.fstat(project)), marker=marker_id)
 
 
-def checked(stack, root, request, marker):
+def checked(stack, root, request, marker, context):
     task = held(stack, request["task"], DIRECTORY_FLAGS, root)
     project = held(stack, "project", DIRECTORY_FLAGS, task)
     fd = held(stack, ".atoms-source-workspace", os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC, task)
@@ -142,11 +142,44 @@ def checked(stack, root, request, marker):
     require(stat.S_IMODE(info.st_mode) == 0o600 and info.st_size == len(marker))
     require(os.read(fd, len(marker) + 1) == marker)
     result = dict(task=identity(os.fstat(task)), project=identity(os.fstat(project)), marker=identity(info))
+    result.update(context)
     require(result == request["evidence"])
     linked(root, request["task"], task)
     linked(task, "project", project)
     linked(task, ".atoms-source-workspace", fd)
     return result, project
+
+
+def scoped_root(stack, root, request):
+    project_id = request.get("scopeProject")
+    if project_id is None:
+        return root, {}, []
+    require(str(uuid.UUID(project_id)) == project_id)
+    repository = held(stack, project_id, DIRECTORY_FLAGS, root)
+    own(os.fstat(repository), True)
+    fresh = False
+    if request["operation"] == "create":
+        try:
+            os.mkdir("staging", 0o700, dir_fd=repository)
+            fresh = True
+        except FileExistsError:
+            pass  # The marker below is mandatory; an existing arbitrary directory is never adopted.
+    staging = held(stack, "staging", DIRECTORY_FLAGS, repository)
+    own(os.fstat(staging), True)
+    name, expected = ".atoms-source-staging", b"atoms-source-staging-v1\n"
+    if fresh:
+        write_file(staging, name, expected, 0o600)
+        os.fsync(staging)
+        os.fsync(repository)
+    marker = held(stack, name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC, staging)
+    info = os.fstat(marker)
+    own(info)
+    require(info.st_size == len(expected) and stat.S_IMODE(info.st_mode) == 0o600)
+    require(os.read(marker, len(expected) + 1) == expected)
+    context = dict(repository=identity(os.fstat(repository)), container=identity(os.fstat(staging)),
+                   containerMarker=identity(info))
+    bindings = [(root, project_id, repository), (repository, "staging", staging), (staging, name, marker)]
+    return staging, context, bindings
 
 
 def stamp(info):
@@ -205,13 +238,20 @@ def handle(request):
     files = validated_files(request) if request["operation"] == "create" else None
     with ExitStack() as stack:
         root = root_fd(stack, request)
-        result = create(stack, root, request, files, marker) if files is not None else checked(stack, root, request, marker)[0]
+        root, context, bindings = scoped_root(stack, root, request)
+        if files is not None:
+            result = create(stack, root, request, files, marker)
+            result.update(context)
+        else:
+            result = checked(stack, root, request, marker, context)[0]
         if request["operation"] == "scan":
-            evidence, project = checked(stack, root, request, marker)
+            evidence, project = checked(stack, root, request, marker, context)
             contents = []
             scan(project, (), contents, [0, 0])
-            checked(stack, root, request, marker)
+            checked(stack, root, request, marker, context)
             result = dict(evidence=evidence, files=contents)
+        for parent, name, child in bindings:
+            linked(parent, name, child)
         # Reopen the absolute chain: a renamed root must not be reported as a successful workspace.
         root_fd(stack, request)
         return result
