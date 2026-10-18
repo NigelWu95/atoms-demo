@@ -1,0 +1,4 @@
+{"type":"system","subtype":"init","tools":["Read","Glob","Grep","Write","Edit"],"mcp_servers":[]}
+{"type":"assistant","message":{"content":[{"type":"text","text":"完成，PRIVATE_RESPONSE_CANARY"},{"type":"tool_use","id":"edit_one","name":"Edit","input":{"file_path":"/private/project/src/App.vue","old_string":"before","new_string":"PRIVATE_SOURCE_CANARY"}}]}}
+{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"edit_one","content":"PRIVATE_TOOL_CANARY","is_error":false}]}}
+{"type":"result","subtype":"success","is_error":false,"permission_denials":[],"num_turns":2,"usage":{"input_tokens":20,"output_tokens":30},"result":"PRIVATE_RESULT_CANARY"}

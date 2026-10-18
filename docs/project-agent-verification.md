@@ -72,3 +72,11 @@ env PATH=/Users/wubingheng/.nvm/versions/node/v24.20.0/bin:$PATH ./mvnw -B \
 红绿：目录类、环境类各自先缺类失败；补齐后目录 5 项、环境 3 项通过。一次测试代码误用了不存在的 Path 断言方法，修正为 Path.startsWith 布尔断言后继续验证，没有跳过用例。最新命令为上述 CLI verify 命令增加 `'-Dtest=Agent*Test,ProjectSourceEnvironmentTest'`，结果 **22 单元 + 4 CLI 集成通过**、0 失败/错误/跳过，2026-10-19 01:04 构建成功。CLI 额外确认 system/init 的工具集合也是同五种。
 
 PA04 不持有运行中的模型进程，不代替后续任务所有权、源码租约及真实模型预算准入。没有日常配置、数据库或远程变更。
+
+## PA05：有界流与真实 CLI 差异
+
+实现逐行严格 UTF-8/JSON 解码，限制单行 4 MiB、总 stdout 64 MiB、4096 事件，只返回工具计数、受校验相对路径和数值 usage。缺结果、冲突结果、工具未结算/错误、权限拒绝、未知能力、越界路径均不能成功；模型正文、源码、thinking、原始错误不进入摘要。
+
+实测纠正了两项初始假设：2.1.302 会在 init 前发送 `system/ui_invalidate`；safe-mode 仍在 init 报告两个 `path=builtin`、`source=<name>@builtin` 的内置模块 cc-plugin-agents-md / cc-plugin-plugin-authoring。先保留失败证据，再添加回归并精确适配，未删除插件校验。未知版本/模块/路径/来源或重复条目仍拒绝；外部插件不放行。新增项目/私有配置 AGENTS.md 与原 CLAUDE.md canary 均未进入假模型请求。依据为已安装 CLI 的离线实测；[官方 safe-mode 说明](https://code.claude.com/docs/en/cli-reference)并不单独证明机器策略或 OS 隔离。
+
+红绿：缺类编译失败 → 单元通过 → 真实 CLI 揭示事件差异 → 精确重现与修正 → 补充未结算工具反例先失败再修正。2026-10-19 01:20，同 PA04 命令得到 **31 单元 + 4 CLI 集成通过，0 失败/错误/跳过**。一次诊断误写测试方法选择器导致 0 测试，未计为通过，随后以正确选择器及整类回归验证。无真实模型、个人配置、日常数据库或远程变更。

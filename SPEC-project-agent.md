@@ -103,6 +103,8 @@ Agent 任务始终绑定非空源码版本和修订号。新项目先完成无�
 
 机器受管策略、加载的工具或 MCP/plugin 状态与批准配置不符时拒绝继续。`system/init` 核对是侦测补充，不是事前防泄漏保证；真实密钥启用前，必须在同机通过无秘密的离线 canary 行为验收。
 
+2026-10-19 实测补充：2.1.302 在 safe-mode 下仍报告 `cc-plugin-agents-md`、`cc-plugin-plugin-authoring` 两个内置模块。解析器仅识别该精确版本及 `path=builtin`、同名 `source=@builtin` 的元数据组合，不接受外部目录插件、未知模块或 MCP/skills。测试中的 CLAUDE.md、AGENTS.md 未被自动加入请求；这不是机器受管策略或 keychain 的完整隔离证明。
+
 ### 4.2 模型、预算与时间
 
 以下均为新模块的拟定配置，不修改现有 `DEEPSEEK_MAX_TOKENS=163840` 默认值、旧生成轮超时或旧调用额度：

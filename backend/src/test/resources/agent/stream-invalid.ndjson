@@ -1,0 +1,2 @@
+{"type":"system","subtype":"init","tools":["Read","Glob","Grep","Write","Edit"],"mcp_servers":[]}
+{"type":"result","subtype":"success","is_error":false,"permission_denials":[{"tool_name":"Read","tool_input":{"file_path":"/outside/PRIVATE_PATH_CANARY"}}]}

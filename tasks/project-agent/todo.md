@@ -1,6 +1,6 @@
 # project-agent · 开发任务
 
-状态：2026-10-19，用户要求一次完成完整本地开发闭环，范围更新见规格 §10。PA01/PA02 完成；PA03 替代模式的四项离线能力检查通过，正式调用参数回归进行中。PA-LIVE 尚未授权。唯一依据为 [已确认规格](../../SPEC-project-agent.md)和[本模块计划](plan.md)。不重复使用旧 EB/PS 清单，不将旧人工验收勾为完成。
+状态：2026-10-19，用户要求一次完成完整本地开发闭环，范围更新见规格 §10。PA01–PA05 完成，继续 PA06 进程生命周期。PA-LIVE 尚未授权。唯一依据为 [已确认规格](../../SPEC-project-agent.md)和[本模块计划](plan.md)。不重复使用旧 EB/PS 清单，不将旧人工验收勾为完成。
 
 每项 S=1–2、M=3–5 个主要文件（含测试）；实际超出先拆子任务，不藏进巨型文件。路径缩写：A=backend/src/main/java/dev/atoms/demo/agent，AT=backend/src/test/java/dev/atoms/demo/agent，S/ST=对应 source 包，M=backend/src/main/resources/db/migration，T=templates/full-project-v1。Agent 包已创建，模板目录尚待创建。U/I/CLI/ALL/PY/FRONT/BROWSER/DOC 命令定义在计划 §6。
 
@@ -49,19 +49,20 @@
 
 ## PA05 · 有界事件解析
 
-- [ ] 完成 PA05。依赖：PA03。规模：M（4 文件）。
+- [x] 完成 PA05。依赖：PA03。规模：M（4 文件，另增强既有 CLI 夹具）。
 - 描述：将 CLI 事件解码为内部结果和平台阶段，不保存原始流。
 - 验收：4 MiB/行、64 MiB stdout、4096 事件等预算按规格执行；缺失/冲突终态、未知终态或权限错误不能成功；丢弃源码、thinking、绝对路径、原始错误和任意模型文本。
 - 验证：U(AgentStreamDecoderTest)；分块 UTF-8、洪泛、截断和敏感 canary 反例。
 - 主要文件：`A/AgentStreamDecoder.java`；`AT/AgentStreamDecoderTest.java`；`backend/src/test/resources/agent/stream-success.ndjson`；`backend/src/test/resources/agent/stream-invalid.ndjson`。
+- 证据：先缺类失败；真实 CLI 揭示 init 前 ui_invalidate 和两个内置模块元数据，精确适配版本/名称/path/source 后验证，不放行外部插件。9 个解析单测，连同环境共 31 单元 + 4 CLI 集成通过。覆盖 UTF-8 拆分、行/总量/事件限制、截断、冲突终态、未结算工具、路径及未知能力；不输出原始正文。新增 AGENTS.md canary 未进入请求。详见验证记录。
 
 ## PA06 · 自有进程生命周期
 
-- [ ] 完成 PA06。依赖：PA02、PA04、PA05。规模：M（3 文件）。
+- [ ] 完成 PA06。依赖：PA02、PA04、PA05。规模：M（4 文件，单独提取共享 deadline）。
 - 描述：将 stdin、并行读流、取消、deadline、退出证据纳入同一拥有者。
 - 验收：只终止本任务持有的进程关系，不按名称/旧 PID 查杀；限制 stderr、等待及收尾，结果与退出同时满足才返回成功；无法证明自有进程全部结束时返回不确定，不发行成功结束证据。
 - 验证：U(AgentProcessTest)；真实受控 Java 子进程覆盖挂起/洪泛/忽略终止/管道未关闭。
-- 主要文件：`A/AgentProcess.java`；`AT/AgentProcessTest.java`；`AT/AgentChildFixture.java`。
+- 主要文件：`A/AgentProcess.java`；`A/AgentDeadline.java`；`AT/AgentProcessTest.java`；`AT/AgentChildFixture.java`。
 
 ### C-PA02 · 进程与流边界
 

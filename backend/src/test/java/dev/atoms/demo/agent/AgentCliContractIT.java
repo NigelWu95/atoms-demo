@@ -29,6 +29,8 @@ class AgentCliContractIT {
             assertThat(Files.readString(fixture.project().resolve("backend/src/main/resources/db/migration/V1__tasks.sql")))
                     .contains("create table tasks");
             assertThat(fixture.configurationCanarySeen()).isFalse();
+            assertThat(fixture.summary().toolCounts()).containsEntry("Write", 3).containsEntry("Edit", 1);
+            assertThat(fixture.summary().paths()).contains("frontend/src/App.vue", "backend/src/main/java/demo/TaskController.java");
         }
     }
 

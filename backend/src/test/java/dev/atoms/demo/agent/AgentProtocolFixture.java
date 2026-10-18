@@ -30,6 +30,7 @@ final class AgentProtocolFixture implements AutoCloseable {
     private final Map<String, ToolResult> toolResults = new java.util.concurrent.ConcurrentHashMap<>();
     private volatile List<Step> steps = List.of();
     private volatile boolean configurationCanarySeen, outsideContentSeen;
+    private AgentStreamDecoder.Summary summary;
     private static final String CONFIG_CANARY = "atoms-fixture-customization-must-not-load";
     private static final String OUTSIDE_CANARY = "atoms-fixture-outside-content-must-not-leak";
     private volatile boolean readReturnedOriginalContent, editReturnedSuccess;
@@ -53,6 +54,7 @@ final class AgentProtocolFixture implements AutoCloseable {
     Map<String, ToolResult> toolResults() { return Map.copyOf(toolResults); }
     boolean configurationCanarySeen() { return configurationCanarySeen; }
     boolean outsideContentSeen() { return outsideContentSeen; }
+    AgentStreamDecoder.Summary summary() { return summary; }
     record ToolResult(boolean error, String content) {}
     private record Step(String id, String name, Map<String, Object> input) {}
     record Request(String apiKey, String model, int maxTokens, List<String> tools, boolean stream,
@@ -66,7 +68,9 @@ final class AgentProtocolFixture implements AutoCloseable {
 
     Result exerciseProjectTools() throws Exception {
         Files.writeString(project.resolve("CLAUDE.md"), CONFIG_CANARY);
+        Files.writeString(project.resolve("AGENTS.md"), CONFIG_CANARY);
         Files.writeString(config.resolve("CLAUDE.md"), CONFIG_CANARY);
+        Files.writeString(config.resolve("AGENTS.md"), CONFIG_CANARY);
         var script = new ArrayList<Step>();
         script.add(new Step("tool_glob", "Glob", Map.of("pattern", "**/*.txt", "path", project.toString())));
         script.add(new Step("tool_grep", "Grep", Map.of("pattern", "before", "path", project.toString(), "output_mode", "content")));
@@ -129,16 +133,41 @@ final class AgentProtocolFixture implements AutoCloseable {
             if (failure != null) throw new AssertionError(failure);
             JsonNode result = null;
             var initialTools = new ArrayList<String>();
+            var eventKinds = new ArrayList<String>();
             for (String line : output.lines().toList()) {
                 JsonNode event = json.readTree(line);
+                eventKinds.add(event.path("type").asText() + "/" + event.path("subtype").asText());
                 if (event.path("type").asText().equals("system") && event.path("subtype").asText().equals("init"))
                     event.path("tools").forEach(tool -> initialTools.add(tool.asText()));
+                if (event.path("type").asText().equals("system") && event.path("subtype").asText().equals("init")) {
+                    for (String field : List.of("mcp_servers", "plugins", "skills"))
+                        eventKinds.add(field + ":" + event.path(field).getNodeType() + ":" + event.path(field).size());
+                    for (var plugin : event.path("plugins")) {
+                        var fields = new ArrayList<String>();
+                        plugin.fieldNames().forEachRemaining(fields::add);
+                        String name = plugin.path("name").asText();
+                        String pluginPath = plugin.path("path").asText();
+                        String location = pluginPath.startsWith(config.toString()) ? "private-config"
+                                : pluginPath.startsWith(cli.getParent().getParent().toString()) ? "cli-install"
+                                : pluginPath.startsWith("/Users/") ? "user-directory"
+                                : pluginPath.startsWith("/Library/") || pluginPath.startsWith("/etc/") ? "system-directory"
+                                : pluginPath.equals("builtin") ? "builtin" : pluginPath.isEmpty() ? "empty" : "other";
+                        String source = plugin.path("source").asText();
+                        eventKinds.add("plugin:" + (name.matches("[a-zA-Z0-9@._-]{1,100}") ? name : "redacted")
+                                + ":fields=" + fields + ":location=" + location
+                                + ":source=" + (source.matches("[a-zA-Z0-9@._-]{1,100}") ? source : "redacted"));
+                    }
+                }
                 if (event.path("type").asText().equals("result")) {
                     if (result != null) throw new AssertionError("Conflicting CLI results");
                     result = event;
                 }
             }
             if (result == null) throw new AssertionError("Missing CLI result; exit=" + process.exitValue());
+            if (result.path("permission_denials").isEmpty() && result.path("subtype").asText().equals("success")) {
+                try { summary = new AgentStreamDecoder(project).read(new java.io.ByteArrayInputStream(output.getBytes(StandardCharsets.UTF_8))); }
+                catch (IOException error) { throw new AssertionError("CLI decoder rejected event kinds " + eventKinds, error); }
+            }
             return new Result(process.exitValue(), result.path("subtype").asText().equals("success")
                     && !result.path("is_error").asBoolean(true), result.path("permission_denials").size(), List.copyOf(initialTools));
         } finally {
