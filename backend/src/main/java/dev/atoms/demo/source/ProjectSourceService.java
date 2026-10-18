@@ -50,6 +50,17 @@ public class ProjectSourceService {
         return value;
     }
 
+    SourceOperation replay(UUID owner, UUID project, SourceRequest request, String idempotencyKey) {
+        requireEnabled();
+        String key = SourceRequest.key(idempotencyKey);
+        return transaction.execute(status -> {
+            writable(projects.lock(owner, project.toString()));
+            var existing = repository.findByKey(project, key);
+            if (existing != null && !existing.requestSha256().equals(request.digest())) throw conflict("SOURCE_IDEMPOTENCY_CONFLICT");
+            return existing;
+        });
+    }
+
     void authorize(UUID owner, UUID project) {
         requireEnabled();
         projects.get(owner, project.toString());

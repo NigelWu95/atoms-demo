@@ -11,12 +11,21 @@ final class SourceCandidateStore {
     private final SourceWorkspaceStore workspaces;
     private final SourceFileSnapshotStore files;
     private final Map<UUID, Entry> issued = new HashMap<>();
+    private final int capacity;
 
     SourceCandidateStore(SourceWorkspaceStore workspaces, ProjectSourceEnvironment environment) {
+        this(workspaces, environment, 64);
+    }
+    SourceCandidateStore(SourceWorkspaceStore workspaces, ProjectSourceEnvironment environment, int capacity) {
+        if (capacity < 1 || capacity > 64) throw new IllegalArgumentException("Invalid candidate capacity");
+        this.capacity = capacity;
         this.workspaces = workspaces; this.files = new SourceFileSnapshotStore(environment);
     }
 
     synchronized SourceCandidate seal(SourceWorkspace workspace) {
+        workspaces.authorize(workspace);
+        if (issued.size() >= capacity) throw ProjectSourceService.conflict("SOURCE_CAPACITY_EXCEEDED");
+        if (issued.values().stream().anyMatch(value -> value.workspace() == workspace)) throw unavailable();
         var tree = workspaces.read(workspace);
         UUID id = UUID.randomUUID();
         var candidate = new SourceCandidate(id, workspace.ownerId(), workspace.projectId(), workspace.taskId(),
@@ -34,6 +43,14 @@ final class SourceCandidateStore {
     }
 
     synchronized void authorize(UUID owner, UUID project, SourceCandidate candidate) { checked(owner, project, candidate); }
+
+    synchronized void release(SourceCandidate candidate) {
+        var entry = candidate == null ? null : issued.get(candidate.id());
+        if (entry != null && entry.candidate() == candidate) {
+            issued.remove(candidate.id());
+            workspaces.release(entry.workspace());
+        }
+    }
 
     synchronized SourceTree read(UUID owner, UUID project, SourceCandidate candidate) {
         var entry = checked(owner, project, candidate);

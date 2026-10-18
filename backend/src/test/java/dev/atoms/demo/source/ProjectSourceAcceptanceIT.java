@@ -10,6 +10,41 @@ import static dev.atoms.demo.source.ProjectSourceInitializationIT.file;
 import static org.assertj.core.api.Assertions.*;
 
 class ProjectSourceAcceptanceIT extends SourceIntegrationSupport {
+    @Test void concurrentRetriesConsumeTheCandidateOnlyOnce() throws Exception {
+        UUID base = initialize();
+        var workspaces = new SourceWorkspaceStore(service, query(), environment);
+        var candidates = new SourceCandidateStore(workspaces, environment);
+        var candidate = candidates.seal(workspaces.prepare(owner, project, base, 1, UUID.randomUUID()));
+        var first = new SourceAcceptance(service, candidates);
+        var second = new SourceAcceptance(service, candidates);
+        var threads = Executors.newFixedThreadPool(2);
+        var start = new java.util.concurrent.CountDownLatch(1);
+        try {
+            var a = threads.submit(() -> { start.await(); return first.prepare(owner, project, candidate, "same-intent"); });
+            var b = threads.submit(() -> { start.await(); return second.prepare(owner, project, candidate, "same-intent"); });
+            start.countDown();
+            var results = List.of(a.get(60, TimeUnit.SECONDS), b.get(60, TimeUnit.SECONDS));
+            assertThat(results).extracting(value -> value.operation().status()).containsOnly("PREPARING");
+            assertThat(results.get(0).operation().id()).isEqualTo(results.get(1).operation().id());
+            assertThat(results.stream().filter(value -> value.tree() != null).toList()).hasSize(1);
+        } finally { threads.shutdownNow(); }
+    }
+
+    @Test void boundedTaskSlotsAreReleasedWithoutDeletingEvidence() throws Exception {
+        UUID base = initialize();
+        var workspaces = new SourceWorkspaceStore(service, query(), environment, 2);
+        var candidates = new SourceCandidateStore(workspaces, environment, 1);
+        var one = workspaces.prepare(owner, project, base, 1, UUID.randomUUID());
+        var two = workspaces.prepare(owner, project, base, 1, UUID.randomUUID());
+        assertThatThrownBy(() -> workspaces.prepare(owner, project, base, 1, UUID.randomUUID())).isInstanceOf(dev.atoms.demo.common.ApiException.class);
+        var candidate = candidates.seal(one);
+        assertThatThrownBy(() -> candidates.seal(two)).isInstanceOf(dev.atoms.demo.common.ApiException.class);
+        new SourceAcceptance(service, candidates).prepare(owner, project, candidate, "release");
+        assertThat(environment.settings().paths().workRoot().resolve(one.taskId().toString())).isDirectory();
+        assertThatThrownBy(() -> workspaces.checked(one)).isInstanceOf(dev.atoms.demo.common.ApiException.class);
+        assertThatCode(() -> workspaces.prepare(owner, project, base, 1, UUID.randomUUID())).doesNotThrowAnyException();
+        assertThatCode(() -> candidates.seal(two)).doesNotThrowAnyException();
+    }
     private SourceQuery query() { return new SourceQuery(service, repository, environment); }
     private SourceTree initial() { return new ProjectSourcePolicy().validate(List.of(file("frontend/App.vue", "<template>one</template>"),
             file("backend/App.java", "class App {}"), file("backend/db/V001.sql", "create table a(id bigint);"), file("README.md", "unchanged"))); }
@@ -31,6 +66,9 @@ class ProjectSourceAcceptanceIT extends SourceIntegrationSupport {
         Files.writeString(directory.resolve("backend/db/V002.sql"), "alter table a add column name text;");
         var candidate = candidates.seal(work);
         var prepared = acceptance.prepare(owner, project, candidate, "second");
+        assertThatThrownBy(() -> candidates.read(owner, project, candidate)).isInstanceOf(dev.atoms.demo.common.ApiException.class);
+        assertThat(acceptance.prepare(owner, project, candidate, "second").operation().id()).isEqualTo(prepared.operation().id());
+        assertThat(acceptance.prepare(owner, project, candidate, "second").tree()).isNull();
         var worker = new SourceWorker(service, repository, environment);
         var result = worker.execute(prepared.operation(), prepared.tree());
         assertThat(result.status()).isEqualTo("COMMITTED");

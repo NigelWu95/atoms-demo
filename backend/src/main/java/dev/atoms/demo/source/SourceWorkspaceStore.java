@@ -13,15 +13,22 @@ final class SourceWorkspaceStore {
     private final SourceQuery query;
     private final ProjectSourceEnvironment environment;
     private final SourceFileSnapshotStore files;
+    private final int capacity;
     private final Map<UUID, Evidence> issued = new HashMap<>();
 
     SourceWorkspaceStore(ProjectSourceService service, SourceQuery query, ProjectSourceEnvironment environment) {
+        this(service, query, environment, 64);
+    }
+    SourceWorkspaceStore(ProjectSourceService service, SourceQuery query, ProjectSourceEnvironment environment, int capacity) {
+        if (capacity < 1 || capacity > 64) throw new IllegalArgumentException("Invalid workspace capacity");
+        this.capacity = capacity;
         this.service = service; this.query = query; this.environment = environment;
         this.files = new SourceFileSnapshotStore(environment);
     }
 
     synchronized SourceWorkspace prepare(UUID owner, UUID project, UUID version, long revision, UUID task) {
         service.writableBase(owner, project, version, revision);
+        if (issued.size() >= capacity) throw ProjectSourceService.conflict("SOURCE_CAPACITY_EXCEEDED");
         var snapshot = query.snapshot(owner, project, version);
         service.writableBase(owner, project, version, revision);
         var handle = new SourceWorkspace(owner, project, java.util.Objects.requireNonNull(task), version, revision, snapshot.tree().sha256());
@@ -53,6 +60,12 @@ final class SourceWorkspaceStore {
     }
 
     synchronized void authorize(SourceWorkspace workspace) { authorized(workspace); }
+
+    synchronized void release(SourceWorkspace workspace) {
+        var entry = workspace == null ? null : issued.get(workspace.taskId());
+        if (entry != null && entry.workspace() == workspace) issued.remove(workspace.taskId());
+        // Release only the in-memory capability. Residual files remain evidence, never automatic cleanup.
+    }
 
     private Evidence authorized(SourceWorkspace workspace) {
         var evidence = workspace == null ? null : issued.get(workspace.taskId());
