@@ -1,6 +1,6 @@
 # project-agent · 开发任务
 
-状态：2026-10-18，用户已批准连续实施 PA01–PA33，开始 PA01；PA-LIVE 尚未授权。唯一依据为 [已确认规格](../../SPEC-project-agent.md)和[本模块计划](plan.md)。不重复使用旧 EB/PS 清单，不将旧人工验收勾为完成。
+状态：2026-10-18，用户已批准连续实施 PA01–PA33，PA01 完成，继续 PA02；PA-LIVE 尚未授权。唯一依据为 [已确认规格](../../SPEC-project-agent.md)和[本模块计划](plan.md)。不重复使用旧 EB/PS 清单，不将旧人工验收勾为完成。
 
 每项 S=1–2、M=3–5 个主要文件（含测试）；实际超出先拆子任务，不藏进巨型文件。路径缩写：A=backend/src/main/java/dev/atoms/demo/agent，AT=backend/src/test/java/dev/atoms/demo/agent，S/ST=对应 source 包，M=backend/src/main/resources/db/migration，T=templates/full-project-v1。以上新 Agent/模板路径尚待创建。U/I/CLI/ALL/PY/FRONT/BROWSER/DOC 命令定义在计划 §6。
 
@@ -8,11 +8,12 @@
 
 ## PA01 · 默认关闭的 Agent 配置
 
-- [ ] 完成 PA01。依赖：用户批准本计划。规模：M（4 文件）。
+- [x] 完成 PA01。依赖：用户批准本计划。规模：M（4 文件）。
 - 描述：建立独立配置读取，不触碰日常私有 env。
 - 验收：禁用时无 I/O、无密钥读取、无进程；启用必须有 CLI/状态根/维护者 UUID；严格校验已批准的 128000 tokens、24 轮及时间预算。
 - 验证：U(AgentSettingsTest)；检查关闭状态不影响既有启动。
 - 主要文件：`A/AgentSettings.java`；`AT/AgentSettingsTest.java`；`backend/src/main/resources/application.yml`；`.env.example`。
+- 证据（2026-10-18）：先运行 U(AgentSettingsTest)，缺少类而失败；实现后配置及源码环境 8 测试通过，全后端 `env PATH=/Users/wubingheng/.nvm/versions/node/v24.20.0/bin:$PATH ./mvnw -B test` 218 通过、0 失败/错误/跳过。Java 17.0.5；无数据库迁移、无真实模型、无私有配置变更。默认关闭，仅新增纯配置读取；目录权限及执行准入仍由后续任务实现。
 
 ## PA02 · 固定 CLI 参数与环境
 

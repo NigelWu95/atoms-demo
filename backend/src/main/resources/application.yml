@@ -24,6 +24,17 @@ spring:
     init:
       mode: never
 atoms:
+  agent:
+    enabled: ${PROJECT_AGENT_ENABLED:false}
+    live-enabled: ${PROJECT_AGENT_LIVE_ENABLED:false}
+    cli: ${PROJECT_AGENT_CLI:}
+    state-root: ${PROJECT_AGENT_STATE_ROOT:}
+    maintainer-ids: ${PROJECT_AGENT_MAINTAINER_IDS:}
+    max-live-runs: ${PROJECT_AGENT_MAX_LIVE_RUNS:0}
+    max-output-tokens: ${PROJECT_AGENT_MAX_OUTPUT_TOKENS:128000}
+    max-turns: ${PROJECT_AGENT_MAX_TURNS:24}
+    task-timeout-seconds: ${PROJECT_AGENT_TASK_TIMEOUT_SECONDS:1800}
+    queue-timeout-seconds: ${PROJECT_AGENT_QUEUE_TIMEOUT_SECONDS:300}
   source:
     enabled: ${PROJECT_SOURCE_ENABLED:false}
     root: ${PROJECT_SOURCE_ROOT:}
