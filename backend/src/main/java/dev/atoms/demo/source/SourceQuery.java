@@ -29,6 +29,10 @@ final class SourceQuery {
     }
 
     Snapshot snapshot(UUID owner, UUID project, UUID versionId) {
+        return snapshot(owner, project, versionId, new SourceDeadline(environment.operationTimeout()));
+    }
+
+    Snapshot snapshot(UUID owner, UUID project, UUID versionId, SourceDeadline deadline) {
         if (TransactionSynchronizationManager.isActualTransactionActive())
             throw new IllegalStateException("Source reads cannot hold a database transaction during Git I/O");
         service.authorize(owner, project);
@@ -38,7 +42,7 @@ final class SourceQuery {
         try {
             var settings = environment.existingSettings();
             var process = new SourceGitProcess(settings.git(), java.time.Duration.ofSeconds(60), handle -> {},
-                    new SourceDeadline(environment.operationTimeout()));
+                    deadline);
             var store = new SourceGitStore(settings.paths(), process, new ProjectSourcePolicy());
             if (!version.commitId().equals(store.reference(project, versionId))) throw new IOException("Source reference mismatch");
             tree = store.read(project, versionId);
@@ -58,8 +62,9 @@ final class SourceQuery {
     }
 
     SourceDiff.Result diff(UUID owner, UUID project, UUID before, UUID after) {
-        var oldTree = snapshot(owner, project, before).tree();
-        var newTree = snapshot(owner, project, after).tree();
+        var deadline = new SourceDeadline(environment.operationTimeout());
+        var oldTree = snapshot(owner, project, before, deadline).tree();
+        var newTree = snapshot(owner, project, after, deadline).tree();
         var result = new SourceDiff().compare(oldTree, newTree);
         service.authorize(owner, project);
         return result;

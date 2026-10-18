@@ -20,13 +20,17 @@ final class SourceStorageBudget {
     }
 
     void check(long anticipated) throws IOException {
+        check(anticipated, new SourceDeadline(Duration.ofSeconds(60)));
+    }
+
+    void check(long anticipated, SourceDeadline deadline) throws IOException {
         if (anticipated < 0) throw new IllegalArgumentException("Invalid source reservation");
+        deadline.remaining(Duration.ofSeconds(60));
         paths.verify();
         Path source = paths.root(), work = paths.workRoot();
         long available = Math.min(Files.getFileStore(source).getUsableSpace(), Files.getFileStore(work).getUsableSpace());
         if (anticipated > maximum || available < reserve || available - reserve < anticipated) throw capacity();
         long[] bytes = {0}, entries = {0};
-        var deadline = new SourceDeadline(Duration.ofSeconds(60));
         Files.walkFileTree(source, EnumSet.noneOf(java.nio.file.FileVisitOption.class), 64, new SimpleFileVisitor<>() {
             private void bounded() throws IOException {
                 deadline.remaining(Duration.ofSeconds(60));

@@ -23,7 +23,9 @@ final class SourceRecovery {
         if (operation.executionPending()) return service.uncertain(operation);
         try {
             var settings = environment.settings();
-            var store = new SourceGitStore(settings.paths(), new SourceGitProcess(settings.git()), new ProjectSourcePolicy());
+            var process = new SourceGitProcess(settings.git(), java.time.Duration.ofSeconds(60), handle -> {},
+                    new SourceDeadline(environment.operationTimeout()));
+            var store = new SourceGitStore(settings.paths(), process, new ProjectSourcePolicy());
             var state = repository.state(project);
             if (state.versionId() != null) validate(repository.version(project, state.versionId()), store);
             var version = repository.version(project, operation.candidateVersionId());

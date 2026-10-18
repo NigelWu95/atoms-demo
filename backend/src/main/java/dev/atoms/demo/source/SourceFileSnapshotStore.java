@@ -12,27 +12,39 @@ import java.util.UUID;
 /** Internal filesystem protocol. Authorization and issuance of capabilities belong to the caller. */
 final class SourceFileSnapshotStore {
     private final ProjectSourceEnvironment environment;
-    SourceFileSnapshotStore(ProjectSourceEnvironment environment) { this.environment = environment; }
+    private final SourceDeadline deadline;
+    SourceFileSnapshotStore(ProjectSourceEnvironment environment) { this(environment, null); }
+    private SourceFileSnapshotStore(ProjectSourceEnvironment environment, SourceDeadline deadline) {
+        this.environment = environment; this.deadline = deadline;
+    }
+
+    SourceFileSnapshotStore withDeadline(SourceDeadline deadline) {
+        return new SourceFileSnapshotStore(environment, java.util.Objects.requireNonNull(deadline));
+    }
 
     Snapshot create(UUID scopeProject, UUID id, String marker, SourceTree input) throws IOException {
+        if (deadline == null) return withDeadline(new SourceDeadline(environment.operationTimeout())).create(scopeProject, id, marker, input);
+        deadline.remaining(environment.operationTimeout());
         var tree = new ProjectSourcePolicy().validate(input.files());
         if (!tree.sha256().equals(input.sha256()) || tree.totalBytes() != input.totalBytes())
             throw new IllegalArgumentException("Source tree metadata mismatch");
-        environment.storageBudget().check(tree.totalBytes() + (tree.files().size() + 1L) * 4096);
+        environment.storageBudget().check(tree.totalBytes() + (tree.files().size() + 1L) * 4096, deadline);
         var request = request(scopeProject, id, marker, "create");
         request.put("files", tree.files().stream().map(file -> Map.of("path", file.path(), "mode", file.mode(),
                 "content", Base64.getEncoder().encodeToString(file.content()))).toList());
         var result = new Snapshot(scopeProject, id, marker, invoke(request));
-        environment.storageBudget().check(0);
+        environment.storageBudget().check(0, deadline);
         check(result);
         return result;
     }
 
     void check(Snapshot snapshot) throws IOException {
+        if (deadline == null) { withDeadline(new SourceDeadline(environment.operationTimeout())).check(snapshot); return; }
         if (!invoke(request(snapshot, "check")).equals(snapshot.identity())) throw ProjectSourcePaths.unavailable();
     }
 
     SourceTree read(Snapshot snapshot) throws IOException {
+        if (deadline == null) return withDeadline(new SourceDeadline(environment.operationTimeout())).read(snapshot);
         var result = invoke(request(snapshot, "scan"));
         if (!result.path("evidence").equals(snapshot.identity()) || !result.path("files").isArray()
                 || result.path("files").size() > 512) throw ProjectSourcePaths.unavailable();
@@ -43,11 +55,15 @@ final class SourceFileSnapshotStore {
             files.add(new SourceTree.File(file.path("path").textValue(), Base64.getDecoder().decode(file.path("content").textValue()),
                     file.path("mode").intValue()));
         }
-        return new ProjectSourcePolicy().validate(files);
+        var tree = new ProjectSourcePolicy().validate(files);
+        deadline.remaining(environment.operationTimeout());
+        return tree;
     }
 
     private JsonNode invoke(Map<String, Object> request) throws IOException {
-        var result = new SourceFileProcess(environment.python()).run(request);
+        var timeout = deadline.remaining(java.time.Duration.ofSeconds(60));
+        var result = new SourceFileProcess(environment.python(), timeout, handle -> {}).run(request);
+        deadline.remaining(environment.operationTimeout());
         environment.existingSettings().paths().verify();
         return result;
     }

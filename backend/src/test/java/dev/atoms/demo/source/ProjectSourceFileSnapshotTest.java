@@ -54,4 +54,21 @@ class ProjectSourceFileSnapshotTest {
                 .withProperty("atoms.source.git", "/usr/bin/git")
                 .withProperty("atoms.source.python", ProjectSourceFileProcessTest.python().toString()));
     }
+
+    @Test void sharedDeadlineIsNotResetBetweenFilesystemSteps() throws Exception {
+        try (var environment = environment()) {
+            var paths = environment.settings().paths();
+            var clock = new java.util.concurrent.atomic.AtomicLong();
+            var deadline = new SourceDeadline(java.time.Duration.ofSeconds(60), clock::get);
+            var store = new SourceFileSnapshotStore(environment).withDeadline(deadline);
+            var tree = new ProjectSourcePolicy().validate(List.of(file("README.md", "one")));
+            var copy = store.create(null, UUID.randomUUID(), "marker", tree);
+            clock.set(java.time.Duration.ofSeconds(61).toNanos());
+            assertThatThrownBy(() -> store.read(copy)).isInstanceOf(SourceDeadline.Expired.class);
+            UUID next = UUID.randomUUID();
+            assertThatThrownBy(() -> store.create(null, next, "marker", tree)).isInstanceOf(SourceDeadline.Expired.class);
+            assertThat(paths.workRoot().resolve(next.toString())).doesNotExist();
+            assertThat(new SourceFileSnapshotStore(environment).read(copy).sha256()).isEqualTo(tree.sha256());
+        }
+    }
 }
