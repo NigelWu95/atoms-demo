@@ -23,7 +23,7 @@ class SourceRepository {
             uuid(r, "expected_version_id"), r.getLong("expected_revision"), uuid(r, "candidate_version_id"), uuid(r, "target_version_id"),
             uuid(r, "legacy_version_id"), r.getString("template_id"), r.getString("template_digest"), r.getString("candidate_sha256"),
             r.getString("status"), r.getBoolean("cancel_requested"), uuid(r, "result_version_id"), r.getString("error_code"),
-            instant(r, "created_at"), instant(r, "finished_at"));
+            instant(r, "created_at"), instant(r, "finished_at"), uuid(r, "execution_id"), r.getBoolean("execution_pending"));
 
     SourceVersion version(UUID project, UUID id) {
         return first(jdbc.query("SELECT * FROM source_versions WHERE project_id=? AND id=?", VERSION, project, id));

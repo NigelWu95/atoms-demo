@@ -2,6 +2,7 @@ package dev.atoms.demo.source;
 
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -64,6 +65,24 @@ class ProjectSourceRepositoryIT {
         jdbc.update("UPDATE source_operations SET status='CANCELLED',finished_at=now() WHERE id=?", operation);
         refused(() -> jdbc.update("UPDATE source_operations SET status='PREPARING',finished_at=NULL WHERE id=?", operation));
         assertThat(repository.operation(project, operation).status()).isEqualTo("CANCELLED");
+    }
+
+    @Test void executionFenceSurvivesUntilConfirmedAndItsIdentityCannotChange() {
+        source(project);
+        UUID operation = UUID.randomUUID(), execution = UUID.randomUUID();
+        insertOperation(operation, UUID.randomUUID(), "e".repeat(64));
+        jdbc.update("UPDATE source_operations SET execution_id=?,execution_pending=true WHERE id=?", execution, operation);
+        var stored = new SourceRepository(jdbc).operation(project, operation);
+        assertThat(stored.executionId()).isEqualTo(execution);
+        assertThat(stored.executionPending()).isTrue();
+        refused(() -> jdbc.update("UPDATE source_operations SET execution_id=? WHERE id=?", UUID.randomUUID(), operation));
+        refused(() -> jdbc.update("UPDATE source_operations SET status='CANCELLED',finished_at=now() WHERE id=?", operation));
+        jdbc.update("UPDATE source_operations SET execution_pending=false WHERE id=?", operation);
+        refused(() -> jdbc.update("UPDATE source_operations SET execution_pending=true WHERE id=?", operation));
+    }
+
+    @AfterEach void finishOnlyThisTestsPendingEvidence() {
+        jdbc.update("UPDATE source_operations SET status='FAILED',finished_at=now() WHERE project_id=? AND status IN ('PREPARING','CANDIDATE_READY')", project);
     }
 
     private void source(UUID id) { jdbc.update("INSERT INTO project_sources(project_id) VALUES (?)", id); }
