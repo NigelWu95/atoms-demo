@@ -37,7 +37,7 @@ final class SourceGitStore {
         Path project = paths.createProject(projectId);
         Path repository = Files.createDirectory(project.resolve("repository.git"),
                 PosixFilePermissions.asFileAttribute(ProjectSourcePaths.DIRECTORY_MODE));
-        git.run(project, List.of("init", "--bare", "--template=", "--object-format=sha1", "repository.git"), EMPTY, 4096);
+        run(project, List.of("init", "--bare", "--template=", "--object-format=sha1", "repository.git"), EMPTY, 4096);
         Files.writeString(repository.resolve("config"), CONFIG, StandardOpenOption.TRUNCATE_EXISTING);
         Files.setPosixFilePermissions(repository.resolve("config"), ProjectSourcePaths.FILE_MODE);
         try (var channel = java.nio.channels.FileChannel.open(project.resolve(".atoms-source-project"),
@@ -68,15 +68,15 @@ final class SourceGitStore {
             String[] names = file.path().split("/");
             Node node = root;
             for (int i = 0; i < names.length - 1; i++) node = node.directories.computeIfAbsent(names[i], unused -> new Node());
-            String blob = oid(git.run(repo, List.of("hash-object", "-w", "--stdin", "--no-filters"), file.content(), 128));
+            String blob = oid(run(repo, List.of("hash-object", "-w", "--stdin", "--no-filters"), file.content(), 128));
             node.entries.put(names[names.length - 1], new Entry(file.mode(), "blob", blob));
         }
         String treeId = writeTree(repo, root);
         var arguments = new ArrayList<>(List.of("commit-tree", treeId));
         if (parent != null) arguments.addAll(List.of("-p", parent));
-        String commit = oid(git.run(repo, arguments, message(versionId, tree.sha256()).getBytes(StandardCharsets.UTF_8), 128));
+        String commit = oid(run(repo, arguments, message(versionId, tree.sha256()).getBytes(StandardCharsets.UTF_8), 128));
         // A zero old value creates only; no ref may ever be moved to different content.
-        git.run(repo, List.of("update-ref", "--no-deref", ref(versionId), commit, "0".repeat(40)), EMPTY, 4096);
+        run(repo, List.of("update-ref", "--no-deref", ref(versionId), commit, "0".repeat(40)), EMPTY, 4096);
         Stored stored = inspect(repo, versionId, commit);
         if (!read(projectId, versionId).sha256().equals(tree.sha256())) throw failure("SOURCE_STORAGE_UNAVAILABLE");
         return stored;
@@ -106,7 +106,7 @@ final class SourceGitStore {
             input.write((Integer.toOctalString(value.mode()) + " " + value.type() + " " + value.oid() + "\t" + entry.getKey() + "\0")
                     .getBytes(StandardCharsets.UTF_8));
         }
-        return oid(git.run(repo, List.of("mktree", "-z"), input.toByteArray(), 128));
+        return oid(run(repo, List.of("mktree", "-z"), input.toByteArray(), 128));
     }
 
     private void readTree(Path repo, String objectId, String prefix, int depth, List<SourceTree.File> files, long[] total) throws IOException {
@@ -156,12 +156,12 @@ final class SourceGitStore {
     }
 
     private byte[] object(Path repo, String type, String id, int limit) throws IOException {
-        String length = text(git.run(repo, List.of("cat-file", "-s", validOid(id)), EMPTY, 32)).strip();
+        String length = text(run(repo, List.of("cat-file", "-s", validOid(id)), EMPTY, 32)).strip();
         final int size;
         try { size = Integer.parseInt(length); }
         catch (NumberFormatException error) { throw failure("SOURCE_STORAGE_UNAVAILABLE"); }
         if (size < 0 || size > limit) throw failure("SOURCE_STORAGE_UNAVAILABLE");
-        byte[] bytes = git.run(repo, List.of("cat-file", type, id), EMPTY, Math.max(1, limit));
+        byte[] bytes = run(repo, List.of("cat-file", type, id), EMPTY, Math.max(1, limit));
         if (bytes.length != size || !gitHash(type, bytes).equals(id)) throw failure("SOURCE_STORAGE_UNAVAILABLE");
         return bytes;
     }
@@ -172,7 +172,7 @@ final class SourceGitStore {
         return value;
     }
     private String reference(Path repo, UUID versionId) throws IOException {
-        String output = text(git.run(repo, List.of("for-each-ref", "--format=%(refname) %(objectname) %(symref)", ref(versionId)), EMPTY, 4096));
+        String output = text(run(repo, List.of("for-each-ref", "--format=%(refname) %(objectname) %(symref)", ref(versionId)), EMPTY, 4096));
         if (output.isEmpty()) return null;
         String expectedPrefix = ref(versionId) + " ";
         if (!output.startsWith(expectedPrefix) || !output.endsWith(" \n")) throw failure("SOURCE_STORAGE_UNAVAILABLE");
@@ -191,6 +191,10 @@ final class SourceGitStore {
                 || !text(readPrivate(repo.resolve("config"), 512)).equals(CONFIG)
                 || Files.exists(repo.resolve("objects/info/alternates"), LinkOption.NOFOLLOW_LINKS)) throw failure("SOURCE_STORAGE_UNAVAILABLE");
         return repo;
+    }
+    private byte[] run(Path directory, List<String> arguments, byte[] input, int limit) throws IOException {
+        paths.verify();
+        return git.run(directory, arguments, input, limit);
     }
     private byte[] readPrivate(Path path, int limit) throws IOException {
         if (!Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS) || Files.size(path) > limit

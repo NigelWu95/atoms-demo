@@ -127,6 +127,30 @@ class ProjectSourceGitStoreTest {
         }
     }
 
+    @Test void rechecksRootIdentityBeforeEveryGitCommandNotOnlyAtTheEnd() throws Exception {
+        Path parent = temporary.toRealPath();
+        UUID project = UUID.randomUUID();
+        try (var paths = new ProjectSourcePaths(parent.resolve("source"), parent.resolve("work"))) {
+            new SourceGitStore(paths, git, policy).initialize(project);
+            var swapped = new java.util.concurrent.atomic.AtomicBoolean();
+            Path replacement = parent.resolve("source").resolve(project.toString()).resolve("repository.git");
+            var replacingGit = new SourceGitProcess(Path.of("/usr/bin/git"), java.time.Duration.ofSeconds(60), handle -> {
+                if (swapped.compareAndSet(false, true)) {
+                    try {
+                        Files.move(parent.resolve("source"), parent.resolve("saved-source"));
+                        Files.createDirectories(replacement.getParent());
+                        git.run(replacement.getParent(), List.of("init", "--bare", "--template=", "repository.git"), new byte[0], 4096);
+                    } catch (IOException error) { throw new java.io.UncheckedIOException(error); }
+                }
+            });
+            var store = new SourceGitStore(paths, replacingGit, policy);
+            assertThatThrownBy(() -> store.save(project, UUID.randomUUID(), null, tree("unchanged"))).isInstanceOf(IOException.class);
+            try (var files = Files.walk(replacement.resolve("objects"))) {
+                assertThat(files.filter(Files::isRegularFile).count()).isZero();
+            }
+        }
+    }
+
     private SourceTree tree(String game) {
         return policy.validate(List.of(file("frontend/src/game.js", game), file("frontend/src/App.vue", "<template>游戏</template>\n"),
                 file("backend/src/Main.java", "class Main {}\n"), file("backend/pom.xml", "<project/>\n"),
