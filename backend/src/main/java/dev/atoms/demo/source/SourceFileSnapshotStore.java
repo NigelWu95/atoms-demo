@@ -18,10 +18,12 @@ final class SourceFileSnapshotStore {
         var tree = new ProjectSourcePolicy().validate(input.files());
         if (!tree.sha256().equals(input.sha256()) || tree.totalBytes() != input.totalBytes())
             throw new IllegalArgumentException("Source tree metadata mismatch");
+        environment.storageBudget().check(tree.totalBytes() + (tree.files().size() + 1L) * 4096);
         var request = request(scopeProject, id, marker, "create");
         request.put("files", tree.files().stream().map(file -> Map.of("path", file.path(), "mode", file.mode(),
                 "content", Base64.getEncoder().encodeToString(file.content()))).toList());
         var result = new Snapshot(scopeProject, id, marker, invoke(request));
+        environment.storageBudget().check(0);
         check(result);
         return result;
     }

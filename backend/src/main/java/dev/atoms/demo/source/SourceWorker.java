@@ -24,15 +24,18 @@ final class SourceWorker {
     synchronized SourceOperation execute(SourceOperation requested, SourceTree input) {
         if (TransactionSynchronizationManager.isActualTransactionActive()) throw new IllegalStateException("Source I/O cannot run in a database transaction");
         try {
+            var deadline = new SourceDeadline(environment.operationTimeout());
             SourceOperation operation = service.prepare(requested.projectId(), requested.id());
             if (operation.terminal()) return operation;
             SourceTree tree = new ProjectSourcePolicy().validate(input.files());
             if (!tree.sha256().equals(operation.candidateSha256()) || !tree.sha256().equals(input.sha256()) || tree.totalBytes() != input.totalBytes())
                 throw ProjectSourceService.conflict("SOURCE_INPUT_CHANGED");
             observer.accept(Stage.BEFORE_GIT);
+            deadline.remaining(java.time.Duration.ofSeconds(60));
             var settings = environment.settings();
+            environment.storageBudget().check(tree.totalBytes() * 2 + (tree.files().size() + 1L) * 4096);
             var process = new SourceGitProcess(settings.git(), java.time.Duration.ofSeconds(60),
-                    handle -> observer.accept(Stage.GIT_STARTED));
+                    handle -> observer.accept(Stage.GIT_STARTED), deadline);
             var store = new SourceGitStore(settings.paths(), process, new ProjectSourcePolicy());
             operation = service.beginExecution(operation.projectId(), operation.id());
             if (operation.terminal()) return operation;
@@ -49,17 +52,23 @@ final class SourceWorker {
                 throw error;
             }
             service.executionSettled(operation.projectId(), operation.id(), operation.executionId());
+            environment.storageBudget().check(0);
             observer.accept(Stage.AFTER_GIT);
             operation = service.ready(operation.projectId(), operation.id());
             if (operation.terminal()) return operation;
             observer.accept(Stage.BEFORE_PUBLISH);
+            deadline.remaining(java.time.Duration.ofSeconds(60));
             SourceOperation result = service.publish(operation.projectId(), operation.id(), stored, tree);
             observer.accept(Stage.AFTER_COMMIT);
             return result;
         } catch (ApiException error) {
             String code = error.code().startsWith("SOURCE_") ? error.code() : "SOURCE_ACCESS_CHANGED";
             return service.fail(requested.projectId(), requested.id(), code, code.equals("SOURCE_STORAGE_UNAVAILABLE"));
+        } catch (SourceDeadline.Expired error) {
+            return service.fail(requested.projectId(), requested.id(), "SOURCE_OPERATION_TIMEOUT", false);
         } catch (IOException error) {
+            if (error instanceof SourceGitProcess.GitFailure && error.getMessage().equals("GIT_TIMEOUT"))
+                return service.fail(requested.projectId(), requested.id(), "SOURCE_OPERATION_TIMEOUT", false);
             return service.fail(requested.projectId(), requested.id(), "SOURCE_STORAGE_UNAVAILABLE", true);
         } catch (IllegalArgumentException error) {
             return service.fail(requested.projectId(), requested.id(), "SOURCE_INPUT_CHANGED", false);

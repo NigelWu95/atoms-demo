@@ -24,6 +24,7 @@ abstract class SourceIntegrationSupport {
     @TempDir Path temporary;
     final UUID owner = UUID.randomUUID(), stranger = UUID.randomUUID(), project = UUID.randomUUID();
     ProjectSourceEnvironment environment;
+    MockEnvironment sourceConfiguration;
     ProjectSourceService service;
 
     @BeforeEach void setup() throws Exception {
@@ -33,10 +34,11 @@ abstract class SourceIntegrationSupport {
         jdbc.update("INSERT INTO guest_users(id) VALUES (?),(?)", owner, stranger);
         jdbc.update("INSERT INTO projects(id,owner_id,name) VALUES (?,?,?)", project, owner, "source-integration");
         Path root = temporary.toRealPath();
-        environment = new ProjectSourceEnvironment(new MockEnvironment().withProperty("atoms.source.enabled", "true")
+        sourceConfiguration = new MockEnvironment().withProperty("atoms.source.enabled", "true")
                 .withProperty("atoms.source.root", root.resolve("source").toString())
                 .withProperty("atoms.source.work-root", root.resolve("work").toString()).withProperty("atoms.source.git", "/usr/bin/git")
-                .withProperty("atoms.source.python", ProjectSourceFileProcessTest.python().toString()));
+                .withProperty("atoms.source.python", ProjectSourceFileProcessTest.python().toString());
+        environment = new ProjectSourceEnvironment(sourceConfiguration);
         service = new ProjectSourceService(projects, repository, transactions, environment);
     }
 

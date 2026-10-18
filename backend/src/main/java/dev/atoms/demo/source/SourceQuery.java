@@ -37,7 +37,9 @@ final class SourceQuery {
         SourceTree tree;
         try {
             var settings = environment.existingSettings();
-            var store = new SourceGitStore(settings.paths(), new SourceGitProcess(settings.git()), new ProjectSourcePolicy());
+            var process = new SourceGitProcess(settings.git(), java.time.Duration.ofSeconds(60), handle -> {},
+                    new SourceDeadline(environment.operationTimeout()));
+            var store = new SourceGitStore(settings.paths(), process, new ProjectSourcePolicy());
             if (!version.commitId().equals(store.reference(project, versionId))) throw new IOException("Source reference mismatch");
             tree = store.read(project, versionId);
             if (!version.treeSha256().equals(tree.sha256()) || version.fileCount() != tree.files().size()
