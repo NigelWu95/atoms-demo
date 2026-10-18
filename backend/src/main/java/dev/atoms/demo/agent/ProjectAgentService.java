@@ -71,6 +71,12 @@ public class ProjectAgentService {
         return config;
     }
     ProjectSourceEditGateway.EditHandle handle(UUID task) { return handles.get(task); }
+    void forgetAfterCommit(UUID task) {
+        if (!TransactionSynchronizationManager.isActualTransactionActive()) throw new IllegalStateException("Task release requires a transaction");
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override public void afterCommit() { handles.remove(task); }
+        });
+    }
     static TaskView view(AgentTask task) {
         return new TaskView(task.id(), task.projectId(), task.status(), task.cancelRequested(), task.baseVersionId(), task.baseRevision(),
                 task.sourceOperationId(), task.resultVersionId(), task.liveReserved(), task.errorCode(), task.createdAt(), task.startedAt(), task.finishedAt());

@@ -28,6 +28,42 @@ class AgentTaskRepository {
         var rows = jdbc.query("SELECT * FROM agent_tasks WHERE project_id=? AND idempotency_sha256=?", ROW, project, key);
         return rows.isEmpty() ? null : rows.get(0);
     }
+    AgentTask lock(UUID id) {
+        requireTransaction();
+        var task = get(id);
+        if (task == null) throw new dev.atoms.demo.common.ApiException(404, "AGENT_TASK_MISSING", "任务不存在。");
+        jdbc.execute("SET LOCAL lock_timeout='3s'");
+        jdbc.queryForObject("SELECT id FROM projects WHERE id=? FOR UPDATE", UUID.class, task.projectId());
+        return jdbc.queryForObject("SELECT * FROM agent_tasks WHERE id=? FOR UPDATE", ROW, id);
+    }
+    AgentTask preparing(AgentTask task) {
+        requireTransaction();
+        if (!task.status().equals("QUEUED")) throw AgentTask.conflict("AGENT_TASK_CONFLICT");
+        jdbc.update("UPDATE agent_tasks SET status='PREPARING',started_at=now() WHERE id=? AND status='QUEUED'", task.id());
+        return get(task.id());
+    }
+    void reserveLive(long maximum) {
+        requireTransaction();
+        if (maximum < 1 || jdbc.update("UPDATE agent_live_budget SET used=used+1 WHERE id AND used<?", maximum) != 1)
+            throw AgentTask.conflict("AGENT_QUOTA_EXHAUSTED");
+    }
+    AgentTask running(AgentTask task, UUID execution, boolean live) {
+        requireTransaction();
+        if (jdbc.update("""
+                UPDATE agent_tasks SET status='RUNNING',execution_id=?,live_reserved=?
+                WHERE id=? AND status='PREPARING' AND execution_id IS NULL AND NOT cancel_requested
+                """, execution, live, task.id()) != 1) throw AgentTask.conflict("AGENT_TASK_CONFLICT");
+        return get(task.id());
+    }
+    AgentTask finish(AgentTask task, String status, String error) {
+        requireTransaction();
+        if (task.terminal()) return task;
+        if (!(AgentTask.TERMINAL.contains(status) || status.equals("NEEDS_RECONCILIATION"))
+                || error != null && !error.matches("(AGENT|SOURCE)_[A-Z_]{1,80}")) throw new IllegalArgumentException("Invalid task result");
+        jdbc.update("UPDATE agent_tasks SET status=?,error_code=?,finished_at=CASE WHEN ? THEN now() ELSE NULL END WHERE id=?",
+                status, error, AgentTask.TERMINAL.contains(status), task.id());
+        return get(task.id());
+    }
     void reserveQueueSlot() {
         requireTransaction();
         jdbc.execute("SELECT pg_catalog.pg_advisory_xact_lock(718395201)");
