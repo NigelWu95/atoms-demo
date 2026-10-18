@@ -82,6 +82,20 @@ class ProjectSourceWorkspaceIT extends SourceIntegrationSupport {
     }
 
     private SourceQuery query() { return new SourceQuery(service, repository, environment); }
+
+    @Test void expiredCallerBudgetCannotBeResetWhileCheckingOrReadingAWorkspace() throws Exception {
+        var tree = new ProjectSourcePolicy().validate(List.of(file("README.md", "unchanged")));
+        var version = publish(project, tree);
+        var store = store();
+        var workspace = store.prepare(owner, project, version, 1, UUID.randomUUID());
+        var clock = new java.util.concurrent.atomic.AtomicLong();
+        var deadline = new SourceDeadline(java.time.Duration.ofSeconds(1), clock::get);
+        clock.set(java.time.Duration.ofSeconds(2).toNanos());
+        assertThatThrownBy(() -> store.checked(workspace, deadline)).isInstanceOf(ApiException.class);
+        assertThatThrownBy(() -> store.read(workspace, deadline)).isInstanceOf(ApiException.class);
+        assertThat(store.read(workspace).sha256()).isEqualTo(tree.sha256());
+        assertThat(query().snapshot(owner, project, version).tree().sha256()).isEqualTo(tree.sha256());
+    }
     private SourceWorkspaceStore store() { return new SourceWorkspaceStore(service, query(), environment); }
     private UUID publish(UUID target, SourceTree tree) {
         var operation = new SourceInitializer(service).request(owner, target, tree, "workspace-initial");

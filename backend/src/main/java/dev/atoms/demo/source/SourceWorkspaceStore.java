@@ -27,13 +27,14 @@ final class SourceWorkspaceStore {
     }
 
     synchronized SourceWorkspace prepare(UUID owner, UUID project, UUID version, long revision, UUID task) {
+        var deadline = new SourceDeadline(environment.operationTimeout());
         service.writableBase(owner, project, version, revision);
         if (issued.size() >= capacity) throw ProjectSourceService.conflict("SOURCE_CAPACITY_EXCEEDED");
-        var snapshot = query.snapshot(owner, project, version);
+        var snapshot = query.snapshot(owner, project, version, deadline);
         service.writableBase(owner, project, version, revision);
         var handle = new SourceWorkspace(owner, project, java.util.Objects.requireNonNull(task), version, revision, snapshot.tree().sha256());
         try {
-            var copy = files.create(null, task, marker(handle), snapshot.tree());
+            var copy = files.withDeadline(deadline).create(null, task, marker(handle), snapshot.tree());
             var evidence = new Evidence(handle, copy);
             service.writableBase(owner, project, version, revision);
             issued.put(task, evidence);
@@ -42,19 +43,27 @@ final class SourceWorkspaceStore {
     }
 
     synchronized Path checked(SourceWorkspace workspace) {
+        return checked(workspace, new SourceDeadline(environment.operationTimeout()));
+    }
+
+    synchronized Path checked(SourceWorkspace workspace, SourceDeadline deadline) {
         var evidence = authorized(workspace);
         service.writableBase(workspace.ownerId(), workspace.projectId(), workspace.versionId(), workspace.revision());
         try {
-            files.check(evidence.snapshot());
+            files.withDeadline(deadline).check(evidence.snapshot());
             return environment.existingSettings().paths().workRoot().resolve(workspace.taskId().toString()).resolve("project");
         } catch (IOException error) { throw unavailable(); }
     }
 
     synchronized SourceTree read(SourceWorkspace workspace) {
-        checked(workspace);
+        return read(workspace, new SourceDeadline(environment.operationTimeout()));
+    }
+
+    synchronized SourceTree read(SourceWorkspace workspace, SourceDeadline deadline) {
+        checked(workspace, deadline);
         try {
-            var tree = files.read(issued.get(workspace.taskId()).snapshot());
-            checked(workspace);
+            var tree = files.withDeadline(deadline).read(issued.get(workspace.taskId()).snapshot());
+            checked(workspace, deadline);
             return tree;
         } catch (IOException | IllegalArgumentException error) { throw unavailable(); }
     }

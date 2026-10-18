@@ -59,7 +59,8 @@ class ProjectSourceCandidateTest {
         var service = mock(ProjectSourceService.class);
         var query = mock(SourceQuery.class);
         var initial = new ProjectSourcePolicy().validate(List.of(file("README.md", "initial")));
-        when(query.snapshot(owner, project, version)).thenReturn(new SourceQuery.Snapshot(null, initial));
+        when(query.snapshot(eq(owner), eq(project), eq(version), any(SourceDeadline.class)))
+                .thenReturn(new SourceQuery.Snapshot(null, initial));
         var workspaces = new SourceWorkspaceStore(service, query, environment);
         return new Fixture(environment, workspaces, new SourceCandidateStore(workspaces, environment));
     }
