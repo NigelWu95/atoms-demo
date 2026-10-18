@@ -60,6 +60,15 @@ class SourceRepository {
         jdbc.execute("SET LOCAL lock_timeout='3s'");
         jdbc.queryForList("SELECT id FROM projects WHERE id=? FOR UPDATE", UUID.class, project);
     }
+    SourceOperation beginExecution(SourceOperation operation, UUID execution) {
+        int updated = jdbc.update("UPDATE source_operations SET execution_id=?,execution_pending=true WHERE id=? AND execution_id IS NULL AND status='PREPARING'",
+                execution, operation.id());
+        if (updated != 1) throw ProjectSourceService.conflict("SOURCE_NEEDS_RECONCILIATION");
+        return operation(operation.projectId(), operation.id());
+    }
+    void executionSettled(SourceOperation operation, UUID execution) {
+        jdbc.update("UPDATE source_operations SET execution_pending=false WHERE id=? AND execution_id=?", operation.id(), execution);
+    }
     SourceOperation ready(SourceOperation operation) {
         jdbc.update("UPDATE source_operations SET status='CANDIDATE_READY' WHERE id=? AND status='PREPARING'", operation.id());
         return operation(operation.projectId(), operation.id());

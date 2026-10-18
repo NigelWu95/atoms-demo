@@ -32,10 +32,21 @@ final class SourceWorker {
             observer.accept(Stage.BEFORE_GIT);
             var settings = environment.settings();
             var store = new SourceGitStore(settings.paths(), new SourceGitProcess(settings.git()), new ProjectSourcePolicy());
-            if (operation.expectedVersionId() == null
-                    && !Files.exists(settings.paths().root().resolve(operation.projectId().toString()), LinkOption.NOFOLLOW_LINKS))
-                store.initialize(operation.projectId());
-            var stored = store.save(operation.projectId(), operation.candidateVersionId(), operation.expectedVersionId(), tree);
+            operation = service.beginExecution(operation.projectId(), operation.id());
+            if (operation.terminal()) return operation;
+            final SourceGitStore.Stored stored;
+            try {
+                if (operation.expectedVersionId() == null
+                        && !Files.exists(settings.paths().root().resolve(operation.projectId().toString()), LinkOption.NOFOLLOW_LINKS))
+                    store.initialize(operation.projectId());
+                stored = store.save(operation.projectId(), operation.candidateVersionId(), operation.expectedVersionId(), tree);
+            } catch (IOException error) {
+                // The Git adapter confirms exit in finally. Explicitly unsettled I/O/processes retain the durable fence.
+                if (!(error instanceof SourceGitProcess.GitFailure && error.getMessage().contains("UNSETTLED")))
+                    service.executionSettled(operation.projectId(), operation.id(), operation.executionId());
+                throw error;
+            }
+            service.executionSettled(operation.projectId(), operation.id(), operation.executionId());
             observer.accept(Stage.AFTER_GIT);
             operation = service.ready(operation.projectId(), operation.id());
             if (operation.terminal()) return operation;
@@ -49,6 +60,9 @@ final class SourceWorker {
             return service.fail(requested.projectId(), requested.id(), "SOURCE_STORAGE_UNAVAILABLE", true);
         } catch (IllegalArgumentException error) {
             return service.fail(requested.projectId(), requested.id(), "SOURCE_INPUT_CHANGED", false);
+        } catch (RuntimeException error) {
+            // Unknown execution outcomes remain fenced. Do not log raw exceptions containing paths/source/config.
+            return service.fail(requested.projectId(), requested.id(), "SOURCE_EXECUTION_UNCERTAIN", true);
         }
     }
 }

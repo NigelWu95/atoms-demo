@@ -18,6 +18,8 @@ class ProjectSourceInitializationIT extends SourceIntegrationSupport {
         });
         var completed = worker.execute(operation, tree);
         assertThat(completed.status()).isEqualTo("COMMITTED");
+        assertThat(completed.executionId()).isNotNull();
+        assertThat(completed.executionPending()).isFalse();
         var version = repository.version(project, completed.resultVersionId());
         assertThat(version.versionNo()).isEqualTo(1);
         assertThat(version.treeSha256()).isEqualTo(tree.sha256());

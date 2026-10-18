@@ -56,7 +56,7 @@ public class ProjectSourceService {
             if (operation.terminal()) return operation;
             writable(projects.lock(operation.ownerId(), project.toString()));
             requireBase(repository.state(project), operation.expectedVersionId(), operation.expectedRevision());
-            if (!operation.status().equals("PREPARING")) throw conflict("SOURCE_NEEDS_RECONCILIATION");
+            if (!operation.status().equals("PREPARING") || operation.executionId() != null) throw conflict("SOURCE_NEEDS_RECONCILIATION");
             return operation.cancelRequested() ? repository.finish(operation, "CANCELLED", "SOURCE_CANCELLED") : operation;
         });
     }
@@ -69,6 +69,26 @@ public class ProjectSourceService {
             requireBase(repository.state(project), operation.expectedVersionId(), operation.expectedRevision());
             if (operation.cancelRequested()) return repository.finish(operation, "CANCELLED", "SOURCE_CANCELLED");
             return repository.ready(operation);
+        });
+    }
+
+    SourceOperation beginExecution(UUID project, UUID id) {
+        return transaction.execute(status -> {
+            var operation = lockedOperation(project, id);
+            if (operation.terminal()) return operation;
+            writable(projects.lock(operation.ownerId(), project.toString()));
+            requireBase(repository.state(project), operation.expectedVersionId(), operation.expectedRevision());
+            if (operation.cancelRequested()) return repository.finish(operation, "CANCELLED", "SOURCE_CANCELLED");
+            if (operation.executionId() != null || !operation.status().equals("PREPARING")) throw conflict("SOURCE_NEEDS_RECONCILIATION");
+            return repository.beginExecution(operation, UUID.randomUUID());
+        });
+    }
+
+    void executionSettled(UUID project, UUID id, UUID execution) {
+        transaction.executeWithoutResult(status -> {
+            var operation = lockedOperation(project, id);
+            if (execution == null || !execution.equals(operation.executionId())) throw conflict("SOURCE_NEEDS_RECONCILIATION");
+            repository.executionSettled(operation, execution);
         });
     }
 
@@ -92,7 +112,7 @@ public class ProjectSourceService {
         return transaction.execute(status -> {
             var operation = lockedOperation(project, id);
             if (operation.terminal()) return operation;
-            return repository.finish(operation, uncertain ? "NEEDS_RECONCILIATION" : "FAILED", code);
+            return repository.finish(operation, uncertain || operation.executionPending() ? "NEEDS_RECONCILIATION" : "FAILED", code);
         });
     }
 
@@ -100,7 +120,7 @@ public class ProjectSourceService {
         return transaction.execute(status -> {
             var current = lockedOperation(observed.projectId(), observed.id());
             if (current.terminal()) return current;
-            if (!current.status().equals(observed.status()) || repository.version(current.projectId(), current.candidateVersionId()) != null)
+            if (current.executionPending() || !current.status().equals(observed.status()) || repository.version(current.projectId(), current.candidateVersionId()) != null)
                 throw conflict("SOURCE_NEEDS_RECONCILIATION");
             var result = repository.finish(current, current.cancelRequested() ? "CANCELLED" : "FAILED",
                     current.cancelRequested() ? "SOURCE_CANCELLED" : "SOURCE_INTERRUPTED");
