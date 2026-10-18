@@ -42,10 +42,17 @@ public final class ProjectSourcePolicy {
         if (input == null || input.isEmpty() || input.size() > limits.files()) throw rejected();
         long total = 0;
         var names = new HashSet<String>();
+        var components = new java.util.HashMap<String, String>();
         for (var file : input) {
             if (file == null || file.size() > limits.fileBytes()) throw rejected();
             validatePath(file.path());
             if (!names.add(file.path().toLowerCase(Locale.ROOT))) throw rejected();
+            String prefix = "";
+            for (String part : file.path().split("/")) {
+                prefix = prefix.isEmpty() ? part : prefix + "/" + part;
+                String prior = components.putIfAbsent(prefix.toLowerCase(Locale.ROOT), prefix);
+                if (prior != null && !prior.equals(prefix)) throw rejected();
+            }
             if (file.mode() != 0100644 && !(file.mode() == 0100755 && file.path().equals("backend/mvnw"))) throw rejected();
             total += file.size();
             if (total > limits.treeBytes()) throw rejected();

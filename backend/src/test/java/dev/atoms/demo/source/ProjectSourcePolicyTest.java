@@ -36,6 +36,7 @@ class ProjectSourcePolicyTest {
 
     @Test void rejectsCaseAliasesFileDirectoryCollisionsAndInvalidText() {
         for (var files : List.of(List.of(file("A.java", "one"), file("a.java", "two")),
+                List.of(file("Frontend/a.js", "one"), file("frontend/b.js", "two")),
                 List.of(file("a", "one"), file("a/b", "two")), List.of(file("a", "one"), file("a", "two")),
                 List.of(new SourceTree.File("data.txt", new byte[]{(byte) 0xff}, 0100644)),
                 List.of(file("image.txt", "abc\0def")))) {
