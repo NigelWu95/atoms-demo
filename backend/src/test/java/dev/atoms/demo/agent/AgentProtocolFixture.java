@@ -66,6 +66,20 @@ final class AgentProtocolFixture implements AutoCloseable {
         return run(separateToolArguments);
     }
 
+    AgentProcess.Result editWithProcessOwner() throws Exception {
+        steps = editSteps();
+        var identity = AgentCliProbe.verify(cli, config, temporary);
+        var settings = new AgentSettings.Configuration(identity.path(), config.getParent(), Set.of(UUID.randomUUID()),
+                false, 0, 128000, 24, Duration.ofSeconds(1800), Duration.ofSeconds(300));
+        var builder = AgentInvocation.create(identity.path(), settings, project, config, temporary, "offline-fixture-key");
+        builder.environment().put("ANTHROPIC_BASE_URL", "http://127.0.0.1:" + server.getAddress().getPort() + "/anthropic");
+        identity.verifyUnchanged();
+        var result = new AgentProcess().run(builder, "Read hello.txt and replace before with after.",
+                new AgentDeadline(Duration.ofSeconds(45)), () -> false);
+        if (failure != null) throw new AssertionError(failure);
+        return result;
+    }
+
     Result exerciseProjectTools() throws Exception {
         Files.writeString(project.resolve("CLAUDE.md"), CONFIG_CANARY);
         Files.writeString(project.resolve("AGENTS.md"), CONFIG_CANARY);

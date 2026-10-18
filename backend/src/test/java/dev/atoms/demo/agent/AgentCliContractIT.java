@@ -13,6 +13,16 @@ import static org.assertj.core.api.Assertions.*;
 class AgentCliContractIT {
     @TempDir Path temporary;
 
+    @Test void installedCliRunsThroughProductionProcessOwner() throws Exception {
+        try (var fixture = new AgentProtocolFixture(temporary.toRealPath(), installedCli())) {
+            var result = fixture.editWithProcessOwner();
+            assertThat(result.stopped()).isNotNull();
+            assertThat(result.summary().toolCounts()).containsEntry("Read", 1).containsEntry("Edit", 1);
+            assertThat(Files.readString(fixture.project().resolve("hello.txt"))).isEqualTo("after\n");
+            assertThat(fixture.requests()).hasSize(3);
+        }
+    }
+
     @Test void installedCliSearchesAndCreatesFrontendBackendAndMigrationFiles() throws Exception {
         try (var fixture = new AgentProtocolFixture(temporary.toRealPath(), installedCli())) {
             var result = fixture.exerciseProjectTools();

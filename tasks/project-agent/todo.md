@@ -1,6 +1,6 @@
 # project-agent · 开发任务
 
-状态：2026-10-19，用户要求一次完成完整本地开发闭环，范围更新见规格 §10。PA01–PA05 完成，继续 PA06 进程生命周期。PA-LIVE 尚未授权。唯一依据为 [已确认规格](../../SPEC-project-agent.md)和[本模块计划](plan.md)。不重复使用旧 EB/PS 清单，不将旧人工验收勾为完成。
+状态：2026-10-19，用户要求一次完成完整本地开发闭环，范围更新见规格 §10。PA01–PA06 完成，继续 PA07 源码编辑租约。PA-LIVE 尚未授权。唯一依据为 [已确认规格](../../SPEC-project-agent.md)和[本模块计划](plan.md)。不重复使用旧 EB/PS 清单，不将旧人工验收勾为完成。
 
 每项 S=1–2、M=3–5 个主要文件（含测试）；实际超出先拆子任务，不藏进巨型文件。路径缩写：A=backend/src/main/java/dev/atoms/demo/agent，AT=backend/src/test/java/dev/atoms/demo/agent，S/ST=对应 source 包，M=backend/src/main/resources/db/migration，T=templates/full-project-v1。Agent 包已创建，模板目录尚待创建。U/I/CLI/ALL/PY/FRONT/BROWSER/DOC 命令定义在计划 §6。
 
@@ -58,15 +58,16 @@
 
 ## PA06 · 自有进程生命周期
 
-- [ ] 完成 PA06。依赖：PA02、PA04、PA05。规模：M（4 文件，单独提取共享 deadline）。
+- [x] 完成 PA06。依赖：PA02、PA04、PA05。规模：M（4 文件，另复用 PA03 的两个 CLI 夹具文件）。
 - 描述：将 stdin、并行读流、取消、deadline、退出证据纳入同一拥有者。
 - 验收：只终止本任务持有的进程关系，不按名称/旧 PID 查杀；限制 stderr、等待及收尾，结果与退出同时满足才返回成功；无法证明自有进程全部结束时返回不确定，不发行成功结束证据。
 - 验证：U(AgentProcessTest)；真实受控 Java 子进程覆盖挂起/洪泛/忽略终止/管道未关闭。
 - 主要文件：`A/AgentProcess.java`；`A/AgentDeadline.java`；`AT/AgentProcessTest.java`；`AT/AgentChildFixture.java`。
+- 证据：先缺类失败，9 项真实 Java 子进程测试通过：正常/非零退出、截断、两种流洪泛、过期不启动、取消不杀旁路进程、忽略 TERM、子进程占管道、stdin 阻塞、无法枚举时不发结束证据。真实 CLI 经正式进程拥有者完成 Read/Edit；40 单元 + 5 CLI 集成通过。沙箱禁进程枚举导致失败后按权限重跑，不削弱检查。
 
 ### C-PA02 · 进程与流边界
 
-- [ ] 前三项实际通过，补记具体命令、数量、失败/跳过、进程和版本证据；检查未扩大权限并审阅变更。向用户汇报，按批准的连续实施范围推进；验收不成立则暂停该切片，不扩大权限或把未测项记为通过。
+- [x] C-PA02：目录、有界流、进程生命周期通过，40 单元 + 5 CLI 集成、0 失败/错误/跳过；仅本机假服务和受控 Java 夹具。无 Shell/MCP、个人配置、真实 Key 或部署变更。仍不宣称 OS 沙箱或后台任务集成完成，继续 PA07。
 
 ## PA07 · 源码编辑租约持久化
 
