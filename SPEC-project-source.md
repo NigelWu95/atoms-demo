@@ -1,6 +1,6 @@
 # Spec: project-source · 完整工程源码与不可变版本
 
-状态：用户已于 2026-10-18 确认规格并授权按整体计划连续实施；功能开发中，未完成验收。对应 [完整工程能力地图](FULL-PROJECT-CAPABILITY-MAP.md)。
+状态：2026-10-18，`project-source` 内部源码管理已实现并通过本地全量验收，默认关闭、未部署。详见 [使用说明](docs/project-source.md)、[验收记录](docs/project-source-verification.md) 与 [完整工程能力地图](FULL-PROJECT-CAPABILITY-MAP.md)。后续 Coding Agent、执行、交付和工作台模块尚未实现。
 
 用户已同意将本模块计划和任务单独存放在 [实施计划](tasks/project-source/plan.md) 与 [任务清单](tasks/project-source/todo.md)，不覆盖原任务记录。
 
@@ -26,11 +26,11 @@
 
 ## 3. 存储结构与事实来源
 
-下面是计划中的结构，不是已经创建的文件夹：
+源码根和任务副本结构已实现；Agent 配置、构建和运行目录仍由后续模块负责。本轮只在测试临时目录验证，未启用日常或线上源码根：
 
 ```text
 <source-root>/<project-uuid>/repository.git/  正式 bare Git 仓库
-<source-root>/<project-uuid>/staging/<operation-uuid>/  平台受控临时输入
+<source-root>/<project-uuid>/staging/<candidate-uuid>/project/  平台受控临时输入
 <agent-work-root>/<task-uuid>/project/        后续 Agent 的普通文件副本
 <agent-config-root>/<task-uuid>/             后续 Agent 私有配置及会话
 <build-root>/<build-uuid>/                   现有/后续构建工作区
@@ -45,7 +45,7 @@
 
 ### 3.1 数据库增量结构
 
-拟新增以下表，实际 Flyway 编号在实现前重新检查；当前最后一个迁移为 V017。批准本规格代表同意设计这些增量表，不代表同意在远程数据库执行迁移。
+以下三张表已通过 V018 在专用测试库创建，V019 追加执行阻断约束；未修改旧迁移，也未在日常/远程数据库执行本轮迁移。
 
 | 表 | 主要数据 | 约束 |
 |---|---|---|
@@ -58,7 +58,7 @@
 ### 3.2 文件与大小策略
 
 - 允许完整目录树和前端/后端/SQL/非敏感配置文件。首期支持 UTF-8 文本源码及文本静态资源；二进制资源上传另行设计，不静默丢弃无法支持的文件。
-- 默认拟定：最多 512 个文件、单文件 2 MiB、整棵树 16 MiB、路径最多 240 个 UTF-8 字节及 16 层。均为新模块待验证的可配置预算，不修改旧三文件产物的限制；超限明确拒绝，不截断或自动减功能。
+- 首版固定策略：最多 512 个文件、单文件 2 MiB、整棵树 16 MiB、路径最多 240 个 UTF-8 字节及 16 层。不修改旧三文件产物限制；超限明确拒绝，不截断或自动减功能。磁盘准入及操作时限通过独立运行配置控制；文件策略尚未开放动态配置。
 - 拒绝绝对路径、空路径分量、`.`、`..`、反斜杠、控制字符、大小写折叠冲突，以及符号链接、硬链接、子模块和非普通文件。读取时仍检查真实路径及文件类型，不能只做一次字符串前缀判断。
 - 不收录 `.git`、Agent 配置目录、依赖缓存、构建结果、日志及运行数据。拒绝 `.env` 等实际凭据文件、私钥和已知敏感配置；允许经过内容检查的无秘密示例配置。扫描不能证明任意文本绝不含秘密，界面及文档必须保留此边界。
 - 保留经过策略允许的文件模式；可执行位只允许初始化模板中明确列出的启动/构建脚本。保存源码不授予这些脚本执行权限。
@@ -125,7 +125,7 @@ public interface ProjectSourceService {
 }
 ```
 
-以上是拟定的契约示例，不是当前可编译实现。`SourceCandidate` 必须是平台校验后产生的不可伪造内部句柄，不能只凭模型提供的路径或哈希接受版本。初始化与接受返回持久操作状态，不要求 HTTP/调用线程等待磁盘处理完成。
+以上保留原设计的契约示例，不是当前可编译接口。实际实现按读取、物化、封存、接受、恢复和协调者拆分，见 [使用说明中的内部入口](docs/project-source.md#内部调用顺序)。`SourceCandidate` 使用发行者实例身份及绑定数据核对，不能只凭模型提供的路径或哈希接受版本。初始化与接受返回持久操作状态，不要求 HTTP/调用线程等待磁盘处理完成。
 
 Java 按现有代码采用四空格、构造器注入、窄职责类；避免持有数据库事务执行 Git 或复制大文件。文件树及差异 DTO 只包含相对路径、大小、模式和摘要等必要字段；数据库 SQL 全部使用绑定参数。
 
@@ -139,13 +139,13 @@ templates/                                       复用受控初始化素材
 docs/decisions/016-full-project-source-and-coding-agent.md
 ```
 
-以下命令在实现对应测试后执行；本次未运行测试、启动平台或修改数据库：
+以下为源码模块检查命令；实际运行结果见 [验收记录](docs/project-source-verification.md)。集成测试只使用专用测试库，不是日常平台启动说明：
 
 ```sh
 cd /Users/wubingheng/atoms-demo/backend
-./mvnw -B -Dtest=ProjectSourcePolicyTest,ProjectSourceServiceTest test
+./mvnw -B -Dtest=ProjectSourcePolicyTest,ProjectSourceFileSnapshotTest test
 ./mvnw -B verify
-./mvnw -B spring-boot:run
+python3 -I -S -B src/test/python/test_workspace_helper.py
 ```
 
 集成测试必须显式连接项目既有的专用测试数据库，不能复用日常或线上用户数据。完整平台回归涉及前端时再执行：

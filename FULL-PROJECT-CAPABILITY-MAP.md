@@ -1,18 +1,18 @@
 # 完整源码工程与 Coding Agent · 能力地图
 
-状态：2026-10-18，模块边界和建设方向已获用户确认；详细规格逐模块评审。本文不是已实现或已部署声明。
+状态：2026-10-18，`project-source` 内部模块已实现并通过本地验收，默认关闭；后续模块仍需逐模块评审。本文不是整体改造完成或已部署声明。
 
 ## 目标与现状
 
 让用户描述需求后得到可持续修改的完整 Vue + Spring Boot 17 + PostgreSQL 工程，包含实际前端、后端业务接口和数据库迁移。预览运行该工程的构建结果，下载提供对应的同一份源码快照。
 
-当前实现仍是模型生成 `view.html`、`styles.css`、`main.js`，数据库保存不可变产物，再与固定工程模板组装。已有工程下载和本机运行不等于已经支持任意后端业务代码生成。
+当前网页生成链路仍是模型生成 `view.html`、`styles.css`、`main.js`，数据库保存不可变产物，再与固定工程模板组装。新源码模块已能在磁盘 Git 管理完整 Vue/Java/SQL 树及其增量版本，但尚未接到模型或网页。已有工程下载和本机运行不等于已经支持任意后端业务代码生成。
 
 原有固定模板能力与验收记录保留在 [原能力地图](CAPABILITY-MAP.md)。本地图描述新模式，不追溯修改旧模式的功能及安全结论。
 
 | 稳定模块 ID | 职责 | 依赖 | 规格状态 |
 |---|---|---|---|
-| `project-source` | 每项目完整源码 Git 仓库、不可变版本、工作副本、元数据、旧产物显式导入 | 现有项目身份与所有权 | [规格已确认](SPEC-project-source.md)；[计划已批准，开发中](tasks/project-source/plan.md)；[任务清单](tasks/project-source/todo.md) |
+| `project-source` | 每项目完整源码 Git 仓库、不可变版本、工作副本、元数据、旧产物显式导入 | 现有项目身份与所有权 | 内部模块已验收、默认关闭；[使用说明](docs/project-source.md)、[测试证据](docs/project-source-verification.md)、[任务清单](tasks/project-source/todo.md) |
 | `project-agent` | Claude Code + DeepSeek 在任务副本中读取及修改 Vue、Java、SQL 等文件，提交可检查的变更 | `project-source` | 待规格评审 |
 | `project-execution` | 对固定源码版本测试、构建、启动本机进程；失败保留上一可用结果 | `project-source` | 待规格评审 |
 | `project-delivery` | 实际应用预览、同快照下载、代码版本恢复；明确业务数据边界 | `project-source`、`project-execution` | 待规格评审 |

@@ -1,6 +1,6 @@
 # project-source · 开发任务
 
-状态：2026-10-18，用户已授权连续实施；PS01–PS12（含执行阻断补充）、C-PS01/02/03/04 已验证。用户批准的 Python 文件工具已解决 PS12 本机兼容性问题；PS13 实施中，其余未开始。证据见 [验证记录](../../docs/project-source-verification.md)。唯一计划入口为 [plan.md](plan.md)，规格见 [SPEC-project-source.md](../../SPEC-project-source.md)。原任务清单不变。
+状态：2026-10-18，PS01–PS20 与 C-PS01–07 已完成本地实现、回归和文档交接。源码模块默认关闭，未接入真实 Coding Agent 或新生成后端执行，未推送/部署。证据见 [验证记录](../../docs/project-source-verification.md)。唯一计划入口为 [plan.md](plan.md)，规格见 [SPEC-project-source.md](../../SPEC-project-source.md)。原任务清单不变。
 
 路径缩写：`S` = `backend/src/main/java/dev/atoms/demo/source/`；`T` = `backend/src/test/java/dev/atoms/demo/source/`；`R` = `backend/src/main/resources/`。所有缩写文件名均为拟新增/修改位置，不代表已存在。每项列出的主实现和测试文件不超过五个，若实际超出，先拆分任务。
 
@@ -245,16 +245,22 @@
 
 实际 PS18c 另更新共用测试配置 `SourceIntegrationSupport` 与读取时限 `SourceQuery`，共 5 个文件。PS18d1：候选读取完成后释放内存句柄、保留磁盘证据，重复请求先查询持久记录（`ProjectSourceService`、`SourceAcceptance`、`SourceWorkspaceStore`、`SourceCandidateStore`、`ProjectSourceAcceptanceIT`，5 个文件）。PS18d2：统一调度提交入口与真实旅程（`SourceCoordinator`、`ProjectSourceJourneyIT`，2 个文件）。
 
-- [ ] 队列/根容量/空间准入生效；模拟磁盘写失败不发布损坏版本；不自动删历史或未知目录。
-- [ ] 日志包含项目/操作标识、阶段、耗时和稳定错误码，不含源码、个人路径、邮箱/模型凭据；待核对状态可经内部查询诊断。
+最终审阅补充 PS18e1：文件存取、容量扫描、双版本差异和恢复核对共用单次操作时限（`SourceFileSnapshotStore`、`SourceStorageBudget`、`ProjectSourceFileSnapshotTest`、`SourceQuery`、`SourceRecovery`，5 个文件）；PS18e2：准备副本/封存中的多次读取传递同一个时限及过期测试（`SourceWorkspaceStore`、`SourceCandidateStore`、`ProjectSourceWorkspaceIT`、`ProjectSourceCandidateTest`，4 个文件）。不能按文件或子步骤不断重置 300 秒预算；进程退出确认另有有界收尾等待。保留现有 Spring 配置项，不增加未验证的环境变量别名。
+
+PS19 回归补充：`Stage` 新增 `GIT_STARTED` 后，原 `EnumSource` 自动覆盖了这个崩溃窗口。应断言持久执行标记仍阻断而非普通失败；单独更新 `ProjectSourceRecoveryIT`，不放松生产恢复逻辑。
+
+PS19 日志补充：`ProjectSourceObservabilityIT` 直接捕获源码协调者事件，注入无效秘密 canary 与路径，验证稳定错误码、项目/操作 ID、耗时存在且原始异常不输出（1 个文件）。
+
+- [x] 队列/根容量/空间准入生效；模拟磁盘写失败不发布损坏版本；不自动删历史或未知目录。
+- [x] 日志包含项目/操作标识、阶段、耗时和稳定错误码，不含源码、个人路径、邮箱/模型凭据；待核对状态可经内部查询诊断。
 - 验证：`./mvnw -B -Dit.test=ProjectSourceFailureIT verify`；小预算夹具触发上限而非填满本机磁盘，秘密 canary 在产物和日志中均不存在。
 - 依赖：PS09、PS15。
 - 文件（5）：`S/ProjectSourceEnvironment.java`、`S/ProjectSourcePaths.java`、`S/SourceCoordinator.java`、`S/SourceWorker.java`、`T/ProjectSourceFailureIT.java`。
 
 ### C-PS06 · 恢复与异常检查点
 
-- [ ] 历史恢复、差异截断和失败防护测试通过；旧数据没有因源码操作改变。
-- [ ] 安全审阅确认无新公开执行入口、无个人配置读取、无凭据继承；明确同用户原生进程的隔离局限。
+- [x] 历史恢复、差异截断和失败防护测试通过；旧数据没有因源码操作改变。
+- [x] 安全审阅确认无新公开执行入口、无个人配置读取、无凭据继承；明确同用户原生进程的隔离局限。
 
 ## G · 回归与交接
 
@@ -262,8 +268,8 @@
 
 从初始化到两轮修改、恢复、服务重开完成真实验收，同时保持旧产品链路可用。
 
-- [ ] 规格 §7 十项全部有测试映射；真实 Git、专用 PostgreSQL 和中断恢复共同通过，不用 mock 冒充集成结果。
-- [ ] 完整后端检查与现有前端/隔离浏览器回归通过；新功能关闭时不触发 Git 或改变原创建、生成、预览、导出、恢复及登录行为。
+- [x] 规格 §7 十项全部有测试映射；真实 Git、专用 PostgreSQL 和中断恢复共同通过，不用 mock 冒充集成结果。
+- [x] 完整后端检查与现有前端/隔离浏览器回归通过；新功能关闭时不触发 Git 或改变原创建、生成、预览、导出、恢复及登录行为。
 - 验证：`./mvnw -B verify`；随后按计划 §5 完整执行前端检查及两组浏览器命令，记录失败与未覆盖项。
 - 依赖：PS16–PS18、此前全部任务。
 - 文件（3）：`T/ProjectSourceJourneyIT.java`、`T/ProjectSourceCompatibilityIT.java`、`docs/project-source-verification.md`。
@@ -272,17 +278,17 @@
 
 只根据通过的证据更新模块状态和操作说明，区分源码管理已完成与 Coding Agent 尚未接入。
 
-- [ ] 说明配置开关、源码根、Git/PG 双份备份、停写备份一致性、恢复核对、残留候选及安全关闭；不包含真实凭据。
-- [ ] 能力地图与验收记录指向真实结果；给后续模块明确内部接口、版本身份和不可变快照约束，不修改原未完成人工验收。
+- [x] 说明配置开关、源码根、Git/PG 双份备份、停写备份一致性、恢复核对、残留候选及安全关闭；不包含真实凭据。
+- [x] 能力地图与验收记录指向真实结果；给后续模块明确内部接口、版本身份和不可变快照约束，不修改原未完成人工验收。
 - 验证：检查 Markdown 链接、命令及源码一致性；`git diff --check`；对照规格/验收记录人工审阅，不将计划当作测试证据。
 - 依赖：PS19。
 - 文件（4）：`docs/project-source.md`、`docs/project-source-verification.md`、`FULL-PROJECT-CAPABILITY-MAP.md`、`SPEC-project-source.md`。
 
 ### C-PS07 · 模块交付检查点
 
-- [ ] 全部任务测试证据、代码审阅和文件/权限边界检查完成；相关文档真实反映实现状态。
-- [ ] 向用户展示初始化 → 文件变更 → 新版本 → 恢复的证据及剩余模块；经评审后进入 `project-agent` 规格。
-- [ ] 未推送或部署、未调用真实模型/SMTP、未修改个人 Claude Code 配置；原 C-EB11 与 OAuth 草稿保留。
+- [x] 全部任务测试证据、代码审阅和文件/权限边界检查完成；相关文档真实反映实现状态。
+- [x] 完成初始化 → 文件变更 → 新版本 → 恢复的证据与剩余模块交接；`project-agent` 尚未开始，下一步进入其规格评审。
+- [x] 未推送或部署、未调用真实模型/SMTP、未修改个人 Claude Code 配置；原 C-EB11 与 OAuth 草稿保留。
 
 ## 规格验收映射
 
