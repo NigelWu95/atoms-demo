@@ -35,7 +35,8 @@ abstract class SourceIntegrationSupport {
         Path root = temporary.toRealPath();
         environment = new ProjectSourceEnvironment(new MockEnvironment().withProperty("atoms.source.enabled", "true")
                 .withProperty("atoms.source.root", root.resolve("source").toString())
-                .withProperty("atoms.source.work-root", root.resolve("work").toString()).withProperty("atoms.source.git", "/usr/bin/git"));
+                .withProperty("atoms.source.work-root", root.resolve("work").toString()).withProperty("atoms.source.git", "/usr/bin/git")
+                .withProperty("atoms.source.python", ProjectSourceFileProcessTest.python().toString()));
         service = new ProjectSourceService(projects, repository, transactions, environment);
     }
 

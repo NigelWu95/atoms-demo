@@ -55,6 +55,16 @@ public class ProjectSourceService {
         projects.get(owner, project.toString());
     }
 
+    void writableBase(UUID owner, UUID project, UUID version, long revision) {
+        requireEnabled();
+        transaction.executeWithoutResult(status -> {
+            writable(projects.lock(owner, project.toString()));
+            var state = repository.state(project);
+            if (state == null || version == null || revision < 1) throw conflict("SOURCE_BASE_CONFLICT");
+            requireBase(state, version, revision);
+        });
+    }
+
     void storageUnavailable(UUID owner, UUID project) {
         transaction.executeWithoutResult(status -> {
             projects.lock(owner, project.toString());
