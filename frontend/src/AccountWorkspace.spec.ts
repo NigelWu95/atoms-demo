@@ -73,6 +73,38 @@ afterEach(() => {
 })
 
 describe('account and persistent workspace navigation', () => {
+  it('collapses the sidebar without remounting the editor or clearing its draft', async () => {
+    vi.stubGlobal('fetch', mockApi(guest))
+    const { wrapper } = await openApp('/workbench')
+    try {
+      const editor = wrapper.get('main textarea').element
+      const identity = wrapper.get('.session-status').element
+      const toggle = wrapper.get('[data-action="toggle-sidebar"]')
+      await toggle.trigger('click')
+      expect(wrapper.get('.app-shell').classes()).toContain('sidebar-collapsed')
+      expect(toggle.attributes('aria-expanded')).toBe('false')
+      expect(wrapper.get('main textarea').element).toBe(editor)
+      expect(wrapper.get('.session-status').element).toBe(identity)
+      await toggle.trigger('click')
+      expect(wrapper.get('.app-shell').classes()).not.toContain('sidebar-collapsed')
+      expect(wrapper.get('main textarea').element).toBe(editor)
+    } finally {
+      wrapper.unmount()
+    }
+  })
+
+  it.each(['/', '/workbench'])(
+    'shows the signed-in email at the account entry on %s',
+    async (path) => {
+      vi.stubGlobal('fetch', mockApi(registered, registered))
+      const { wrapper } = await openApp(path)
+      try {
+        expect(wrapper.get('.session-status').text()).toContain(registered.email)
+      } finally {
+        wrapper.unmount()
+      }
+    },
+  )
   it.each(['/workbench', '/create', '/projects', '/settings/account'])(
     'returns to the landing page through the workspace brand from %s',
     async (path) => {
@@ -306,7 +338,7 @@ describe('account and persistent workspace navigation', () => {
       expect(content).toMatch(/注册时间[\s\S]*2026/)
       expect(wrapper.get('time').attributes('datetime')).toBe(registered.createdAt)
       expect(wrapper.get('time').text()).toBe(new Date(registered.createdAt).toLocaleString())
-      expect(wrapper.get('.sidebar').text()).not.toContain(registered.email)
+      expect(wrapper.get('.sidebar').text()).toContain(registered.email)
       expect(fetch).toHaveBeenCalledWith(
         '/api/account',
         expect.objectContaining({ method: 'GET', cache: 'no-store' }),

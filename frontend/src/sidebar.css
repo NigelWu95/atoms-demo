@@ -1,0 +1,55 @@
+.sidebar-toggle {
+  margin-top: 16px;
+}
+.sidebar-toggle > [aria-hidden] {
+  font-size: 20px;
+}
+.sidebar .sidebar-account-toggle {
+  display: none;
+}
+.primary-nav a > .sidebar-label {
+  width: auto;
+  font-size: inherit;
+  line-height: inherit;
+}
+.profile {
+  min-width: 0;
+}
+.profile-avatar {
+  flex-shrink: 0;
+}
+@media (min-width: 768px) {
+  .app-shell.sidebar-collapsed {
+    grid-template-columns: 72px minmax(0, 1fr);
+  }
+  .sidebar-collapsed > .sidebar {
+    padding: 16px 8px;
+  }
+  .sidebar-collapsed .brand {
+    padding: 0;
+    justify-content: center;
+  }
+  .sidebar-collapsed :is(.brand-name, .sidebar-label, .workspace-name, .sidebar-note),
+  .sidebar-collapsed .sidebar-footer > :not(.sidebar-account-toggle) {
+    display: none;
+  }
+  .sidebar-collapsed .primary-nav {
+    margin-top: 16px;
+  }
+  .sidebar-collapsed .primary-nav a {
+    justify-content: center;
+    padding: 12px;
+  }
+  .sidebar-collapsed .sidebar-account-toggle {
+    display: flex;
+    width: 100%;
+  }
+}
+@media (max-width: 767px) {
+  .sidebar .sidebar-toggle {
+    display: none;
+  }
+  .primary-nav a > .sidebar-label {
+    display: inline;
+  }
+}

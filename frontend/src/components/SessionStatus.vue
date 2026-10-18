@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { errorMessage } from '../api/client'
 import { accountReturnTarget } from '../runtime/accountReturn'
 import { useSessionStore } from '../stores/session'
+import AccountIdentity from './AccountIdentity.vue'
 defineProps<{ compact?: boolean }>()
 const session = useSessionStore()
 const route = useRoute()
@@ -48,7 +49,7 @@ onBeforeUnmount(() => stop?.())
       </button>
     </template>
     <template v-else>
-      <span class="identity-name">{{ session.identity?.displayName }}</span>
+      <AccountIdentity v-if="session.identity" :identity="session.identity" />
       <span v-if="!compact" class="muted">项目已启用持久化</span>
     </template>
     <RouterLink
@@ -79,6 +80,10 @@ onBeforeUnmount(() => stop?.())
 </template>
 
 <style scoped>
+.session-status {
+  min-width: 0;
+  max-width: 100%;
+}
 .account-link {
   display: inline-flex;
   align-items: center;
@@ -99,7 +104,7 @@ onBeforeUnmount(() => stop?.())
   justify-content: flex-end;
   gap: 12px;
   flex-wrap: wrap;
-  max-width: 360px;
+  max-width: 440px;
 }
 .compact p {
   overflow-wrap: anywhere;
@@ -109,19 +114,22 @@ onBeforeUnmount(() => stop?.())
   margin-left: 0;
   color: var(--on-accent);
 }
-.compact .identity-name {
+.compact :deep(.account-identity),
+.compact :deep(.identity-name) {
   color: var(--muted);
-  max-width: 144px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  max-width: 200px;
 }
 @media (max-width: 767px) {
   .account-link {
     margin-left: 12px;
   }
-  .compact .identity-name {
-    display: none;
+  .compact :deep(.account-identity) {
+    flex-basis: 100%;
+    max-width: 100%;
+    text-align: right;
+  }
+  .compact :deep(.account-identity summary) {
+    justify-content: flex-end;
   }
 }
 </style>

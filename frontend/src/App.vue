@@ -10,6 +10,7 @@ const route = useRoute()
 const session = useSessionStore()
 const isWorkbench = computed(() => route.meta.workbench === true)
 const navigationOpen = ref(false)
+const sidebarCollapsed = ref(false)
 watch(
   () => route.path,
   async () => {
@@ -28,14 +29,33 @@ watch(
     :class="{
       'entry-shell': route.meta.entryPage,
       'workbench-shell': isWorkbench,
+      'sidebar-collapsed': sidebarCollapsed && !route.meta.entryPage,
     }"
   >
     <EntryHeader v-if="route.meta.entryPage" />
-    <aside v-else class="sidebar" :class="{ 'navigation-open': navigationOpen }">
+    <aside
+      v-else
+      id="workspace-sidebar"
+      class="sidebar"
+      :class="{ 'navigation-open': navigationOpen }"
+    >
       <RouterLink class="brand" to="/" aria-label="Atoms Demo Studio 首页">
         <span class="brand-mark" aria-hidden="true">✳</span>
-        <span>atoms<span class="brand-subtitle">DEMO STUDIO</span></span>
+        <span class="brand-name">atoms<span class="brand-subtitle">DEMO STUDIO</span></span>
       </RouterLink>
+      <button
+        type="button"
+        class="button secondary sidebar-toggle"
+        data-action="toggle-sidebar"
+        :aria-expanded="!sidebarCollapsed"
+        :aria-label="sidebarCollapsed ? '展开侧边栏' : '收起侧边栏'"
+        :title="sidebarCollapsed ? '展开侧边栏' : '收起侧边栏'"
+        aria-controls="workspace-sidebar"
+        @click="sidebarCollapsed = !sidebarCollapsed"
+      >
+        <span aria-hidden="true">{{ sidebarCollapsed ? '»' : '«' }}</span>
+        <span class="sidebar-label">收起侧栏</span>
+      </button>
       <button
         v-if="isWorkbench"
         type="button"
@@ -53,14 +73,14 @@ watch(
         >
       </div>
       <nav id="workspace-navigation" class="primary-nav" aria-label="主要导航">
-        <RouterLink to="/create" exact-active-class="active"
-          ><span aria-hidden="true">＋</span>开始创作</RouterLink
+        <RouterLink to="/create" exact-active-class="active" aria-label="开始创作" title="开始创作"
+          ><span aria-hidden="true">＋</span><span class="sidebar-label">开始创作</span></RouterLink
         >
-        <RouterLink to="/projects" active-class="active"
-          ><span aria-hidden="true">▤</span>我的项目</RouterLink
+        <RouterLink to="/projects" active-class="active" aria-label="我的项目" title="我的项目"
+          ><span aria-hidden="true">▤</span><span class="sidebar-label">我的项目</span></RouterLink
         >
-        <RouterLink to="/workbench" active-class="active"
-          ><span aria-hidden="true">◫</span>工作台</RouterLink
+        <RouterLink to="/workbench" active-class="active" aria-label="工作台" title="工作台"
+          ><span aria-hidden="true">◫</span><span class="sidebar-label">工作台</span></RouterLink
         >
       </nav>
       <div class="sidebar-note">
@@ -68,6 +88,15 @@ watch(
         <p>每个应用，<br />从一个好想法开始。</p>
       </div>
       <div id="workspace-account" class="sidebar-footer">
+        <button
+          type="button"
+          class="button secondary sidebar-account-toggle"
+          aria-label="展开侧栏查看账号"
+          title="查看账号"
+          @click="sidebarCollapsed = false"
+        >
+          你
+        </button>
         <ServiceStatus />
         <div class="profile">
           <span class="profile-avatar" aria-hidden="true">你</span>
