@@ -1,10 +1,8 @@
 package dev.atoms.demo.source;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import dev.atoms.demo.common.ApiException;
 import java.io.IOException;
 import java.nio.file.Path;
-import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -14,10 +12,12 @@ final class SourceWorkspaceStore {
     private final ProjectSourceService service;
     private final SourceQuery query;
     private final ProjectSourceEnvironment environment;
+    private final SourceFileSnapshotStore files;
     private final Map<UUID, Evidence> issued = new HashMap<>();
 
     SourceWorkspaceStore(ProjectSourceService service, SourceQuery query, ProjectSourceEnvironment environment) {
         this.service = service; this.query = query; this.environment = environment;
+        this.files = new SourceFileSnapshotStore(environment);
     }
 
     synchronized SourceWorkspace prepare(UUID owner, UUID project, UUID version, long revision, UUID task) {
@@ -26,13 +26,8 @@ final class SourceWorkspaceStore {
         service.writableBase(owner, project, version, revision);
         var handle = new SourceWorkspace(owner, project, java.util.Objects.requireNonNull(task), version, revision, snapshot.tree().sha256());
         try {
-            var process = new SourceFileProcess(environment.python());
-            var request = request(handle, "create");
-            request.put("files", snapshot.tree().files().stream().map(file -> Map.of("path", file.path(), "mode", file.mode(),
-                    "content", Base64.getEncoder().encodeToString(file.content()))).toList());
-            JsonNode identity = process.run(request);
-            var evidence = new Evidence(handle, identity.deepCopy());
-            verify(evidence);
+            var copy = files.create(null, task, marker(handle), snapshot.tree());
+            var evidence = new Evidence(handle, copy);
             service.writableBase(owner, project, version, revision);
             issued.put(task, evidence);
             return handle;
@@ -40,36 +35,38 @@ final class SourceWorkspaceStore {
     }
 
     synchronized Path checked(SourceWorkspace workspace) {
-        var evidence = workspace == null ? null : issued.get(workspace.taskId());
-        if (evidence == null || evidence.workspace() != workspace) throw unavailable();
+        var evidence = authorized(workspace);
         service.writableBase(workspace.ownerId(), workspace.projectId(), workspace.versionId(), workspace.revision());
         try {
-            verify(evidence);
+            files.check(evidence.snapshot());
             return environment.existingSettings().paths().workRoot().resolve(workspace.taskId().toString()).resolve("project");
         } catch (IOException error) { throw unavailable(); }
     }
 
-    private void verify(Evidence value) throws IOException {
-        var request = request(value.workspace(), "check");
-        request.put("evidence", value.identity());
-        if (!new SourceFileProcess(environment.python()).run(request).equals(value.identity())) throw ProjectSourcePaths.unavailable();
-        environment.existingSettings().paths().verify();
+    synchronized SourceTree read(SourceWorkspace workspace) {
+        checked(workspace);
+        try {
+            var tree = files.read(issued.get(workspace.taskId()).snapshot());
+            checked(workspace);
+            return tree;
+        } catch (IOException | IllegalArgumentException error) { throw unavailable(); }
     }
 
-    private Map<String, Object> request(SourceWorkspace workspace, String operation) throws IOException {
-        var paths = environment.existingSettings().paths();
-        Path root = paths.workRoot();
-        var request = new HashMap<String, Object>();
-        request.put("operation", operation); request.put("root", root.toString());
-        request.put("rootIdentity", SourceFileProcess.identity(root));
-        request.put("task", workspace.taskId().toString());
-        request.put("marker", String.join("\n", "atoms-source-workspace-v1", workspace.ownerId().toString(),
+    synchronized void authorize(SourceWorkspace workspace) { authorized(workspace); }
+
+    private Evidence authorized(SourceWorkspace workspace) {
+        var evidence = workspace == null ? null : issued.get(workspace.taskId());
+        if (evidence == null || evidence.workspace() != workspace) throw unavailable();
+        service.authorize(workspace.ownerId(), workspace.projectId());
+        return evidence;
+    }
+
+    private static String marker(SourceWorkspace workspace) {
+        return String.join("\n", "atoms-source-workspace-v1", workspace.ownerId().toString(),
                 workspace.projectId().toString(), workspace.taskId().toString(), workspace.versionId().toString(),
-                Long.toString(workspace.revision()), workspace.treeSha256(), ""));
-        paths.verify();
-        return request;
+                Long.toString(workspace.revision()), workspace.treeSha256(), "");
     }
 
     private static ApiException unavailable() { return new ApiException(409, "SOURCE_WORKSPACE_UNAVAILABLE", "任务工作副本不可用，请重新准备任务。"); }
-    private record Evidence(SourceWorkspace workspace, JsonNode identity) {}
+    private record Evidence(SourceWorkspace workspace, SourceFileSnapshotStore.Snapshot snapshot) {}
 }
