@@ -111,6 +111,11 @@ class SourceEditLeaseRepository {
         jdbc.update("UPDATE source_edit_leases SET cancel_requested=true WHERE id=? AND status<>'RELEASED'", lease.id());
     }
 
+    void uncertain(Lease lease) {
+        locked(lease.projectId());
+        jdbc.update("UPDATE source_edit_leases SET status='NEEDS_RECONCILIATION' WHERE id=? AND status='ACTIVE'", lease.id());
+    }
+
     SourceOperation operation(Lease lease) {
         var ids = jdbc.query("SELECT id FROM source_operations WHERE edit_lease_id=?", (r,n) -> r.getObject(1, UUID.class), lease.id());
         return ids.isEmpty() ? null : sources.operation(lease.projectId(), ids.get(0));

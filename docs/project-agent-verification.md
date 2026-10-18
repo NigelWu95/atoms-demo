@@ -148,3 +148,13 @@ PA14c（02:38）：新增 Worker 先缺类红测。`./mvnw -B '-Dit.test=Project
 PA15a（02:44）：新增 V022 持久取消标记，只迁移测试库，不重写 V020/V021。领取/启动意图/停止确认/取消等数据库动作不再获取文件 I/O 的全局监视器，容量采用 64 个非阻塞许可；取消标记与项目行锁阻止后续接受/发布。源操作已提交时只返回持久事实。先缺接口红测，`./mvnw -B '-Dit.test=ProjectSourceEditCancellationIT,ProjectSourceEditAcceptanceIT,ProjectSourceEditWorkspaceIT,ProjectSourceCancellationIT' test-compile failsafe:integration-test failsafe:verify` **17 项通过、0 失败/错误/跳过**。受控复制阻塞下，持有项目行锁的取消 2 秒内完成；提交前/后竞争分别得到 CANCELLED / COMMITTED，原取消回归通过。
 
 PA15b（02:49）：任务取消 API 与发布结果判定接通。`./mvnw -B '-Dit.test=ProjectAgentCancellationIT,ProjectAgentWorkerIT,ProjectAgentLifecycleIT,ProjectAgentAdmissionIT' test-compile failsafe:integration-test failsafe:verify` **15 项通过、0 失败/错误/跳过**。排队取消不启动进程，运行取消先持久标记再由拥有者确认退出；提交前取消不新增版本，提交后请求保留 SOURCE_SAVED。测试使用本地受控子进程及专用测试库，不使用真实模型。
+
+PA15c / PA16（03:03）：启动前检查回调由进程拥有者执行，尚未启动时能签发绑定的停止证据。线程中断后暂时清除中断标记以保存数据库退出事实，完成后恢复，不继续发布。新增反例先缺重载编译失败；随后 JDBC 收尾带中断标记的定向测试实际失败，再修复。恢复先缺类红测，实现后仅根据持久编辑租约和源码操作结算：未启动失败、退出未知保留待核对，已提交补齐 SOURCE_SAVED；不重跑模型、不重建可写句柄、不操作旧 PID，归属变化不向旧用户返回数据。
+
+```sh
+env PATH=/Users/wubingheng/.nvm/versions/node/v24.20.0/bin:$PATH ./mvnw -B \
+  '-Dtest=AgentProcessTest,AgentCliProbeTest,ClaudeCodeAgentTest' \
+  '-Dit.test=ProjectAgentCancellationIT,ProjectAgentRecoveryIT,ProjectAgentWorkerIT,ProjectAgentLifecycleIT' verify
+```
+
+**18 单元 + 15 集成通过，0 失败/错误/跳过，BUILD SUCCESS**。包括提交后超时和 Agent 尚未记下源码操作 ID 的恢复，均保留唯一提交版本、不追加预算。真实模型未调用，自动调度尚未接入。

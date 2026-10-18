@@ -173,21 +173,45 @@ public class ProjectSourceEditGateway {
         owned(handle); return leases.operation(handle.lease);
     }
 
+    /** Startup-only, behind the caller's exclusive coordinator lease. Never recreates a writable capability. */
+    public RecoveryFact reconcileAbandonedEdit(UUID project, UUID leaseId, UUID task) {
+        return transaction.execute(status -> {
+            repository.lockEvidence(project);
+            var lease = leases.get(project, leaseId);
+            if (!lease.taskId().equals(task)) throw ProjectSourceService.conflict("SOURCE_EDIT_UNAVAILABLE");
+            var operation = leases.operation(lease);
+            boolean uncertain = lease.executionPending() || operation != null && (!operation.terminal() || operation.executionPending());
+            if (uncertain) leases.uncertain(lease);
+            else {
+                leases.release(lease);
+                forgetAfterCommit(leaseId);
+            }
+            return new RecoveryFact(uncertain, operation);
+        });
+    }
+    public record RecoveryFact(boolean uncertain, SourceOperation operation) {}
+
     public void releaseEdit(EditHandle handle) {
         owned(handle);
         transaction.executeWithoutResult(status -> {
             repository.lockEvidence(handle.lease.projectId());
             service.authorize(handle.lease.ownerId(), handle.lease.projectId());
             leases.release(handle.lease);
-            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-                @Override public void afterCommit() {
-                    synchronized (ProjectSourceEditGateway.this) {
-                        candidates.release(handle.candidate);
-                        workspaces.release(handle.workspace);
-                        if (issued.remove(handle.lease.id(), handle)) releaseCapacity(handle.slotReleased);
-                    }
+            forgetAfterCommit(handle.leaseId());
+        });
+    }
+
+    private void forgetAfterCommit(UUID leaseId) {
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override public void afterCommit() {
+                synchronized (ProjectSourceEditGateway.this) {
+                    var handle = issued.remove(leaseId);
+                    if (handle == null) return;
+                    candidates.release(handle.candidate);
+                    workspaces.release(handle.workspace);
+                    releaseCapacity(handle.slotReleased);
                 }
-            });
+            }
         });
     }
 
