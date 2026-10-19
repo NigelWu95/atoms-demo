@@ -9,7 +9,7 @@ public final class AgentChildFixture {
     private static final String RESULT = "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"permission_denials\":[]}";
 
     public static void main(String[] args) throws Exception {
-        if (args.length > 1) Files.writeString(Path.of(args[1]), Long.toString(ProcessHandle.current().pid()));
+        if (args.length > 1) publishPid(Path.of(args[1]), () -> {});
         switch (args[0]) {
             case "project-edit" -> {
                 System.in.readAllBytes();
@@ -47,5 +47,13 @@ public final class AgentChildFixture {
             case "hang" -> Thread.sleep(60000);
             default -> throw new IllegalArgumentException("Unknown fixture");
         }
+    }
+
+    static void publishPid(Path destination, Runnable beforePublish) throws java.io.IOException {
+        Path pending = destination.resolveSibling(destination.getFileName() + ".pending");
+        Files.writeString(pending, Long.toString(ProcessHandle.current().pid()));
+        beforePublish.run();
+        // File existence is a readiness signal to cancellation tests. Never expose a partial PID.
+        Files.move(pending, destination, java.nio.file.StandardCopyOption.ATOMIC_MOVE);
     }
 }
