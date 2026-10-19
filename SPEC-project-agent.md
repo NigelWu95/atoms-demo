@@ -1,6 +1,6 @@
 # Spec: project-agent · Claude Code + DeepSeek 完整工程编辑
 
-状态：2026-10-18～19，用户已确认规格、[实施计划](tasks/project-agent/plan.md)与[任务清单](tasks/project-agent/todo.md)，并将范围扩展至完整本地开发闭环（§10）。检查点用于汇报证据，不重复请求逐项批准；真实付费模型 PA-LIVE 与部署仍需另行授权。PA01–PA27 内部切片已完成：文件编辑、默认 4 并发调度、查询/正文保留、原生 Java/Vue 模板、脚本契约及正式平台 JAR 模板包装；前端自身测试、构建及本机测试 API 的浏览器验收通过。初始化、完整工程实际构建运行及工作台接入仍在实施，不是完整产品交付声明。
+状态：2026-10-18～19，用户已确认规格、[实施计划](tasks/project-agent/plan.md)与[任务清单](tasks/project-agent/todo.md)，并将范围扩展至完整本地开发闭环（§10）。检查点用于汇报证据，不重复请求逐项批准；真实付费模型 PA-LIVE 与部署仍需另行授权。PA01–PA28 内部切片已完成：文件编辑、默认 4 并发调度、查询/正文保留、原生 Java/Vue 模板、脚本契约、正式平台 JAR 模板包装及初始化到任务准入交接；前端自身测试、构建及本机测试 API 的浏览器验收通过。完整工程两轮旅程、实际构建运行及工作台接入仍在实施，不是完整产品交付声明。
 
 模块索引：[完整工程能力地图](FULL-PROJECT-CAPABILITY-MAP.md)。上游：[源码模块](SPEC-project-source.md)。总体方向：[ADR-016](docs/decisions/016-full-project-source-and-coding-agent.md)。本文不是整个工程改造的完成声明，也不是执行生成后端的授权。
 
@@ -136,10 +136,11 @@ stdout / stderr 并行有界消费，JSON 每行最多 4 MiB、stdout 总量最�
 
 必须同时满足：受支持的成功 result、无结果冲突/协议损坏、进程正常退出、无未决工具权限错误、自有进程结束已确认、文件校验及基线检查通过，才能接受版本。只有“完成”文本、退出码 0、文件存在或部分流输出均不够。缺少最终结果、上下文/轮数/输出限制、权限拒绝均保存失败状态而不保存新源码版本。无实际内容变化返回 `NO_CHANGES`，不创建重复版本，也不宣称需求已完成。
 
-## 5. 源码模块提供的窄接口（待实现）
+## 5. 源码模块提供的内部窄接口
 
 提供者契约归 `project-source` 所有，依赖仍是 `project-agent → project-source`。新增源包门面和不透明编辑句柄，不把 `SourceWorkspaceStore`、`SourceCandidateStore` 等所有内部类改为 public。
 
+- `initializeTemplate(owner, project, tree, templateId, digest, key)`：仅受信任模板适配器调用；校验完整树与摘要，在共享项目锁下拒绝已有旧版本/活跃旧生成任务的原生初始化，发布前复查。返回源码操作与完成句柄，不创建 Agent 任务，不改变旧版本指针或业务数据。
 - `claimEdit(owner, project, base, taskId)`：短事务重新授权并领取持久编辑租约；同项目唯一；基线来自源码修订号，不是旧 `projects.project_revision`。
 - `prepareEdit(handle)`：从不可变快照物化副本；只有进程适配器可获得已经核对的工作路径，模型/外部调用者不能指定目录。
 - `markExecutionStarted(handle, executionId)`：在启动 CLI 前记录一次性执行意图；宁可保守标记待核对，也不能崩溃后自动重复付费调用。
@@ -148,6 +149,8 @@ stdout / stderr 并行有界消费，JSON 每行最多 4 MiB、stdout 总量最�
 - `releaseEdit(handle)`：只有未启动或已确认结束且源码操作已结算时才释放活动租约；只释放能力，不删除磁盘证据。
 
 所有源码写入口（包括恢复、其他接受和导入）必须在相同锁顺序下检查编辑租约；只有持有当前租约的接受流程可继续。只在 Agent 服务内加内存锁不合格。源码存储可见性读取保持可用。
+
+初始化调用方使用 `ProjectAgentInitialization.initialize`，先验证 Agent 启用、维护者和当前项目归属；禁止包在调用方事务中读取模板。只有完成结果为 `COMMITTED` 后才以其 `resultVersionId` 和初始源码修订号 1 调用 `ProjectAgentService.submit`。第二步失败保留首版供重试，不伪造已生成业务；初始化本身不读取模型密钥或消耗模型额度。这里是内部接口，没有新增公开 HTTP 路由。
 
 新增通用 `source_edit_leases` 持久结构，拥有者是源码模块，不引用 Agent 表；保留执行未决标识及历史证据。其约束不得削弱既有 V019 的 Git 执行阻断；CLI 执行和 Git 写入是两个不同执行身份。追加迁移，不改 V018/V019；具体迁移编号由后续计划确认。
 

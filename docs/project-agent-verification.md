@@ -93,6 +93,27 @@ env -i PATH=/Users/wubingheng/.nvm/versions/node/v24.20.0/bin:/usr/bin:/bin /Use
 
 这是平台分发模板的包装验收，不是生成应用 JAR 构建、数据库迁移或应用启动验收。自有读取子进程退出并已收尾；没有实际模型、日常配置、数据库迁移、推送或部署。
 
+## PA28：初始化来源与编辑任务交接（2026-10-19）
+
+内部初始化使用固定模板 ID `full-project-v1` 和完整源码树摘要，经已有源码协调者/Git 发布首版。来源保存在既有 source_operations/source_versions 元数据列，不新增数据库迁移、不把源码放回 PG。初始化与需求提交明确分两步：首版 COMMITTED 后再绑定其版本 ID / 修订号 1 提交 Agent 任务；第二步失败保留首版。没有模型密钥读取、模型预算预留或自动生成业务成功状态。
+
+红绿与边界修复：
+
+- 来源重载先缺方法编译失败；补齐后 11:38 原生来源、旧初始化与旧显式导入 **7 项集成通过**。
+- Agent 初始化先缺类编译失败；实现后 3 项交接测试通过。同轮新增旧应用反例 **2 项明确失败**：已有旧版仍可准入；Git 写入期间出现旧版，原生首版仍会提交。
+- 修复在共同项目行锁内判断 INITIALIZE + 模板来源，只针对原生首版拒绝已有旧版本/活跃旧任务；准备、启动、ready 和发布阶段复查，不改变 IMPORT/ACCEPT/RESTORE。11:44 来源/旧应用保护 **4 项通过**。同轮事务反例仍失败：调用方事务内确实读取了模板。随后在 Agent 初始化入口先拒绝外层事务，不将文件读取放入数据库事务。
+- 11:48 最新组合回归 **17 单元 + 26 集成通过，0 失败/错误/跳过，BUILD SUCCESS**。包含 4 项原生来源/旧应用保护、4 项 Agent 初始化、5 项原任务准入、3 项旧源码初始化、2 项旧显式导入、4 项生命周期及 4 项新旧模板包装。完整工作树全量套件仍以本文之前的完整运行记录为准，不把这次定向结果称为全量全绿。
+
+实际命令（backend）：
+
+```sh
+env PATH=/Users/wubingheng/.nvm/versions/node/v24.20.0/bin:$PATH ./mvnw -B '-Dtest=FullProject*Test,TemplateCatalogTest' '-Dit.test=ProjectAgentInitializationIT,ProjectAgentAdmissionIT,ProjectSourceTemplateInitializationIT,ProjectSourceInitializationIT,ProjectSourceLegacyImportIT,ProjectSourceLifecycleIT,FullProjectTemplatePackagingIT,TemplatePackagingIT' verify
+```
+
+只连接 `atoms_demo_test` / 非超级用户 `atoms_test`；Flyway 显示 V022 已是最新，没有新迁移。35 文件首版经真实 Git 保存并读回 Vue 页面；幂等、来源、无模型任务、第二步失败保留、所有权、禁用、归档、损坏模板和外层事务都有断言。旧 source_json、当前版本指针和运行数据不改写，旧导入的精确数据回归通过。自审确认模块依赖仍单向、入口默认关闭、没有公开 HTTP 或 Shell 权限变更。
+
+后续 PA29 继续完整模板上的两轮编辑/差异/重开读取及真实 CLI + loopback 旅程；PA30–33 和真实 DeepSeek 尚未验收。构建脚本虽已提供契约，完整生成应用实际构建、数据库迁移、运行、同快照交付和工作台入口仍未完成。未推送或部署。
+
 ## 并发调度调整（2026-10-19）
 
 用户确认不同项目并行，同项目保持编辑互斥，随后要求默认并发提高到 4。新增 `PROJECT_AGENT_MAX_CONCURRENT_TASKS`，默认 4、范围 1–8、重启生效；最大等待队列仍为 8，排队期限仍为 300 秒。此设置只影响新 Agent 模块，不修改旧生成器或默认关闭状态。

@@ -13,7 +13,7 @@
 | 稳定模块 ID | 职责 | 依赖 | 规格状态 |
 |---|---|---|---|
 | `project-source` | 每项目完整源码 Git 仓库、不可变版本、工作副本、元数据、旧产物显式导入 | 现有项目身份与所有权 | 内部模块已验收、默认关闭；[使用说明](docs/project-source.md)、[测试证据](docs/project-source-verification.md)、[任务清单](tasks/project-source/todo.md) |
-| `project-agent` | Claude Code + DeepSeek 在任务副本中读取及修改 Vue、Java、SQL 等文件，提交可检查的变更 | `project-source` | [规格](SPEC-project-agent.md)和[计划](tasks/project-agent/plan.md)已确认；PA01–PA27 内部切片完成，包含离线文件编辑、默认 4 并发调度、查询/保留、原生 Java/Vue 模板及打包；[证据](docs/project-agent-verification.md)。初始化、完整工程实际构建运行及工作台接入未完成，尚无真实模型验收 |
+| `project-agent` | Claude Code + DeepSeek 在任务副本中读取及修改 Vue、Java、SQL 等文件，提交可检查的变更 | `project-source` | [规格](SPEC-project-agent.md)和[计划](tasks/project-agent/plan.md)已确认；PA01–PA28 内部切片完成，包含离线文件编辑、默认 4 并发调度、查询/保留、原生 Java/Vue 模板、打包及初始化交接；[证据](docs/project-agent-verification.md)。完整工程两轮旅程、实际构建运行及工作台接入未完成，尚无真实模型验收 |
 | `project-execution` | 对固定源码版本测试、构建、启动本机进程；失败保留上一可用结果 | `project-source` | 待规格评审 |
 | `project-delivery` | 实际应用预览、同快照下载、代码版本恢复；明确业务数据边界 | `project-source`、`project-execution` | 待规格评审 |
 | `project-workbench` | 文件树、差异、任务与构建状态、实际进程预览及增量开发入口 | 以上模块 | 待规格评审 |
