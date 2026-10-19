@@ -1,8 +1,8 @@
 # project-agent · 开发任务
 
-状态：2026-10-19，用户要求一次完成完整本地开发闭环，范围更新见规格 §10。PA01–PA17 完成。用户确认的不同项目并行、同项目互斥及默认并发 4 已实现，49 项相关单元和 49 项集成通过；完整工程模板与后续闭环仍未完成，不把本次调度验收当作产品上线。PA-LIVE 授权询问尚无答复，不作已授权处理。唯一依据为 [已确认规格](../../SPEC-project-agent.md)和[本模块计划](plan.md)。不重复使用旧 EB/PS 清单，不将旧人工验收勾为完成。
+状态：2026-10-19，用户要求一次完成完整本地开发闭环，范围更新见规格 §10。PA01–PA22 已完成对应内部切片：默认并发 4、授权阶段查询、30 天正文保留清理、独立原生 Java 后端骨架。新后端自身的 2 项 MVC 测试已实际编译运行；数据库迁移、业务启动和前端尚未验收。继续 PA23 原生 Vue 模板，不把内部切片当作产品上线。PA-LIVE 授权询问尚无答复，不作已授权处理。唯一依据为 [已确认规格](../../SPEC-project-agent.md)和[本模块计划](plan.md)。不重复使用旧 EB/PS 清单，不将旧人工验收勾为完成。
 
-每项 S=1–2、M=3–5 个主要文件（含测试）；实际超出先拆子任务，不藏进巨型文件。路径缩写：A=backend/src/main/java/dev/atoms/demo/agent，AT=backend/src/test/java/dev/atoms/demo/agent，S/ST=对应 source 包，M=backend/src/main/resources/db/migration，T=templates/full-project-v1。Agent 包已创建，模板目录尚待创建。U/I/CLI/ALL/PY/FRONT/BROWSER/DOC 命令定义在计划 §6。
+每项 S=1–2、M=3–5 个主要文件（含测试）；实际超出先拆子任务，不藏进巨型文件。路径缩写：A=backend/src/main/java/dev/atoms/demo/agent，AT=backend/src/test/java/dev/atoms/demo/agent，S/ST=对应 source 包，M=backend/src/main/resources/db/migration，T=templates/full-project-v1。Agent 包和原生后端模板目录已创建。U/I/CLI/ALL/PY/FRONT/BROWSER/DOC 命令定义在计划 §6。
 
 每项还需满足项目 Definition of Done：新行为有红绿测试、运行证据与失败路径、原功能回归、不泄漏秘密、记录限制。模板静态测试和假模型不是应用可运行证明。检查点不授权新费用、执行用户代码、合并或部署。
 
@@ -193,10 +193,10 @@
 
 ## PA18 · 授权查询与阶段事件
 
-- [ ] 完成 PA18。依赖：PA13、PA17。规模：M（4 文件）。
+- [x] 完成 PA18。依赖：PA13、PA17。规模：M（4 文件）。
 - PA18a 查询/事件存储可先独立验证，不依赖调度循环；PA18b 再接状态迁移和 Worker 用量，最终调度旅程仍须 PA17 验证。每片最多 5 个实现/测试文件。
-- [x] PA18a：5 项查询/存储集成通过，当前所有权与 100 项分页、事件容量和终态预留、明确过期/缺损错误、不泄漏非白名单 payload。尚未自动写入每个任务阶段。
-- [x] PA18b：状态与事件同事务写入，确认模型进程停止后记用量和访问路径数；重复阶段不重复插入，真实受控 Worker 旅程可查询全部阶段。相关 21 项集成通过，自动调度旅程仍待 PA17b。
+- [x] PA18a：5 项查询/存储集成通过，当前所有权与 100 项分页、事件容量和终态预留、明确过期/缺损错误、不泄漏非白名单 payload。各阶段的自动写入由 PA18b 补齐。
+- [x] PA18b：状态与事件同事务写入，确认模型进程停止后记用量和访问路径数；重复阶段不重复插入。补验自动调度的 QUEUED → PREPARING → RUNNING → VALIDATING → ACCEPTING → SOURCE_SAVED 完整有序阶段；与授权查询、保留及脱敏合计 11 项集成通过。
 - 描述：提供内部任务列表、快照及有界 after 游标读取。
 - 验收：每次读取核对维护者及当前所有权，最多 100 条；单调序号和持久 256 KiB 预算，终态留空间；只输出平台阶段和校验统计，不直接复用旧 run SSE 或新开 HTTP 路由。
 - 验证：I(ProjectAgentQueryIT)；跨账号/项目、非法游标、断档和事件量上限。
@@ -204,19 +204,19 @@
 
 ### C-PA06 · 恢复与查询
 
-- [ ] 前三项实际通过，补记具体命令、数量、失败/跳过、进程和版本证据；检查未扩大权限并审阅变更。向用户汇报，按批准的连续实施范围推进；验收不成立则暂停该切片，不扩大权限或把未测项记为通过。
+- [x] PA16/17 既有 49 项集成回归和 PA18 自动调度阶段/查询补验通过；检查点已汇报，证据见验证记录。无付费模型、无新 HTTP 入口或工具权限扩大。
 
 ## PA19 · 保留期限与脱敏审计
 
-- [ ] 完成 PA19。依赖：PA18。规模：M（4 文件）。
+- [x] 完成 PA19。依赖：PA18。规模：M（4 文件）。
 - 描述：清理过期提示与事件正文，同时保留任务幂等和结算证据。
 - 验收：终态满 30 天按有界批次清理，活动/待核对不清；旧游标明确过期，同键重试仍返回原任务；日志、事件、SQL 诊断不含 canary/源码/邮箱/原始 stderr。
-- 验证：I(ProjectAgentRetentionIT,ProjectAgentObservabilityIT)；固定时钟与清理前后幂等验证。
-- 主要文件：`A/AgentRetention.java`；`A/AgentEventRepository.java`；`AT/ProjectAgentRetentionIT.java`；`AT/ProjectAgentObservabilityIT.java`。
+- 验证：I(ProjectAgentRetentionIT,ProjectAgentObservabilityIT) 7 项通过；数据库时钟域的 719/721 小时边界、幂等与结果保留、失败回滚、并发清理及日志 canary。U(AgentRetentionSchedulingTest) 2 项通过，证明不依赖旧生成器开关。
+- 主要文件：`A/AgentRetention.java`；`AT/AgentRetentionSchedulingTest.java`；`AT/ProjectAgentRetentionIT.java`；`AT/ProjectAgentObservabilityIT.java`。复用既有事件水位及过期错误，无需迁移。
 
 ## PA20 · 新模板 Maven Wrapper 来源
 
-- [ ] 完成 PA20。依赖：PA03。规模：M（5 文件）。
+- [x] 完成 PA20。依赖：PA03。规模：M（5 文件）。
 - 描述：从已审阅现有模板保留 Wrapper 与许可证，建立独立新模板目录。
 - 验收：工具版本与来源可核对，不新下载安装器；仅 backend/mvnw 保留允许的执行位；内容满足源码策略且不带个人 Maven 配置。
 - 验证：U(FullProjectWrapperTest)；逐字节来源及文件模式检查，不运行生成脚本。
@@ -224,7 +224,7 @@
 
 ## PA21 · 原生 Java 启动骨架
 
-- [ ] 完成 PA21。依赖：PA20。规模：M（5 文件）。
+- [x] 完成 PA21。依赖：PA20。规模：M（5 文件）。
 - 描述：建立不依赖平台类的 Spring Boot 17 工程配置。
 - 验收：仅选既有依赖/版本，保留真实项目测试目标；数据库/端口配置外置且无可用默认密码；配置示例不混入平台密钥或旧应用 iframe 运行器。
 - 验证：U(FullProjectBackendSeedTest)；静态结构与源码策略检查，不冒充真实启动验收。
@@ -232,14 +232,15 @@
 
 ### C-PA07 · 保留与后端骨架
 
-- [ ] 前三项实际通过，补记具体命令、数量、失败/跳过、进程和版本证据；检查未扩大权限并审阅变更。向用户汇报，按批准的连续实施范围推进；验收不成立则暂停该切片，不扩大权限或把未测项记为通过。
+- [x] PA19–PA21 验收通过；保留相关 7 集成、调度注册 2 单元及模板 Wrapper/后端/原生 API 3 单元通过。旧 PA21 缺文件红测已解决，未删除或跳过；仅专用测试库清理合成历史，未清理日常数据。
 
 ## PA22 · Java API 与 SQL 扩展起点
 
-- [ ] 完成 PA22。依赖：PA21。规模：M（4 文件）。
+- [x] 完成 PA22。依赖：PA21。规模：M（4 文件）。
 - 描述：提供原生 API、迁移与有意义的测试骨架，供模型扩展业务。
 - 验收：包内无 dev.atoms.demo 依赖；SQL 只作为源码保存，不连平台库执行；API/测试骨架对应且不宣称已生成用户业务。
 - 验证：U(FullProjectApiSeedTest)；检查 Java/SQL/测试相互引用与模板政策。
+- 附加实测：在 `templates/full-project-v1/backend` 执行 `./mvnw -B -o test`，独立编译并运行 2 项 MVC 测试通过。无数据库迁移或监听端口，不能代替完整应用运行验收。首次缺测试端口配置的 2 项错误已通过测试专用 APP_PORT=0 修复，正式配置仍无隐式端口/密码。
 - 主要文件：`T/backend/src/main/java/dev/atoms/generated/HealthController.java`；`T/backend/src/main/resources/db/migration/V001__application_metadata.sql`；`T/backend/src/test/java/dev/atoms/generated/HealthControllerTest.java`；`AT/FullProjectApiSeedTest.java`。
 
 ## PA23 · 原生 Vue 可复现依赖配置

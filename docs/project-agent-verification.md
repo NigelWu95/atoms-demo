@@ -2,6 +2,44 @@
 
 日期：2026-10-18～19。规格与计划已批准，模块仍未完成。只使用本机假 Anthropic 服务和公开测试字符串，不调用真实 DeepSeek、不改个人 Claude 配置、不部署、不推送。任务状态以 [清单](../tasks/project-agent/todo.md)为准。
 
+## PA18–PA22：历史保留与原生后端（2026-10-19）
+
+- 自动调度旅程补上完整有序阶段断言。查询、保留、脱敏、自动调度定向组合 **11 集成通过**，0 失败/错误/跳过，08:51 完成。
+- 保留红测先得到 3 项中 2 失败：空实现不清理正文、不消耗批次。实现后采用数据库时钟判断 30 天，沿用项目行锁和任务锁；标记过期、提示清空和事件删除同事务，保留幂等摘要、最终结果和最后事件序号。只处理已释放编辑租约的终态任务；磁盘、项目、源码及业务数据不清理。
+- 独立调度测试的第一轮因夹具 `registerBean` 方法引用重载歧义编译失败；改为明确 Supplier 后，暴露预期行为红测：关闭旧生成器时没有定时器。新清理组件独立启用调度，Agent 关闭不创建该组件。首批延迟 60 秒、以后每 300 秒，最多 100 个候选、逐任务短事务。
+- 反向验证：临时把清理组件条件从 `havingValue=true` 翻成 false，`AgentRetentionSchedulingTest` 两个开关场景均明确失败；随后立即恢复 true。证明测试能发现启停条件被反转，正式实现未保留变异。
+- 原生后端使用现有 Spring Boot 3.5.16 + Java 17 依赖子集，Wrapper 与许可证逐字节继承既有已审阅模板。独立包 `dev.atoms.generated`；外置 APP_PORT/APP_DB_URL/APP_DB_USERNAME/APP_DB_PASSWORD，没有平台类、SDK 或 iframe。SQL 仅保存到模板，未在平台数据库执行。
+- 原有 `FullProjectBackendSeedTest` 缺文件错误已修复。新增 API 模板测试先因 HealthController 缺文件失败；补齐控制器、初始元数据迁移及工程自身测试后通过。健康接口只说明 HTTP 存活/INITIALIZED，不宣称已生成用户业务或数据库健康。
+- 定向 `verify`：**5 单元 + 7 集成通过**，0 失败/错误/跳过，08:56 完成且平台打包成功。覆盖 719/721 小时边界、活跃/待核对/未释放租约保护、清理前后幂等和结果、410 过期游标、批次边界、禁用、失败回滚、双清理者竞争；日志及事件的私有 canary 不外泄。
+- 新工程自身第一次 `./mvnw -B -o test` 编译成功但 MVC 上下文有 2 错误：测试没有提供必填 APP_PORT。仅给 MVC 测试添加 `APP_PORT=0` 后，**2 项独立 MVC 测试通过**（08:55），不下载依赖、不连数据库、不监听端口。正式配置要求不放宽；完整启动和 SQL 迁移仍未验收。
+
+对应命令：
+
+```sh
+# backend 目录
+./mvnw -B '-Dit.test=ProjectAgentRetentionIT,ProjectAgentObservabilityIT,ProjectAgentQueryIT,ProjectAgentCoordinatorIT#oneDispatcherRunsNewTasksAutomaticallyAndRejectsAnotherDispatcher' test-compile failsafe:integration-test failsafe:verify
+./mvnw -B '-Dtest=AgentRetentionSchedulingTest,FullProject*Test' '-Dit.test=ProjectAgentRetentionIT,ProjectAgentObservabilityIT' verify
+# templates/full-project-v1/backend 目录
+./mvnw -B -o test
+```
+
+自审：无新增平台迁移/依赖/HTTP 入口；清理数据库异常不打印异常文本或 SQL 诊断。只在 `atoms_demo_test` / `atoms_test` 非超级用户下创建并清理合成测试正文，未清理日常或远程数据。恢复禁用开关可以停止后续清理，但已过期正文不可恢复；幂等和结果审计仍保留。原生模板尚未进入平台 JAR 清单，尚无 Vue 页面、构建脚本或初始化入口，不修改旧模板或现有生成体验。
+
+框架依据：[Spring 定时调度](https://docs.spring.io/spring-framework/reference/integration/scheduling.html#scheduling-annotation-support)、[Spring Boot 3.5 外部配置](https://docs.spring.io/spring-boot/3.5/reference/features/external-config.html)、[MVC 切片测试](https://docs.spring.io/spring-boot/3.5/reference/testing/spring-boot-applications.html#testing.spring-boot-applications.spring-mvc-tests)。这些文档说明框架契约；上面的本地测试是当前版本的执行证据。
+
+### 全量回归发现的旧生成器时钟问题
+
+- 09:18 第一次完整 `./mvnw -B verify`：**267 单元通过；242 集成中 234 通过、5 失败、3 错误、0 跳过**。8 项均在旧 `GenerationExecutionIT`，新 Agent/源码测试通过。没有把失败总结果标为通过。
+- 根因：旧任务 `started_at` 由 PG `now()` 写入，Worker 检查和过期扫描却使用 Java `Instant.now()`。10:12 的只读诊断得到主机 `2026-10-19T02:12:40.396465Z`、数据库 `2026-10-19T00:01:51.824600Z`，相差约 2 小时 11 分钟。统一使用 PG `clock_timestamp()` 比较，不修改系统时间、不放宽超时上限、不改模型额度。
+- `RunExecutionClockTest` 分别将数据库时间设为 2000/2100 年：新任务应有效、901 秒旧任务应超时，扫描与 Worker 同源。修复前 **4 项明确失败**，修复后 **4 项通过**。一次沙箱运行因 Mockito 无法附加 JVM 报错，获准原样重跑后通过，没有禁用 Mockito 或跳过测试。
+- 首轮失败留下 1 RUNNING，随后复测留下 4 QUEUED，阻塞旧生成器单槽位及容量上限。按精确 UUID、测试项目名、提示和创建时间核实后，仅在 `atoms_demo_test`/`atoms_test` 将这 5 项标记取消、追加终态事件、清除对应活跃指针；不删除记录、不触碰其他历史排队项或开发库。Docker 的只读诊断客户端挂起后仅结束该自有 CLI 进程，未停止 Docker/数据库。
+- 为 `GenerationExecutionIT` 记录本测试提交成功的任务，即使后续断言失败也能通过正常取消服务收尾。第一版清理未检查终态，导致 24 项定向集成中 7 个 afterEach 错误（业务断言无失败）；已修正为只取消仍活跃的自有任务，保留错误证据并重新验证。
+- 10:18 修正后的定向 `verify`：**4 单元 + 24 集成全部通过，0 失败/错误/跳过，BUILD SUCCESS**，包括生成/追加修改、取消、失败、预算、恢复、截止时间和 SSE 回放。命令（backend 目录）：`env PATH=/Users/wubingheng/.nvm/versions/node/v24.20.0/bin:$PATH ./mvnw -B -Dtest=RunExecutionClockTest '-Dit.test=GenerationExecutionIT,RunAdmissionIT,EventReplayIT,ArtifactIT,RestorationIT' verify`。
+- 10:38 再次完整 `verify`：**271 单元全部通过；243 集成中 242 通过、0 失败、1 错误、0 跳过**。旧生成器的 10 项在完整组合中也已通过。唯一错误为 `ProjectAgentCancellationIT.interruptStillRecordsStoppedEvidenceAndRestoresInterruptFlag`：夹具 PID 文件创建即触发中断，子进程可能在写入 PID 内容前结束，最后解析空字符串；取消状态、恢复中断标记及解除执行未决的断言已通过。此命令整体仍为失败，不将其报告为全绿。
+- PID 修正仅影响受控 Java 测试夹具：先写完整 `.pending` 文件再同目录原子移动，PID 路径存在才表示就绪。新增两个确定性单测检查发布前不可见、完成后 PID 完整，以及发布前异常不产生空就绪信号；不删除进程退出断言、不放宽超时、不修改生产进程管理逻辑。后续复测覆盖该夹具的所有直接使用者。
+- 10:40 临时恢复旧的直接写 PID 文件语义，`./mvnw -B -Dtest=AgentChildFixtureTest test` **2 项均明确失败**；随即还原为原子发布，未保留该反向验证变更。两项失败均是就绪路径过早可见，不依赖随机调度碰到空文件。
+- 10:48 原子发布修复后的定向 `verify`：**18 单元 + 27 集成通过，0 失败/错误/跳过，BUILD SUCCESS**。覆盖所有直接使用夹具的 AgentProcess、CLI 探测、Worker、取消、恢复、并发协调和生命周期。命令：`env PATH=/Users/wubingheng/.nvm/versions/node/v24.20.0/bin:$PATH ./mvnw -B '-Dtest=AgentChildFixtureTest,AgentProcessTest,AgentCliProbeTest' '-Dit.test=ProjectAgentCancellationIT,ProjectAgentWorkerIT,ProjectAgentRecoveryIT,ProjectAgentCoordinatorIT,ProjectAgentLifecycleIT' verify`。最后仅测试夹具有变化，没有第三次重复无关全量套件；不把跨次结果拼成“一次全量全绿”。
+
 ## 并发调度调整（2026-10-19）
 
 用户确认不同项目并行，同项目保持编辑互斥，随后要求默认并发提高到 4。新增 `PROJECT_AGENT_MAX_CONCURRENT_TASKS`，默认 4、范围 1–8、重启生效；最大等待队列仍为 8，排队期限仍为 300 秒。此设置只影响新 Agent 模块，不修改旧生成器或默认关闭状态。
