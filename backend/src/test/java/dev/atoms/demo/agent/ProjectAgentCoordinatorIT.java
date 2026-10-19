@@ -133,6 +133,10 @@ class ProjectAgentCoordinatorIT extends AgentIntegrationSupport {
             var task = submit();
             assertThat(awaitTerminal(task.id()).status()).isEqualTo("SOURCE_SAVED");
             assertThat(adapter.calls.get()).isEqualTo(1);
+            var events = new AgentQuery(settings, projects, repository, new AgentEventRepository(jdbc), transactions)
+                    .events(owner, task.projectId(), task.id(), 0, 100);
+            assertThat(events.events().stream().filter(e -> !e.kind().equals("USAGE")).map(e -> e.payload().get("status")))
+                    .containsExactly("QUEUED", "PREPARING", "RUNNING", "VALIDATING", "ACCEPTING", "SOURCE_SAVED");
         }
     }
 
