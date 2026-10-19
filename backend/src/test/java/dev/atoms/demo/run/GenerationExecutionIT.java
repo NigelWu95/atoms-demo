@@ -8,6 +8,7 @@ import dev.atoms.demo.model.ModelException;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BooleanSupplier;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -33,6 +34,14 @@ class GenerationExecutionIT {
     @Autowired ArtifactService artifacts;
     @Autowired FakeModel model;
     @Autowired org.springframework.transaction.PlatformTransactionManager transactions;
+    private final java.util.Map<UUID, UUID> createdRuns = new java.util.LinkedHashMap<>();
+    @AfterEach void cleanupOwnedRuns() {
+        // Also settle fixtures when an assertion fails before the worker can finish.
+        // Never reset the shared test database or cancel another test's tasks.
+        createdRuns.forEach((id, owner) -> {
+            if (runs.get(owner, id.toString()).active()) admission.cancel(owner, id.toString());
+        });
+    }
     @TestConfiguration static class Fakes { @Bean @Primary FakeModel fakeModel() { return new FakeModel(); } }
     static class FakeModel implements ModelGateway {
         final AtomicInteger calls = new AtomicInteger();
@@ -68,7 +77,19 @@ class GenerationExecutionIT {
         if (base == null) input.putNull("baseVersionId"); else input.put("baseVersionId", base.toString());
         var response = s.browser.request("POST", "/api/projects/" + s.project + "/runs", input.toString(), key);
         assertThat(response.status()).isEqualTo(202);
-        return execution.start(s.owner, response.body().path("runId").asText());
+        UUID id = UUID.fromString(response.body().path("runId").asText());
+        createdRuns.put(id, s.owner);
+        Run started = execution.start(s.owner, id.toString());
+        assertThat(started).as("test run must own the execution slot").isNotNull();
+        return started;
+    }
+    @Test void cleanupSettlesOnlyOwnedFixturesWithoutCallingTheModel() throws Exception {
+        var s = setup(); Run run = enqueue(s, null, 0);
+        int before = model.calls.get();
+        cleanupOwnedRuns();
+        assertThat(runs.get(s.owner, run.id().toString()).status()).isEqualTo("CANCELLED");
+        assertThat(s.browser.get("/api/projects/" + s.project).body().path("activeRunId").isNull()).isTrue();
+        assertThat(model.calls.get()).isEqualTo(before);
     }
     @Test void createsAndModifiesRealVersionsPreservingApplicationState() throws Exception {
         var s = setup(); String key = UUID.randomUUID().toString(); Run first = enqueue(s, null, 0, key);

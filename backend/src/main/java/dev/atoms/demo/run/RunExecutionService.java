@@ -80,11 +80,15 @@ public class RunExecutionService {
     public void check(Run identity) { requireRunning(repo.get(identity.ownerId(), identity.id().toString())); }
     private void requireRunning(Run run) {
         if (!"RUNNING".equals(run.status())) throw new ModelException("RUN_CANCELLED", "任务已结束，晚到结果不会保存。");
-        if (run.startedAt().plusSeconds(timeoutSeconds).isBefore(Instant.now())) throw new ModelException("RUN_TIMEOUT", "整轮生成超过时限，未自动重试。");
+        if (run.startedAt().plusSeconds(timeoutSeconds).isBefore(databaseNow())) throw new ModelException("RUN_TIMEOUT", "整轮生成超过时限，未自动重试。");
     }
     public java.util.List<Run> interrupted() { return jdbc.query("SELECT * FROM runs WHERE status = 'RUNNING'", RunRepository.ROW); }
     public java.util.List<Run> expired() {
         return jdbc.query("SELECT * FROM runs WHERE status = 'RUNNING' AND started_at < ?", RunRepository.ROW,
-                java.sql.Timestamp.from(Instant.now().minusSeconds(timeoutSeconds)));
+                java.sql.Timestamp.from(databaseNow().minusSeconds(timeoutSeconds)));
+    }
+    private Instant databaseNow() {
+        // started_at is written by PostgreSQL. Host/VM clock skew must not expire fresh work.
+        return jdbc.queryForObject("SELECT clock_timestamp()", java.sql.Timestamp.class).toInstant();
     }
 }
