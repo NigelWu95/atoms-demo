@@ -52,4 +52,18 @@
       </plugin>
     </plugins>
   </build>
+  <profiles>
+    <profile>
+      <id>full-project-package</id>
+      <build>
+        <resources>
+          <resource><directory>src/main/resources</directory><filtering>false</filtering></resource>
+          <resource>
+            <directory>${full-project.resources}</directory><filtering>false</filtering>
+            <includes><include>static/**</include></includes>
+          </resource>
+        </resources>
+      </build>
+    </profile>
+  </profiles>
 </project>
