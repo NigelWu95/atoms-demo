@@ -2,6 +2,32 @@
 
 日期：2026-10-18～19。规格与计划已批准，模块仍未完成。只使用本机假 Anthropic 服务和公开测试字符串，不调用真实 DeepSeek、不改个人 Claude 配置、不部署、不推送。任务状态以 [清单](../tasks/project-agent/todo.md)为准。
 
+## PA31–PA32：隔离回归与重复中断修复（2026-10-19）
+
+用户确认保留旧测试记录后，新建 `atoms_demo_test.atoms_verify_20261019_pa32`，owner 为非超级用户 `atoms_test`、撤销 PUBLIC 权限；创建事务前后核对原任务和租约的行摘要一致。管理员只创建 schema，Flyway 和测试仍用 `atoms_test`。通过进程环境 `SPRING_DATASOURCE_URL` 指定 `currentSchema`，未修改私有 env、默认测试配置、开发库或远程数据库。Docker 管理接口 8 秒超时，但 JDBC 直连正常；没有重启 Docker。
+
+- 13:52 自动应用 23 项迁移至 V022。13:55 组合 `ProjectAgentCrashIT,ProjectAgentConcurrencyIT,ProjectAgentRecoveryIT,ProjectAgentCoordinatorIT,ProjectSourceAgentCoexistenceIT,ProjectSourceRecoveryIT` **32 项：26 通过、6 失败、0 错误/跳过，BUILD FAILURE**。命令还指定了不存在的 `ProjectAgentCoordinatorLeaseIT`，它没有产生测试结果，不计入覆盖；实际租约丢失验证在 CoordinatorIT 中通过。
+- 初次失败是默认四并发用例：任务 `af6755c5-182b-4e97-af94-1e5bd1b5e1d4`（项目 `2c35e723-fb66-47f5-a3e4-4f57ceba9d43`）成为 `NEEDS_RECONCILIATION / AGENT_PROCESS_UNSETTLED`，导致队列下一项不能启动，后续协调者也被阻断。只读检查确认 `live_reserved=false`、执行未决、停止凭据缺失、基线未改变。原 `atoms` 中 PA29b 记录也原样保留。未直接更新状态、删除证据或换环境冒充通过。
+- 此次日志不足以区分进程、后代或 I/O 收尾失败。脱离数据库的四进程取消 **3 次通过**，不能据此认定原失败消失。代码检查另发现重复中断会使 `awaitTermination` 提前返回失败；14:00 新增两个确定性测试 **2 失败**：额外中断提前放弃本任务 I/O、缺少安全原因日志。
+- PA32a 修复：重复中断继续在**原 10 秒**收尾期限内等待真实 I/O 结束，最后恢复中断标志；超时、未知后代和身份变化仍不发行停止凭据。新增 `owned_process_unsettled` 只记录任务/执行 UUID、固定 `entryPoint` 和枚举原因，不记录路径、命令、提示、stderr 或原始异常。它回答“哪次执行未结算、在哪个收尾边界失败”两个问题，不增加公开错误详情或指标高基数标签。
+- 14:01 `./mvnw -B '-Dtest=AgentProcessTest,AgentProcessConcurrencyTest,AgentProcessInterruptionTest,AgentCliProbeTest' test` **21 单元通过，0 失败/错误/跳过**。其中日志 canary 和重复中断均通过，未知后代仍保留拒绝。不把这个独立修复称为初次四并发失败已完全定位。
+- Python 源码文件工具 **11 项通过**。前端 `typecheck / lint / format:check / test:unit / build` 全部通过，**54 文件 / 372 单元**；既有浏览器基础流程 **22 项通过**，使用 8081/5174 隔离测试服务、独立 Chrome、假模型配置和假邮件，没有连接日常运行服务。
+- 14:05 全部后端单元 **288 项 / 66 文件通过**；定向 `ProjectAgentDisabledCompatibilityIT,ProjectAgentCancellationIT,ProjectAgentConcurrencyIT,ProjectSourceCompatibilityIT,ProjectAgentObservabilityIT` **13 集成通过，BUILD SUCCESS**。关闭兼容覆盖实际 Spring 装配：无协调者/清理调度 bean，七个 Agent 入口返回 `AGENT_DISABLED`；旧版保存、恢复和工程组装不创建 Agent/源码记录。不是全部后端集成通过。
+- 运行态浏览器 **49 项通过**，与前述基础流程合计 **71 项，0 失败/跳过**。包含旧工程下载、增量差异、发布/下线、数据保存、版本恢复、首页生成状态及长工作台内滚动。命令为 `CI=1 npx playwright test --config playwright.isolated.config.ts` 和 `CI=1 npm run test:e2e:runtime`，两者均带上面的 Node24 PATH 与测试数据库 URL。
+- 14:09 `agent-cli-contract` 显式 profile 复验 **15 单元 + 9 集成通过，0 失败/错误/跳过，BUILD SUCCESS**。集成为 7 项真实 CLI 离线契约和 2 项 `AgentCoordinatorLeaseIT`；本机 2.1.303 通过五种文件工具、两轮完整工程修改以及 Bash/MCP/子 Agent/目录外访问拒绝。两轮实际新版本为 `dc858eb9-d6dc-4b02-8743-f5824e8f91db`、`e38f6f4f-e304-4d12-a026-cdac634d2e77`，tree hash 分别 `0282e14a08cea9c4b50229eed9233c18b4d07cce9073fb6782909a96f1f93252`、`88329a7a813e6386dc88b6104299cd192745bea9e48e9802fb2d654c75e33f37`，两次停止凭据均已保存。假服务每轮 8 次请求，不是付费模型效果验收。
+- 14:10 反向审阅临时将收尾等待的中断分支恢复为立即失败；针对性单测 **1 项明确失败**，随后立即还原。还原前后 `OwnedProcess.java` SHA-256 均为 `bf4b618039bd050f982a5a8b505fcc51af7d57a9e562e89154b542650a637640`，不保留变异。四进程单测另补全每个任务最终凭据和 PID 已退出的断言，不仅检查第一个取消者。
+- 14:11 还原后的最终定向 `verify` **21 单元 + 2 关闭兼容集成通过，0 失败/错误/跳过，BUILD SUCCESS**，平台 JAR 已重建。测试状态以原型本地包为限，没有部署。审阅确认：无数据库迁移、工具/额度/超时放宽、额外依赖或秘密字段；新等待循环沿用固定截止时刻，新日志只在未决结果出现；浏览器测试的 8081/5174 端口已释放。旧 OAuth 草稿和用户私有配置不纳入提交。
+
+本节测试均使用 Oracle Java 17.0.5、Node 24.20.0；新测试 schema 的命令前缀为：
+
+```sh
+env PATH=/Users/wubingheng/.nvm/versions/node/v24.20.0/bin:$PATH \
+  SPRING_DATASOURCE_URL='jdbc:postgresql://127.0.0.1:5432/atoms_demo_test?currentSchema=atoms_verify_20261019_pa32&connectTimeout=3&socketTimeout=5' \
+  ./mvnw -B ...
+```
+
+PA31 完整组合和 PA32 全量仍未验收通过；新增 schema 不意味着原未决记录已结算。没有把多个定向命令拼成“一次全量全绿”，PA33 最终交接和后续执行模块仍未完成。
+
 ## PA31：中断与并发验收进展（2026-10-19，未全项完成）
 
 本轮新增三个测试文件，不修改生产恢复规则或数据库迁移：
