@@ -1,6 +1,67 @@
 # project-agent · 离线实施与兼容性记录
 
-日期：2026-10-18～19。规格与计划已批准，模块仍未完成。只使用本机假 Anthropic 服务和公开测试字符串，不调用真实 DeepSeek、不改个人 Claude 配置、不部署、不推送。任务状态以 [清单](../tasks/project-agent/todo.md)为准。
+日期：2026-10-18～19。PA01–PA33 内部离线验收完成，真实模型 PA-LIVE 未验收，完整应用构建/运行/交付/工作台仍未完成。只使用本机假 Anthropic 服务和公开测试字符串，不调用真实 DeepSeek、不改个人 Claude 配置、不部署、不推送。任务状态以 [清单](../tasks/project-agent/todo.md)为准，操作说明见[维护指南](project-agent.md)。下文历史失败记录保留，不代表最终回归仍失败。
+
+## PA32–PA33：最终全量与交接（2026-10-19 15:31）
+
+15:31:42，修复并恢复所有校验后的单次完整后端 `verify`：**290 单元 + 272 集成通过，0 失败/错误/跳过，BUILD SUCCESS**，耗时 14:34。包括崩溃子进程、默认四并发/取消补位、两轮完整模板编辑、源码恢复、旧生成器、邮箱/密码账号、预览/下载/恢复/发布及新旧模板包装。平台 JAR 重建成功，不是生成应用 JAR 的运行验收。
+
+```sh
+# backend 目录；Oracle Java 17.0.5
+env PATH=/Users/wubingheng/.nvm/versions/node/v24.20.0/bin:$PATH \
+  SPRING_DATASOURCE_URL='jdbc:postgresql://127.0.0.1:5432/atoms_demo_test?currentSchema=atoms_verify_20261019_pa32b&connectTimeout=3&socketTimeout=5' \
+  ./mvnw -B verify
+```
+
+本轮唯一代码修改是 3 个测试文件的 schema 传递与校验，已本地提交 `e108c3d`；生产代码与上一轮修复后版本一致。因此保留此前同生产代码的 Python 11、前端 372 单元及类型/规范/构建、浏览器 71 和显式 CLI profile 9 集成证据（本文件 14:05～14:11 记录），不称它们在本轮又运行了一次。默认 `verify` 不包含 opt-in 的真实 CLI 离线契约，不把排除它们的结果当作 CLI 验收。
+
+最终只读复核：旧 `atoms` 的 `f7e3d276-…` 和 `atoms_verify_20261019_pa32` 的 `af6755c5-…` 仍保留原未决状态、执行 ID、停止凭据缺失和原基线。pa32b 的待核对 Agent 任务、未决执行及活动编辑租约均为 **0**。`atoms_test` 仍无 CREATE schema 权限。进程列表中仅原日常 Java PID 74524 保留，本次 Maven/测试 JVM 已退出；未杀个人进程、重启 Docker或改变日常服务。
+
+PA33 新增维护指南，按实际代码核对 16 个配置别名、内部入口、额度/期限、默认并发、错误处理、保留期限、启停顺序及备份要求；同步规格、能力地图、ADR 和旧源码说明。原有 C-EB11、PA-LIVE 与旧失败审计不被勾掉或抹去。没有新增依赖、生产迁移、公开路由或宽权限工具；私有 env、本地审计辅助程序及 OAuth 草稿不纳入提交。
+
+验收映射（对应规格 §8）：
+
+| 场景 | 证据入口 |
+|---|---|
+| 1 配置、禁用、权限 | `AgentSettingsTest`、`ClaudeCodeAgentTest`、`ProjectAgentDisabledCompatibilityIT` |
+| 2 隔离配置与真实 CLI 参数 | `AgentInvocationTest`、`AgentEnvironmentTest`、`AgentCliContractIT`（loopback） |
+| 3 越界与工具拒绝 | `AgentCliBoundaryContractIT`、`ProjectAgentBoundaryIT`、源码策略测试 |
+| 4 完整源码连续编辑 | `ProjectAgentJourneyIT`、`AgentCliJourneyContractIT`，版本/hash 见 PA29 |
+| 5 幂等、同项目互斥与所有权 | `ProjectAgentAdmissionIT`、`ProjectAgentCoordinatorIT`、`ProjectSourceEditGuardIT` |
+| 6 取消、期限、进程收尾 | `AgentProcessTest`、并发/重复中断单测、`ProjectAgentCancellationIT` |
+| 7 失败流及无修改 | `AgentStreamDecoderTest`、`ProjectAgentWorkerIT`、`ProjectAgentJourneyIT` |
+| 8 崩溃与恢复 | `ProjectAgentCrashIT`、`ProjectSourceAgentCoexistenceIT`、`ProjectSourceLifecycleIT` |
+| 9 事件/清理与旧链路 | 查询/保留/兼容集成，本次全量及前述浏览器回归 |
+| 10 真实 DeepSeek | **未授权、未执行；PA-LIVE 保持未完成** |
+
+后续接入受控安装/构建、修复反馈、本机应用进程和同快照交付；不能把这次文件编辑模块的离线验收称为新网页功能已经上线。
+
+## PA31 组合复验（2026-10-19 14:34）
+
+用户确认后新建 `atoms_demo_test.atoms_verify_20261019_pa32b`，owner 仍为非超级用户 `atoms_test`，PUBLIC 权限撤销。创建事务核对旧 `atoms` 和 `atoms_verify_20261019_pa32` 两份任务/租约行摘要前后一致；没有解除旧阻断或重写审计。23 项迁移仅应用到新 schema，日常与远程数据库未改动。
+
+14:34:35 以下组合 **34 项全部通过，0 失败/错误/跳过，BUILD SUCCESS**，耗时 3:41。包括默认 4、显式 1/3 并发、取消后补位、其他任务继续运行、双协调者互斥、租约丢失、停机收尾、崩溃窗口、重复 Worker、源码恢复竞争。正确类名 `AgentCoordinatorLeaseIT` 的 2 项也计入本次结果。
+
+```sh
+# backend 目录；Oracle Java 17.0.5
+env PATH=/Users/wubingheng/.nvm/versions/node/v24.20.0/bin:$PATH \
+  SPRING_DATASOURCE_URL='jdbc:postgresql://127.0.0.1:5432/atoms_demo_test?currentSchema=atoms_verify_20261019_pa32b&connectTimeout=3&socketTimeout=5' \
+  ./mvnw -B \
+  '-Dit.test=ProjectAgentCoordinatorIT,AgentCoordinatorLeaseIT,ProjectAgentCrashIT,ProjectAgentConcurrencyIT,ProjectAgentRecoveryIT,ProjectSourceAgentCoexistenceIT,ProjectSourceRecoveryIT' \
+  test-compile failsafe:integration-test failsafe:verify
+```
+
+本次未再出现 `owned_process_unsettled`。先前重复中断缺陷已有确定性红绿证据，本次组合为修复后的回归证据；不能倒推日志不足的旧失败必然只有同一根因。旧两份未决审计仍保留，未伪造停止凭据。PA31 的组合验收完成；PA32 的单次全量后端结果另行记录，不用此次定向结果替代。
+
+### PA32c：真实崩溃夹具的 schema 传递
+
+随后全量 `verify` 于 14:50:19 完成：**288 单元通过，272 集成中 271 通过、1 失败，0 错误/跳过，BUILD FAILURE**，耗时 15:02。唯一失败为 `ProjectSourceLifecycleIT.recoversAfterARealJvmExitsBetweenGitAndDatabasePublication`：预期子进程在 Git 写入后以 71 退出，实际为 1。检查发现测试专用 `SourceProcessProbe` 固定连接 `currentSchema=atoms`，而父测试任务位于 pa32b；不是生产恢复规则导致。子进程未取得该测试任务，不能把退出 1 当作完成崩溃窗口测试。Agent 调度 10 项和其余新旧功能均通过。
+
+修复仅涉及测试夹具：父进程从实际连接读取 `current_schema()`，子进程只接受 `atoms` 或有界 `atoms_verify_*` 标识，数据库/主机/账号仍固定为本机 `atoms_demo_test` / `atoms_test`，并复查当前 schema 与非超级用户。密码仍只经 stdin 传递，其他环境不继承。新增两个单测检查原/隔离 schema 和缺失、搜索路径、连接参数注入；在独立临时 javac 输出目录中先得到缺少 `databaseUrl` 的两处编译错误，未覆盖正在运行的测试类。生产文件、迁移及超时均不改。
+
+15:14:01，同一 pa32b 前缀运行 `./mvnw -B -Dtest=SourceProcessProbeTest -Dit.test=ProjectSourceLifecycleIT verify`：**2 单元 + 4 生命周期集成通过，0 失败/错误/跳过，BUILD SUCCESS**。15:14:42 反向验证临时去掉 schema 格式校验，`./mvnw -B -Dtest=SourceProcessProbeTest test` **2 项中 1 明确失败**；立即恢复后文件 SHA-256 与变异前一致：`0f86e3a1527bfcd29541f439936af0d4a4258963cac194f0b53c84f7d1a726aa`。之后开始最终全量，不保留变异。
+
+只读检查确认旧两份审计的任务/执行/基线/未决标记不变；pa32b 中 Agent 待核对、执行未决和活动编辑租约均为 **0**。测试账号仍无 CREATE schema 权限。最终全量结果另记，不能用定向绿色结果替代。
 
 ## PA31–PA32：隔离回归与重复中断修复（2026-10-19）
 

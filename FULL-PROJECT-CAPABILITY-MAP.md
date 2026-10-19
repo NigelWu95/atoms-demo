@@ -1,19 +1,19 @@
 # 完整源码工程与 Coding Agent · 能力地图
 
-状态：2026-10-18，`project-source` 内部模块已实现并通过本地验收，默认关闭；后续模块仍需逐模块评审。本文不是整体改造完成或已部署声明。
+状态：2026-10-19，`project-source` 内部模块与 `project-agent` 的 PA01–PA33 离线能力已验收，默认关闭；真实模型及执行/交付/工作台仍待完成。按已确认的完整本地闭环范围继续逐模块细化，不将本文当作整体改造完成或已部署声明。
 
 ## 目标与现状
 
 让用户描述需求后得到可持续修改的完整 Vue + Spring Boot 17 + PostgreSQL 工程，包含实际前端、后端业务接口和数据库迁移。预览运行该工程的构建结果，下载提供对应的同一份源码快照。
 
-当前网页生成链路仍是模型生成 `view.html`、`styles.css`、`main.js`，数据库保存不可变产物，再与固定工程模板组装。新源码模块已能在磁盘 Git 管理完整 Vue/Java/SQL 树及其增量版本，但尚未接到模型或网页。已有工程下载和本机运行不等于已经支持任意后端业务代码生成。
+当前网页生成链路仍是模型生成 `view.html`、`styles.css`、`main.js`，数据库保存不可变产物，再与固定工程模板组装。新源码模块已能在磁盘 Git 管理完整 Vue/Java/SQL 树及增量版本，内部 Claude Code 适配器已通过真实 CLI + 假模型服务的两轮编辑与恢复验收；尚未完成真实 DeepSeek、新工程构建运行或网页接入。已有工程下载和本机运行不等于网页已经支持任意后端业务代码生成。
 
 原有固定模板能力与验收记录保留在 [原能力地图](CAPABILITY-MAP.md)。本地图描述新模式，不追溯修改旧模式的功能及安全结论。
 
 | 稳定模块 ID | 职责 | 依赖 | 规格状态 |
 |---|---|---|---|
 | `project-source` | 每项目完整源码 Git 仓库、不可变版本、工作副本、元数据、旧产物显式导入 | 现有项目身份与所有权 | 内部模块已验收、默认关闭；[使用说明](docs/project-source.md)、[测试证据](docs/project-source-verification.md)、[任务清单](tasks/project-source/todo.md) |
-| `project-agent` | Claude Code + DeepSeek 在任务副本中读取及修改 Vue、Java、SQL 等文件，提交可检查的变更 | `project-source` | [规格](SPEC-project-agent.md)和[计划](tasks/project-agent/plan.md)已确认；PA01–PA30 内部切片完成，包含默认 4 并发、原生模板、两轮完整源码离线旅程和拒绝边界；当前 CLI 2.1.303 已精确适配，[证据](docs/project-agent-verification.md)。恢复/全量回归仍待完成，并保留一条合成测试待核对记录；实际构建运行、工作台及真实模型验收未完成 |
+| `project-agent` | Claude Code + DeepSeek 在任务副本中读取及修改 Vue、Java、SQL 等文件，提交可检查的变更 | `project-source` | PA01–PA33 内部离线验收完成，默认 4 并发；最终后端 290 单元 + 272 集成通过，CLI 2.1.302 / 2.1.303 精确适配。见[维护说明](docs/project-agent.md)、[证据](docs/project-agent-verification.md)、[任务清单](tasks/project-agent/todo.md)。真实模型 PA-LIVE 未完成，旧两份测试未决审计保留；不代表实际构建运行或工作台已交付 |
 | `project-execution` | 对固定源码版本测试、构建、启动本机进程；失败保留上一可用结果 | `project-source` | 待规格评审 |
 | `project-delivery` | 实际应用预览、同快照下载、代码版本恢复；明确业务数据边界 | `project-source`、`project-execution` | 待规格评审 |
 | `project-workbench` | 文件树、差异、任务与构建状态、实际进程预览及增量开发入口 | 以上模块 | 待规格评审 |
