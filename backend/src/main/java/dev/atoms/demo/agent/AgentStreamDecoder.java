@@ -22,7 +22,7 @@ import java.util.TreeSet;
 /** Decodes one NDJSON run. Raw model text, source, reasoning and stderr are never returned. */
 final class AgentStreamDecoder {
     private static final Set<String> TOOLS = Set.of("Read", "Glob", "Grep", "Write", "Edit");
-    // CLI 2.1.302 reports these bundled modules even in safe mode; no filesystem plugin is accepted.
+    // Pinned CLI releases report these modules even in safe mode; no filesystem plugin is accepted.
     private static final Set<String> BUILTIN_MODULES = Set.of("cc-plugin-agents-md", "cc-plugin-plugin-authoring");
     private final ObjectMapper json = new ObjectMapper().enable(JsonParser.Feature.STRICT_DUPLICATE_DETECTION)
             .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
@@ -117,7 +117,7 @@ final class AgentStreamDecoder {
             var seen = new HashSet<String>();
             for (var plugin : plugins) {
                 String name = plugin.path("name").asText();
-                if (!event.path("claude_code_version").asText().equals("2.1.302")
+                if (!AgentCliProbe.SUPPORTED_VERSIONS.contains(event.path("claude_code_version").asText())
                         || !plugin.isObject() || plugin.size() != 3 || !BUILTIN_MODULES.contains(name) || !seen.add(name)
                         || !plugin.path("path").asText().equals("builtin")
                         || !plugin.path("source").asText().equals(name + "@builtin"))

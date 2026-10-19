@@ -55,7 +55,8 @@ class AgentStreamDecoderTest {
         String plugin = "{\"name\":\"cc-plugin-agents-md\",\"path\":\"builtin\",\"source\":\"cc-plugin-agents-md@builtin\"}";
         String init = INIT.replace("\"mcp_servers\":[]", "\"mcp_servers\":[],\"claude_code_version\":\"2.1.302\",\"plugins\":[" + plugin + "]");
         assertThat(read(init + SUCCESS).events()).isEqualTo(2);
-        for (String invalid : new String[]{init.replace("2.1.302", "2.1.303"),
+        assertThat(read(init.replace("2.1.302", "2.1.303") + SUCCESS).events()).isEqualTo(2);
+        for (String invalid : new String[]{init.replace("2.1.302", "2.1.304"),
                 init.replace("\"builtin\"", "\"/private/plugin\""),
                 init.replace("cc-plugin-agents-md@builtin", "cc-plugin-agents-md@user"),
                 init.replace("cc-plugin-agents-md", "unknown-plugin"),

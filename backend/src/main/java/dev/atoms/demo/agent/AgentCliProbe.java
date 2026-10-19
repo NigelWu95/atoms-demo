@@ -15,6 +15,8 @@ import java.util.Objects;
 
 /** Version probing is explicit and credential-free; no update or personal configuration commands. */
 final class AgentCliProbe {
+    // Exact, behavior-tested releases only; never accept an arbitrary semver range.
+    static final java.util.Set<String> SUPPORTED_VERSIONS = java.util.Set.of("2.1.302", "2.1.303");
     private AgentCliProbe() {}
 
     static Identity verify(Path executable, Path config, Path temporary) throws IOException {
@@ -46,7 +48,8 @@ final class AgentCliProbe {
     }
 
     static void requireVersion(int exit, byte[] output) throws IOException {
-        if (exit != 0 || !Arrays.equals(output, "2.1.302 (Claude Code)\n".getBytes(StandardCharsets.UTF_8)))
+        if (exit != 0 || SUPPORTED_VERSIONS.stream().noneMatch(version ->
+                Arrays.equals(output, (version + " (Claude Code)\n").getBytes(StandardCharsets.UTF_8))))
             throw unsupported();
     }
 
