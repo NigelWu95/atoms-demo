@@ -1,6 +1,6 @@
 # Spec: project-agent · Claude Code + DeepSeek 完整工程编辑
 
-状态：2026-10-18～19，用户已确认规格、[实施计划](tasks/project-agent/plan.md)与[任务清单](tasks/project-agent/todo.md)，并将范围扩展至完整本地开发闭环（§10）。检查点用于汇报证据，不重复请求逐项批准；真实付费模型 PA-LIVE 与部署仍需另行授权。PA01–PA25 内部切片已完成：文件编辑、默认 4 并发调度、查询/正文保留及原生 Java/Vue 模板；前端自身测试、构建及本机测试 API 的浏览器验收通过。模板包装/初始化、完整工程构建运行及工作台接入仍在实施，不是完整产品交付声明。
+状态：2026-10-18～19，用户已确认规格、[实施计划](tasks/project-agent/plan.md)与[任务清单](tasks/project-agent/todo.md)，并将范围扩展至完整本地开发闭环（§10）。检查点用于汇报证据，不重复请求逐项批准；真实付费模型 PA-LIVE 与部署仍需另行授权。PA01–PA27 内部切片已完成：文件编辑、默认 4 并发调度、查询/正文保留、原生 Java/Vue 模板、脚本契约及正式平台 JAR 模板包装；前端自身测试、构建及本机测试 API 的浏览器验收通过。初始化、完整工程实际构建运行及工作台接入仍在实施，不是完整产品交付声明。
 
 模块索引：[完整工程能力地图](FULL-PROJECT-CAPABILITY-MAP.md)。上游：[源码模块](SPEC-project-source.md)。总体方向：[ADR-016](docs/decisions/016-full-project-source-and-coding-agent.md)。本文不是整个工程改造的完成声明，也不是执行生成后端的授权。
 

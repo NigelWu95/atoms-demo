@@ -71,6 +71,28 @@ env -i PATH=/Users/wubingheng/.nvm/versions/node/v24.20.0/bin:/usr/bin:/bin /Use
 
 最终脚本退出 0，截图在 `.local/native-seed-browser-Zjzsfy/`；开发与构建各有桌面/手机图，已核对布局。API 是本机确定性夹具，**没有启动真实 Java 或数据库**。脚本关闭自己创建的浏览器和服务，不触碰日常平台；不随应用模板打包。模板尚未进入正式 JAR 清单，构建/启动脚本、初始化交接、完整工程运行和工作台仍未完成。没有真实模型调用、个人配置修改、推送或部署。
 
+## PA26：工程自带构建/启动契约（2026-10-19）
+
+分三片交付：进程工具、构建打包、显式配置启动。进程工具沿用已审阅旧模板实现，固定 argv、`shell:false`、白名单环境，取消传播至本次进程组；没有为 Agent 开放 Shell。构建先执行脚本测试，再依次安装锁定前端依赖（禁用安装脚本）、检查/测试/构建，复制 dist 至独立临时资源目录，由原生 Maven profile 打进 JAR。链接、私有 dot 文件、缺少入口和过量资源拒绝；不重写源码或递归删除目录。
+
+启动要求工程外的 0600 普通配置文件和已有 JAR，只启动前台 Java、绑定 loopback，不隐式构建或发布。源码忽略规则、运行配置说明与第三方许可证索引齐备。脚本仍不是 OS 沙箱：过滤环境不防止同 UID 文件访问，工具可能读取本机用户配置；维护者应只执行已审阅工程，平台执行准入另行实现。
+
+- 三组 Node 测试先因缺少对应脚本无法加载；实现后 **12 项通过、0 失败/错误/跳过**（11:24）。其中 4 项进程测试真实运行无网络 Node 子进程，其余注入 runner，检查顺序、argv、环境、资源复制与拒绝路径；没有执行 npm 安装、Maven 打包或 Java 应用启动。
+- 一项构建测试初次失败是 macOS `/var` 与 `/private/var` 路径别名断言不一致；测试临时根统一 `realpath` 后通过，生产路径校验未放宽。测试目录和资源暂存只含合成内容，保留而不自动清理未知目录。
+- Java 构建契约先缺 build.mjs 失败，补齐后通过；扩展启动说明/权限断言后，11:25 **全部 8 项 FullProject 模板测试通过**。模板源码通过既有 ProjectSourcePolicy，未扩充秘密占位符白名单。
+
+命令（仓库根）：`node --test templates/full-project-v1/scripts/process.test.mjs templates/full-project-v1/scripts/build.test.mjs templates/full-project-v1/scripts/start.test.mjs`，实际 Node 为 `/Users/wubingheng/.nvm/versions/node/v24.20.0/bin/node`。平台 backend 目录：`./mvnw -B '-Dtest=FullProject*Test' test`。未实际运行 `node scripts/build.mjs` 或 `node scripts/start.mjs`；完整 JAR/数据库/业务启动仍未验收。进程组依据 [Node 24 detached](https://nodejs.org/download/release/v24.20.0/docs/api/child_process.html#optionsdetached)，资源配置依据 [Maven 资源目录](https://maven.apache.org/plugins/maven-resources-plugin/examples/resource-directory.html)。
+
+## PA27：原生模板进入正式平台 JAR（2026-10-19）
+
+独立 `project-agent-templates/` 资源域，固定 `full-project-v1.files` 的 35 项清单；先验证排序、路径、冲突与数量，再限量读取，拒绝缺失/重复 classpath 来源、链接、超限、非 UTF-8 和秘密内容。完整树使用原有 ProjectSourcePolicy 计算确定性摘要；只有 `backend/mvnw` 标为可执行。不扫描源码工作目录、不打包 node_modules/target/dist 或本机环境。
+
+- 读取器先缺类编译失败，实现后 4 单测通过。打包集成先得到 1 失败 + 1 错误：平台包未包含清单，真实 Boot JAR 外部启动的测试入口退出 1。旧模板 2 项集成当时仍通过。
+- 添加精确 Maven includes 后，11:32 `./mvnw -B '-Dtest=FullProject*Test,TemplateCatalogTest' '-Dit.test=FullProjectTemplatePackagingIT,TemplatePackagingIT' verify`：**17 单元 + 4 集成通过，0 失败/错误/跳过，BUILD SUCCESS**。
+- 清单、源文件、Maven 资源和最终 JAR 逐字节核对；实际 Boot JAR 在全新临时目录、空环境，由测试专用入口读取新旧各自 catalog。测试入口/Agent 夹具未混入生产类。旧 TemplatePackagingIT 仅将 POM include 检查限定到原 engineering-templates 资源域，原 106 文件、字节和 JAR 精确集合断言不变；新资源域有对称的精确集合断言。
+
+这是平台分发模板的包装验收，不是生成应用 JAR 构建、数据库迁移或应用启动验收。自有读取子进程退出并已收尾；没有实际模型、日常配置、数据库迁移、推送或部署。
+
 ## 并发调度调整（2026-10-19）
 
 用户确认不同项目并行，同项目保持编辑互斥，随后要求默认并发提高到 4。新增 `PROJECT_AGENT_MAX_CONCURRENT_TASKS`，默认 4、范围 1–8、重启生效；最大等待队列仍为 8，排队期限仍为 300 秒。此设置只影响新 Agent 模块，不修改旧生成器或默认关闭状态。
