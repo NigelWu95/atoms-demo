@@ -37,11 +37,15 @@ final class AgentProtocolFixture implements AutoCloseable {
     private volatile String failure;
 
     AgentProtocolFixture(Path root, Path cli) throws IOException {
+        this(root, cli, null);
+    }
+
+    AgentProtocolFixture(Path root, Path cli, Path workspace) throws IOException {
         this.cli = cli;
-        this.project = directory(root.resolve("project"));
+        this.project = workspace == null ? directory(root.resolve("project")) : workspace.toRealPath();
         this.config = directory(root.resolve("config"));
         this.temporary = directory(root.resolve("tmp"));
-        Files.writeString(project.resolve("hello.txt"), "before\n");
+        if (workspace == null) Files.writeString(project.resolve("hello.txt"), "before\n");
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/", this::respond);
         server.start();
@@ -55,6 +59,7 @@ final class AgentProtocolFixture implements AutoCloseable {
     boolean configurationCanarySeen() { return configurationCanarySeen; }
     boolean outsideContentSeen() { return outsideContentSeen; }
     AgentStreamDecoder.Summary summary() { return summary; }
+    String failure() { return failure; }
     record ToolResult(boolean error, String content) {}
     private record Step(String id, String name, Map<String, Object> input) {}
     record Request(String apiKey, String model, int maxTokens, List<String> tools, boolean stream,
@@ -78,6 +83,36 @@ final class AgentProtocolFixture implements AutoCloseable {
                 new AgentDeadline(Duration.ofSeconds(45)), () -> false);
         if (failure != null) throw new AssertionError(failure);
         return result;
+    }
+
+    AgentCliProbe.Identity verifyCli(AgentDeadline deadline) throws IOException {
+        return AgentCliProbe.verify(cli, config, temporary, deadline::remaining);
+    }
+
+    AgentProcess.Result editNativeProject(AgentTask task, UUID execution, AgentDeadline deadline,
+                                         java.util.function.BooleanSupplier cancelled, int round,
+                                         AgentCliProbe.Identity identity) throws IOException {
+        var script = new ArrayList<Step>();
+        script.add(new Step("glob_vue", "Glob", Map.of("pattern", "frontend/src/*.vue", "path", project.toString())));
+        script.add(new Step("grep_title", "Grep", Map.of("pattern", NativeProjectEdits.before(round), "path", project.toString(), "output_mode", "content")));
+        script.add(new Step("read_vue", "Read", Map.of("file_path", project.resolve(NativeProjectEdits.VUE).toString())));
+        script.add(new Step("edit_vue", "Edit", Map.of("file_path", project.resolve(NativeProjectEdits.VUE).toString(),
+                "old_string", NativeProjectEdits.before(round), "new_string", NativeProjectEdits.after(round))));
+        String readJava = round == 1 ? "backend/src/main/java/dev/atoms/generated/HealthController.java" : NativeProjectEdits.JAVA;
+        script.add(new Step("read_java", "Read", Map.of("file_path", project.resolve(readJava).toString())));
+        script.add(round == 1 ? write("write_java", NativeProjectEdits.JAVA, NativeProjectEdits.javaContent(round))
+                : new Step("edit_java", "Edit", Map.of("file_path", project.resolve(NativeProjectEdits.JAVA).toString(),
+                        "old_string", "round-1", "new_string", "round-2")));
+        script.add(write("write_sql", NativeProjectEdits.sqlPath(round), NativeProjectEdits.sqlContent(round)));
+        steps = List.copyOf(script);
+        var settings = new AgentSettings.Configuration(identity.path(), config.getParent(), Set.of(task.ownerId()),
+                false, 0, 128000, 24, Duration.ofSeconds(1800), Duration.ofSeconds(300), 4);
+        var builder = AgentInvocation.create(identity.path(), settings, project, config, temporary, "offline-fixture-key");
+        builder.environment().put("ANTHROPIC_BASE_URL", "http://127.0.0.1:" + server.getAddress().getPort() + "/anthropic");
+        try {
+            return new AgentProcess().run(builder, task.prompt(), deadline, cancelled, task.id(), execution,
+                    () -> identity.verifyUnchanged(deadline::remaining));
+        } finally { builder.environment().clear(); }
     }
 
     Result exerciseProjectTools() throws Exception {

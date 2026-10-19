@@ -14,6 +14,20 @@ class ProjectAgentJourneyIT extends NativeJourneySupport {
         assertThat(calls).hasValue(2);
     }
 
+    @Test void unsupportedCliAtPreparationCreatesNoExecutionIntentAndReleasesTheLease() {
+        var base = source.create(owner);
+        var task = tasks.submit(owner, base.projectId(), input("edit", base.versionId(), 1), "unsupported-cli");
+        CodingAgent unsupported = (request, work, deadline) -> { throw new IOException("AGENT_CLI_UNSUPPORTED"); };
+        var result = worker(unsupported).execute(task.id());
+        assertThat(result.status()).isEqualTo("FAILED");
+        assertThat(result.errorCode()).isEqualTo("AGENT_CLI_UNSUPPORTED");
+        assertThat(result.executionId()).isNull();
+        assertThat(result.liveReserved()).isFalse();
+        assertThat(jdbc.queryForObject("SELECT status FROM source_edit_leases WHERE task_id=?", String.class, task.id())).isEqualTo("RELEASED");
+        assertThat(jdbc.queryForObject("SELECT execution_pending FROM source_edit_leases WHERE task_id=?", Boolean.class, task.id())).isFalse();
+        assertCurrent(base.projectId(), base.versionId(), 1);
+    }
+
     @Test void noChangeAndIncompleteResultKeepTheFullNativeVersion() throws Exception {
         var base = initialize();
         var original = source.snapshot(owner, base.projectId(), base.versionId());

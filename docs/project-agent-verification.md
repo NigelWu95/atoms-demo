@@ -114,6 +114,37 @@ env PATH=/Users/wubingheng/.nvm/versions/node/v24.20.0/bin:$PATH ./mvnw -B '-Dte
 
 后续 PA29 继续完整模板上的两轮编辑/差异/重开读取及真实 CLI + loopback 旅程；PA30–33 和真实 DeepSeek 尚未验收。构建脚本虽已提供契约，完整生成应用实际构建、数据库迁移、运行、同快照交付和工作台入口仍未完成。未推送或部署。
 
+## PA29：完整模板的连续编辑旅程（2026-10-19）
+
+PA29a 使用正式 35 文件模板、真实 Git/PG、正式 Worker/进程拥有者/源码接受流程，但编辑器是确定性 Java 子进程。两轮各修改 Vue 和 Java，并新增一份 SQL；逐文件检查未改字节和模式，差异必须精确匹配三个路径。重新创建源码服务/协调者及任务查询服务后，首版和最终版摘要、任务结果均保持。每轮停止凭据已持久化、租约释放，重复调度不再启动进程；无修改以及修改后缺最终结果均保留原版。
+
+- 先缺少旅程支持类编译失败；补齐后修正测试误写的 TaskView 字段名。沙箱拒绝本机数据库连接后，获准原条件重跑。
+- 12:10 `./mvnw -B -Dit.test=ProjectAgentJourneyIT test-compile failsafe:integration-test failsafe:verify`：**2 集成通过，0 失败/错误/跳过，BUILD SUCCESS**，用时 3:16；Java 17.0.5、Node 24 PATH、专用非超级用户测试库。不是新工程业务运行或真实模型验收。
+- 首版 `905a4ba9-226b-4f1f-baba-8faa0b1e64f7` → 第一轮任务 `07062e31-ce87-46bf-a188-22a6bf6f797b` / 版本 `3363edb7-3510-467a-ba21-2368070155e3` / 树摘要 `0282e14a08cea9c4b50229eed9233c18b4d07cce9073fb6782909a96f1f93252`。
+- 第二轮任务 `cb9acd44-e665-4b17-b5b0-a6fa1c5fc092` / 版本 `8f97011b-0c10-46fe-be28-b9f4fcb88e7c` / 树摘要 `88329a7a813e6386dc88b6104299cd192745bea9e48e9802fb2d654c75e33f37`。两个任务均保存 SOURCE_SAVED 和真实停止凭据；这些 UUID 仅是测试审计证据，不是用户项目。
+
+### 当前安装 CLI 发生版本变化
+
+PA29b 新增真实 CLI 同旅程夹具后，12:14 离线 CLI 组合 **6 项中 1 失败、5 错误、0 跳过**，均为 `AGENT_CLI_UNSUPPORTED`，没有把结果记作兼容通过。空环境、独立临时配置目录、不带密钥的 `--version` 探测确认当前为 **2.1.303**；可执行文件修改时间为 11:56:33。检查的本机原生版本目录及项目临时目录未找到旧版。没有运行安装/更新/登录命令或修改个人配置。
+
+[官方更新记录](https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md#21303)只将 2.1.303 描述为修复和可靠性改进，不能据此推断工具权限或事件协议不变。保留 2.1.302 的既有证据，针对 2.1.303 做精确兼容验证，未知版本仍拒绝；未验证前不修改默认关闭状态或启用真实调用。
+
+首次新夹具把版本探测误放在执行阶段，留下合成测试任务 `f7e3d276-1c27-43f4-8c64-866bb5b95ac4`（项目 `cec9f0ee-3d3e-4dd2-a43a-73aa62b9fddb`）为 NEEDS_RECONCILIATION。探测已退出、未启动编辑会话、没有 API 请求；该测试记录保留，不伪造停止摘要或删证据解锁。已将夹具探测移至 prepare，与生产适配器一致；12:16 新增准备期拒绝测试 **1 集成通过**，证明版本不兼容时没有执行身份、没有额度预留、释放租约并保留旧版。该次定向命令选择 `ProjectAgentJourneyIT#unsupportedCliAtPreparationCreatesNoExecutionIntentAndReleasesTheLease`；不把它当作真实 2.1.303 工具验收。
+
+### PA29b 完成证据
+
+2.1.303 的版本/内置模块单测先有 **14 项中 2 错误**；仅新增精确版本到同一集合，不接受版本范围，不修改命令/工具/环境权限。未知 2.1.304、beta、非零退出和混入正文仍拒绝。12:22 以下命令完成 **14 单元 + 6 真实 CLI 离线集成通过，0 失败/错误/跳过，BUILD SUCCESS**：
+
+```sh
+env PATH=/Users/wubingheng/.nvm/versions/node/v24.20.0/bin:$PATH ./mvnw -B -Pagent-cli-contract \
+  -Datoms.agent.test.cli=/Users/wubingheng/.nvm/versions/node/v20.15.0/lib/node_modules/@anthropic-ai/claude-code/bin/claude.exe \
+  '-Dtest=AgentCliProbeTest,AgentStreamDecoderTest' '-Dit.test=AgentCli*ContractIT' verify
+```
+
+其中原有 5 项权限/工具/进程契约通过，新完整旅程使用新配置目录和不同任务副本分别启动两次 CLI。每轮 7 个真实文件工具往返、8 个仅 loopback 请求，假 Key、deepseek-flash、实际 max_tokens=128000、工具集合固定五项。首版 `400287d3-09af-4b92-948d-c04f91b3d077`；第一轮任务 `a3007be3-cf3f-4570-8b5d-c5a8760373c2` / 版本 `ca809214-ec2b-4124-8815-c4bb75458ce0`；第二轮任务 `44f75293-5b27-43f3-9076-b6caa4af1fd0` / 版本 `994b9f7d-2c9b-408d-8da5-e8b6f49b5b81`。两轮树摘要分别与 PA29a 的 `0282e14a…f93252` / `88329a7a…e33f37` 完全一致，测试读取完整摘要而非只比前缀。停止凭据、版本差异、未改内容及重开读取均通过。
+
+这是同一源码流程的实际 CLI **离线**验收；没有真实 DeepSeek 质量/账单、应用构建运行或工作台入口验收。PA30–33 尚未完成；上述合成待核对记录仍保留，不能宣称全部协调者或全量回归已通过。
+
 ## 并发调度调整（2026-10-19）
 
 用户确认不同项目并行，同项目保持编辑互斥，随后要求默认并发提高到 4。新增 `PROJECT_AGENT_MAX_CONCURRENT_TASKS`，默认 4、范围 1–8、重启生效；最大等待队列仍为 8，排队期限仍为 300 秒。此设置只影响新 Agent 模块，不修改旧生成器或默认关闭状态。
