@@ -1,6 +1,6 @@
 # project-agent · 开发任务
 
-状态：2026-10-19，用户要求一次完成完整本地开发闭环，范围更新见规格 §10。PA01–PA22 已完成对应内部切片：默认并发 4、授权阶段查询、30 天正文保留清理、独立原生 Java 后端骨架。新后端自身的 2 项 MVC 测试已实际编译运行；数据库迁移、业务启动和前端尚未验收。继续 PA23 原生 Vue 模板，不把内部切片当作产品上线。PA-LIVE 授权询问尚无答复，不作已授权处理。唯一依据为 [已确认规格](../../SPEC-project-agent.md)和[本模块计划](plan.md)。不重复使用旧 EB/PS 清单，不将旧人工验收勾为完成。
+状态：2026-10-19，用户要求一次完成完整本地开发闭环，范围更新见规格 §10。PA01–PA25 已完成对应内部切片：默认并发 4、授权阶段查询、30 天正文保留清理、原生 Java/Vue 工程骨架。Java 自身 2 项 MVC、Vue 15 项测试/检查/生产构建及本机测试 API 的浏览器验收通过；模板包装、数据库迁移和完整业务启动尚未验收。继续 PA26 构建/启动契约，不把内部切片当作产品上线。PA-LIVE 授权询问尚无答复，不作已授权处理。唯一依据为 [已确认规格](../../SPEC-project-agent.md)和[本模块计划](plan.md)。不重复使用旧 EB/PS 清单，不将旧人工验收勾为完成。
 
 每项 S=1–2、M=3–5 个主要文件（含测试）；实际超出先拆子任务，不藏进巨型文件。路径缩写：A=backend/src/main/java/dev/atoms/demo/agent，AT=backend/src/test/java/dev/atoms/demo/agent，S/ST=对应 source 包，M=backend/src/main/resources/db/migration，T=templates/full-project-v1。Agent 包和原生后端模板目录已创建。U/I/CLI/ALL/PY/FRONT/BROWSER/DOC 命令定义在计划 §6。
 
@@ -245,31 +245,36 @@
 
 ## PA23 · 原生 Vue 可复现依赖配置
 
-- [ ] 完成 PA23。依赖：PA20。规模：M（5 文件）。
+- [x] 完成 PA23。依赖：PA20。规模：M（5 文件）。
 - 描述：独立锁定 Vue/TypeScript/Vite 与测试依赖，不复制整个旧平台。
 - 验收：依赖与锁文件一致，不擅自添加新库/升级版本；不运行 install 生命周期脚本；前后端路径与后续构建约定一致。
 - 验证：U(FullProjectFrontendConfigTest)；核对锁文件；若需要下载/新增依赖先确认。
+- 实测：缺 package.json 红测后，配置/锁文件一致性单测通过；`npm ci --ignore-scripts --offline --no-audit --no-fund` 从缓存安装 213 项，无依赖升级、下载或安装生命周期脚本。
 - 主要文件：`T/frontend/package.json`；`T/frontend/package-lock.json`；`T/frontend/.npmrc`；`T/frontend/tsconfig.json`；`AT/FullProjectFrontendConfigTest.java`。
 
 ## PA24 · 原生 Vue 入口与页面
 
-- [ ] 完成 PA24。依赖：PA23。规模：M（5 文件）。
+- [x] 完成 PA24。依赖：PA23。规模：M（拆为两片）。
+- 细分 PA24a（本机开发边界 + Vite/入口/静态测试）与 PA24b（组件行为测试 + 页面），每片不超过 5 个文件；复用旧模板的 loopback 边界并使用独立 5275/4275 端口，不修改旧模板。PA25 继续补前端测试契约和检查规则。
+- 页面设计契约：这是工程初始化状态页，不是广告页或用户业务成品；主操作为检查/重试应用自身健康 API。沿用平台深色/浅绿语义色、单栏紧凑排版；必须显示加载、成功、连接失败/超时和初始化未完成业务的说明，320–1440 宽度不横向溢出，键盘可访问。无 iframe、平台 SDK、外部字体/图片或成功业务假数据。
 - 描述：让模型有真实 Vue 组件可改，不继续以内嵌旧三文件为主体。
 - 验收：页面访问自身应用 API，不请求平台 SDK；提供加载/失败反馈与语义化基础控件；无 iframe 兼容层、硬编码私有服务器或业务完成宣称。
 - 验证：U(FullProjectFrontendSeedTest)；检查入口引用及 API 路径；运行视觉验收留给执行/工作台模块。
+- 补充实测：静态入口检查、7 项组件行为测试通过；浏览器验证开发页和构建产物的 4 种宽度、键盘及重试。API 为本机确定性夹具，未代替真实 Java/数据库或工作台验收。组件样式拆为 `src/app.css`，小型同源 SVG 图标单独保存。
 - 主要文件：`T/frontend/vite.config.ts`；`T/frontend/index.html`；`T/frontend/src/main.ts`；`T/frontend/src/App.vue`；`AT/FullProjectFrontendSeedTest.java`。
 
 ### C-PA08 · 原生前端骨架
 
-- [ ] 前三项实际通过，补记具体命令、数量、失败/跳过、进程和版本证据；检查未扩大权限并审阅变更。向用户汇报，按批准的连续实施范围推进；验收不成立则暂停该切片，不扩大权限或把未测项记为通过。
+- [x] PA22–PA24 及 PA25 的前端测试通过。6 项模板契约检查、Java 自身 2 项 MVC、前端 15 项测试/类型/代码检查/生产构建和隔离浏览器证据已记录。保持旧平台/模板不变，不扩大 Agent 工具权限；未执行数据库迁移或付费模型。
 
 ## PA25 · 模板前端测试契约
 
-- [ ] 完成 PA25。依赖：PA24。规模：M（3 文件）。
+- [x] 完成 PA25。依赖：PA24。规模：M（4 文件；组件测试在 PA24b 已提交）。
 - 描述：保存工程自己需要的组件测试和静态检查规则。
 - 验收：测试包含请求成功及失败分支，不是空断言；package scripts 与配置/文件匹配；不把平台测试专用登录或服务夹具打入模板。
 - 验证：U(FullProjectFrontendTestContractTest)；模板测试实际运行由执行模块单列验证。
-- 主要文件：`T/frontend/src/App.spec.ts`；`T/frontend/eslint.config.js`；`AT/FullProjectFrontendTestContractTest.java`。
+- 实测：7 项页面 + 8 项开发边界测试，0 失败/错误/跳过；固定 Node 24.20 后类型检查、ESLint 与生产构建均通过。增加仓库级浏览器脚本，仅验收受控模板，不随工程导出。
+- 主要文件：`T/frontend/dev/boundary.spec.ts`；`T/frontend/eslint.config.js`；`AT/FullProjectFrontendTestContractTest.java`；`scripts/verify-full-project-seed.mjs`。
 
 ## PA26 · 模板构建和启动说明
 

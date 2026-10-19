@@ -40,6 +40,37 @@
 - 10:40 临时恢复旧的直接写 PID 文件语义，`./mvnw -B -Dtest=AgentChildFixtureTest test` **2 项均明确失败**；随即还原为原子发布，未保留该反向验证变更。两项失败均是就绪路径过早可见，不依赖随机调度碰到空文件。
 - 10:48 原子发布修复后的定向 `verify`：**18 单元 + 27 集成通过，0 失败/错误/跳过，BUILD SUCCESS**。覆盖所有直接使用夹具的 AgentProcess、CLI 探测、Worker、取消、恢复、并发协调和生命周期。命令：`env PATH=/Users/wubingheng/.nvm/versions/node/v24.20.0/bin:$PATH ./mvnw -B '-Dtest=AgentChildFixtureTest,AgentProcessTest,AgentCliProbeTest' '-Dit.test=ProjectAgentCancellationIT,ProjectAgentWorkerIT,ProjectAgentRecoveryIT,ProjectAgentCoordinatorIT,ProjectAgentLifecycleIT' verify`。最后仅测试夹具有变化，没有第三次重复无关全量套件；不把跨次结果拼成“一次全量全绿”。
 
+## PA23–PA25：原生 Vue 工程（2026-10-19）
+
+复用已审阅 standalone-v1 的 Vue/TypeScript/Vite/Vitest/ESLint 依赖版本及锁文件传递依赖，只改新包名；不升级库，不改旧模板。固定 Node 24.20.x / npm 11.19.x，`npm ci --ignore-scripts --offline --no-audit --no-fund` 从缓存安装 213 项，不下载依赖、不执行安装生命周期脚本。
+
+原生页面调用自己的 `./api/health`，不使用平台 SDK 或 iframe。页面覆盖加载、成功、错误、10 秒超时、重试及卸载取消，明确说明“尚未生成业务功能”；连接成功不冒充数据库或业务验收。Vue 生命周期依据 [官方说明](https://vuejs.org/guide/essentials/lifecycle.html)。
+
+开发/预览固定 loopback 5275/4275，继承旧模板的 Host/Origin/Fetch Metadata 边界与响应头；代理只指向 127.0.0.1 的经校验端口。Vite 关闭 `.env` 加载和客户端环境注入，关闭 publicDir，限制文件读取，不将平台或应用密码放进页面。依据 [Vite envDir/envPrefix](https://vite.dev/config/shared-options.html#envdir)、[文件读取限制](https://vite.dev/config/server-options.html#server-fs-deny)；这些开发设置不是任意代码执行的 OS 沙箱。
+
+红绿和执行记录：
+
+- PA23 配置测试先缺 package.json 失败，PA24 入口测试先缺 vite.config.ts 失败，补齐后分别通过。组件测试第一次因缺 App.vue 加载失败、0 项执行，不计作行为断言失败；实现后 7 项通过。PA25 契约先缺 app.css 失败，再补齐样式、边界测试和 ESLint 配置。
+- 首次组合命令仅在第一条命令设置 Node PATH，后续落到 Node 20，Vitest 发生 ERR_REQUIRE_ESM；没有修改依赖或跳过用例。将整个命令链置于固定 Node 24 PATH 后，完整检查通过。
+- 11:07 最终前端命令：类型检查、ESLint、**15 项测试 / 2 文件，0 失败/错误/跳过**及生产构建全部通过。生产 JS 63.83 kB（gzip 25.60 kB），CSS 1.92 kB（gzip 0.89 kB）；这是体积记录，不是性能 SLA。
+- 11:07 平台 `FullProject*Test` **6 项通过，0 失败/错误/跳过**，包括依赖/锁文件一致、模板文件源码策略、Java/Vue 入口和测试契约。不重复声明完整后端全量通过，前一节保留完整回归及定向修复的真实结果。
+- 反向验证：11:13 临时反转 `body.stage !== 'INITIALIZED'`，组件测试 **2 项明确失败、5 项通过**。立即恢复后 11:14 全部 **15 项通过**，未保留变异。
+
+可重跑命令：
+
+```sh
+# templates/full-project-v1/frontend 目录；整个命令链固定 Node 24
+env PATH=/Users/wubingheng/.nvm/versions/node/v24.20.0/bin:$PATH /bin/sh -c 'npm run typecheck && npm run lint && npm run test:unit && npm run build'
+# backend 目录
+./mvnw -B '-Dtest=FullProject*Test' test
+# 仓库根目录；需先安装现有锁定依赖、构建前端，且本机已安装 Chrome
+env -i PATH=/Users/wubingheng/.nvm/versions/node/v24.20.0/bin:/usr/bin:/bin /Users/wubingheng/.nvm/versions/node/v24.20.0/bin/node scripts/verify-full-project-seed.mjs
+```
+
+浏览器验收：本会话没有 Chrome DevTools MCP，使用仓库已有 Playwright + 已安装 Chrome 的全新隔离上下文，不读取个人浏览器资料。默认 Playwright headless shell 未安装时没有下载浏览器，改用仓库既有 Chrome channel。经授权监听本机测试端口后，开发页和构建产物均通过 320/768/1024/1440 宽度、无横向溢出、44 px 操作目标、键盘跳转/操作、自动 axe 检查。成功路径控制台无警告/错误；另验加载、503 通用错误和重试，错误正文 canary 不显示，无未捕获异常。浏览器请求只允许本机两端口；API 请求无 Cookie/Authorization。
+
+最终脚本退出 0，截图在 `.local/native-seed-browser-Zjzsfy/`；开发与构建各有桌面/手机图，已核对布局。API 是本机确定性夹具，**没有启动真实 Java 或数据库**。脚本关闭自己创建的浏览器和服务，不触碰日常平台；不随应用模板打包。模板尚未进入正式 JAR 清单，构建/启动脚本、初始化交接、完整工程运行和工作台仍未完成。没有真实模型调用、个人配置修改、推送或部署。
+
 ## 并发调度调整（2026-10-19）
 
 用户确认不同项目并行，同项目保持编辑互斥，随后要求默认并发提高到 4。新增 `PROJECT_AGENT_MAX_CONCURRENT_TASKS`，默认 4、范围 1–8、重启生效；最大等待队列仍为 8，排队期限仍为 300 秒。此设置只影响新 Agent 模块，不修改旧生成器或默认关闭状态。
