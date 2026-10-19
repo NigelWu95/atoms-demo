@@ -1,6 +1,6 @@
 # project-agent · 开发任务
 
-状态：2026-10-19，用户要求一次完成完整本地开发闭环，范围更新见规格 §10。PA01–PA16 完成，继续 PA17 自动调度。用户询问独立会话并发，已解释会话隔离与资源并发区别，待确认是否改为不同项目默认并发 2。PA-LIVE 授权询问尚无答复，不作已授权处理。唯一依据为 [已确认规格](../../SPEC-project-agent.md)和[本模块计划](plan.md)。不重复使用旧 EB/PS 清单，不将旧人工验收勾为完成。
+状态：2026-10-19，用户要求一次完成完整本地开发闭环，范围更新见规格 §10。PA01–PA17 完成。用户确认的不同项目并行、同项目互斥及默认并发 4 已实现，49 项相关单元和 49 项集成通过；完整工程模板与后续闭环仍未完成，不把本次调度验收当作产品上线。PA-LIVE 授权询问尚无答复，不作已授权处理。唯一依据为 [已确认规格](../../SPEC-project-agent.md)和[本模块计划](plan.md)。不重复使用旧 EB/PS 清单，不将旧人工验收勾为完成。
 
 每项 S=1–2、M=3–5 个主要文件（含测试）；实际超出先拆子任务，不藏进巨型文件。路径缩写：A=backend/src/main/java/dev/atoms/demo/agent，AT=backend/src/test/java/dev/atoms/demo/agent，S/ST=对应 source 包，M=backend/src/main/resources/db/migration，T=templates/full-project-v1。Agent 包已创建，模板目录尚待创建。U/I/CLI/ALL/PY/FRONT/BROWSER/DOC 命令定义在计划 §6。
 
@@ -180,12 +180,14 @@
 
 ## PA17 · 单协调者与有界调度
 
-- [ ] 完成 PA17。依赖：PA16。规模：M（5 文件）。
+- [x] 完成 PA17。依赖：PA16。规模：M（分配置、调度、回归切片）。独立协调租约、多 Worker、停止与队列过期已接通；用户追加默认 4（可配置 1–8），10 项调度测试及相关回归通过。
 - 实施拆分：PA17a 数据库独占租约及关闭/丢失证明（2 文件）；PA17b 调度循环、队列查询、阶段排序和 Worker 停止信号（5 个实现文件及单独集成夹具/测试）。关闭和失去租约都阻止新执行；任何未决执行阻止新协调者自动接单。
 - [x] PA17a：2 项专用测试库集成通过；单个调度器不等于单个 Claude 会话，Worker 并发调整独立处理。
 - [x] PA17b 前置：源码 phase 降至 MAX_VALUE-100，Agent 采用 MAX_VALUE；门面提供只读就绪信号，4 项原源码生命周期回归通过。
+- [x] PA17b/c：默认 4 及显式 1/3 个任务同时运行；工作路径、执行 ID、PID 各自独立。达到上限才等待，取消后补位；同项目拒绝并发修改。显式 2 个任务关闭、调度租约丢失、异常收尾、重复领取与数据库时钟域过期通过；未启用真实模型。
 - 描述：接入 Spring 生命周期，先完成源码和 Agent 恢复再接收执行。
-- 验收：唯一数据库协调者、1 个 Worker，队列 300 秒过期不启动；先启源码后启 Agent、先停 Agent 后停源码，不凭相同 phase 假设顺序；正常关闭有界，未决进程不提前丢租约。
+- 验收：唯一数据库协调者，Worker 默认 4、可配置 1–8，不同项目并行且同项目互斥；队列 300 秒过期不启动；先启源码后启 Agent、先停 Agent 后停源码，不凭相同 phase 假设顺序；正常关闭有界，所有自有进程停止前不提前丢租约。
+- 并发调整切片：配置范围与默认值测试 → 有界多 Worker 及移除全局执行锁 → 真实测试子进程验证 1/3/4 个运行槽位、溢出排队、取消补位、同项目冲突、关闭/租约丢失 → 回归与文档。不得启用真实付费调用或修改个人 Claude 配置。
 - 验证：I(ProjectAgentCoordinatorIT)；双协调者、租约丢失、队列过期、关闭竞态。
 - 主要文件：`A/AgentCoordinator.java`；`A/AgentCoordinatorLease.java`；`A/AgentTaskRepository.java`；`AT/ProjectAgentCoordinatorIT.java`；`S/SourceCoordinator.java`。
 

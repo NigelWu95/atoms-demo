@@ -32,6 +32,32 @@ class AgentTaskRepository {
         if (limit<1 || limit>100) throw AgentTask.invalid();
         return jdbc.query("SELECT * FROM agent_tasks WHERE project_id=? ORDER BY created_at DESC,id DESC LIMIT ?", ROW, project, limit);
     }
+    java.util.List<AgentTask> queued() {
+        return jdbc.query("SELECT * FROM agent_tasks WHERE status='QUEUED' ORDER BY created_at,id LIMIT 8", ROW);
+    }
+    java.util.List<UUID> recoveryCandidates(UUID after) {
+        return jdbc.query("""
+                SELECT a.id FROM agent_tasks a JOIN source_edit_leases e ON e.id=a.edit_lease_id
+                WHERE (a.finished_at IS NULL OR e.status<>'RELEASED') AND (?::uuid IS NULL OR a.id>?::uuid)
+                ORDER BY a.id LIMIT 100
+                """, (r,n) -> r.getObject(1, UUID.class), after, after);
+    }
+    boolean hasUnresolved() {
+        return Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM agent_tasks WHERE status='NEEDS_RECONCILIATION')", Boolean.class));
+    }
+    boolean hasUnsettledExecutions() {
+        return Boolean.TRUE.equals(jdbc.queryForObject("""
+                SELECT EXISTS(SELECT 1 FROM agent_tasks a JOIN source_edit_leases e ON e.id=a.edit_lease_id
+                    WHERE e.execution_pending)
+                """, Boolean.class));
+    }
+    boolean queueExpired(UUID id) {
+        // created_at is database-owned. Never compare it against another host's wall clock.
+        return Boolean.TRUE.equals(jdbc.queryForObject("""
+                SELECT clock_timestamp()>=created_at+queue_timeout_seconds*interval '1 second'
+                FROM agent_tasks WHERE id=?
+                """, Boolean.class, id));
+    }
     AgentTask lock(UUID id) {
         requireTransaction();
         var task = get(id);

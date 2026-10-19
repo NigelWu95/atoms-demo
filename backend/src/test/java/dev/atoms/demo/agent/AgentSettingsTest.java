@@ -36,7 +36,7 @@ class AgentSettingsTest {
         assertThat(settings.maxTurns()).isEqualTo(24);
         assertThat(settings.taskTimeout()).isEqualTo(Duration.ofSeconds(1800));
         assertThat(settings.queueTimeout()).isEqualTo(Duration.ofSeconds(300));
-        assertThat(settings.maxConcurrentTasks()).isEqualTo(2);
+        assertThat(settings.maxConcurrentTasks()).isEqualTo(4);
         assertThat(settings.cli()).isEqualTo(temporary.resolve("cli"));
         assertThat(settings.stateRoot()).isEqualTo(temporary.resolve("state"));
         try (var paths = Files.list(temporary)) { assertThat(paths.toList()).isEmpty(); }
@@ -79,7 +79,7 @@ class AgentSettingsTest {
     }
 
     @Test void acceptsExplicitConcurrencyWithinTheBound() {
-        for (int value : new int[]{1, 2, 3, 8})
+        for (int value : new int[]{1, 2, 3, 4, 8})
             assertThat(new AgentSettings(config().withProperty("atoms.agent.max-concurrent-tasks", Integer.toString(value)))
                     .load().maxConcurrentTasks()).isEqualTo(value);
     }

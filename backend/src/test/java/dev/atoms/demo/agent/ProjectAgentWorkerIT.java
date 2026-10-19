@@ -65,6 +65,38 @@ class ProjectAgentWorkerIT extends AgentIntegrationSupport {
         assertThat(service.handle(task.id())).isNull();
     }
 
+    @Test void duplicateDispatchDoesNotWaitForOrStartAnotherSession() throws Exception {
+        var base = source.create(owner); var fixture = new FixtureAgent("success");
+        var entered = new java.util.concurrent.CountDownLatch(1);
+        var release = new java.util.concurrent.CountDownLatch(1);
+        var preparations = new AtomicInteger();
+        CodingAgent gated = (task, work, deadline) -> {
+            preparations.incrementAndGet(); entered.countDown();
+            try {
+                if (!release.await(10, java.util.concurrent.TimeUnit.SECONDS)) throw new IOException("AGENT_TIMEOUT");
+            } catch (InterruptedException error) {
+                Thread.currentThread().interrupt(); throw new IOException("AGENT_CANCELLED");
+            }
+            return fixture.prepare(task, work, deadline);
+        };
+        var task = service.submit(owner, base.projectId(), new ProjectAgentService.Input("once", base.versionId().toString(), 1), "once");
+        var worker = new AgentWorker(service, repository, lifecycle, source.gateway(), gated);
+        var threads = java.util.concurrent.Executors.newFixedThreadPool(2);
+        try {
+            var first = threads.submit(() -> worker.execute(task.id()));
+            assertThat(entered.await(10, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+            var duplicate = threads.submit(() -> worker.execute(task.id())).get(3, java.util.concurrent.TimeUnit.SECONDS);
+            assertThat(duplicate.status()).isEqualTo("PREPARING");
+            assertThat(preparations.get()).isEqualTo(1);
+            release.countDown();
+            assertThat(first.get(15, java.util.concurrent.TimeUnit.SECONDS).status()).isEqualTo("NO_CHANGES");
+            assertThat(fixture.calls.get()).isEqualTo(1);
+        } finally {
+            release.countDown(); threads.shutdownNow();
+            assertThat(threads.awaitTermination(15, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+        }
+    }
+
     @Test void invalidFilesAndIncompleteProtocolKeepOldVersionAndReleaseOnlyAfterProcessStops() {
         for (String mode : new String[] {"invalid-source", "truncated"}) {
             var base = source.create(owner); var adapter = new FixtureAgent(mode);

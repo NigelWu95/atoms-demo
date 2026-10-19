@@ -21,7 +21,7 @@
 - `ProjectSourceService` 已有所有权、归档、基线、幂等及短事务发布；`SourceRepository.lockEvidence` 实际锁的是 projects 行。新租约要沿用这个序列化边界，不能另造一套不互相检查的锁。
 - `SourceWorkspaceStore`、`SourceCandidateStore`、`SourceAcceptance` 是包内能力，句柄按发行者身份验证。通过源包窄门面接入，不把所有类公开给调用者。
 - 源码现有 deadline 在部分阶段重新创建。现有 SourceQuery 支持传入共享 deadline，可复用；物化、封存、接受、源码排队和 Worker 需要补齐跨调用传递，不能只给最外层 Future 加 timeout。
-- `SourceCoordinator` 是 SmartLifecycle 单 Worker，phase 为 Integer.MAX_VALUE；新的 Agent 生命周期必须显式保证依赖顺序，不能用相同 phase 推断先后。
+- `SourceCoordinator` 保持单 Worker，SmartLifecycle phase 为 Integer.MAX_VALUE-100；Agent 为 Integer.MAX_VALUE，明确保证先启源码后启 Agent、先停 Agent 后停源码，不以相同 phase 推断先后。
 - 当前迁移至 V019。拟追加 V020 编辑租约和 V021 Agent 任务/事件/启动预算。实施前复查编号是否被其他工作占用，绝不修改已应用 V018/V019。
 - 原 `TemplateCatalog` 只接受 standalone-v1 固定清单。新增 full-project-v1 目录及独立 catalog，不修改旧导出物语义，不扫描工作目录打包。
 - 既有 SourceIntegrationSupport 使用专用 PG、临时 Git 根和禁用旧模型 Worker，可参照而不暴露测试夹具为正式服务。
@@ -83,9 +83,9 @@ V020 同时给 source_operations 增加可空租约关联：旧操作为空；�
 
 ## 5. 配置与资源预算
 
-沿用规格已确认值：128000 输出 tokens 目标、24 工具轮、1 执行 / 8 待处理、300 秒排队期限、1800 秒执行期限、300 秒 API 参数、最多额外 10 秒收尾；stdout 单行 4 MiB / 总量 64 MiB，stderr 256 KiB，总事件 4096 / 持久事件 256 KiB。真实有效模型参数必须由离线请求和之后的真实联调核验，不能静默下调后仍显示原值。
+沿用规格已确认值：128000 输出 tokens 目标、24 工具轮、默认 4 执行（可配置 1–8）/ 8 待处理、300 秒排队期限、1800 秒执行期限、300 秒 API 参数、最多额外 10 秒收尾；stdout 单行 4 MiB / 总量 64 MiB，stderr 256 KiB，总事件 4096 / 持久事件 256 KiB。真实有效模型参数必须由离线请求和之后的真实联调核验，不能静默下调后仍显示原值。
 
-拟用 `atoms.agent.*` / `PROJECT_AGENT_*` 独立配置：enabled、live-enabled、cli、state-root、maintainer-ids、max-live-runs、max-output-tokens、max-turns、task-timeout-seconds、queue-timeout-seconds。API 端点固定为规格中的 DeepSeek HTTPS 地址；没有可由请求指定的上游或命令参数。复用已有 DEEPSEEK_API_KEY，只在获准启动真实子进程时读取并交给该进程，不把它写入 settings 文件。
+使用 `atoms.agent.*` / `PROJECT_AGENT_*` 独立配置：enabled、live-enabled、cli、state-root、maintainer-ids、max-live-runs、max-output-tokens、max-turns、task-timeout-seconds、queue-timeout-seconds、max-concurrent-tasks。并发值在调度器启动时读取，需重启生效；唯一协调者管理多个独立任务，不在 Worker 上持有跨任务的执行锁。同项目新需求在旧任务结束后基于最新版本重新提交，不自动积压过期基线。API 端点固定为规格中的 DeepSeek HTTPS 地址；没有可由请求指定的上游或命令参数。复用已有 DEEPSEEK_API_KEY，只在获准启动真实子进程时读取并交给该进程，不把它写入 settings 文件。
 
 本计划补充的目录准入提案：Agent 私有状态根逻辑总量最多 1 GiB，文件系统至少保留 512 MiB；沿用源码根的已有容量策略，不把两者合并成一个错误的“硬配额”。启动、阶段边界和轮询时检查；同 UID 外部写入仍可能耗尽磁盘，这不是 OS 配额。实现中仅临时测试配置启用，日常 env 不改。需要放大上述预算时先记录原因并确认。
 

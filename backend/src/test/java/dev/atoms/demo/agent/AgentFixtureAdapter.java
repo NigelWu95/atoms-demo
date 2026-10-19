@@ -8,11 +8,13 @@ import java.util.concurrent.atomic.AtomicInteger;
 /** Only test resources use this deterministic adapter; production always selects ClaudeCodeAgent. */
 final class AgentFixtureAdapter implements CodingAgent {
     final AtomicInteger calls = new AtomicInteger();
+    final java.util.Map<UUID, Path> work = new java.util.concurrent.ConcurrentHashMap<>();
     private final Path state;
     private final String mode;
     AgentFixtureAdapter(Path state, String mode) { this.state = state; this.mode = mode; }
     Path pid(UUID task) { return state.resolve(task + ".pid"); }
     @Override public Session prepare(AgentTask task, Path work, AgentDeadline deadline) {
+        this.work.put(task.id(), work);
         return new Session() {
             @Override public boolean paid() { return false; }
             @Override public Result execute(UUID execution, java.util.function.BooleanSupplier cancelled) throws IOException {

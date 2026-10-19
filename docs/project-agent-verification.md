@@ -2,6 +2,31 @@
 
 日期：2026-10-18～19。规格与计划已批准，模块仍未完成。只使用本机假 Anthropic 服务和公开测试字符串，不调用真实 DeepSeek、不改个人 Claude 配置、不部署、不推送。任务状态以 [清单](../tasks/project-agent/todo.md)为准。
 
+## 并发调度调整（2026-10-19）
+
+用户确认不同项目并行，同项目保持编辑互斥，随后要求默认并发提高到 4。新增 `PROJECT_AGENT_MAX_CONCURRENT_TASKS`，默认 4、范围 1–8、重启生效；最大等待队列仍为 8，排队期限仍为 300 秒。此设置只影响新 Agent 模块，不修改旧生成器或默认关闭状态。
+
+- 配置红测：原实现忽略 `max-concurrent-tasks=0`，`AgentSettingsTest` 6 项中 1 项失败。加入范围校验和默认值后，配置/命令/任务单测共 12 项通过。
+- 并发红测：`ProjectAgentCoordinatorIT#distinctProjectsUseConfiguredSlotsAndCancellationAdmitsTheNextTask` 共 3 项，默认 2 和显式 3 均因第二个进程未启动而失败；显式 1 通过。随后将单槽位改为有界活动任务集合、固定大小线程池，移除 Worker 跨任务执行锁；同项目仍依赖项目行锁、活动编辑租约和任务唯一索引。
+- 运行证据使用真实 PG、Git、确定性 Java 子进程。不同项目的工作目录、执行 ID、PID 必须不同，且同时存活；一个任务取消后，其他任务保持 RUNNING，队列自动补位。不是实际模型的质量/吞吐/费用验收。
+- 第一轮 10 项调度测试中，9 项通过；异常收尾测试在数据库已提交、内存句柄尚未清理的时间窗口失败。等待条件改为同一 30 秒期限内同时满足终态和句柄清理，保留两项断言，不以固定睡眠掩盖问题。随后异常收尾和重复调度 2 项定向测试通过。
+- 防回退实验：临时恢复 Worker 的全局 `synchronized` 后，`duplicateDispatchDoesNotWaitForOrStartAnotherSession` 在重复领取处明确超时失败；已还原此变异，正式代码不持有跨任务执行锁。
+- 全量单元检查 `./mvnw -B test`：264 项，262 通过，2 错误、0 跳过。一项是调用命令的 PATH 先找到 Node 20.15.0，而既有 BuildEnvironmentTest 要求项目固定的 Node 24.20.x / npm 11.19.x；另一项是本轮开始前已存在的 PA21 红测 FullProjectBackendSeedTest，完整工程模板的 backend/pom.xml 等文件尚未实现。本次不删除或屏蔽该测试，也不把整个工作树报为全绿；后续回归使用显式 Node 24 PATH。
+- 不增加依赖，不改变个人 Claude 设置、模型工具权限或日常 env。独立进程不是 OS 安全隔离；目录校验和维护者限制保留。
+- 完整工程模板、安装构建和工作台接入属于尚未完成的后续工作；并发调度完成不能表述为整个 Agent 产品已上线。
+
+最终定向回归命令（backend 目录；不包含仍为红测的 PA21 模板）：
+
+```sh
+env PATH=/Users/wubingheng/.nvm/versions/node/v24.20.0/bin:$PATH ./mvnw -B \
+  '-Dtest=Agent*Test,ClaudeCodeAgentTest,BuildEnvironmentTest' \
+  '-Dit.test=ProjectAgent*IT,AgentCoordinatorLeaseIT,ProjectSourceLifecycleIT,ProjectSourceEditLeaseIT' verify
+```
+
+2026-10-19 08:41 完成：**49 单元 + 49 集成通过，0 失败/错误/跳过，BUILD SUCCESS**。包含默认 4、显式 1/3 的并发与补位、显式 2 个任务一起关闭、同项目互斥、重复领取不启动第二会话、租约丢失停止所有当前进程，以及原有取消/恢复/事件/额度/源码租约回归。Node 24 的构建环境测试已通过；全量工作树中 PA21 的模板缺文件问题仍未解决。未新增数据库迁移、未触碰日常服务、未推送或部署。
+
+本次自审：活动槽位包含准备/执行/封存/收尾阶段；单个调度线程准入、关闭共用短锁、任务退出释放各自槽位。Worker 不再全局加锁，同项目数据库约束保留。子进程环境、工具白名单、真实调用额度和身份授权未放宽；没有新增依赖、外部服务或秘密配置。需要回退并发时设置 `PROJECT_AGENT_MAX_CONCURRENT_TASKS=1` 并重启。
+
 ## 已完成底座
 
 - PA01：懒加载默认关闭配置，维护者 UUID、绝对路径与预算校验。先缺类失败，再 5 个配置测试通过。配置关闭不读取密钥、不做文件/进程 I/O。

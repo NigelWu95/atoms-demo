@@ -27,7 +27,7 @@ final class AgentSettings {
                     (int) number("max-turns", 24, 1, 24),
                     Duration.ofSeconds(number("task-timeout-seconds", 1800, 1, 1800)),
                     Duration.ofSeconds(number("queue-timeout-seconds", 300, 1, 300)),
-                    (int) number("max-concurrent-tasks", 2, 1, 8));
+                    (int) number("max-concurrent-tasks", 4, 1, 8));
         } catch (IllegalArgumentException error) { throw unavailable(); }
     }
 

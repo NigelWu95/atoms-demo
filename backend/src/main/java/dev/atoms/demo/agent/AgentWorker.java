@@ -22,7 +22,9 @@ final class AgentWorker {
         this.service = service; this.repository = repository; this.lifecycle = lifecycle; this.source = source; this.agent = agent;
     }
 
-    synchronized AgentTask execute(UUID id) {
+    AgentTask execute(UUID id) { return execute(id, () -> false); }
+
+    AgentTask execute(UUID id, java.util.function.BooleanSupplier shutdown) {
         var task = repository.get(id);
         if (task == null) throw new ApiException(404, "AGENT_TASK_MISSING", "任务不存在。");
         if (!task.status().equals("QUEUED")) return task; // A duplicate dispatcher must not interfere with the owner.
@@ -33,21 +35,24 @@ final class AgentWorker {
         }
         if (task.terminal()) return task;
         long started = System.nanoTime();
-        var result = perform(task);
+        var result = perform(task, shutdown);
         LOG.info("{\"event\":\"agent_task_finished\",\"entryPoint\":\"{}\",\"requestId\":\"{}\",\"projectId\":\"{}\",\"status\":\"{}\",\"errorCode\":\"{}\",\"durationMs\":{}}",
                 result.entryPoint(), id, result.projectId(), result.status(), result.errorCode()==null ? "NONE" : result.errorCode(),
                 TimeUnit.NANOSECONDS.toMillis(System.nanoTime()-started));
         return result;
     }
 
-    private AgentTask perform(AgentTask task) {
+    private AgentTask perform(AgentTask task, java.util.function.BooleanSupplier shutdown) {
         var handle = service.handle(task.id());
         var deadline = new AgentDeadline(Duration.ofSeconds(task.taskTimeoutSeconds()));
         boolean executionStarted = false, stopped = false;
         try {
             AgentStreamDecoder.Summary usage;
-            source.prepareEdit(handle, deadline::remaining);
-            var cancellation = new Cancellation(task);
+            var cancellation = new Cancellation(task, shutdown);
+            source.prepareEdit(handle, () -> {
+                if (cancellation.getAsBoolean()) throw new IOException("AGENT_CANCELLED");
+                return deadline.remaining();
+            });
             try (var session = agent.prepare(task, source.workPath(handle), deadline)) {
                 deadline.remaining();
                 if (cancellation.getAsBoolean()) throw new IOException("AGENT_CANCELLED");
@@ -79,6 +84,7 @@ final class AgentWorker {
         } catch (IOException | RuntimeException | java.util.concurrent.ExecutionException error) {
             String code = error instanceof ApiException api ? api.code() : error instanceof IOException ? error.getMessage() : "AGENT_EXECUTION_FAILED";
             if (code == null || !code.matches("(AGENT|SOURCE)_[A-Z_]{1,80}")) code = "AGENT_EXECUTION_FAILED";
+            if (Thread.currentThread().isInterrupted() || shutdown.getAsBoolean()) code = "AGENT_CANCELLED";
             return fail(task.id(), code, executionStarted && !stopped);
         }
     }
@@ -101,11 +107,12 @@ final class AgentWorker {
     /** Bounded-rate DB cancellation/ownership observation; it never extends the execution deadline. */
     private final class Cancellation implements java.util.function.BooleanSupplier {
         private final UUID id, owner;
+        private final java.util.function.BooleanSupplier shutdown;
         private long checked;
-        private boolean stopped;
-        Cancellation(AgentTask task) { id = task.id(); owner = task.ownerId(); }
+        private volatile boolean stopped;
+        Cancellation(AgentTask task, java.util.function.BooleanSupplier shutdown) { id = task.id(); owner = task.ownerId(); this.shutdown = shutdown; }
         @Override public boolean getAsBoolean() {
-            if (Thread.currentThread().isInterrupted()) return true;
+            if (Thread.currentThread().isInterrupted() || shutdown.getAsBoolean()) return true;
             long now = System.nanoTime();
             if (!stopped && (checked == 0 || now-checked >= TimeUnit.MILLISECONDS.toNanos(250))) {
                 stopped = repository.stopRequested(id, owner); checked = now;

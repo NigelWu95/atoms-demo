@@ -52,7 +52,10 @@ public class ProjectAgentService {
             var task = repository.insert(id, owner, project, edit.leaseId(), request);
             // The queue cannot observe a task capability until its database transaction commits.
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-                @Override public void afterCommit() { handles.put(id, edit); }
+                @Override public void afterCommit() {
+                    // A dispatcher may settle the row between commit and this callback.
+                    handles.compute(id, (ignored, previousHandle) -> repository.get(id).terminal() ? null : edit);
+                }
             });
             return view(task);
         });
@@ -97,6 +100,9 @@ public class ProjectAgentService {
         return config;
     }
     ProjectSourceEditGateway.EditHandle handle(UUID task) { return handles.get(task); }
+    void discardSettled(UUID id) {
+        handles.computeIfPresent(id, (ignored, handle) -> repository.get(id).terminal() ? null : handle);
+    }
     void forgetAfterCommit(UUID task) {
         if (!TransactionSynchronizationManager.isActualTransactionActive()) throw new IllegalStateException("Task release requires a transaction");
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {

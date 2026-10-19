@@ -28,6 +28,9 @@ final class AgentRecovery {
                 return tasks.sourceSaved(task, operation.resultVersionId());
             }
             if (operation != null) task = tasks.bindSource(task, operation.id());
+            if (task.status().equals("QUEUED") && !task.cancelRequested()
+                    && tasks.queueExpired(task.id()))
+                return tasks.finish(task, "TIMED_OUT", "AGENT_QUEUE_TIMEOUT");
             return tasks.finish(task, task.cancelRequested() ? "CANCELLED" : "FAILED",
                     task.cancelRequested() ? "AGENT_CANCELLED" : "AGENT_INTERRUPTED");
         });

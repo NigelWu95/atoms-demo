@@ -24,6 +24,15 @@ class ProjectAgentLifecycleIT extends AgentIntegrationSupport {
         return repository.get(view.id());
     }
 
+    @Test void aFreshTaskMustNotExpireByComparingDatabaseTimeToTheHostClock() {
+        var task = admit("clock-domain");
+        var databaseNow = jdbc.queryForObject("SELECT clock_timestamp()", java.sql.Timestamp.class).toInstant();
+        long skew = java.time.Duration.between(databaseNow, java.time.Instant.now()).toSeconds();
+        System.out.println("Agent test clock difference (host minus database seconds): " + skew);
+        assertThat(java.time.Duration.between(task.createdAt(), databaseNow)).isLessThan(java.time.Duration.ofSeconds(30));
+        assertThat(lifecycle.preparing(task.id()).status()).isEqualTo("PREPARING");
+    }
+
     @Test void paidExecutionReservationAndSourceIntentAreAtomicAndFailuresDoNotRefund() throws Exception {
         long before = jdbc.queryForObject("SELECT used FROM agent_live_budget WHERE id", Long.class);
         configuration.withProperty("atoms.agent.live-enabled", "true").withProperty("atoms.agent.max-live-runs", Long.toString(before+1));

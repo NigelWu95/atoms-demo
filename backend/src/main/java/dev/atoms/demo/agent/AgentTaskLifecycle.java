@@ -3,7 +3,6 @@ package dev.atoms.demo.agent;
 import dev.atoms.demo.common.ApiException;
 import dev.atoms.demo.project.ProjectService;
 import dev.atoms.demo.source.ProjectSourceEditGateway;
-import java.time.Instant;
 import java.util.UUID;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -30,7 +29,7 @@ class AgentTaskLifecycle {
             if (task.terminal()) return task;
             if (!task.status().equals("QUEUED")) throw AgentTask.conflict("AGENT_TASK_CONFLICT");
             if (task.cancelRequested()) return finish(task, "CANCELLED", "AGENT_CANCELLED");
-            if (!Instant.now().isBefore(task.createdAt().plusSeconds(task.queueTimeoutSeconds())))
+            if (repository.queueExpired(task.id()))
                 return finish(task, "TIMED_OUT", "AGENT_QUEUE_TIMEOUT");
             requireHandle(task.id());
             return repository.preparing(task);
