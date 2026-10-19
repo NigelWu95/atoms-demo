@@ -33,6 +33,17 @@ public class ProjectSourceEditGateway {
         return scheduler != null && scheduler.isRunning();
     }
 
+    /** Trusted template adapter only. Publishes an initial source version, never an Agent task or business-ready state. */
+    public Submitted initializeTemplate(UUID owner, UUID project, SourceTree tree, String templateId, String digest, String key) {
+        requireOutsideTransaction();
+        service.authorize(owner, project);
+        if (templateId == null || digest == null) throw new IllegalArgumentException("Controlled template origin required");
+        var scheduler = coordinator.get();
+        if (scheduler == null || !scheduler.isRunning()) throw ProjectSourceService.conflict("SOURCE_COORDINATOR_UNAVAILABLE");
+        var submission = scheduler.initialize(owner, project, tree, templateId, digest, key);
+        return new Submitted(submission.operation(), submission.completion());
+    }
+
     ProjectSourceEditGateway(ProjectSourceService service, SourceRepository repository, ProjectSourceEnvironment environment,
                             PlatformTransactionManager transactions) {
         this(service, repository, environment, transactions, (java.util.function.Supplier<SourceCoordinator>) () -> null);

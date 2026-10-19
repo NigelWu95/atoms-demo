@@ -40,6 +40,7 @@ public class ProjectSourceService {
                     throw conflict("SOURCE_IDEMPOTENCY_CONFLICT");
                 return existing;
             }
+            requireInitialTarget(project, request.kind(), request.templateId());
             repository.ensureSource(projectId);
             var source = repository.state(projectId);
             requireBase(source, request.expectedVersionId(), request.expectedRevision());
@@ -120,7 +121,7 @@ public class ProjectSourceService {
             var operation = lockedOperation(project, id);
             if (operation.terminal()) return operation;
             edits.requireOperation(operation);
-            writable(projects.lock(operation.ownerId(), project.toString()));
+            writableOperation(projects.lock(operation.ownerId(), project.toString()), operation);
             requireBase(repository.state(project), operation.expectedVersionId(), operation.expectedRevision());
             if (!operation.status().equals("PREPARING") || operation.executionId() != null) throw conflict("SOURCE_NEEDS_RECONCILIATION");
             return operation.cancelRequested() ? repository.finish(operation, "CANCELLED", "SOURCE_CANCELLED") : operation;
@@ -132,7 +133,7 @@ public class ProjectSourceService {
             var operation = lockedOperation(project, id);
             if (operation.terminal()) return operation;
             edits.requireOperation(operation);
-            writable(projects.lock(operation.ownerId(), project.toString()));
+            writableOperation(projects.lock(operation.ownerId(), project.toString()), operation);
             requireBase(repository.state(project), operation.expectedVersionId(), operation.expectedRevision());
             if (operation.cancelRequested()) return repository.finish(operation, "CANCELLED", "SOURCE_CANCELLED");
             return repository.ready(operation);
@@ -144,7 +145,7 @@ public class ProjectSourceService {
             var operation = lockedOperation(project, id);
             if (operation.terminal()) return operation;
             edits.requireOperation(operation);
-            writable(projects.lock(operation.ownerId(), project.toString()));
+            writableOperation(projects.lock(operation.ownerId(), project.toString()), operation);
             requireBase(repository.state(project), operation.expectedVersionId(), operation.expectedRevision());
             if (operation.cancelRequested()) return repository.finish(operation, "CANCELLED", "SOURCE_CANCELLED");
             if (operation.executionId() != null || !operation.status().equals("PREPARING")) throw conflict("SOURCE_NEEDS_RECONCILIATION");
@@ -169,7 +170,7 @@ public class ProjectSourceService {
             var operation = lockedOperation(project, id);
             if (operation.terminal()) return operation;
             edits.requireOperation(operation);
-            writable(projects.lock(operation.ownerId(), project.toString()));
+            writableOperation(projects.lock(operation.ownerId(), project.toString()), operation);
             requireBase(repository.state(project), operation.expectedVersionId(), operation.expectedRevision());
             if (operation.cancelRequested()) return repository.finish(operation, "CANCELLED", "SOURCE_CANCELLED");
             if (!operation.status().equals("CANDIDATE_READY") || !operation.candidateVersionId().equals(stored.versionId())
@@ -232,6 +233,17 @@ public class ProjectSourceService {
     }
     static void writable(Project project) {
         if (project.archived()) throw conflict("SOURCE_PROJECT_ARCHIVED");
+    }
+    private static void writableOperation(Project project, SourceOperation operation) {
+        writable(project);
+        requireInitialTarget(project, operation.kind(), operation.templateId());
+    }
+    private static void requireInitialTarget(Project project, String kind, String templateId) {
+        // Native initialization is for an empty project; legacy applications must be explicitly imported.
+        // Recheck under the shared project lock at publication, not only before filesystem work.
+        if (kind.equals("INITIALIZE") && templateId != null
+                && (project.currentVersionId() != null || project.activeRunId() != null))
+            throw conflict("SOURCE_TEMPLATE_REQUIRES_IMPORT");
     }
     static void requireBase(SourceRepository.State source, UUID version, long revision) {
         if (source.status().equals("NEEDS_RECONCILIATION")) throw conflict("SOURCE_NEEDS_RECONCILIATION");
