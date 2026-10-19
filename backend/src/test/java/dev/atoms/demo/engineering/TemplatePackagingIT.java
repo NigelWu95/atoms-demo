@@ -31,7 +31,10 @@ class TemplatePackagingIT {
         var parser = DocumentBuilderFactory.newInstance();
         parser.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
         var pom = parser.newDocumentBuilder().parse(Path.of("pom.xml").toFile());
-        var includes = pom.getElementsByTagName("include");
+        // Scope parity to the unchanged legacy catalog; native templates have a separate namespace and test.
+        var includes = (org.w3c.dom.NodeList) javax.xml.xpath.XPathFactory.newInstance().newXPath().evaluate(
+                "/project/build/resources/resource[starts-with(targetPath,'engineering-templates')]/includes/include",
+                pom, javax.xml.xpath.XPathConstants.NODESET);
         var configured = new java.util.ArrayList<String>();
         for (int i = 0; i < includes.getLength(); i++) configured.add(includes.item(i).getTextContent());
         var expectedIncludes = new java.util.ArrayList<String>();

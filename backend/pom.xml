@@ -180,6 +180,52 @@
           <include>scripts/start.test.mjs</include>
         </includes>
       </resource>
+      <resource>
+        <directory>${project.basedir}/../templates</directory>
+        <targetPath>project-agent-templates</targetPath><filtering>false</filtering>
+        <includes><include>full-project-v1.files</include></includes>
+      </resource>
+      <resource>
+        <directory>${project.basedir}/../templates/full-project-v1</directory>
+        <targetPath>project-agent-templates/full-project-v1</targetPath><filtering>false</filtering>
+        <includes>
+          <include>.gitignore</include>
+          <include>README.md</include>
+          <include>THIRD-PARTY-NOTICES.md</include>
+          <include>backend/.mvn/wrapper/maven-wrapper.properties</include>
+          <include>backend/mvnw</include>
+          <include>backend/pom.xml</include>
+          <include>backend/src/main/java/dev/atoms/generated/GeneratedApplication.java</include>
+          <include>backend/src/main/java/dev/atoms/generated/HealthController.java</include>
+          <include>backend/src/main/resources/application.yml</include>
+          <include>backend/src/main/resources/db/migration/V001__application_metadata.sql</include>
+          <include>backend/src/test/java/dev/atoms/generated/HealthControllerTest.java</include>
+          <include>config/application.properties.example</include>
+          <include>frontend/.npmrc</include>
+          <include>frontend/dev/boundary.spec.ts</include>
+          <include>frontend/dev/boundary.ts</include>
+          <include>frontend/eslint.config.js</include>
+          <include>frontend/index.html</include>
+          <include>frontend/package-lock.json</include>
+          <include>frontend/package.json</include>
+          <include>frontend/src/App.spec.ts</include>
+          <include>frontend/src/App.vue</include>
+          <include>frontend/src/app.css</include>
+          <include>frontend/src/icon.svg</include>
+          <include>frontend/src/main.ts</include>
+          <include>frontend/tsconfig.json</include>
+          <include>frontend/vite.config.ts</include>
+          <include>licenses/maven-wrapper-LICENSE.txt</include>
+          <include>licenses/maven-wrapper-NOTICE.txt</include>
+          <include>scripts/build.mjs</include>
+          <include>scripts/build.test.mjs</include>
+          <include>scripts/package-frontend.mjs</include>
+          <include>scripts/process.mjs</include>
+          <include>scripts/process.test.mjs</include>
+          <include>scripts/start.mjs</include>
+          <include>scripts/start.test.mjs</include>
+        </includes>
+      </resource>
     </resources>
     <plugins>
       <plugin>
