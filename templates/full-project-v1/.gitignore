@@ -1,0 +1,13 @@
+**/node_modules/
+**/target/
+**/dist/
+**/coverage/
+**/test-results/
+**/playwright-report/
+**/.env
+**/.env.*
+**/*.log
+**/*.properties
+!backend/.mvn/wrapper/maven-wrapper.properties
+.local/
+.DS_Store
