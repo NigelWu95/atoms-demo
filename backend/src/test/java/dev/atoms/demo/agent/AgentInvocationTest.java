@@ -11,7 +11,7 @@ class AgentInvocationTest {
     private final Path root = Path.of("/private/task-state/one");
     private final AgentSettings.Configuration settings = new AgentSettings.Configuration(Path.of("/opt/cli/claude"),
             root.getParent(), Set.of(UUID.randomUUID()), false, 0, 128000, 24,
-            Duration.ofSeconds(1800), Duration.ofSeconds(300));
+            Duration.ofSeconds(1800), Duration.ofSeconds(300), 2);
 
     @Test void fixedArgvDoesNotIncludePromptsShellOrFallbacks() {
         var builder = invocation();

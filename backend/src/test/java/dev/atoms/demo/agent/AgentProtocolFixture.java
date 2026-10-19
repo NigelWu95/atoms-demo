@@ -70,7 +70,7 @@ final class AgentProtocolFixture implements AutoCloseable {
         steps = editSteps();
         var identity = AgentCliProbe.verify(cli, config, temporary);
         var settings = new AgentSettings.Configuration(identity.path(), config.getParent(), Set.of(UUID.randomUUID()),
-                false, 0, 128000, 24, Duration.ofSeconds(1800), Duration.ofSeconds(300));
+                false, 0, 128000, 24, Duration.ofSeconds(1800), Duration.ofSeconds(300), 2);
         var builder = AgentInvocation.create(identity.path(), settings, project, config, temporary, "offline-fixture-key");
         builder.environment().put("ANTHROPIC_BASE_URL", "http://127.0.0.1:" + server.getAddress().getPort() + "/anthropic");
         identity.verifyUnchanged();
@@ -118,7 +118,7 @@ final class AgentProtocolFixture implements AutoCloseable {
     private Result run(boolean separateToolArguments) throws Exception {
         var identity = AgentCliProbe.verify(cli, config, temporary);
         var settings = new AgentSettings.Configuration(identity.path(), config.getParent(), Set.of(UUID.randomUUID()),
-                false, 0, 128000, 24, Duration.ofSeconds(1800), Duration.ofSeconds(300));
+                false, 0, 128000, 24, Duration.ofSeconds(1800), Duration.ofSeconds(300), 2);
         var builder = AgentInvocation.create(identity.path(), settings, project, config, temporary, "offline-fixture-key");
         if (separateToolArguments) {
             var arguments = new ArrayList<>(builder.command());

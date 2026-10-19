@@ -26,13 +26,14 @@ final class AgentSettings {
                     (int) number("max-output-tokens", 128000, 1, 128000),
                     (int) number("max-turns", 24, 1, 24),
                     Duration.ofSeconds(number("task-timeout-seconds", 1800, 1, 1800)),
-                    Duration.ofSeconds(number("queue-timeout-seconds", 300, 1, 300)));
+                    Duration.ofSeconds(number("queue-timeout-seconds", 300, 1, 300)),
+                    (int) number("max-concurrent-tasks", 2, 1, 8));
         } catch (IllegalArgumentException error) { throw unavailable(); }
     }
 
     record Configuration(Path cli, Path stateRoot, Set<UUID> maintainerIds, boolean liveEnabled,
                          long maxLiveRuns, int maxOutputTokens, int maxTurns,
-                         Duration taskTimeout, Duration queueTimeout) {
+                         Duration taskTimeout, Duration queueTimeout, int maxConcurrentTasks) {
         Configuration { maintainerIds = Set.copyOf(maintainerIds); }
     }
 

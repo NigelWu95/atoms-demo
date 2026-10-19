@@ -35,6 +35,7 @@ atoms:
     max-turns: ${PROJECT_AGENT_MAX_TURNS:24}
     task-timeout-seconds: ${PROJECT_AGENT_TASK_TIMEOUT_SECONDS:1800}
     queue-timeout-seconds: ${PROJECT_AGENT_QUEUE_TIMEOUT_SECONDS:300}
+    max-concurrent-tasks: ${PROJECT_AGENT_MAX_CONCURRENT_TASKS:2}
   source:
     enabled: ${PROJECT_SOURCE_ENABLED:false}
     root: ${PROJECT_SOURCE_ROOT:}

@@ -36,6 +36,7 @@ class AgentSettingsTest {
         assertThat(settings.maxTurns()).isEqualTo(24);
         assertThat(settings.taskTimeout()).isEqualTo(Duration.ofSeconds(1800));
         assertThat(settings.queueTimeout()).isEqualTo(Duration.ofSeconds(300));
+        assertThat(settings.maxConcurrentTasks()).isEqualTo(2);
         assertThat(settings.cli()).isEqualTo(temporary.resolve("cli"));
         assertThat(settings.stateRoot()).isEqualTo(temporary.resolve("state"));
         try (var paths = Files.list(temporary)) { assertThat(paths.toList()).isEmpty(); }
@@ -70,6 +71,17 @@ class AgentSettingsTest {
         String canary = "not-a-valid-config-secret-canary";
         assertThatThrownBy(() -> new AgentSettings(config().withProperty("atoms.agent.cli", canary)).load())
                 .isInstanceOf(ApiException.class).hasMessageNotContaining(canary).hasNoCause();
+    }
+
+    @Test void rejectsUnboundedOrMalformedConcurrency() {
+        for (String value : new String[]{"0", "-1", "9", "", "two", "999999999999999999999"})
+            assertInvalid("max-concurrent-tasks", value);
+    }
+
+    @Test void acceptsExplicitConcurrencyWithinTheBound() {
+        for (int value : new int[]{1, 2, 3, 8})
+            assertThat(new AgentSettings(config().withProperty("atoms.agent.max-concurrent-tasks", Integer.toString(value)))
+                    .load().maxConcurrentTasks()).isEqualTo(value);
     }
 
     private void assertInvalid(String key, String value) {

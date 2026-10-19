@@ -10,7 +10,7 @@ import static org.assertj.core.api.Assertions.*;
 class AgentTaskTest {
     private AgentSettings.Configuration config(int turns) {
         return new AgentSettings.Configuration(Path.of("/tools/claude"), Path.of("/state/agent"), Set.of(UUID.randomUUID()),
-                false, 0, 128000, turns, Duration.ofMinutes(30), Duration.ofMinutes(5));
+                false, 0, 128000, turns, Duration.ofMinutes(30), Duration.ofMinutes(5), 2);
     }
 
     @Test void strictRequestBindsModelConfigurationAndExactPromptWithoutExposingIt() {
