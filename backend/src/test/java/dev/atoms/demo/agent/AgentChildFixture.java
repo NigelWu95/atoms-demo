@@ -23,6 +23,17 @@ public final class AgentChildFixture {
                 System.in.readAllBytes(); Files.writeString(Path.of(".env"), "PRIVATE_FIXTURE_SECRET=canary");
                 System.out.println(INIT); System.out.println(RESULT);
             }
+            case "source-secret", "source-symlink", "source-hardlink", "source-oversize" -> {
+                System.in.readAllBytes();
+                switch (args[0]) {
+                    case "source-secret" -> Files.writeString(Path.of("README.md"), "api_key: public-fixture-canary-not-a-real-secret\n");
+                    case "source-symlink" -> Files.createSymbolicLink(Path.of("linked.txt"), Path.of("README.md"));
+                    case "source-hardlink" -> Files.createLink(Path.of("linked.txt"), Path.of("README.md"));
+                    case "source-oversize" -> Files.writeString(Path.of("large.txt"), "x".repeat((2 << 20) + 1));
+                    default -> throw new IllegalArgumentException("Unknown candidate fixture");
+                }
+                System.out.println(INIT); System.out.println(RESULT);
+            }
             case "success", "exit-error" -> {
                 System.in.readAllBytes();
                 System.out.println(INIT); System.out.println(RESULT);

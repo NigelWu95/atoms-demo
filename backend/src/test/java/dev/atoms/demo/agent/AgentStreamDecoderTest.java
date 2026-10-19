@@ -87,6 +87,15 @@ class AgentStreamDecoderTest {
         }
     }
 
+    @Test void unadvertisedToolsCannotBecomeValidByReturningASuccessfulResult() {
+        for (String tool : new String[] {"Bash", "Agent", "Task", "mcp__fixture__read"}) {
+            String call = "{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"tool_use\",\"id\":\"one\",\"name\":\""
+                    + tool + "\",\"input\":{\"file_path\":\"/private/project/README.md\"}}]}}\n";
+            String result = "{\"type\":\"user\",\"message\":{\"content\":[{\"type\":\"tool_result\",\"tool_use_id\":\"one\",\"is_error\":false}]}}\n";
+            assertThatThrownBy(() -> read(INIT + call + result + SUCCESS)).hasMessage("AGENT_PROTOCOL_INVALID");
+        }
+    }
+
     @Test void unresolvedToolUseUnknownToolResultsAndHookEventsCannotSucceed() throws Exception {
         String stream;
         try (var input = getClass().getResourceAsStream("/agent/stream-success.ndjson")) {

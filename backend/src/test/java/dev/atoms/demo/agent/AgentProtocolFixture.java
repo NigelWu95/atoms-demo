@@ -31,6 +31,7 @@ final class AgentProtocolFixture implements AutoCloseable {
     private volatile List<Step> steps = List.of();
     private volatile boolean configurationCanarySeen, outsideContentSeen;
     private AgentStreamDecoder.Summary summary;
+    private String decoderFailure;
     private static final String CONFIG_CANARY = "atoms-fixture-customization-must-not-load";
     private static final String OUTSIDE_CANARY = "atoms-fixture-outside-content-must-not-leak";
     private volatile boolean readReturnedOriginalContent, editReturnedSuccess;
@@ -60,6 +61,7 @@ final class AgentProtocolFixture implements AutoCloseable {
     boolean outsideContentSeen() { return outsideContentSeen; }
     AgentStreamDecoder.Summary summary() { return summary; }
     String failure() { return failure; }
+    String decoderFailure() { return decoderFailure; }
     record ToolResult(boolean error, String content) {}
     private record Step(String id, String name, Map<String, Object> input) {}
     record Request(String apiKey, String model, int maxTokens, List<String> tools, boolean stream,
@@ -141,6 +143,20 @@ final class AgentProtocolFixture implements AutoCloseable {
         return run(false);
     }
 
+    Result exerciseForbiddenCapabilities() throws Exception {
+        Files.writeString(config.resolve("settings.json"), json.writeValueAsString(Map.of("env", Map.of("ATOMS_TEST_CANARY", CONFIG_CANARY))));
+        Path syntheticPersonal = directory(directory(config.getParent().resolve("synthetic-user")).resolve(".claude"));
+        Path credentials = syntheticPersonal.resolve(".credentials.json");
+        Files.writeString(credentials, json.writeValueAsString(Map.of("canary", OUTSIDE_CANARY)));
+        var subagent = Map.<String, Object>of("description", "Synthetic denial check", "prompt", "Return only a fixed word.", "subagent_type", "general-purpose");
+        steps = List.of(new Step("bash_denied", "Bash", Map.of("command", "printf atoms-fixture-forbidden")),
+                new Step("agent_denied", "Agent", subagent), new Step("task_denied", "Task", subagent),
+                new Step("mcp_denied", "mcp__fixture__read", Map.of()),
+                new Step("settings_denied", "Read", Map.of("file_path", config.resolve("settings.json").toString())),
+                new Step("credentials_denied", "Read", Map.of("file_path", credentials.toString())));
+        return run(false, true);
+    }
+
     private List<Step> editSteps() {
         return List.of(new Step("tool_read", "Read", Map.of("file_path", project.resolve("hello.txt").toString())),
                 new Step("tool_edit", "Edit", Map.of("file_path", project.resolve("hello.txt").toString(), "old_string", "before", "new_string", "after")));
@@ -151,6 +167,10 @@ final class AgentProtocolFixture implements AutoCloseable {
     }
 
     private Result run(boolean separateToolArguments) throws Exception {
+        return run(separateToolArguments, false);
+    }
+
+    private Result run(boolean separateToolArguments, boolean observeProtocolRejection) throws Exception {
         var identity = AgentCliProbe.verify(cli, config, temporary);
         var settings = new AgentSettings.Configuration(identity.path(), config.getParent(), Set.of(UUID.randomUUID()),
                 false, 0, 128000, 24, Duration.ofSeconds(1800), Duration.ofSeconds(300), 2);
@@ -213,9 +233,12 @@ final class AgentProtocolFixture implements AutoCloseable {
                 }
             }
             if (result == null) throw new AssertionError("Missing CLI result; exit=" + process.exitValue());
-            if (result.path("permission_denials").isEmpty() && result.path("subtype").asText().equals("success")) {
+            if (observeProtocolRejection || result.path("permission_denials").isEmpty() && result.path("subtype").asText().equals("success")) {
                 try { summary = new AgentStreamDecoder(project).read(new java.io.ByteArrayInputStream(output.getBytes(StandardCharsets.UTF_8))); }
-                catch (IOException error) { throw new AssertionError("CLI decoder rejected event kinds " + eventKinds, error); }
+                catch (IOException error) {
+                    if (!observeProtocolRejection) throw new AssertionError("CLI decoder rejected event kinds " + eventKinds, error);
+                    decoderFailure = error.getMessage();
+                }
             }
             return new Result(process.exitValue(), result.path("subtype").asText().equals("success")
                     && !result.path("is_error").asBoolean(true), result.path("permission_denials").size(), List.copyOf(initialTools));
