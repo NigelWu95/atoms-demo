@@ -73,9 +73,12 @@ class ProjectSourceLifecycleIT extends SourceIntegrationSupport {
     @Test void recoversAfterARealJvmExitsBetweenGitAndDatabasePublication() throws Exception {
         var intent = new SourceInitializer(service).request(owner, project, ProjectSourceInitializationIT.tree(), "real-process");
         var parent = temporary.toRealPath();
+        // The child must observe this test's actual schema, not an unrelated default schema.
+        String schema = jdbc.queryForObject("SELECT current_schema()", String.class);
+        SourceProcessProbe.databaseUrl(schema);
         var builder = new ProcessBuilder(Path.of(System.getProperty("java.home"), "bin/java").toString(), "-cp",
                 System.getProperty("java.class.path"), SourceProcessProbe.class.getName(), project.toString(), intent.id().toString(),
-                parent.resolve("source").toString(), parent.resolve("work").toString())
+                parent.resolve("source").toString(), parent.resolve("work").toString(), schema)
                 .redirectOutput(ProcessBuilder.Redirect.DISCARD).redirectError(ProcessBuilder.Redirect.DISCARD);
         builder.environment().clear();
         builder.environment().put("PATH", "/usr/bin:/bin");
