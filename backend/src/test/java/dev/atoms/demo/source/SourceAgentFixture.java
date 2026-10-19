@@ -39,10 +39,14 @@ public final class SourceAgentFixture implements AutoCloseable {
     }
 
     public record Base(UUID projectId, UUID versionId, long revision) {}
-    public Base create(UUID owner) {
+    public UUID createEmpty(UUID owner) {
         UUID project = UUID.randomUUID();
         jdbc.update("INSERT INTO projects(id,owner_id,name) VALUES (?,?,?)", project, owner, "agent-test");
         projects.add(project);
+        return project;
+    }
+    public Base create(UUID owner) {
+        UUID project = createEmpty(owner);
         var tree = new ProjectSourcePolicy().validate(List.of(
                 ProjectSourceInitializationIT.file("frontend/App.vue", "<template>one</template>"),
                 ProjectSourceInitializationIT.file("backend/App.java", "class App {}"),
