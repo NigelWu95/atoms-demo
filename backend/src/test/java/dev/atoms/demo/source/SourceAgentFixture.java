@@ -68,6 +68,13 @@ public final class SourceAgentFixture implements AutoCloseable {
     public byte[] file(UUID owner, UUID project, UUID version, String path) {
         return new SourceQuery(source, repository, environment).file(owner, project, version, path).content();
     }
+    public SourceTree snapshot(UUID owner, UUID project, UUID version) {
+        return new SourceQuery(source, repository, environment).snapshot(owner, project, version).tree();
+    }
+    public java.util.Map<String, String> changedPaths(UUID owner, UUID project, UUID before, UUID after) {
+        return new SourceQuery(source, repository, environment).diff(owner, project, before, after).changes().stream()
+                .collect(java.util.stream.Collectors.toUnmodifiableMap(SourceDiff.Change::path, SourceDiff.Change::kind));
+    }
     @Override public void close() throws Exception {
         if (coordinator != null) coordinator.close();
         for (var project : projects) {
