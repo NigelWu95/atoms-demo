@@ -1,0 +1,11 @@
+# Copy outside the source tree and replace placeholders; never commit the real file.
+# Supply through Spring's explicit external config location at runtime:
+# https://docs.spring.io/spring-boot/3.5/reference/features/external-config.html#features.external-config.files
+# Prepare a dedicated PostgreSQL database and non-superuser role owning the
+# generated_app schema. Do not use the platform database or its credentials.
+APP_PORT=8088
+APP_DB_URL=REPLACE_WITH_DATABASE_URL
+APP_DB_USERNAME=REPLACE_WITH_DATABASE_USER
+APP_DB_PASSWORD=REPLACE_WITH_DATABASE_PASSWORD
+# The server binds to loopback by default. Public hosting/authentication is not
+# implemented by this initialization template; no user business logic exists yet.

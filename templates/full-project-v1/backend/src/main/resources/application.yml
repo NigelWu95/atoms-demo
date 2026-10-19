@@ -1,0 +1,24 @@
+server:
+  address: 127.0.0.1
+  port: ${APP_PORT}
+  error:
+    include-message: never
+    include-stacktrace: never
+    include-binding-errors: never
+spring:
+  application:
+    name: generated-app
+  datasource:
+    url: ${APP_DB_URL}
+    username: ${APP_DB_USERNAME}
+    password: ${APP_DB_PASSWORD}
+    hikari:
+      maximum-pool-size: 4
+      connection-timeout: 5000
+  flyway:
+    default-schema: generated_app
+    create-schemas: false
+    clean-disabled: true
+  sql:
+    init:
+      mode: never
