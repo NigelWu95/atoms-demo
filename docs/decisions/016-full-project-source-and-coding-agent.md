@@ -6,6 +6,8 @@
 
 本记录增加新模式，不撤销 [ADR-013](013-native-process-engineering-preview.md) 对现有固定模板运行的限制。后续开放模型生成 Java 的执行前，必须单独通过新执行模块评审。
 
+2026-10-19 实施补充：源码模块和 Agent PA01–PA33 已通过内部离线验收。Agent 已实现完整模板初始化、两轮文件编辑、版本保存、默认 4 并发、取消/恢复及查询/正文保留；最终后端 290 单元 + 272 集成通过，完整结果见[验证记录](../project-agent-verification.md)。本机 CLI 2.1.302 / 2.1.303 的 `safe-mode + restricted` 经离线协议验证提供五种文件工具，采用此组合而非早期候选 `bare`。不修改个人配置、不开 Shell/MCP；真实 DeepSeek 与新工程运行/交付/工作台仍未验收。操作边界见[维护说明](../project-agent.md)。保留下文最初决策时的观察，不将旧“未运行 CLI”描述当作当前状态。
+
 ## 背景
 
 现有模型产物是三个前端文本文件，保存在 PostgreSQL `versions.source_json` 的 TEXT 字段中。完整下载工程由固定模板加产物组装；这与可由 Agent 修改 Vue、Java、SQL 及配置的完整源工程不同。

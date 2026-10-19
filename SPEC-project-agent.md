@@ -1,6 +1,6 @@
 # Spec: project-agent · Claude Code + DeepSeek 完整工程编辑
 
-状态：2026-10-18～19，用户已确认规格、[实施计划](tasks/project-agent/plan.md)与[任务清单](tasks/project-agent/todo.md)，并将范围扩展至完整本地开发闭环（§10）。检查点用于汇报证据，不重复请求逐项批准；真实付费模型 PA-LIVE 与部署仍需另行授权。PA01–PA30 内部切片已完成：文件编辑、默认 4 并发、查询/保留、原生模板/包装/初始化，以及受控进程和真实 CLI 离线两轮旅程、拒绝边界。当前精确支持 2.1.302 / 2.1.303，未知版本仍拒绝。恢复压力/全量回归、实际构建运行和工作台仍未完成，测试待核对记录见验证文档；不是完整产品交付声明。
+状态：2026-10-19，用户已确认规格、[实施计划](tasks/project-agent/plan.md)与[任务清单](tasks/project-agent/todo.md)，并将范围扩展至完整本地开发闭环（§10）。PA01–PA33 内部离线验收完成：完整源码编辑、默认 4 并发、查询/保留、原生模板/初始化、连续两轮旅程、拒绝边界及取消恢复。最终后端全量 290 单元 + 272 集成通过；当前精确支持 CLI 2.1.302 / 2.1.303，未知版本仍拒绝。旧两份测试未决审计保留，不能将新隔离 schema 的通过视作旧执行已结算。真实付费模型 PA-LIVE、实际构建运行、交付和工作台仍未完成；不是完整产品交付或部署声明。检查点用于汇报，不重复请求逐项批准；真实调用与部署仍需另行授权。
 
 模块索引：[完整工程能力地图](FULL-PROJECT-CAPABILITY-MAP.md)。上游：[源码模块](SPEC-project-source.md)。总体方向：[ADR-016](docs/decisions/016-full-project-source-and-coding-agent.md)。本文不是整个工程改造的完成声明，也不是执行生成后端的授权。
 
@@ -190,28 +190,25 @@ backend/src/main/resources/db/migration/           新增迁移
 backend/src/test/java/dev/atoms/demo/agent/        协议/假进程/集成测试
 backend/src/test/java/dev/atoms/demo/source/       上游租约回归
 backend/src/test/resources/agent/                 无秘密工具事件与受控协议样本
-templates/full-project-v1/                        新原生工程模板（待新增）
+templates/full-project-v1/                        已打包的 35 文件原生工程模板
 docs/project-agent.md                             实施后的使用边界与维护说明
 docs/project-agent-verification.md                实施后的可重复验收证据
 ```
 
-沿用 Java 四空格、构造器注入、不可变 DTO、绑定 SQL、短事务。对外不透明句柄和进程拥有权不使用客户端可构造的 record 冒充。普通输入 DTO 示例（设计示例，尚非已存在接口）：
+沿用 Java 四空格、构造器注入、不可变 DTO、绑定 SQL、短事务。对外不透明句柄和进程拥有权不使用客户端可构造的 record 冒充。当前内部入口为具体 Spring 服务 `ProjectAgentService`，输入版本字符串在边界严格转换为 UUID；主要契约如下（省略实现，不是新增 HTTP API）：
 
 ```java
-public record AgentTaskInput(
+public record Input(
         String prompt,
-        UUID baseSourceVersionId,
+        String baseSourceVersionId,
         long expectedSourceRevision) {}
 
-public interface ProjectAgentService {
-    AgentTaskView submit(UUID ownerId, UUID projectId,
-            AgentTaskInput input, String idempotencyKey);
-    AgentTaskView get(UUID ownerId, UUID projectId, UUID taskId);
-    AgentTaskView cancel(UUID ownerId, UUID projectId, UUID taskId);
-}
+public TaskView submit(UUID owner, UUID project, Input input, String key);
+public TaskView get(UUID owner, UUID project, UUID taskId);
+public TaskView cancel(UUID owner, UUID project, UUID taskId);
 ```
 
-基础检查命令如下，本轮未执行测试，也不将源码模块历史结果计为新模块通过：
+基础检查命令如下；具体执行时间、范围、schema 和结果见[验证记录](docs/project-agent-verification.md)，不将源码模块历史结果计为新模块通过：
 
 ```sh
 cd /Users/wubingheng/atoms-demo/backend
@@ -227,7 +224,7 @@ npm run test:unit
 npm run build
 ```
 
-后端集成测试只使用既有专用 `atoms_demo_test`、`atoms_test` 非超级用户及私有测试密码；先检查连接目标，禁止日常库或远程库。测试默认不读真实 DeepSeek/SMTP 密钥。新测试类、离线 CLI 契约命令在批准后的实施计划中补充，不写不存在的测试命令假装已执行。
+后端集成测试只使用专用 `atoms_demo_test`、`atoms_test` 非超级用户及私有测试密码；先检查连接目标，禁止日常库或远程库。默认 schema 保留了历史未决审计，当前复验通过进程环境指定获准的新 schema，不能删锁后重跑。测试默认不读真实 DeepSeek/SMTP 密钥。新测试类、离线 CLI 契约命令见已批准的[实施计划](tasks/project-agent/plan.md)和验证记录。
 
 ## 8. 验收标准
 
@@ -259,7 +256,7 @@ npm run build
 
 真实调用的具体项目、启动次数和费用约束可在离线适配完成后单独确认，不阻塞确定性实现。第三方模型组合及对外托管的适用条款仍是正式开放前核查项，沿用 ADR-016 的边界，不将技术连通性等同于商业授权。
 
-下一步形成实施计划与任务；批准本规格不自动开启真实调用、执行生成代码或远程部署。
+实施计划与任务已批准，具体完成状态见[清单](tasks/project-agent/todo.md)。批准本规格不自动开启真实调用或远程部署；完整本地闭环的后续范围以 §10 为准。
 
 ## 10. 2026-10-19 完整闭环实施授权
 
