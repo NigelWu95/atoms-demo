@@ -17,6 +17,11 @@ import java.util.function.BooleanSupplier;
 
 /** Owns only the process it starts and observed descendants; not an OS process sandbox. */
 public final class OwnedProcess {
+    private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(OwnedProcess.class);
+    private enum UnsettledReason {
+        DESCENDANT_LIMIT, DESCENDANT_IDENTITY_UNAVAILABLE, DESCENDANT_ENUMERATION_FAILED,
+        DESCENDANT_IDENTITY_CHANGED, PROCESS_EXIT_TIMEOUT, IO_DRAIN_TIMEOUT, CLEANUP_FAILED
+    }
     private static final Set<String> STREAM_FAILURES = Set.of("AGENT_PROTOCOL_INVALID", "AGENT_CLI_UNSUPPORTED",
             "AGENT_TOOL_FAILED", "AGENT_TOOL_PATH_REJECTED", "AGENT_OUTPUT_LIMIT", "AGENT_MODEL_INCOMPLETE");
     private static final Set<String> PREFLIGHT_FAILURES = Set.of("AGENT_CANCELLED", "AGENT_TIMEOUT",
@@ -123,7 +128,11 @@ public final class OwnedProcess {
             settled = owner.settle(streams);
             if (interrupted) Thread.currentThread().interrupt();
         }
-        if (!settled) throw new Failure("AGENT_PROCESS_UNSETTLED", null);
+        if (!settled) {
+            LOG.warn("{\"event\":\"owned_process_unsettled\",\"entryPoint\":\"owned_process\",\"requestId\":\"{}\",\"executionId\":\"{}\",\"reason\":\"{}\"}",
+                    task, execution, owner.reason);
+            throw new Failure("AGENT_PROCESS_UNSETTLED", null);
+        }
         var stopped = new Stopped(task, execution, builder.directory().toPath());
         if (failure != null) throw new Failure(failure, stopped);
         return new Result<>(summary, stopped);
@@ -155,6 +164,7 @@ public final class OwnedProcess {
         private final java.util.function.Function<Process, List<ProcessHandle>> descendants;
         private final Map<ProcessHandle, java.time.Instant> children = new LinkedHashMap<>();
         private boolean uncertain;
+        private UnsettledReason reason;
         Owned(Process process, java.util.function.Function<Process, List<ProcessHandle>> descendants) {
             this.process = process; this.descendants = descendants;
         }
@@ -162,13 +172,15 @@ public final class OwnedProcess {
         void observe() {
             try {
                 if (process.isAlive()) descendants.apply(process).forEach(child -> {
-                    if (children.size() >= 128 && !children.containsKey(child)) { uncertain = true; return; }
+                    if (children.size() >= 128 && !children.containsKey(child)) { uncertain(UnsettledReason.DESCENDANT_LIMIT); return; }
                     var start = child.info().startInstant();
                     if (start.isPresent()) children.putIfAbsent(child, start.get());
-                    else if (child.isAlive()) uncertain = true;
+                    else if (child.isAlive()) uncertain(UnsettledReason.DESCENDANT_IDENTITY_UNAVAILABLE);
                 });
-            } catch (RuntimeException error) { uncertain = true; }
+            } catch (RuntimeException error) { uncertain(UnsettledReason.DESCENDANT_ENUMERATION_FAILED); }
         }
+        private void uncertain(UnsettledReason cause) { uncertain = true; failed(cause); }
+        private boolean failed(UnsettledReason cause) { if (reason == null) reason = cause; return false; }
         boolean childrenAlive() { return children.keySet().stream().anyMatch(ProcessHandle::isAlive); }
 
         boolean settle(ExecutorService streams) {
@@ -178,18 +190,24 @@ public final class OwnedProcess {
                 observe();
                 signal(false);
                 while (process.isAlive() || childrenAlive()) {
-                    if (System.nanoTime() - start >= budget) return false;
+                    if (System.nanoTime() - start >= budget) return failed(UnsettledReason.PROCESS_EXIT_TIMEOUT);
                     observe();
                     if (System.nanoTime() - start > Duration.ofMillis(300).toNanos()) signal(true);
                     try { TimeUnit.MILLISECONDS.sleep(10); }
                     catch (InterruptedException error) { interrupted = true; }
                 }
                 streams.shutdownNow();
-                long remaining = budget - (System.nanoTime() - start);
-                if (remaining <= 0) return false;
-                try { return streams.awaitTermination(remaining, TimeUnit.NANOSECONDS) && !uncertain; }
-                catch (InterruptedException error) { interrupted = true; return false; }
-            } catch (RuntimeException error) { return false; }
+                // Cancellation can arrive repeatedly. Finish observing our own I/O within the original
+                // cleanup deadline; interruption alone is neither stopped evidence nor proof of failure.
+                while (true) {
+                    long remaining = budget - (System.nanoTime() - start);
+                    if (remaining <= 0) return failed(UnsettledReason.IO_DRAIN_TIMEOUT);
+                    try {
+                        if (!streams.awaitTermination(remaining, TimeUnit.NANOSECONDS)) return failed(UnsettledReason.IO_DRAIN_TIMEOUT);
+                        return !uncertain;
+                    } catch (InterruptedException error) { interrupted = true; }
+                }
+            } catch (RuntimeException error) { return failed(UnsettledReason.CLEANUP_FAILED); }
             finally { streams.shutdownNow(); if (interrupted) Thread.currentThread().interrupt(); }
         }
 
@@ -197,7 +215,9 @@ public final class OwnedProcess {
             for (var entry : children.entrySet()) {
                 ProcessHandle child = entry.getKey();
                 if (!child.isAlive()) continue;
-                if (!child.info().startInstant().filter(entry.getValue()::equals).isPresent()) { uncertain = true; continue; }
+                if (!child.info().startInstant().filter(entry.getValue()::equals).isPresent()) {
+                    uncertain(UnsettledReason.DESCENDANT_IDENTITY_CHANGED); continue;
+                }
                 if (force) child.destroyForcibly(); else child.destroy();
             }
             if (process.isAlive()) { if (force) process.destroyForcibly(); else process.destroy(); }
