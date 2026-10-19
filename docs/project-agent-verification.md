@@ -145,6 +145,28 @@ env PATH=/Users/wubingheng/.nvm/versions/node/v24.20.0/bin:$PATH ./mvnw -B -Page
 
 这是同一源码流程的实际 CLI **离线**验收；没有真实 DeepSeek 质量/账单、应用构建运行或工作台入口验收。PA30–33 尚未完成；上述合成待核对记录仍保留，不能宣称全部协调者或全量回归已通过。
 
+## PA30：工具拒绝与候选边界（2026-10-19）
+
+真实 CLI 2.1.303 的离线假服务依次发起 Bash、Agent、Task、虚构 MCP 工具，以及读取合成 settings / credentials 的请求。6 次工具结果全部明确为错误，7 次请求仍只公布五种文件工具；两个 canary 均未进入请求。测试目录内专门创建 `synthetic-user/.claude`，不读取或写入真正的个人配置。CLI 最终文本即使声称成功，平台流解析器也因首个未公布工具调用返回 `AGENT_PROTOCOL_INVALID`，不发行成功摘要。
+
+另有 4 个真实受控 Java 子进程分别写入公开秘密格式 canary、软链接、硬链接和超过 2 MiB 的文本。即使子进程正常退出并返回 success，正式 Worker 仍拒绝候选：旧 Git/PG 版本与摘要不变、没有新接受操作、停止证据保留且租约释放，重复调度不启动第二次。受控副本证据保留至测试临时目录的正常收尾；不是任意恶意程序的 OS 隔离保证。
+
+- 新工具夹具先缺方法编译失败。首次完整组合为 **16 单元通过，14 集成中 13 通过/1 失败**：拒绝和不泄漏断言均通过，测试误把未知工具的协议拒绝期望为能力/路径错误。检查正式 decoder 的工具名守卫后改为精确 `AGENT_PROTOCOL_INVALID`，不改生产拒绝条件，并补上“未知工具伪造成功结果仍拒绝”的独立单测。
+- 12:40 **17 单元 + 14 集成通过，0 失败/错误/跳过，BUILD SUCCESS**，包含原 5 项 CLI 契约和 4 项 Worker 回归。
+- 12:51 反向验证：临时移除 `!TOOLS.contains(name)`，15 单元中新增反例 **1 项明确失败**（未抛拒绝异常），其余 14 通过；随后立即恢复该条件，未提交或部署变异。恢复后 `git diff` 确认该生产文件无变化；12:54 原组合命令重新编译、打包并完成 **17 单元 + 14 集成通过，0 失败/错误/跳过，BUILD SUCCESS**，没有留下变异构建产物。
+- 只读排查合成待核对记录时，Docker CLI 无输出挂起；按完整命令定位本次自有 PID 19277，仅结束该 CLI，退出码 143。没有停止 Docker Desktop/容器/数据库，未执行任何数据库 UPDATE/DELETE 或人工解锁。该待核对记录和全量恢复回归仍待处理。
+
+组合命令（backend）：
+
+```sh
+env PATH=/Users/wubingheng/.nvm/versions/node/v24.20.0/bin:$PATH ./mvnw -B -Pagent-cli-contract \
+  -Datoms.agent.test.cli=/Users/wubingheng/.nvm/versions/node/v20.15.0/lib/node_modules/@anthropic-ai/claude-code/bin/claude.exe \
+  '-Dtest=AgentChildFixtureTest,AgentCliProbeTest,AgentStreamDecoderTest' \
+  '-Dit.test=AgentCliContractIT,AgentCliBoundaryContractIT,ProjectAgentBoundaryIT,ProjectAgentWorkerIT' verify
+```
+
+自审：PA30 仅添加测试/夹具；候选策略、权限、源码限额、模型调用额度和默认开关没有放宽。PA29 的版本兼容只添加精确 2.1.303；本次没有安装/更新任何工具或依赖。真实模型、完整后端全量回归、运行/交付/工作台仍未完成。
+
 ## 并发调度调整（2026-10-19）
 
 用户确认不同项目并行，同项目保持编辑互斥，随后要求默认并发提高到 4。新增 `PROJECT_AGENT_MAX_CONCURRENT_TASKS`，默认 4、范围 1–8、重启生效；最大等待队列仍为 8，排队期限仍为 300 秒。此设置只影响新 Agent 模块，不修改旧生成器或默认关闭状态。

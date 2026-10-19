@@ -1,6 +1,6 @@
 # Spec: project-agent · Claude Code + DeepSeek 完整工程编辑
 
-状态：2026-10-18～19，用户已确认规格、[实施计划](tasks/project-agent/plan.md)与[任务清单](tasks/project-agent/todo.md)，并将范围扩展至完整本地开发闭环（§10）。检查点用于汇报证据，不重复请求逐项批准；真实付费模型 PA-LIVE 与部署仍需另行授权。PA01–PA28 内部切片已完成：文件编辑、默认 4 并发调度、查询/正文保留、原生 Java/Vue 模板、脚本契约、正式平台 JAR 模板包装及初始化到任务准入交接；前端自身测试、构建及本机测试 API 的浏览器验收通过。完整工程两轮旅程、实际构建运行及工作台接入仍在实施，不是完整产品交付声明。
+状态：2026-10-18～19，用户已确认规格、[实施计划](tasks/project-agent/plan.md)与[任务清单](tasks/project-agent/todo.md)，并将范围扩展至完整本地开发闭环（§10）。检查点用于汇报证据，不重复请求逐项批准；真实付费模型 PA-LIVE 与部署仍需另行授权。PA01–PA30 内部切片已完成：文件编辑、默认 4 并发、查询/保留、原生模板/包装/初始化，以及受控进程和真实 CLI 离线两轮旅程、拒绝边界。当前精确支持 2.1.302 / 2.1.303，未知版本仍拒绝。恢复压力/全量回归、实际构建运行和工作台仍未完成，测试待核对记录见验证文档；不是完整产品交付声明。
 
 模块索引：[完整工程能力地图](FULL-PROJECT-CAPABILITY-MAP.md)。上游：[源码模块](SPEC-project-source.md)。总体方向：[ADR-016](docs/decisions/016-full-project-source-and-coding-agent.md)。本文不是整个工程改造的完成声明，也不是执行生成后端的授权。
 
@@ -40,6 +40,8 @@
 - 独立临时配置目录、空继承环境、无密钥条件下，`--version` 返回 `2.1.302 (Claude Code)`，`--help` 正常退出。
 - §4 所列主要参数与 `--max-turns 24` 组合后追加 `--version`，退出码为 0。这只证明解析器接受参数，不能证明权限、工具执行或 DeepSeek 协议已工作。
 - 未运行 `auth`、`doctor`、`update` 或普通模型会话；未读取个人认证。远程服务器的 CLI 版本、系统策略和可执行路径尚未探测。
+
+2026-10-19 追加探测：本机已安装版本变为 2.1.303；在不改个人配置、不安装/更新 CLI 的情况下完成同参数离线工具、完整两轮工程编辑和拒绝边界验收。精确支持集合为 2.1.302 / 2.1.303，不接受后续版本范围；具体红绿测试和版本证据见 [验证记录](docs/project-agent-verification.md)。
 
 ### 2.1 官方依据及不能直接推断的部分
 
@@ -103,7 +105,7 @@ Agent 任务始终绑定非空源码版本和修订号。新项目先完成无�
 
 机器受管策略、加载的工具或 MCP/plugin 状态与批准配置不符时拒绝继续。`system/init` 核对是侦测补充，不是事前防泄漏保证；真实密钥启用前，必须在同机通过无秘密的离线 canary 行为验收。
 
-2026-10-19 实测补充：2.1.302 在 safe-mode 下仍报告 `cc-plugin-agents-md`、`cc-plugin-plugin-authoring` 两个内置模块。解析器仅识别该精确版本及 `path=builtin`、同名 `source=@builtin` 的元数据组合，不接受外部目录插件、未知模块或 MCP/skills。测试中的 CLAUDE.md、AGENTS.md 未被自动加入请求；这不是机器受管策略或 keychain 的完整隔离证明。
+2026-10-19 实测补充：2.1.302 / 2.1.303 在 safe-mode 下仍报告 `cc-plugin-agents-md`、`cc-plugin-plugin-authoring` 两个内置模块。解析器仅识别这两个精确版本及 `path=builtin`、同名 `source=@builtin` 的元数据组合，不接受外部目录插件、未知模块或 MCP/skills。测试中的 CLAUDE.md、AGENTS.md 未被自动加入请求；这不是机器受管策略或 keychain 的完整隔离证明。
 
 ### 4.2 模型、预算与时间
 
