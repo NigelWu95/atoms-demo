@@ -2,6 +2,29 @@
 
 日期：2026-10-18～19。规格与计划已批准，模块仍未完成。只使用本机假 Anthropic 服务和公开测试字符串，不调用真实 DeepSeek、不改个人 Claude 配置、不部署、不推送。任务状态以 [清单](../tasks/project-agent/todo.md)为准。
 
+## PA31：中断与并发验收进展（2026-10-19，未全项完成）
+
+本轮新增三个测试文件，不修改生产恢复规则或数据库迁移：
+
+- `ProjectAgentCrashIT`：启动前、实际子进程退出但停止凭据尚未入库、停止凭据已入库但尚未封存，三处注入致命异常后重开服务。重复恢复/调度不重跑模型、不重建写入句柄、不改变基线；凭据缺失继续待核对。测试收尾只使用原执行实际返回并由夹具持有的停止凭据，不从 PID 或候选文件推断退出。
+- `ProjectAgentConcurrencyIT`：同一任务一个运行 Worker 加三个并发重复调用，取消、归属变化、10 秒期限分别验证仅启动一次、执行中不提前解锁、退出凭据持久化、版本不变。归属变化不能由旧用户释放，但在真实停止证据保存后可恢复结算；不是四个项目吞吐性能测试。
+- `ProjectSourceAgentCoexistenceIT`：编辑副本停止后，在 Git 前、Git 后、数据库发布前、提交后中断源码 Worker，再让恢复与重复接受请求并发。每个编辑只有一个源码操作；只有已提交者保留新版本，未提交候选不会自动晋升。原 `ProjectSourceRecoveryIT` 的 Git 执行未决窗口等八项一起回归。
+
+执行证据（backend 目录，Oracle Java 17.0.5、Node 24 PATH、专用 `atoms_demo_test` / `atoms_test`）：
+
+1. 13:32 首次中断测试 **3 错误**：测试重开时旧存储目录锁未释放，快照读取正确拒绝。只修正测试的关闭顺序，没有放宽生产目录锁。13:33 重跑 **11 单元 + 3 集成通过**，0 失败/错误/跳过。
+2. 13:35 反向验证临时将 `AgentRecovery` 的未决状态结算改成直接返回旧任务；**3 集成中 1 失败、2 通过**，精确得到预期 `NEEDS_RECONCILIATION`、实际 `RUNNING`。生产文件立即恢复，后续组合重新编译，没有保留变异。
+3. 13:37 `env PATH=/Users/wubingheng/.nvm/versions/node/v24.20.0/bin:$PATH ./mvnw -B -Dtest=AgentProcessTest '-Dit.test=ProjectAgentCrashIT,ProjectAgentConcurrencyIT,ProjectAgentRecoveryIT' verify`：**11 单元 + 10 集成通过，0 失败/错误/跳过，BUILD SUCCESS**，1:56。平台打包通过，不是生成应用的构建/运行。
+4. 13:39 `env PATH=/Users/wubingheng/.nvm/versions/node/v24.20.0/bin:$PATH ./mvnw -B '-Dit.test=ProjectSourceAgentCoexistenceIT,ProjectSourceRecoveryIT' test-compile failsafe:integration-test failsafe:verify`：**12 集成通过，0 失败/错误/跳过，BUILD SUCCESS**，1:17。四条 `SOURCE_EXECUTION_UNCERTAIN` 日志来自预定崩溃注入，结果由持久提交事实恢复；没有模型请求。
+
+### 未决测试记录与后续阻断
+
+使用只读 JDBC 事务复核 PA29b 的任务 `f7e3d276-1c27-43f4-8c64-866bb5b95ac4`：仍为 `NEEDS_RECONCILIATION / AGENT_CLI_UNSUPPORTED`，`live_reserved=false`；执行 `54305fca-4895-4bed-8510-cd154b2590b8` 对应租约 `d47c3c72-eab9-4056-aa05-ba605ca586e8`，`execution_pending=true`、停止摘要为空。基线和当前源码均为 `b95bf19a-fe48-43e8-8c65-16bf7d7503a2`，该编辑的源码操作数为 0。测试前后未决 Agent 任务总数均为 **1**，原记录未改变，本轮未新增待核对 Agent 任务。
+
+该记录来自旧夹具的准备期探测位置错误，防复发测试已通过，但当前实现没有“管理员确认后强制解除”的通道。不能将启动一个无关进程得到的凭据绑定给旧执行，也不能删审计或改全局协调者查询来掩盖阻断。因此 PA31 的协调者租约丢失组合、PA32 全量回归、PA33 交接仍未完成。
+
+建议保留原测试数据与审计，另建独立测试 schema 完成完整回归；此测试环境调整尚未执行，需确认。新 schema 的通过不能作为旧任务已结算的证据；生产中遇到同类未决任务仍需停机核查，不自动强制释放。实际业务构建/运行、交付和工作台尚待后续模块；本轮无付费模型、个人配置修改、推送或部署。
+
 ## PA18–PA22：历史保留与原生后端（2026-10-19）
 
 - 自动调度旅程补上完整有序阶段断言。查询、保留、脱敏、自动调度定向组合 **11 集成通过**，0 失败/错误/跳过，08:51 完成。
