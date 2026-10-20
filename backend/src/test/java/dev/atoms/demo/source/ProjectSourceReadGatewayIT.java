@@ -70,6 +70,44 @@ class ProjectSourceReadGatewayIT extends SourceIntegrationSupport {
         assertThat(Files.exists(reference)).isFalse();
     }
 
+    @Test void callerBudgetExpiresWithoutFencingHealthyStorageOrReadingTheLatestVersion() {
+        UUID first = publish(null, 0, tree("before"));
+        UUID second = publish(first, 1, tree("after"));
+        var remaining = new java.util.concurrent.atomic.AtomicInteger(2);
+        assertCode("SOURCE_OPERATION_TIMEOUT", () -> gateway().read(owner, project, first, () ->
+                remaining.getAndDecrement() > 0 ? java.time.Duration.ofSeconds(30) : java.time.Duration.ZERO));
+        assertThat(repository.state(project).status()).isEqualTo("READY");
+        assertThat(repository.state(project).versionId()).isEqualTo(second);
+        var snapshot = gateway().read(owner, project, first, () -> java.time.Duration.ofSeconds(30));
+        assertThat(snapshot.version().id()).isEqualTo(first);
+        assertThat(snapshot.tree().sha256()).isEqualTo(tree("before").sha256());
+    }
+
+    @Test void callerBudgetCannotBypassTransactionOrFinalOwnershipChecks() {
+        UUID version = publish(null, 0, tree("owner"));
+        assertThatThrownBy(() -> new TransactionTemplate(transactions).execute(status ->
+                gateway().read(owner, project, version, () -> java.time.Duration.ofSeconds(30))))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("database transaction");
+        var once = new java.util.concurrent.atomic.AtomicBoolean();
+        assertCode("PROJECT_NOT_FOUND", () -> gateway().read(owner, project, version, () -> {
+            if (once.compareAndSet(false, true)) jdbc.update("UPDATE projects SET owner_id=? WHERE id=?", stranger, project);
+            return java.time.Duration.ofSeconds(30);
+        }));
+        assertThat(gateway().read(stranger, project, version).version().id()).isEqualTo(version);
+    }
+
+    @Test void failedCallerBudgetNeverLeaksItsExceptionText() {
+        UUID version = publish(null, 0, tree("budget"));
+        assertThatThrownBy(() -> gateway().read(owner, project, version, () -> {
+            throw new java.io.IOException("PRIVATE_BUDGET_CANARY");
+        })).isInstanceOfSatisfying(ApiException.class, error -> {
+            assertThat(error.code()).isEqualTo("SOURCE_OPERATION_TIMEOUT");
+            assertThat(error.toString()).doesNotContain("PRIVATE_BUDGET_CANARY");
+            assertThat(error.getCause()).isNull();
+        });
+        assertThat(repository.state(project).status()).isEqualTo("READY");
+    }
+
     private ProjectSourceReadGateway gateway() {
         return new ProjectSourceReadGateway(service, repository, environment);
     }

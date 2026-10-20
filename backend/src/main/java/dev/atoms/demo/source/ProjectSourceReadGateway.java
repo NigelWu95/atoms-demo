@@ -7,10 +7,12 @@ import org.springframework.stereotype.Service;
 @Service
 public final class ProjectSourceReadGateway {
     private final SourceQuery query;
+    private final ProjectSourceEnvironment environment;
 
     ProjectSourceReadGateway(ProjectSourceService service, SourceRepository repository,
                              ProjectSourceEnvironment environment) {
         this.query = new SourceQuery(service, repository, environment);
+        this.environment = environment;
     }
 
     /**
@@ -20,6 +22,14 @@ public final class ProjectSourceReadGateway {
      */
     public Snapshot read(UUID owner, UUID project, UUID version) {
         var snapshot = query.snapshot(owner, project, version);
+        return new Snapshot(snapshot.version(), snapshot.tree());
+    }
+
+    /** Shares the caller's remaining time; never expands the source module's own operation limit. */
+    public Snapshot read(UUID owner, UUID project, UUID version, SourceExecutionBudget budget) {
+        java.util.Objects.requireNonNull(budget);
+        var deadline = new SourceDeadline(environment.operationTimeout(), System::nanoTime, budget);
+        var snapshot = query.snapshot(owner, project, version, deadline);
         return new Snapshot(snapshot.version(), snapshot.tree());
     }
 

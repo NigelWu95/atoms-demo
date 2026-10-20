@@ -201,3 +201,5 @@ npm run build
 `ProjectSourceReadGateway.read(UUID owner, UUID project, UUID version)` 将 §4.3 已有只读契约提供给后续模块，返回 `Snapshot(SourceVersion version, SourceTree tree)`；复用 `SourceQuery`，不复制权限或 Git 校验逻辑。只按项目下已发布版本 UUID 读取，不接受任意路径、Git 对象或调用方自报的树。
 
 返回完整不可变文本树，不按最新模板重新组装，也不因当前版本变化而改读最新版。该值是数据而非执行凭据；后续消费者必须独立授权。读操作保持原 300 秒上限、不持有数据库事务、不自动初始化、不构建运行。新增门面不改变源文件预算、迁移或旧网页流程；验证见 [PS21 任务](tasks/project-source/todo.md)。
+
+EX04 的兼容重载 `read(owner, project, version, SourceExecutionBudget)` 将调用方剩余期限传入原 `SourceDeadline`，与源码模块配置期限（最高 300 秒）取较短值，不逐文件续期。预算用尽或预算回调异常返回 `SOURCE_OPERATION_TIMEOUT`，不能据此把健康源码标记为损坏；读后再次核对项目归属。原三参数方法不变，事务内 Git/I/O 仍拒绝。
