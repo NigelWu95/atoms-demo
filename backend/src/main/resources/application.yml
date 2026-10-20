@@ -24,6 +24,21 @@ spring:
     init:
       mode: never
 atoms:
+  project-execution:
+    enabled: ${PROJECT_EXECUTION_ENABLED:false}
+    root: ${PROJECT_EXECUTION_ROOT:}
+    node: ${PROJECT_EXECUTION_NODE:}
+    npm: ${PROJECT_EXECUTION_NPM:}
+    java: ${PROJECT_EXECUTION_JAVA:}
+    maven: ${PROJECT_EXECUTION_MAVEN:}
+    policy: ${PROJECT_EXECUTION_POLICY:}
+    maintainer-ids: ${PROJECT_EXECUTION_MAINTAINER_IDS:}
+    max-concurrent-builds: ${PROJECT_EXECUTION_MAX_CONCURRENT_BUILDS:1}
+    queue-capacity: ${PROJECT_EXECUTION_QUEUE_CAPACITY:8}
+    max-running-projects: ${PROJECT_EXECUTION_MAX_RUNNING_PROJECTS:4}
+    task-timeout-seconds: ${PROJECT_EXECUTION_TASK_TIMEOUT_SECONDS:1800}
+    queue-timeout-seconds: ${PROJECT_EXECUTION_QUEUE_TIMEOUT_SECONDS:300}
+    start-timeout-seconds: ${PROJECT_EXECUTION_START_TIMEOUT_SECONDS:120}
   agent:
     enabled: ${PROJECT_AGENT_ENABLED:false}
     live-enabled: ${PROJECT_AGENT_LIVE_ENABLED:false}
