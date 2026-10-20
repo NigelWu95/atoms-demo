@@ -58,11 +58,18 @@ final class ExecutionPaths implements AutoCloseable {
 
     synchronized Task createBuild(UUID id) throws IOException { return create(Area.BUILD, id); }
     synchronized Task createArtifact(UUID id) throws IOException { return create(Area.ARTIFACT, id); }
+    synchronized Task createArtifact(UUID id, dev.atoms.demo.execution.OwnedProcess.Budget budget) throws IOException {
+        return create(Area.ARTIFACT, id, budget);
+    }
     synchronized Task createRun(UUID id) throws IOException { return create(Area.RUN, id); }
 
     private Task create(Area area, UUID id) throws IOException {
+        return create(area, id, () -> java.time.Duration.ofSeconds(10));
+    }
+
+    private Task create(Area area, UUID id, dev.atoms.demo.execution.OwnedProcess.Budget budget) throws IOException {
         Objects.requireNonNull(id);
-        checkCapacity();
+        checkCapacity(budget);
         Path path = ExecutionRootLease.directory(root.resolve(area.directory).resolve(id.toString()));
         Object key = lease.directoryKey(path);
         Object projectKey = area == Area.BUILD
@@ -80,6 +87,7 @@ final class ExecutionPaths implements AutoCloseable {
         }
         var task = new Task(this, area, path, key, projectKey, lease.fileKey(markerPath, marker.length), marker);
         directory(task);
+        checkBudget(budget);
         return task;
     }
 

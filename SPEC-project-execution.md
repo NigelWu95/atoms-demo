@@ -1,6 +1,6 @@
 # Spec: project-execution · 完整工程受控构建与本机进程
 
-状态：2026-10-21，用户已确认本规格及 §10 三项取舍，并确认[实施计划](tasks/project-execution/plan.md)与[任务清单](tasks/project-execution/todo.md)；EX01–09、C-EX03 及 EX10a/b 已验证，下一项 EX10c JAR 与清单封存。EX10 整体未完成，不是完整执行器已交付或已启用的声明。本地完整闭环的总体开发范围已获准，见 [Agent 规格 §10](SPEC-project-agent.md#10-2026-10-19-完整闭环实施授权)。
+状态：2026-10-21，用户已确认本规格及 §10 三项取舍，并确认[实施计划](tasks/project-execution/plan.md)与[任务清单](tasks/project-execution/todo.md)；EX01–09、C-EX03 及 EX10a–c 已验证，下一项 EX10d Java 阶段与 worker 接线。EX10 整体未完成，不是完整执行器已交付或已启用的声明。本地完整闭环的总体开发范围已获准，见 [Agent 规格 §10](SPEC-project-agent.md#10-2026-10-19-完整闭环实施授权)。
 
 模块 ID 沿用[能力地图](FULL-PROJECT-CAPABILITY-MAP.md)的 `project-execution`，依赖 `project-source`，不反向依赖 Agent、交付或工作台。上游只读门面 PS21 已完成；当前网页仍走旧固定模板链路。
 
@@ -67,6 +67,12 @@ Java 报告校验器 `ExecutionJavaReport` 按固定 Surefire 3.5.6 XML 格式�
 `ExecutionPackaging` 将 `frontend/dist` 复制为任务目录下的 `resources/static`，不写 `backend/src/main/resources` 或任何源码文件；固定 Maven 命令把该目录作为 `full-project.resources` 传给已批准 profile。装配要求 `resources` 和 `backend/target` 尚不存在，不自动删除旧结果。首版拒绝源码中的 `backend/src/main/resources/static`，避免两套资源覆盖顺序不明确；前端资源须由本次 dist 提供。[Maven 资源目录](https://maven.apache.org/plugins/maven-resources-plugin/examples/resource-directory.html)
 
 沿用种子工程资源打包的 8 MiB/文件、32 MiB/总量限制，并限制 1024 条目（含根）、12 层、每个名称 128 字符；名称仅接受字母数字开头的 ASCII 字母数字/点/横线/下划线，拒绝隐藏项及密钥/属性文件扩展名。拒绝非普通文件、符号/硬链接、非当前用户所有及组/其他用户可写输出；不改变原 dist 权限。新资源目录/文件为 0700/0600，封装返回不可自行构造的内部句柄及路径/字节摘要。复验会核对输入与副本的文件身份、权限、内容和目录集合，并调用来源/授权复验；旧输出或失败副本保留，不重试覆盖。此处只是停止后的资源一致性检查，调用者仍须保证前一工具已停止；不是 OS 沙箱或整个构建成功。
+
+`ExecutionArtifact` 只从持有的构建任务中读取 `project/backend/target/app.jar`，复制到新建的 `artifacts/构建UUID/app.jar`。输入必须为当前用户拥有、非空且不超过 256 MiB 的普通单链接文件，无符号链接及组/其他用户可写权限；输出目录/文件保持 0700/0600。复制前后复核原文件和目标目录身份，副本逐字节摘要相同；封存句柄复验 JAR、清单的 inode、权限、长度、修改时间、SHA-256 和产物目录成员。共享预算覆盖分配/扫描/复制，事务内禁止文件 I/O。此层只检查产物字节及证据绑定，不自行运行或验证 Java 业务，也不解释 JAR 内部布局；实际测试、停止证明与 JAR 内容验收仍由 worker 和 EX11 完成。
+
+固定格式 `manifest.json` 最大 16 KiB，保存构建/项目/源码版本 ID、源码树摘要、四个工具的文件摘要、npm 清单/锁及 Maven POM/批准策略摘要、前后端测试数、静态资源摘要及 JAR 长度/摘要。字段只允许 UUID、枚举、数值和 SHA-256；不包含账号、路径、日志、凭据或自由文本。清单形状检查不是执行授权，调用者必须使用真实校验结果，并在封存前后复验来源、授权及取消状态。
+
+封存使用 `CREATE_NEW`，重复调用或中途失败不得覆盖/删除已有目录；失败副本保留，旧成功构建不受影响。JAR 和清单分别 `force(true)`，这不是跨文件/数据库原子提交，也不保证断电后目录项持久；只有持有封存结果且后续数据库成功结算，才允许宣称构建成功。重启后的核对留给 EX13，不能凭目录或清单存在自动认领。[Java 17 CREATE_NEW](https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/nio/file/StandardOpenOption.html#CREATE_NEW)、[FileChannel.force](https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/nio/channels/FileChannel.html#force(boolean))
 
 使用清空继承环境后的白名单，不继承模型、SMTP、平台数据库、Cookie、个人代理或注入参数；子进程私有缓存、配置和临时目录不写入源码。Java 的 `ProcessBuilder` 支持独立 cwd、参数列表和清空环境，但它本身不提供沙箱。[Java 17 接口](https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/ProcessBuilder.html)
 
