@@ -1,6 +1,6 @@
 # project-execution · 开发任务
 
-状态：2026-10-21，规格及计划/任务已获用户确认，EX01–09 及 C-EX03 完成，下一项 EX10 Java 检查与 JAR 封存。本机四套验收库已获准并创建。唯一依据为[规格](../../SPEC-project-execution.md)与[本模块计划](plan.md)，不复用旧工程导出的 PE 编号。任务勾选需附真实证据，不把下列拟新增类、命令或样本当作已有功能。
+状态：2026-10-21，规格及计划/任务已获用户确认，EX01–09、C-EX03 及 EX10a/b 完成，下一项 EX10c JAR 与清单封存；EX10 整体未完成。本机四套验收库已获准并创建。唯一依据为[规格](../../SPEC-project-execution.md)与[本模块计划](plan.md)，不复用旧工程导出的 PE 编号。任务勾选需附真实证据，不把下列拟新增类、命令或样本当作已有功能。
 
 路径缩写：`E` = `backend/src/main/java/dev/atoms/demo/projectexecution`；`ET` = 对应 `src/test/java` 包；`ER` = `backend/src/test/resources/projectexecution`；`R` = `backend/src/main/resources/projectexecution`；`S/ST` = 现有 source 主/测试包；`X/XT` = execution 主/测试包；`M` = `backend/src/main/resources/db/migration`；`T` = `templates/full-project-v1`。这些是具体文件的前缀，不是用一个目录隐藏多文件变更。
 
@@ -120,7 +120,7 @@ U/I/REAL/ALL/COMPAT/DOC 的命令与权限条件见计划 §6。S = 1–2、M = 
 
 - [ ] 完成 EX10。依赖：EX04、EX06–09。拆成以下小片，每片最多 5 个主要文件；保持本模块默认关闭。
   - [x] EX10a：有界 Surefire XML 报告校验（`ExecutionJavaReport`、`ExecutionJavaReportTest`）。只返回数值，拒绝空/失败/跳过/重跑失败及计数不符、DTD/外部实体/畸形报告；缺类 RED，计数变异被拦住，01:59:42 报告校验定向 6 项及打包通过，见验证记录。
-  - [ ] EX10b：前端静态产物的私有资源装配与复验，固定 Maven 资源参数（`ExecutionPackaging`、`ExecutionPackagingTest`、`ExecutionToolchain`、`ExecutionToolchainTest`）。不写源码，不覆盖旧输出；拒绝链接/篡改/容量及来源漂移；U(ExecutionPackagingTest,ExecutionToolchainTest)。
+  - [x] EX10b：前端静态产物的私有资源装配与复验，固定 Maven 资源参数（`ExecutionPackaging`、`ExecutionPackagingTest`、`ExecutionToolchain`、`ExecutionToolchainTest`）。不写源码，不覆盖旧输出；拒绝链接/篡改/容量及来源漂移。缺类 RED、副本复验变异被拦住；02:28:46 完整回归 363 单元 + 309 集成全部通过并打包，见验证记录。
   - [ ] EX10c：JAR 和构建清单封存（`ExecutionArtifact`、`ExecutionArtifactTest`）。来源/工具/策略/检查与产物摘要绑定，拒绝空/越界/链接/替换及重复封存，失败保留证据；U(ExecutionArtifactTest)。
   - [ ] EX10d：Java 阶段与 worker 接线（`ExecutionBuildWorker`、`ExecutionBuildWorkerIT`、`ExecutionBuildJournal`、`ExecutionBuildRepository`，必要时单列更多小片）。真实 PG 验证意图/取消/停止/提交失败，不提前实现调度；I(ExecutionBuildWorkerIT) + ALL。真实 npm/Maven 用户工程仍在 EX11。
 - 描述：接入平台控制的前端资源装配和 Maven 测试打包，成功后封存来源及 JAR。

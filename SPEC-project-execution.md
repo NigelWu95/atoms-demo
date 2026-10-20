@@ -1,6 +1,6 @@
 # Spec: project-execution · 完整工程受控构建与本机进程
 
-状态：2026-10-21，用户已确认本规格及 §10 三项取舍，并确认[实施计划](tasks/project-execution/plan.md)与[任务清单](tasks/project-execution/todo.md)；EX01–09 及 C-EX03 已验证，下一项 EX10 Java 检查与 JAR 封存，不是完整执行器已交付或已启用的声明。本地完整闭环的总体开发范围已获准，见 [Agent 规格 §10](SPEC-project-agent.md#10-2026-10-19-完整闭环实施授权)。
+状态：2026-10-21，用户已确认本规格及 §10 三项取舍，并确认[实施计划](tasks/project-execution/plan.md)与[任务清单](tasks/project-execution/todo.md)；EX01–09、C-EX03 及 EX10a/b 已验证，下一项 EX10c JAR 与清单封存。EX10 整体未完成，不是完整执行器已交付或已启用的声明。本地完整闭环的总体开发范围已获准，见 [Agent 规格 §10](SPEC-project-agent.md#10-2026-10-19-完整闭环实施授权)。
 
 模块 ID 沿用[能力地图](FULL-PROJECT-CAPABILITY-MAP.md)的 `project-execution`，依赖 `project-source`，不反向依赖 Agent、交付或工作台。上游只读门面 PS21 已完成；当前网页仍走旧固定模板链路。
 
@@ -63,6 +63,10 @@
 前端阶段是一次性的 `npm ci → vue-tsc → ESLint → Vitest → Vite`，复用受信命令目录而不调用工程的 npm scripts。开始前要求输出目录不存在，单测前新建私有空报告文件并固定其 inode；已有报告、缺失/空/替换/链接报告均拒绝，不通过删除旧结果重试。解析上限为 1 MiB、32 层、512 测试文件和 10000 用例/套件；必须存在实际 passed 用例，无 failed/pending/todo，报告汇总与实际断言数一致。只返回文件/套件/用例计数，报告原文只在任务私有副本内，不进事件、浏览器或模型。[Vitest 5.0.3 报告格式](https://github.com/vitest-dev/vitest/blob/v5.0.3/packages/vitest/src/node/reporters/json.ts)
 
 Java 报告校验器 `ExecutionJavaReport` 按固定 Surefire 3.5.6 XML 格式逐条核对：每份报告必须包含实际 testcase，汇总与条数一致，不允许失败、错误、跳过或重跑失败。解析最多 512 份、单份 1 MiB、合计 16 MiB、合计 10000 用例；只返回文件/用例计数。使用 JDK 自带 StAX，不加载 schema，禁用并拒绝 DTD/实体，不回传系统属性、用例名称或日志。调用者仍须先证明文件来自本次干净构建且进程已停止；解析成功本身不证明来源新鲜、测试质量或构建成功。[Surefire 3.5.6 reporter](https://github.com/apache/maven-surefire/blob/surefire-3.5.6/maven-surefire-common/src/main/java/org/apache/maven/plugin/surefire/report/StatelessXmlReporter.java)
+
+`ExecutionPackaging` 将 `frontend/dist` 复制为任务目录下的 `resources/static`，不写 `backend/src/main/resources` 或任何源码文件；固定 Maven 命令把该目录作为 `full-project.resources` 传给已批准 profile。装配要求 `resources` 和 `backend/target` 尚不存在，不自动删除旧结果。首版拒绝源码中的 `backend/src/main/resources/static`，避免两套资源覆盖顺序不明确；前端资源须由本次 dist 提供。[Maven 资源目录](https://maven.apache.org/plugins/maven-resources-plugin/examples/resource-directory.html)
+
+沿用种子工程资源打包的 8 MiB/文件、32 MiB/总量限制，并限制 1024 条目（含根）、12 层、每个名称 128 字符；名称仅接受字母数字开头的 ASCII 字母数字/点/横线/下划线，拒绝隐藏项及密钥/属性文件扩展名。拒绝非普通文件、符号/硬链接、非当前用户所有及组/其他用户可写输出；不改变原 dist 权限。新资源目录/文件为 0700/0600，封装返回不可自行构造的内部句柄及路径/字节摘要。复验会核对输入与副本的文件身份、权限、内容和目录集合，并调用来源/授权复验；旧输出或失败副本保留，不重试覆盖。此处只是停止后的资源一致性检查，调用者仍须保证前一工具已停止；不是 OS 沙箱或整个构建成功。
 
 使用清空继承环境后的白名单，不继承模型、SMTP、平台数据库、Cookie、个人代理或注入参数；子进程私有缓存、配置和临时目录不写入源码。Java 的 `ProcessBuilder` 支持独立 cwd、参数列表和清空环境，但它本身不提供沙箱。[Java 17 接口](https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/ProcessBuilder.html)
 

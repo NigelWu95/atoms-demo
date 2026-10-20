@@ -33,6 +33,7 @@ class ExecutionToolchainTest {
             assertThat(maven.command().subList(1, main)).contains("-Duser.home=" + home.home(),
                     "-Djava.io.tmpdir=" + home.temporary());
             assertThat(maven.command()).endsWith("-Pfull-project-package", "verify");
+            assertThat(maven.command()).contains("-Dfull-project.resources=" + paths.directory(task).resolve("resources"));
             assertThat(maven.environment()).doesNotContainKeys("MAVEN_OPTS", "JAVA_TOOL_OPTIONS", "NODE_OPTIONS");
             assertThat(maven.environment().get("JDK_JAVA_OPTIONS"))
                     .isEqualTo("\"-Duser.home=" + home.home() + "\" \"-Djava.io.tmpdir=" + home.temporary() + "\"");

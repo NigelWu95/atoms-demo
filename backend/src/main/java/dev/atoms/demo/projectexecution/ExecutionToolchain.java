@@ -129,7 +129,9 @@ final class ExecutionToolchain {
                 "-Dmaven.multiModuleProjectDirectory=" + cwd, "-Dstyle.color=never",
                 "-classpath", launcher.toString(), "org.codehaus.plexus.classworlds.launcher.Launcher"));
         args.addAll(home.mavenOptions());
-        args.addAll(probe ? List.of("--version") : List.of("-Pfull-project-package", "verify"));
+        args.addAll(probe ? List.of("--version") : List.of(
+                "-Dfull-project.resources=" + home.project().getParent().resolve("resources"),
+                "-Pfull-project-package", "verify"));
         return invocation(Kind.JAVA, args, cwd, home);
     }
     private List<String> javaOptions(ExecutionToolHome home, boolean version) {
