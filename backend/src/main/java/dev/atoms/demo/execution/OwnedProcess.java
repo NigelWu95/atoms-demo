@@ -26,6 +26,19 @@ public final class OwnedProcess {
             "AGENT_TOOL_FAILED", "AGENT_TOOL_PATH_REJECTED", "AGENT_OUTPUT_LIMIT", "AGENT_MODEL_INCOMPLETE");
     private static final Set<String> PREFLIGHT_FAILURES = Set.of("AGENT_CANCELLED", "AGENT_TIMEOUT",
             "AGENT_CLI_CHANGED", "AGENT_STATE_UNAVAILABLE", "AGENT_STATE_CAPACITY");
+    private enum Policy {
+        AGENT, EXECUTION;
+        String code(String suffix) { return name() + "_" + suffix; }
+        boolean streamFailure(String code) {
+            return this == AGENT ? STREAM_FAILURES.contains(code)
+                    : Set.of("EXECUTION_OUTPUT_LIMIT", "EXECUTION_REPORT_INVALID").contains(code);
+        }
+        boolean preflightFailure(String code) {
+            return this == AGENT ? PREFLIGHT_FAILURES.contains(code)
+                    : Set.of("EXECUTION_CANCELLED", "EXECUTION_TIMEOUT", "EXECUTION_TOOL_CHANGED",
+                    "EXECUTION_STORAGE_UNAVAILABLE", "EXECUTION_STORAGE_CAPACITY").contains(code);
+        }
+    }
     private final java.util.function.Function<Process, List<ProcessHandle>> descendants;
 
     public OwnedProcess() { this(process -> process.descendants().limit(129).toList()); }
@@ -69,28 +82,44 @@ public final class OwnedProcess {
 
     public <T> Result<T> run(ProcessBuilder builder, String prompt, Budget deadline, BooleanSupplier cancelled,
                              java.util.UUID task, java.util.UUID execution, Decoder<T> decoder, Preflight preflight) throws IOException {
+        return run(builder, prompt, deadline, cancelled, task, execution, decoder,
+                stream -> { discard(stream); return null; }, preflight, Policy.AGENT);
+    }
+
+    /** Trusted in-process caller only. It owns argv/environment and bounded decoders; no shell or HTTP API. */
+    public <T> Result<T> runCommand(ProcessBuilder builder, Budget deadline, BooleanSupplier cancelled,
+                                    java.util.UUID task, java.util.UUID execution, Decoder<T> stdout,
+                                    Decoder<Void> stderr, Preflight preflight) throws IOException {
+        return run(builder, "", deadline, cancelled, task, execution, stdout, stderr, preflight, Policy.EXECUTION);
+    }
+
+    private <T> Result<T> run(ProcessBuilder builder, String prompt, Budget deadline, BooleanSupplier cancelled,
+                              java.util.UUID task, java.util.UUID execution, Decoder<T> decoder,
+                              Decoder<Void> errorDecoder, Preflight preflight, Policy policy) throws IOException {
         java.util.Objects.requireNonNull(task); java.util.Objects.requireNonNull(execution);
-        java.util.Objects.requireNonNull(decoder); java.util.Objects.requireNonNull(preflight);
+        java.util.Objects.requireNonNull(decoder); java.util.Objects.requireNonNull(errorDecoder);
+        java.util.Objects.requireNonNull(preflight);
         byte[] input = prompt.getBytes(StandardCharsets.UTF_8);
         if (input.length > (1 << 20) || prompt.indexOf('\0') >= 0
                 || builder.directory() == null || !builder.directory().isAbsolute()
                 || builder.redirectInput() != ProcessBuilder.Redirect.PIPE
                 || builder.redirectOutput() != ProcessBuilder.Redirect.PIPE
                 || builder.redirectError() != ProcessBuilder.Redirect.PIPE || builder.redirectErrorStream())
-            throw new Failure("AGENT_INVOCATION_REJECTED", null);
+            throw new Failure(policy.code("INVOCATION_REJECTED"), null);
         // No launch has occurred: cancellation/preflight failure has positive no-process evidence.
-        try { check(deadline, cancelled); preflight.check(); check(deadline, cancelled); }
+        try { check(deadline, cancelled, policy); preflight.check(); check(deadline, cancelled, policy); }
         catch (IOException | RuntimeException error) {
             String code = error.getMessage();
-            throw new Failure(PREFLIGHT_FAILURES.contains(code == null ? "" : code) ? code : "AGENT_PREFLIGHT_FAILED",
+            throw new Failure(policy.preflightFailure(code == null ? "" : code) ? code : policy.code("PREFLIGHT_FAILED"),
                     new Stopped(task, execution, builder.directory().toPath()));
         }
         final Process process;
         try { process = builder.start(); }
-        catch (IOException error) { throw new Failure("AGENT_START_FAILED", null); }
+        catch (IOException error) { throw new Failure(policy.code("START_FAILED"), null); }
         var owner = new Owned(process, descendants);
         var streams = Executors.newFixedThreadPool(3, action -> {
-            var thread = new Thread(action, "atoms-agent-io"); thread.setDaemon(true); return thread;
+            var thread = new Thread(action, policy == Policy.AGENT ? "atoms-agent-io" : "atoms-execution-io");
+            thread.setDaemon(true); return thread;
         });
         String failure = null;
         T summary = null;
@@ -101,28 +130,30 @@ public final class OwnedProcess {
                     return decoder.read(stream);
                 }
             });
-            Future<Void> stderr = streams.submit(() -> { discard(process.getErrorStream()); return null; });
+            Future<Void> stderr = streams.submit(() -> {
+                try (var stream = process.getErrorStream()) { return errorDecoder.read(stream); }
+            });
             Future<Void> stdin = streams.submit(() -> {
                 try (var stream = process.getOutputStream()) { stream.write(input); }
                 return null;
             });
             while (true) {
-                check(deadline, cancelled); owner.observe();
-                if (owner.uncertain) throw new IOException("AGENT_PROCESS_UNSETTLED");
-                for (var future : List.of(stdout, stderr, stdin)) if (future.isDone()) completed(future);
+                check(deadline, cancelled, policy); owner.observe();
+                if (owner.uncertain) throw new IOException(policy.code("PROCESS_UNSETTLED"));
+                for (var future : List.of(stdout, stderr, stdin)) if (future.isDone()) completed(future, policy);
                 if (!process.isAlive()) {
-                    if (process.exitValue() != 0) throw new IOException("AGENT_PROCESS_FAILED");
-                    if (owner.childrenAlive()) throw new IOException("AGENT_CHILD_PROCESS_REMAINS");
-                    if (stdout.isDone() && stderr.isDone() && stdin.isDone()) { summary = completed(stdout); break; }
+                    if (process.exitValue() != 0) throw new IOException(policy.code("PROCESS_FAILED"));
+                    if (owner.childrenAlive()) throw new IOException(policy.code("CHILD_PROCESS_REMAINS"));
+                    if (stdout.isDone() && stderr.isDone() && stdin.isDone()) { summary = completed(stdout, policy); break; }
                 }
-                TimeUnit.NANOSECONDS.sleep(Math.min(TimeUnit.MILLISECONDS.toNanos(20), deadline.remaining().toNanos()));
+                TimeUnit.NANOSECONDS.sleep(Math.min(TimeUnit.MILLISECONDS.toNanos(20), remaining(deadline, policy).toNanos()));
             }
         } catch (InterruptedException error) {
-            interrupted = true; failure = "AGENT_CANCELLED";
+            interrupted = true; failure = policy.code("CANCELLED");
         } catch (IOException error) {
             failure = error.getMessage();
         } catch (RuntimeException error) {
-            failure = "AGENT_IO_FAILED";
+            failure = policy.code("IO_FAILED");
         } finally {
             interrupted |= Thread.interrupted();
             settled = owner.settle(streams);
@@ -131,23 +162,32 @@ public final class OwnedProcess {
         if (!settled) {
             LOG.warn("{\"event\":\"owned_process_unsettled\",\"entryPoint\":\"owned_process\",\"requestId\":\"{}\",\"executionId\":\"{}\",\"reason\":\"{}\"}",
                     task, execution, owner.reason);
-            throw new Failure("AGENT_PROCESS_UNSETTLED", null);
+            throw new Failure(policy.code("PROCESS_UNSETTLED"), null);
         }
         var stopped = new Stopped(task, execution, builder.directory().toPath());
         if (failure != null) throw new Failure(failure, stopped);
         return new Result<>(summary, stopped);
     }
 
-    private static void check(Budget deadline, BooleanSupplier cancelled) throws IOException {
-        if (Thread.currentThread().isInterrupted() || cancelled.getAsBoolean()) throw new IOException("AGENT_CANCELLED");
-        deadline.remaining();
+    private static void check(Budget deadline, BooleanSupplier cancelled, Policy policy) throws IOException {
+        if (Thread.currentThread().isInterrupted() || cancelled.getAsBoolean()) throw new IOException(policy.code("CANCELLED"));
+        remaining(deadline, policy);
     }
 
-    private static <T> T completed(Future<T> future) throws IOException, InterruptedException {
+    private static Duration remaining(Budget deadline, Policy policy) throws IOException {
+        if (policy == Policy.AGENT) return deadline.remaining();
+        try {
+            Duration remaining = deadline.remaining();
+            if (remaining == null || remaining.isNegative() || remaining.isZero()) throw new IOException();
+            return remaining;
+        } catch (IOException | RuntimeException error) { throw new IOException("EXECUTION_TIMEOUT"); }
+    }
+
+    private static <T> T completed(Future<T> future, Policy policy) throws IOException, InterruptedException {
         try { return future.get(); } // Only called after isDone: no fresh wait budget.
         catch (ExecutionException error) {
             String code = error.getCause() instanceof IOException ? error.getCause().getMessage() : null;
-            throw new IOException(STREAM_FAILURES.contains(code == null ? "" : code) ? code : "AGENT_IO_FAILED");
+            throw new IOException(policy.streamFailure(code == null ? "" : code) ? code : policy.code("IO_FAILED"));
         }
     }
 

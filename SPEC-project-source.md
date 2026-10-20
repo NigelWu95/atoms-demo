@@ -194,6 +194,8 @@ npm run build
 
 这是随 project-agent 规格确认并已通过 PA01–PA33 离线验收的后续增量，实际入口为 `ProjectSourceEditGateway`。租约及执行证据迁移均为追加，原 V018/V019 未重写；默认关闭状态不变。实际模型和新工程运行状态仍以 Agent 验证记录及后续模块为准。
 
+执行模块 EX03 的兼容扩展：`OwnedProcess.runCommand` 接受平台内部构造的进程参数、共享预算、取消信号、任务/执行 UUID、有界 stdout/stderr 解码器和启动前复核。它与原 Agent 调用共用唯一进程拥有/10 秒收尾实现，原调用及 `AGENT_*` 错误不变，新入口使用白名单 `EXECUTION_*` 错误。`Stopped` 的私有发行、任务/执行/cwd 匹配及源码 `confirmExecutionStopped` 校验不变；普通退出码、PID 或任意异常均不能替代该证明。新入口不是对外 shell 权限，也不表示已接通构建流水线。
+
 ## 11. 完整快照读取门面
 
 `ProjectSourceReadGateway.read(UUID owner, UUID project, UUID version)` 将 §4.3 已有只读契约提供给后续模块，返回 `Snapshot(SourceVersion version, SourceTree tree)`；复用 `SourceQuery`，不复制权限或 Git 校验逻辑。只按项目下已发布版本 UUID 读取，不接受任意路径、Git 对象或调用方自报的树。
