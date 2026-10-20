@@ -28,7 +28,8 @@ class ExecutionProcessTest {
                 "JAVA_TOOL_OPTIONS", "_JAVA_OPTIONS", "NODE_OPTIONS", "SPRING_DATASOURCE_PASSWORD", "SMTP_PASSWORD");
         assertThat(builder.environment().keySet()).containsExactlyInAnyOrder("PATH", "HOME", "JAVA_HOME",
                 "TMPDIR", "TMP", "TEMP", "LANG", "LC_ALL", "TZ", "CI", "NO_COLOR", "TERM", "MAVEN_SKIP_RC",
-                "npm_config_userconfig", "npm_config_globalconfig", "npm_config_cache");
+                "npm_config_userconfig", "npm_config_globalconfig", "npm_config_cache", "MAVEN_BASEDIR");
+        assertThat(builder.environment().get("MAVEN_BASEDIR")).isEqualTo(temporary.toString());
         var result = new ExecutionProcess().run(invocation, deadline(5), () -> false,
                 UUID.randomUUID(), UUID.randomUUID(), () -> {});
         assertThat(result.summary().stdoutBytes()).isEqualTo(6);

@@ -79,7 +79,7 @@ final class ExecutionProcess {
                     Map.entry("TMPDIR", temporary.toString()), Map.entry("TMP", temporary.toString()),
                     Map.entry("TEMP", temporary.toString()), Map.entry("LANG", "C.UTF-8"), Map.entry("LC_ALL", "C.UTF-8"),
                     Map.entry("TZ", "UTC"), Map.entry("CI", "true"), Map.entry("NO_COLOR", "1"), Map.entry("TERM", "dumb"),
-                    Map.entry("MAVEN_SKIP_RC", "true"),
+                    Map.entry("MAVEN_SKIP_RC", "true"), Map.entry("MAVEN_BASEDIR", directory.toString()),
                     Map.entry("npm_config_userconfig", privateHome.resolve("npmrc").toString()),
                     Map.entry("npm_config_globalconfig", privateHome.resolve("npm-globalrc").toString()),
                     Map.entry("npm_config_cache", privateHome.resolve("npm-cache").toString()));

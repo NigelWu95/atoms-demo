@@ -104,6 +104,21 @@ final class ExecutionPaths implements AutoCloseable {
         return path;
     }
 
+    synchronized Object privateDirectoryKey(Task task, Path child) throws IOException {
+        return lease.directoryKey(ownedChild(task, child));
+    }
+
+    synchronized Object privateFileKey(Task task, Path child, long size) throws IOException {
+        return lease.fileKey(ownedChild(task, child), size);
+    }
+
+    private Path ownedChild(Task task, Path child) throws IOException {
+        Path parent = directory(task);
+        if (child == null || !child.isAbsolute() || !child.normalize().equals(child)
+                || !child.startsWith(parent) || child.equals(parent)) throw ExecutionRootLease.unavailable();
+        return child;
+    }
+
     private void checkedAreas() throws IOException {
         lease.checked();
         for (Area area : Area.values())

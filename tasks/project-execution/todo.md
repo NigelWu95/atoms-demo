@@ -1,6 +1,6 @@
 # project-execution · 开发任务
 
-状态：2026-10-20，规格及计划/任务已获用户确认，EX01–05 完成；下一项 EX06。唯一依据为[规格](../../SPEC-project-execution.md)与[本模块计划](plan.md)，不复用旧工程导出的 PE 编号。任务勾选需附真实证据，不把下列拟新增类、命令或样本当作已有功能。
+状态：2026-10-20，规格及计划/任务已获用户确认，EX01–05、EX06a、EX06b1 完成，下一项 EX06b2 工具接线。本机四套验收库已获准并创建。唯一依据为[规格](../../SPEC-project-execution.md)与[本模块计划](plan.md)，不复用旧工程导出的 PE 编号。任务勾选需附真实证据，不把下列拟新增类、命令或样本当作已有功能。
 
 路径缩写：`E` = `backend/src/main/java/dev/atoms/demo/projectexecution`；`ET` = 对应 `src/test/java` 包；`ER` = `backend/src/test/resources/projectexecution`；`R` = `backend/src/main/resources/projectexecution`；`S/ST` = 现有 source 主/测试包；`X/XT` = execution 主/测试包；`M` = `backend/src/main/resources/db/migration`；`T` = `templates/full-project-v1`。这些是具体文件的前缀，不是用一个目录隐藏多文件变更。
 
@@ -61,9 +61,11 @@ U/I/REAL/ALL/COMPAT/DOC 的命令与权限条件见计划 §6。S = 1–2、M = 
 
 ## EX06 · 固定工具与 Maven 执行策略
 
-- [ ] 完成 EX06。依赖：EX03、EX05。规模：M（5 文件）。
+- [ ] 完成 EX06。依赖：EX03、EX05。规模：拆分为下面的小片，每片 1–5 个主要文件。
 - [x] EX06a：POM、源码配置入口与外部批准策略；npm 策略兼容新增 Maven 策略节。缺类 RED 后 16:20 定向 44 项及打包通过，见验证记录。
-- [ ] EX06b：固定工具身份、探测/构建 argv 与私有配置；需补进程调用的明确 Maven 根目录环境及回归，分开提交。
+- [ ] EX06b：固定工具身份、探测/构建 argv 与私有配置，分开提交。
+  - [x] EX06b1：任务私有 home/settings/cache、配置身份复验、明确 Maven 根目录；主要文件 `ExecutionToolHome`、`ExecutionPaths`、`ExecutionProcess` 及两个测试类。缺类 RED、移除等长字节比较的变异被拦截；恢复后 17:29 全后端 331 单元 + 19 源码集成及打包通过，见验证记录。
+  - [ ] EX06b2：固定工具身份及漂移检测、版本探测、固定操作 argv；核对 JVM 实际 `user.home` 与子进程继承，不能只以生成了配置文件推断已隔离实际工具。
 - 描述：核对工具身份，构造平台拥有的 argv/settings/cache，检查 Maven 的全部受支持配置入口。
 - 验收：拒绝未知工具版本、个人配置继承与工具漂移；POM 父/插件/仓库/profile、`.mvn`/扩展或注入参数未批准则拒绝；不执行源码 `mvnw`/`build.mjs`，不静默改 registry/证书。
 - 验证：U(ExecutionToolchainTest,ExecutionMavenPolicyTest)，XML 外部实体/解析失败、属性覆盖和配置注入反例；官方固定版本参数核对记录。
