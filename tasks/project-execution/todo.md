@@ -1,6 +1,6 @@
 # project-execution · 开发任务
 
-状态：2026-10-20，规格及计划/任务已获用户确认，EX01–03 完成；下一项 EX04。唯一依据为[规格](../../SPEC-project-execution.md)与[本模块计划](plan.md)，不复用旧工程导出的 PE 编号。任务勾选需附真实证据，不把下列拟新增类、命令或样本当作已有功能。
+状态：2026-10-20，规格及计划/任务已获用户确认，EX01–04 完成；下一项 EX05。唯一依据为[规格](../../SPEC-project-execution.md)与[本模块计划](plan.md)，不复用旧工程导出的 PE 编号。任务勾选需附真实证据，不把下列拟新增类、命令或样本当作已有功能。
 
 路径缩写：`E` = `backend/src/main/java/dev/atoms/demo/projectexecution`；`ET` = 对应 `src/test/java` 包；`ER` = `backend/src/test/resources/projectexecution`；`R` = `backend/src/main/resources/projectexecution`；`S/ST` = 现有 source 主/测试包；`X/XT` = execution 主/测试包；`M` = `backend/src/main/resources/db/migration`；`T` = `templates/full-project-v1`。这些是具体文件的前缀，不是用一个目录隐藏多文件变更。
 
@@ -42,9 +42,9 @@ U/I/REAL/ALL/COMPAT/DOC 的命令与权限条件见计划 §6。S = 1–2、M = 
 
 ## EX04 · 只物化请求指定的源码版本
 
-- [ ] 完成 EX04。依赖：EX02、EX03。规模：M（5 文件）。
+- [x] 完成 EX04。依赖：EX02、EX03。拆为 EX04a、EX04b 各最多 5 个实现/测试文件。
 - [x] EX04a：只读源码门面的共享预算兼容重载和集成测试；5 处缺重载 RED，15:03 定向 9 单元 + 11 集成通过并打包。
-- [ ] EX04b：独立构建目录的物化/复验及真实快照集成；需要给既有测试夹具补一个只读门面访问方法，分开提交，不扩大生产 API。
+- [x] EX04b：独立构建目录的物化/复验及真实快照集成；测试夹具补只读门面与后续版本发布方法，不扩大生产 API；容量扫描补共享预算。15:53 定向 47 单元 + 15 集成通过及打包，见验证记录。
 - 描述：把授权不可变快照写入新任务目录，并给只读门面增加共享剩余期限。
 - 验收：V1 请求在 V2 提交后仍取 V1；文件/字节/模式/摘要及 512/2 MiB/16 MiB 限制有效；读取、复制和复验受同一剩余期限约束，拒绝事务内 Git/I/O。
 - 验证：I(ExecutionSnapshotIT,ProjectSourceReadGatewayIT)，包括版本竞争、超时、权限改变及链接/篡改；旧无预算重载回归。

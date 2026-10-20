@@ -118,12 +118,18 @@ final class ExecutionPaths implements AutoCloseable {
     }
 
     synchronized void checkCapacity() throws IOException {
+        checkCapacity(() -> java.time.Duration.ofSeconds(10));
+    }
+
+    synchronized void checkCapacity(dev.atoms.demo.execution.OwnedProcess.Budget budget) throws IOException {
+        checkBudget(budget);
         checkedAreas();
         long started = System.nanoTime();
         long[] used = {0};
         int[] entries = {0};
         Files.walkFileTree(root, Set.of(), 64, new SimpleFileVisitor<>() {
             private void step() throws IOException {
+                checkBudget(budget);
                 if (Thread.currentThread().isInterrupted() || ++entries[0] > 100_000
                         || System.nanoTime() - started > 10_000_000_000L) throw ExecutionRootLease.unavailable();
             }
@@ -148,6 +154,14 @@ final class ExecutionPaths implements AutoCloseable {
         });
         checkedAreas();
         requireCapacity(used[0], Files.getFileStore(root).getUsableSpace(), maxBytes, reserveBytes);
+        checkBudget(budget);
+    }
+
+    private static void checkBudget(dev.atoms.demo.execution.OwnedProcess.Budget budget) throws IOException {
+        try {
+            var remaining = budget.remaining();
+            if (remaining == null || remaining.isNegative() || remaining.isZero()) throw new IOException();
+        } catch (IOException | RuntimeException error) { throw new IOException("EXECUTION_TIMEOUT"); }
     }
 
     static void requireCapacity(long used, long available, long max, long reserve) throws IOException {

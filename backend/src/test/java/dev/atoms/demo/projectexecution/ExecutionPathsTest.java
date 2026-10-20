@@ -96,4 +96,17 @@ class ExecutionPathsTest {
         assertThat(Files.exists(root.resolve("runs"))).isFalse();
         assertThat(Files.exists(root.resolve("saved-runs"))).isTrue();
     }
+
+    @Test void storageScanAlsoConsumesTheCallersRemainingDeadline() throws Exception {
+        Path root = temporary.toRealPath().resolve("execution");
+        try (var paths = new ExecutionPaths(root, List.of())) {
+            var task = paths.createBuild(UUID.randomUUID());
+            Files.writeString(paths.project(task).resolve("evidence"), "retained");
+            var steps = new java.util.concurrent.atomic.AtomicInteger(2);
+            assertThatThrownBy(() -> paths.checkCapacity(() -> steps.getAndDecrement() > 0
+                    ? java.time.Duration.ofSeconds(5) : java.time.Duration.ZERO))
+                    .hasMessage("EXECUTION_TIMEOUT");
+            assertThat(Files.readString(paths.project(task).resolve("evidence"))).isEqualTo("retained");
+        }
+    }
 }
