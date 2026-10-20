@@ -1,6 +1,6 @@
 # project-execution · 实施计划
 
-状态：2026-10-20，用户已确认本计划及 EX01–EX30 任务，连续实施；检查点报告证据，不逐小项请求开始。依据[规格](../../SPEC-project-execution.md)，规划基线 `1e3a13a`、计划提交 `ee5096a`，当前分支 `feature/standalone-engineering`。EX01–06 及 C-EX02 已完成，下一项 EX07 持久构建准入，见[验证记录](../../docs/project-execution-verification.md)；本文不表示新模式已能构建、启动或在网页使用。
+状态：2026-10-20，用户已确认本计划及 EX01–EX30 任务，连续实施；检查点报告证据，不逐小项请求开始。依据[规格](../../SPEC-project-execution.md)，规划基线 `1e3a13a`、计划提交 `ee5096a`，当前分支 `feature/standalone-engineering`。EX01–07 及 C-EX02 已完成，下一项 EX08 测试数据库真实目标检查，见[验证记录](../../docs/project-execution-verification.md)；本文不表示新模式已能构建、启动或在网页使用。
 
 ## 1. 交付范围与组织
 
@@ -127,7 +127,7 @@ lock-only 是独立任务：批准待解析的清单/来源 → 编辑租约副�
 
 ## 6. 验证命令与证据规则
 
-以下 `Execution*` 测试及 `project-execution-contract` profile **是拟新增项，现在不存在**。任务落地后记录实际完整命令、时间、数量、失败/跳过、产物摘要；不能把此处命令当作已通过的结果。
+以下是验证命令模板。EX01–07 对应的 `Execution*` 测试已存在并有[验证记录](../../docs/project-execution-verification.md)；`project-execution-contract` profile、`ExecutionSeedBuildContractIT` 及后续任务测试仍待实现。任务落地后记录实际完整命令、时间、数量、失败/跳过、产物摘要；不能把此处命令模板当作已通过的结果。
 
 所有后端命令工作目录 `/Users/wubingheng/atoms-demo/backend`。以 EX01 为例，`U(X)` 为单测、`I(X)` 为带平台专用 PG 的集成测试，逗号分隔多个类：
 

@@ -1,6 +1,6 @@
 # Spec: project-execution · 完整工程受控构建与本机进程
 
-状态：2026-10-20，用户已确认本规格及 §10 三项取舍，并确认[实施计划](tasks/project-execution/plan.md)与[任务清单](tasks/project-execution/todo.md)；EX01–06 及 C-EX02 已验证，下一项 EX07 持久构建准入，不是完整执行器已交付或已启用的声明。本地完整闭环的总体开发范围已获准，见 [Agent 规格 §10](SPEC-project-agent.md#10-2026-10-19-完整闭环实施授权)。
+状态：2026-10-20，用户已确认本规格及 §10 三项取舍，并确认[实施计划](tasks/project-execution/plan.md)与[任务清单](tasks/project-execution/todo.md)；EX01–07 及 C-EX02 已验证，下一项 EX08 测试数据库真实目标检查，不是完整执行器已交付或已启用的声明。本地完整闭环的总体开发范围已获准，见 [Agent 规格 §10](SPEC-project-agent.md#10-2026-10-19-完整闭环实施授权)。
 
 模块 ID 沿用[能力地图](FULL-PROJECT-CAPABILITY-MAP.md)的 `project-execution`，依赖 `project-source`，不反向依赖 Agent、交付或工作台。上游只读门面 PS21 已完成；当前网页仍走旧固定模板链路。
 
@@ -80,7 +80,7 @@
 
 ## 6. 状态、幂等与恢复
 
-拟新增持久构建、运行、数据库绑定及阶段事件记录；迁移只追加，不改现有源码/Agent 或旧构建表的含义。字段保存引用、状态与摘要，不保存完整源码、原始输出或密码。
+V023 已增加持久构建及阶段事件记录；运行、数据库绑定仍待后续任务。迁移只追加，不改现有源码/Agent 或旧构建表的含义。字段保存引用、状态与摘要，不保存完整源码、原始输出或密码。
 
 ```text
 构建：QUEUED → PREPARING → INSTALLING → CHECKING → PACKAGING → SUCCEEDED
@@ -120,24 +120,22 @@
 
 上游现有接口：`ProjectSourceReadGateway` 读取不可变输入；需要发布锁文件新版本时使用 `ProjectSourceEditGateway` 的拥有权与停写证据，不公开任意写路径。
 
-下列是拟定契约，不是已实现 Java/HTTP 接口：
+当前 `ProjectExecutionService` 仅提供内部 Java 准入/查询，不是 HTTP 接口，也没有自动调度：
 
 ```java
-public record BuildInput(UUID sourceVersionId) {}
-
-public interface ProjectExecutionService {
-    BuildView build(UUID owner, UUID project, BuildInput input, String key);
-    BuildView getBuild(UUID owner, UUID project, UUID build);
-    BuildView cancelBuild(UUID owner, UUID project, UUID build);
-    RunView start(UUID owner, UUID project, UUID build, String key);
-    RunView stop(UUID owner, UUID project, UUID run);
-    RunView getRun(UUID owner, UUID project, UUID run);
-}
+BuildView submit(UUID owner, UUID project, UUID sourceVersion, String key);
+BuildView get(UUID owner, UUID project, UUID build);
 ```
+
+`submit` 必须在数据库事务外调用。先锁项目检查所有权/归档和幂等键，再在事务外读取准确版本的完整快照，最后重新授权并锁项目、分配等待槽位、原子保存意图/首条事件。不在持有项目锁时等待 Git。相同项目/键/版本返回原任务（包括终态），不同版本返回 `EXECUTION_IDEMPOTENCY_CONFLICT`，项目已有其他活动构建返回 `EXECUTION_PROJECT_BUSY`，队列满返回 `EXECUTION_QUEUE_FULL`。键最多 128 个 Java 字符，不允许空白键、控制字符或不完整的 Unicode 代理项；只保存 SHA-256，不保存原键。
+
+`get` 同样校验当前维护者、项目所有权及归档状态；视图只含任务/项目/来源 UUID、树摘要、状态、取消标记、稳定错误码、创建/完成时间和最后事件序号，不包含持久请求摘要、内部容量槽、路径或配置。配置及授权检查失败不能靠重放绕过。准入快照仅固定来源，不代表完成依赖批准、工具/应用库验证或可执行调度；后续 worker 仍需重新核对这些边界。
+
+取消构建、启动/停止/查询运行、列表/事件及交付身份仍按 EX12–24 实施。阶段事件只包含状态、取消标记和平台错误码，任务 UUID 是关联标识；不提供任意原始输出写入 API。可按任务查询是否入队、当前阶段及拒绝/失败码，不用源码或凭据作为诊断。
 
 列表/事件使用有界游标分页。给交付模块的是经核对的构建/运行身份与内部受控句柄，不是浏览器可指定的磁盘路径或代理目标；每次访问仍重新授权。错误采用既有 `ApiException` 稳定码，不泄露命令、路径或底层异常。
 
-拟建 `backend/src/main/java/dev/atoms/demo/projectexecution/`，对应测试位于 `backend/src/test/java/dev/atoms/demo/projectexecution/`，受控样本位于 `backend/src/test/resources/projectexecution/`；追加数据库迁移，维护说明/验证记录放入 `docs/`。现有 `execution/OwnedProcess` 有 Agent 专用错误码，复用前需明确适配，不能直接把其结果当新构建证据。旧 `workspace`/`instances` 固定模板代码不改成混杂的双模式执行器。
+实现位于 `backend/src/main/java/dev/atoms/demo/projectexecution/`，对应测试位于 `backend/src/test/java/dev/atoms/demo/projectexecution/`，受控样本位于 `backend/src/test/resources/projectexecution/`；追加数据库迁移，维护说明/验证记录放入 `docs/`。现有 `execution/OwnedProcess` 有 Agent 专用错误码，由 `ExecutionProcess` 明确适配，不能直接把其结果当新构建证据。旧 `workspace`/`instances` 固定模板代码不改成混杂的双模式执行器。
 
 沿用 Java 四空格、构造器注入、不可变 DTO、参数化 SQL、短事务。不得在数据库事务中等待 Git、安装或构建，不为本模块引入通用插件框架或新平台依赖。
 

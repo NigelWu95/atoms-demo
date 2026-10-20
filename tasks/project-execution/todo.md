@@ -1,6 +1,6 @@
 # project-execution · 开发任务
 
-状态：2026-10-20，规格及计划/任务已获用户确认，EX01–06 及 C-EX02 完成，下一项 EX07 持久构建准入。本机四套验收库已获准并创建。唯一依据为[规格](../../SPEC-project-execution.md)与[本模块计划](plan.md)，不复用旧工程导出的 PE 编号。任务勾选需附真实证据，不把下列拟新增类、命令或样本当作已有功能。
+状态：2026-10-20，规格及计划/任务已获用户确认，EX01–07 及 C-EX02 完成，下一项 EX08 测试数据库真实目标检查。本机四套验收库已获准并创建。唯一依据为[规格](../../SPEC-project-execution.md)与[本模块计划](plan.md)，不复用旧工程导出的 PE 编号。任务勾选需附真实证据，不把下列拟新增类、命令或样本当作已有功能。
 
 路径缩写：`E` = `backend/src/main/java/dev/atoms/demo/projectexecution`；`ET` = 对应 `src/test/java` 包；`ER` = `backend/src/test/resources/projectexecution`；`R` = `backend/src/main/resources/projectexecution`；`S/ST` = 现有 source 主/测试包；`X/XT` = execution 主/测试包；`M` = `backend/src/main/resources/db/migration`；`T` = `templates/full-project-v1`。这些是具体文件的前缀，不是用一个目录隐藏多文件变更。
 
@@ -80,13 +80,15 @@ U/I/REAL/ALL/COMPAT/DOC 的命令与权限条件见计划 §6。S = 1–2、M = 
 
 ## EX07 · 幂等的持久构建准入
 
-- [ ] 完成 EX07。依赖：EX01、EX04、EX06。拆为两片，分别验证后提交。
+- [x] 完成 EX07。依赖：EX01、EX04、EX06。拆为以下小片，分别验证后提交。
   - [x] EX07a：V023 构建/事件新表、槽位/不可变约束和真实 PG 测试（2 个主要文件）。缺表 RED 后，19:09 全部 340 单元 + 1 项数据库约束集成通过及打包；只迁移批准的 pa32b schema。
-  - [ ] EX07b：内部提交/查询、固定版本读取、幂等与并发容量、权限及原子回滚（最多 5 个主要文件）。
+  - [x] EX07b：内部提交/查询、固定版本读取、幂等与并发容量、权限及原子回滚（最多 5 个主要文件）；授权变异被拦截、Unicode 键与缩容边界先 RED 后修复。
+  - [x] EX07c：完整回归发现测试上下文累计占满 PG 连接；补 `ExecutionSnapshotIT` 的类级资源关闭（1 个主要文件）。本轮新建准入/schema 测试也按类关闭，不改变生产连接数、测试断言或数据库上限。
 - 描述：追加构建/阶段事件记录及内部服务，接受一次稳定的固定版本构建意图。
 - 验收：维护者、所有权/归档独立检查；同键同体并发只产生一任务、异体冲突，活动/等待容量有 DB 保护；状态、来源不可变及事件配额原子更新，默认关闭不影响旧表。
 - 验证：I(ExecutionAdmissionIT)，真实双连接竞争、事务回滚、越权、活动唯一及迁移兼容；ALL。
 - 主要文件：`M/V023__project_execution_builds.sql`、`E/ExecutionBuild.java`、`E/ExecutionBuildRepository.java`、`E/ProjectExecutionService.java`、`ET/ExecutionAdmissionIT.java`。
+- 证据：22:25:37 完整后端 `verify`，340 单元 + 297 集成全部通过，0 失败/错误/跳过并打包；包括 8 项准入、2 项 schema、7 项快照测试。先前连接池失败和修复过程保留在[验证记录](../../docs/project-execution-verification.md)。这是内部构建意图准入，不是实际工程构建/运行或网页交付。
 
 ## EX08 · 测试数据库真实目标检查
 

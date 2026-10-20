@@ -11,12 +11,57 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import static org.assertj.core.api.Assertions.*;
 
+@org.springframework.test.annotation.DirtiesContext(classMode = org.springframework.test.annotation.DirtiesContext.ClassMode.AFTER_CLASS)
 @ActiveProfiles("test")
 @SpringBootTest(properties = {"atoms.project-execution.enabled=false", "atoms.source.enabled=false",
         "atoms.generation.worker-enabled=false"})
 class ExecutionBuildSchemaIT {
     @Autowired JdbcTemplate jdbc;
     @Autowired PlatformTransactionManager transactions;
+
+    @Test void databaseAloneRejectsDuplicateProjectQueueAndWorkerSlots() {
+        new TransactionTemplate(transactions).executeWithoutResult(status -> {
+            UUID first = queuedFixture(1), second = queuedFixture(2);
+            for (String sql : new String[] {
+                    "UPDATE execution_builds SET queue_slot=1 WHERE id=?",
+                    """
+                    INSERT INTO execution_builds(id,project_id,owner_id,source_version_id,tree_sha256,
+                        idempotency_key_sha256,request_sha256,queue_slot)
+                    SELECT gen_random_uuid(),project_id,owner_id,source_version_id,tree_sha256,
+                        repeat('e',64),request_sha256,3 FROM execution_builds WHERE id=?
+                    """}) {
+                Object save = status.createSavepoint();
+                assertThatThrownBy(() -> jdbc.update(sql, second)).isInstanceOf(DataAccessException.class);
+                status.rollbackToSavepoint(save);
+                status.releaseSavepoint(save);
+            }
+            jdbc.update("UPDATE execution_builds SET status='PREPARING',queue_slot=null,worker_slot=1 WHERE id=?", first);
+            Object save = status.createSavepoint();
+            assertThatThrownBy(() -> jdbc.update(
+                    "UPDATE execution_builds SET status='PREPARING',queue_slot=null,worker_slot=1 WHERE id=?", second))
+                    .isInstanceOf(DataAccessException.class);
+            status.rollbackToSavepoint(save);
+            assertThat(jdbc.queryForObject("SELECT status FROM execution_builds WHERE id=?", String.class, second)).isEqualTo("QUEUED");
+            status.setRollbackOnly();
+        });
+    }
+
+    private UUID queuedFixture(int slot) {
+        UUID owner = UUID.randomUUID(), project = UUID.randomUUID(), version = UUID.randomUUID(), build = UUID.randomUUID();
+        jdbc.update("INSERT INTO guest_users(id) VALUES (?)", owner);
+        jdbc.update("INSERT INTO projects(id,owner_id,name) VALUES (?,?,'slot-test')", project, owner);
+        jdbc.update("INSERT INTO project_sources(project_id) VALUES (?)", project);
+        jdbc.update("""
+                INSERT INTO source_versions(id,project_id,version_no,commit_id,tree_sha256,file_count,tree_bytes)
+                VALUES (?,?,1,?,?,1,1)
+                """, version, project, "a".repeat(40), "b".repeat(64));
+        jdbc.update("""
+                INSERT INTO execution_builds(id,project_id,owner_id,source_version_id,tree_sha256,
+                    idempotency_key_sha256,request_sha256,queue_slot)
+                VALUES (?,?,?,?,?,?,?,?)
+                """, build, project, owner, version, "b".repeat(64), "c".repeat(64), "d".repeat(64), slot);
+        return build;
+    }
 
     @Test void additiveSchemaBindsImmutableSourceAndPreservesAudit() {
         assertThat(jdbc.queryForObject("SELECT current_database()", String.class)).isEqualTo("atoms_demo_test");
