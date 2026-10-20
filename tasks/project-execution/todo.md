@@ -103,7 +103,10 @@ U/I/REAL/ALL/COMPAT/DOC 的命令与权限条件见计划 §6。S = 1–2、M = 
 
 ## EX09 · 固定前端检查流水线
 
-- [ ] 完成 EX09。依赖：EX03–08。规模：M（4 文件）。
+- [ ] 完成 EX09。依赖：EX03–08。拆为以下小片，各不超过 5 个主要文件。
+  - [x] EX09a：有界 Vitest 5 JSON 报告校验，只输出数值摘要（`ExecutionDiagnostics` 及单测）；23:31:46 定向 9 项及打包通过，补齐变异揭示的用例计数反例。
+  - [ ] EX09b：固定前端流水线、共享取消/期限、干净报告目录与停止证据（`ExecutionFrontend` 及单测）。
+  - [ ] EX09c：持久阶段/执行意图接线及 PG 反例（内部 journal、repository 和集成测试，必要时补前端接线）；不提前实现 EX12 调度。
 - 描述：从持久任务运行冻结安装与平台固定的类型/lint/单测/构建入口，产生阶段事件。
 - 验收：显式 ci/ignore-scripts/no-audit/no-fund，源脚本不能替换平台编排；失败立即停止，取消/期限跨阶段共享；本次报告必须存在且有实际非跳过测试，原始输出不持久化。
 - 验证：U(ExecutionFrontendTest,ExecutionDiagnosticsTest)，确定性进程/报告反例；真实工具闭环在 EX11 单列。
