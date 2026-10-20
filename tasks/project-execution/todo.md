@@ -1,6 +1,6 @@
 # project-execution · 开发任务
 
-状态：2026-10-20，规格及计划/任务已获用户确认，EX01–04 完成；下一项 EX05。唯一依据为[规格](../../SPEC-project-execution.md)与[本模块计划](plan.md)，不复用旧工程导出的 PE 编号。任务勾选需附真实证据，不把下列拟新增类、命令或样本当作已有功能。
+状态：2026-10-20，规格及计划/任务已获用户确认，EX01–05 完成；下一项 EX06。唯一依据为[规格](../../SPEC-project-execution.md)与[本模块计划](plan.md)，不复用旧工程导出的 PE 编号。任务勾选需附真实证据，不把下列拟新增类、命令或样本当作已有功能。
 
 路径缩写：`E` = `backend/src/main/java/dev/atoms/demo/projectexecution`；`ET` = 对应 `src/test/java` 包；`ER` = `backend/src/test/resources/projectexecution`；`R` = `backend/src/main/resources/projectexecution`；`S/ST` = 现有 source 主/测试包；`X/XT` = execution 主/测试包；`M` = `backend/src/main/resources/db/migration`；`T` = `templates/full-project-v1`。这些是具体文件的前缀，不是用一个目录隐藏多文件变更。
 
@@ -52,11 +52,12 @@ U/I/REAL/ALL/COMPAT/DOC 的命令与权限条件见计划 §6。S = 1–2、M = 
 
 ## EX05 · npm 清单与锁图批准
 
-- [ ] 完成 EX05。依赖：EX04。规模：M（3 文件）。
+- [x] 完成 EX05。依赖：EX04。规模：M（3 文件）。
 - 描述：为种子工程建立源码外的准确依赖策略，验证根清单及完整传递锁图。
 - 验收：清单/锁摘要绑定批准，缺锁或不匹配不自动安装修复；拒绝未批准 registry、git/file/URL/link、完整性缺失及 workspace 绕过；准备批准与构建批准明确分开。
 - 验证：U(ExecutionNpmPolicyTest)，用种子真实 lock 和最小恶意向量；审批摘要改变必须使旧批准失效。
 - 主要文件：`E/ExecutionNpmPolicy.java`、`ET/ExecutionNpmPolicyTest.java`、`R/seed-dependency-policy.json`。
+- 证据：缺类 RED 后种子及反例通过；另加格式版本整数溢出反例先 RED、修复后 16:12 共 40 项定向及打包通过。未下载/安装依赖，没有真实构建结论。
 
 ## EX06 · 固定工具与 Maven 执行策略
 

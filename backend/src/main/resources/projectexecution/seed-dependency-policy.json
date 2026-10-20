@@ -1,0 +1,8 @@
+{
+  "schema": 1,
+  "npm": {
+    "registry": "https://registry.npmjs.org/",
+    "manifestSha256": "f143410c102800beb8c0a32cbc99e170ee5e1ed55e2a0d0ed1a169f6a4f34240",
+    "lockSha256": "db061436fc2646ecaab3ee1609d6bae21a0145594eb2f44f79a0f7381e986708"
+  }
+}
