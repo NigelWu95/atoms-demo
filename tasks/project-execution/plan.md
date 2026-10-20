@@ -1,6 +1,6 @@
 # project-execution · 实施计划
 
-状态：2026-10-20，用户已确认本计划及 EX01–EX30 任务，连续实施；检查点报告证据，不逐小项请求开始。依据[规格](../../SPEC-project-execution.md)，规划基线 `1e3a13a`、计划提交 `ee5096a`，当前分支 `feature/standalone-engineering`。EX01–07 及 C-EX02 已完成，下一项 EX08 测试数据库真实目标检查，见[验证记录](../../docs/project-execution-verification.md)；本文不表示新模式已能构建、启动或在网页使用。
+状态：2026-10-20，用户已确认本计划及 EX01–EX30 任务，连续实施；检查点报告证据，不逐小项请求开始。依据[规格](../../SPEC-project-execution.md)，规划基线 `1e3a13a`、计划提交 `ee5096a`，当前分支 `feature/standalone-engineering`。EX01–08 及 C-EX02 已完成，下一项 EX09 固定前端检查流水线，见[验证记录](../../docs/project-execution-verification.md)；本文不表示新模式已能构建、启动或在网页使用。
 
 ## 1. 交付范围与组织
 
@@ -127,7 +127,7 @@ lock-only 是独立任务：批准待解析的清单/来源 → 编辑租约副�
 
 ## 6. 验证命令与证据规则
 
-以下是验证命令模板。EX01–07 对应的 `Execution*` 测试已存在并有[验证记录](../../docs/project-execution-verification.md)；`project-execution-contract` profile、`ExecutionSeedBuildContractIT` 及后续任务测试仍待实现。任务落地后记录实际完整命令、时间、数量、失败/跳过、产物摘要；不能把此处命令模板当作已通过的结果。
+以下是验证命令模板。EX01–07 对应的 `Execution*` 测试已存在并有[验证记录](../../docs/project-execution-verification.md)；EX08 提前引入独立 `project-execution-contract` profile，仅承载真实测试数据库只读契约。`ExecutionSeedBuildContractIT` 及后续任务测试仍待实现。任务落地后记录实际完整命令、时间、数量、失败/跳过、产物摘要；不能把此处命令模板当作已通过的结果。
 
 所有后端命令工作目录 `/Users/wubingheng/atoms-demo/backend`。以 EX01 为例，`U(X)` 为单测、`I(X)` 为带平台专用 PG 的集成测试，逗号分隔多个类：
 
@@ -140,7 +140,18 @@ env PATH=/Users/wubingheng/.nvm/versions/node/v24.20.0/bin:$PATH \
   ./mvnw -B -Dit.test=ExecutionAdmissionIT verify
 ```
 
-`REAL(X)` 是拟增加的显式真实工程构建/运行套件；默认平台 `verify` 不自动安装嵌套工程依赖或运行生成后端，但默认排除不算通过真实验收。新 profile 与既有 `agent-cli-contract` 独立 opt-in：当前 Agent profile 会把自身排除组置为 `none`，新增执行测试时必须分开计算排除组，不能使“验收 CLI”顺便执行新后端，或反过来。指定 profile 时缺工具/应用 DB 配置须失败或明确阻断，不能 skip 后报完成：
+`REAL(X)` 使用显式 `project-execution-contract` 套件；当前只有 EX08 数据库契约，真实工程构建/运行仍待 EX11 等任务。默认平台 `verify` 不自动连接这些私有验收库、安装嵌套工程依赖或运行生成后端，默认排除不算通过真实验收。新 profile 与既有 `agent-cli-contract` 使用两个独立排除组，启用其中一个不会启用另一个；只有同时显式启用才运行两者。指定 profile 时缺工具/应用 DB 配置须失败或明确阻断，不能 skip 后报完成。
+
+EX08 的准确本机只读验收命令如下（仅私有目录路径作为参数，密码不进入命令行；这些四库仅在已批准本机环境存在）：
+
+```sh
+env PATH=/Users/wubingheng/.nvm/versions/node/v24.20.0/bin:$PATH \
+  ./mvnw -B -Pproject-execution-contract \
+  -Dexecution.test-config-directory=/Users/wubingheng/atoms-demo/.local/project-execution-acceptance.x5cvui \
+  -Dtest=ExecutionTestDatabaseTest,ExecutionSettingsTest -Dit.test=ExecutionTestDatabaseIT verify
+```
+
+EX11 的拟新增命令，当前不得当作已可执行：
 
 ```sh
 env PATH=/Users/wubingheng/.nvm/versions/node/v24.20.0/bin:$PATH \

@@ -1,6 +1,6 @@
 # project-execution · 开发任务
 
-状态：2026-10-20，规格及计划/任务已获用户确认，EX01–07 及 C-EX02 完成，下一项 EX08 测试数据库真实目标检查。本机四套验收库已获准并创建。唯一依据为[规格](../../SPEC-project-execution.md)与[本模块计划](plan.md)，不复用旧工程导出的 PE 编号。任务勾选需附真实证据，不把下列拟新增类、命令或样本当作已有功能。
+状态：2026-10-20，规格及计划/任务已获用户确认，EX01–08 及 C-EX02 完成，下一项 EX09 固定前端检查流水线。本机四套验收库已获准并创建。唯一依据为[规格](../../SPEC-project-execution.md)与[本模块计划](plan.md)，不复用旧工程导出的 PE 编号。任务勾选需附真实证据，不把下列拟新增类、命令或样本当作已有功能。
 
 路径缩写：`E` = `backend/src/main/java/dev/atoms/demo/projectexecution`；`ET` = 对应 `src/test/java` 包；`ER` = `backend/src/test/resources/projectexecution`；`R` = `backend/src/main/resources/projectexecution`；`S/ST` = 现有 source 主/测试包；`X/XT` = execution 主/测试包；`M` = `backend/src/main/resources/db/migration`；`T` = `templates/full-project-v1`。这些是具体文件的前缀，不是用一个目录隐藏多文件变更。
 
@@ -92,11 +92,14 @@ U/I/REAL/ALL/COMPAT/DOC 的命令与权限条件见计划 §6。S = 1–2、M = 
 
 ## EX08 · 测试数据库真实目标检查
 
-- [ ] 完成 EX08。依赖：EX01、EX06。规模：M（4 文件）。
+- [x] 完成 EX08。依赖：EX01、EX06。拆成以下小片，维持每片最多 5 个主要文件。
+  - [x] EX08a：私有配置读取与固定项目注册表、只读目标校验及拒绝路径（2 个实现 + 1 个单元测试文件）。
+  - [x] EX08b：四套已批准本机库的真实只读契约（1 个集成测试 + `backend/pom.xml`）。提前引入原定 EX11 的独立 `project-execution-contract` profile，默认不连接私有验收库；与 Agent profile 分开启用，缺配置明确失败，不 skip。
 - 描述：只允许维护者预置、用途明确的独立测试 DB，凭据不进入任务表或源码。
 - 验收：实际连接身份与配置匹配且非超级用户，拒绝平台/系统/业务库和跨项目复用；检查前不执行清理或迁移；测试配置私有且无个人/平台 env 注入。
 - 验证：U(ExecutionTestDatabaseTest) + I(ExecutionTestDatabaseIT)；真实目标只读检查需先确认准确新 DB/角色，缺环境记录阻断，不能假连接代替。
 - 主要文件：`E/ExecutionTestDatabase.java`、`E/ExecutionPrivateConfig.java`、`ET/ExecutionTestDatabaseTest.java`、`ET/ExecutionTestDatabaseIT.java`。
+- 证据：缺类 RED、移除角色用途检查的变异被拦住；显式契约缺环境时 4 项明确失败，22:57 配置后 14 单元 + 4 真实契约通过；23:18:09 全后端含该契约共 347 单元 + 301 集成全部通过并打包，0 失败/错误/跳过。实际业务库伪装、错误绑定/密码、文件替换与重复登记均拒绝，四库无新增表；详见[验证记录](../../docs/project-execution-verification.md)。没有实际 npm/Maven 应用构建。
 
 ## EX09 · 固定前端检查流水线
 

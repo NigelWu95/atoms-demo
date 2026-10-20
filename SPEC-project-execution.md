@@ -1,6 +1,6 @@
 # Spec: project-execution · 完整工程受控构建与本机进程
 
-状态：2026-10-20，用户已确认本规格及 §10 三项取舍，并确认[实施计划](tasks/project-execution/plan.md)与[任务清单](tasks/project-execution/todo.md)；EX01–07 及 C-EX02 已验证，下一项 EX08 测试数据库真实目标检查，不是完整执行器已交付或已启用的声明。本地完整闭环的总体开发范围已获准，见 [Agent 规格 §10](SPEC-project-agent.md#10-2026-10-19-完整闭环实施授权)。
+状态：2026-10-20，用户已确认本规格及 §10 三项取舍，并确认[实施计划](tasks/project-execution/plan.md)与[任务清单](tasks/project-execution/todo.md)；EX01–08 及 C-EX02 已验证，下一项 EX09 固定前端检查流水线，不是完整执行器已交付或已启用的声明。本地完整闭环的总体开发范围已获准，见 [Agent 规格 §10](SPEC-project-agent.md#10-2026-10-19-完整闭环实施授权)。
 
 模块 ID 沿用[能力地图](FULL-PROJECT-CAPABILITY-MAP.md)的 `project-execution`，依赖 `project-source`，不反向依赖 Agent、交付或工作台。上游只读门面 PS21 已完成；当前网页仍走旧固定模板链路。
 
@@ -70,6 +70,12 @@
 
 数据库采用维护者预置的专用绑定：每项目独立数据库及最小权限角色，另有测试数据库。禁止平台日常库、系统库、超级用户和跨项目复用；运行服务不持有建库/建角色的管理员密码。创建这些环境需要单独明确目标，不能由网页提交连接字符串。
 
+测试库检查器读取维护者提供的完整、不可变项目注册表（最多 4 项），不按网页请求临时登记连接。每份文件仅允许 `database/user/password/purpose/bindingId/jdbcUrl/schema` 七个键，拒绝重复键、环境占位符和任意 JDBC 参数；仅支持明确的 `127.0.0.1` TCP、`purpose=test` 与 `generated_app` schema。文件须为本机非 root 用户拥有的 0600 普通文件，父目录 0700，拒绝链接、硬链接、源码/构建等受保护根内位置，读取后固定身份及内容并在每次检查前后复验。配置最大 8 KiB；不读取个人或平台 env。
+
+注册表拒绝重复数据库名、角色名或绑定 UUID，并额外拒绝调用者传入的实际平台/业务库及角色集合，不能只依赖默认库名黑名单。数据库连接在只读事务中执行固定的系统目录查询，核对实际 DB/会话角色、库与角色的 `atoms-project-execution:test:<bindingId>` 标记，以及非超级用户/无建库建角色等高权限/无角色成员关系、目标 schema 所有权及访问权限。拒绝数据库 PUBLIC 授权、其他非系统 schema 权限、模板库或备库；不执行 DDL、DML、Flyway 或清理。返回项目/绑定 UUID、实际 DB/角色 OID 和 relation 数量，不返回 URL、密码或配置摘要。
+
+这些检查防止误配置及越界复用，不是 OS 隔离或对生成代码的安全认证；管理员可改变数据库，返回值仅是本次检查证据，执行前仍须重新核对。当前完整注册表内的唯一性检查不替代 EX17 的持久业务库绑定，也没有提供向任意进程发放数据库凭据的公开接口。
+
 - 首次启动允许在已确认归该项目所有的空业务库初始化迁移；测试不得连接该业务库。
 - 同一项目重启使用同一绑定，数据保留；停进程不删除数据库，绑定不自动分配给其他项目。
 - 已有非空库的迁移集合发生变化时，默认返回 `RUN_MIGRATION_REVIEW_REQUIRED`，不启动新进程或修改数据库。维护者核对迁移、备份及兼容性后，批准记录须绑定项目、数据库身份和准确迁移摘要；普通“启动”按钮不能冒充批准。
@@ -136,6 +142,8 @@ BuildView get(UUID owner, UUID project, UUID build);
 列表/事件使用有界游标分页。给交付模块的是经核对的构建/运行身份与内部受控句柄，不是浏览器可指定的磁盘路径或代理目标；每次访问仍重新授权。错误采用既有 `ApiException` 稳定码，不泄露命令、路径或底层异常。
 
 实现位于 `backend/src/main/java/dev/atoms/demo/projectexecution/`，对应测试位于 `backend/src/test/java/dev/atoms/demo/projectexecution/`，受控样本位于 `backend/src/test/resources/projectexecution/`；追加数据库迁移，维护说明/验证记录放入 `docs/`。现有 `execution/OwnedProcess` 有 Agent 专用错误码，由 `ExecutionProcess` 明确适配，不能直接把其结果当新构建证据。旧 `workspace`/`instances` 固定模板代码不改成混杂的双模式执行器。
+
+`ExecutionTestDatabase.load` 只装载上述内部注册表，不连接数据库；`verify(projectId, budget)` 才创建并关闭一个有界只读连接。未登记项目、无效/漂移配置、重复绑定、实际目标不符、连接不可用和预算耗尽分别返回 `EXECUTION_DB_BINDING_NOT_FOUND`、`EXECUTION_DB_CONFIGURATION_INVALID`、`EXECUTION_DB_BINDING_CONFLICT`、`EXECUTION_DB_TARGET_REJECTED`、`EXECUTION_DB_UNAVAILABLE`、`EXECUTION_TIMEOUT`。异常不携带底层 cause/suppressed 连接详情。连接/读超时和语句期限从剩余整秒预算取值且最多 3/5/5 秒，不把 0 传给 JDBC 表示无限等待；不足 1 秒直接拒绝。该内部类不是自动启动的 Spring 组件，后续协调者须先按现有开关和权限准入。
 
 沿用 Java 四空格、构造器注入、不可变 DTO、参数化 SQL、短事务。不得在数据库事务中等待 Git、安装或构建，不为本模块引入通用插件框架或新平台依赖。
 
