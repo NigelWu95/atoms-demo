@@ -1,6 +1,6 @@
 # project-execution · 开发任务
 
-状态：2026-10-20，规格及计划/任务已获用户确认，EX01 配置完成；下一项 EX02。唯一依据为[规格](../../SPEC-project-execution.md)与[本模块计划](plan.md)，不复用旧工程导出的 PE 编号。任务勾选需附真实证据，不把下列拟新增类、命令或样本当作已有功能。
+状态：2026-10-20，规格及计划/任务已获用户确认，EX01–02 完成；下一项 EX03。唯一依据为[规格](../../SPEC-project-execution.md)与[本模块计划](plan.md)，不复用旧工程导出的 PE 编号。任务勾选需附真实证据，不把下列拟新增类、命令或样本当作已有功能。
 
 路径缩写：`E` = `backend/src/main/java/dev/atoms/demo/projectexecution`；`ET` = 对应 `src/test/java` 包；`ER` = `backend/src/test/resources/projectexecution`；`R` = `backend/src/main/resources/projectexecution`；`S/ST` = 现有 source 主/测试包；`X/XT` = execution 主/测试包；`M` = `backend/src/main/resources/db/migration`；`T` = `templates/full-project-v1`。这些是具体文件的前缀，不是用一个目录隐藏多文件变更。
 
@@ -17,9 +17,9 @@ U/I/REAL/ALL/COMPAT/DOC 的命令与权限条件见计划 §6。S = 1–2、M = 
 
 ## EX02 · 私有执行根与排他租约
 
-- [ ] 完成 EX02。依赖：EX01。规模：M（4 文件）。
+- [x] 完成 EX02。依赖：EX01。规模：M（4 文件）。
 - [x] EX02a：根身份、私有权限、同 JVM 与跨 JVM 排他租约。先缺类 RED，14:32 定向 20 项及打包通过。
-- [ ] EX02b：任务子目录、持有句柄和磁盘容量核对；该子项完成前不勾选整个 EX02。
+- [x] EX02b：任务子目录、持有句柄和磁盘容量核对；先缺类 RED，14:40 定向 25 项及打包通过，见验证记录。
 - 描述：仅在批准根下分配构建/产物/运行目录，持有根身份和跨 JVM 文件租约。
 - 验收：拒绝 root、未知/被替换根、链接/权限错误及与源码/Agent 根重叠；同根双协调者不能并存；容量不足拒绝新任务且不自动清理。
 - 验证：U(ExecutionPathsTest,ExecutionRootLeaseTest)，含真实临时目录、两个 JVM 和 8 GiB/1 GiB 边界；核对无外部目录变更。
