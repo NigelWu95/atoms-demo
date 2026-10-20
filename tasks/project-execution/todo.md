@@ -118,11 +118,15 @@ U/I/REAL/ALL/COMPAT/DOC 的命令与权限条件见计划 §6。S = 1–2、M = 
 
 ## EX10 · Java 检查与 JAR 封存
 
-- [ ] 完成 EX10。依赖：EX04、EX06–09。规模：M（5 文件）。
+- [ ] 完成 EX10。依赖：EX04、EX06–09。拆成以下小片，每片最多 5 个主要文件；保持本模块默认关闭。
+  - [x] EX10a：有界 Surefire XML 报告校验（`ExecutionJavaReport`、`ExecutionJavaReportTest`）。只返回数值，拒绝空/失败/跳过/重跑失败及计数不符、DTD/外部实体/畸形报告；缺类 RED，计数变异被拦住，01:59:42 报告校验定向 6 项及打包通过，见验证记录。
+  - [ ] EX10b：前端静态产物的私有资源装配与复验，固定 Maven 资源参数（`ExecutionPackaging`、`ExecutionPackagingTest`、`ExecutionToolchain`、`ExecutionToolchainTest`）。不写源码，不覆盖旧输出；拒绝链接/篡改/容量及来源漂移；U(ExecutionPackagingTest,ExecutionToolchainTest)。
+  - [ ] EX10c：JAR 和构建清单封存（`ExecutionArtifact`、`ExecutionArtifactTest`）。来源/工具/策略/检查与产物摘要绑定，拒绝空/越界/链接/替换及重复封存，失败保留证据；U(ExecutionArtifactTest)。
+  - [ ] EX10d：Java 阶段与 worker 接线（`ExecutionBuildWorker`、`ExecutionBuildWorkerIT`、`ExecutionBuildJournal`、`ExecutionBuildRepository`，必要时单列更多小片）。真实 PG 验证意图/取消/停止/提交失败，不提前实现调度；I(ExecutionBuildWorkerIT) + ALL。真实 npm/Maven 用户工程仍在 EX11。
 - 描述：接入平台控制的前端资源装配和 Maven 测试打包，成功后封存来源及 JAR。
 - 验收：干净报告/测试数量和退出码通过后才封存；前后源码/lock 不变，产物非空普通文件且不超过 256 MiB；清单绑定来源/工具/策略/检查/JAR 摘要，失败保留上一成功记录。
 - 验证：U(ExecutionPackagingTest) + I(ExecutionBuildWorkerIT)，篡改、硬链接、越界、跳过测试、来源改变及失败提交反例。
-- 主要文件：`E/ExecutionPackaging.java`、`E/ExecutionArtifact.java`、`E/ExecutionBuildWorker.java`、`ET/ExecutionPackagingTest.java`、`ET/ExecutionBuildWorkerIT.java`。
+- 主要文件：以上各片列出的 `E/` 实现与 `ET/` 测试，分别验证和提交；相较原五文件预估，独立拆出报告与封存测试，避免单类承载所有检查。
 
 ## EX11 · 第一次真实种子工程构建
 
