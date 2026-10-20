@@ -49,7 +49,8 @@
 |---|---|
 | 初始化 | `SourceCoordinator.initialize`；受控完整树、所有者、项目、幂等键；返回持久操作及本次完成 Future |
 | 导入旧工程 | `LegacySourceImporter.prepare`；固定旧版本与模板摘要；得到的操作和树交给协调者 |
-| 读取 | `SourceQuery.versions/snapshot/tree/file/diff`；平台版本 UUID、当前所有者校验、不可变树摘要复核 |
+| 跨模块完整读取 | `ProjectSourceReadGateway.read(owner, project, version)`；返回指定已发布版本的 `Snapshot(version, tree)`，不接受绝对路径或 Git 对象 ID |
+| 包内查询 | `SourceQuery.versions/snapshot/tree/file/diff`；平台版本 UUID、当前所有者校验、不可变树摘要复核 |
 | 准备修改 | `SourceWorkspaceStore.prepare`；固定源码版本/修订号及任务 UUID；`checked` 仅向内部适配器给出已核对路径 |
 | 封存 | 确认 Agent 已结束后调用 `SourceCandidateStore.seal`；重新扫描并复制到受控 staging，不信任模型自报的路径/hash |
 | 接受 | `SourceAcceptance.prepare` 后 `SourceCoordinator.submit`；持久幂等、再授权及基线 CAS；失败不能覆盖当前版本 |
@@ -59,6 +60,8 @@
 协调者有一个磁盘 Worker，待处理操作上限 64。工作副本和候选句柄也各自有 64 的内存上限；接收候选后释放句柄，磁盘证据保留。幂等重试先读取持久记录，不要求仍持有已释放句柄。重复请求可能返回仍在处理的状态，需要查询操作；Future 的存在不等于已经提交。
 
 源码版本 `COMMITTED` 只意味着源码已保存，不表示编译、启动、健康检查或业务验收成功。源码差异的正文最多 128 KiB，返回截断标记及完整文件统计，仅作展示，不可当作可应用补丁。
+
+完整读取复用包内查询的读前/读后授权、引用、SHA-256、文件数量和字节数校验；返回的文件列表及字节内容不可被调用方原地修改。读取历史版不会切换当前版本，不初始化缺失存储，也不运行工程。调用方不得持有数据库事务进行此读取；返回值不是执行授权，后续构建、启动或下载仍须重新检查当前所有者和各自准入条件。
 
 ## 超时、容量与故障
 

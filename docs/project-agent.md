@@ -98,7 +98,7 @@ QUEUED → PREPARING → RUNNING → VALIDATING → ACCEPTING → SOURCE_SAVED
 
 给下一模块的交接约束：
 
-- 构建输入必须是已发布源码版本及树摘要，通过源码模块授权读取；不能直接使用仍可修改的 Agent 工作目录。当前 `SourceQuery` 为包内接口，应增加窄读取门面，不暴露任意磁盘路径或 Git 对象。
+- 构建输入必须是已发布源码版本及树摘要，通过 `ProjectSourceReadGateway.read(owner, project, version)` 授权读取；不能直接使用仍可修改的 Agent 工作目录。`SourceQuery` 保持包内接口，门面不暴露任意磁盘路径或 Git 对象。读取不授予后续执行权限。
 - 旧 `workspace/NativeBuildProcess` 与 `instances/RuntimeEngine` 服务于固定模板，不能仅复用其“构建成功”字段就宣称任意 Java 工程兼容。新构建结果需绑定源码版本、工具/依赖策略和实际产物摘要。
 - 平台自己控制安装、测试、构建步骤；可修改的工程脚本、npm scripts、Maven 插件和生成代码仍具有本机执行风险。审阅依赖来源与脚本策略、维护者 opt-in、最小运行环境都是前置条件。
 - 构建失败只产出有界脱敏诊断，不能替换上一可用预览。反馈修复需要显式的新 Agent 任务及基线；不得无限自动重试，也不能绕过真实调用预算。

@@ -1,6 +1,29 @@
 # 完整工程源码模块 · 验证记录
 
-2026-10-18，`project-source` 内部模块本地验收完成。后端 213 项单测 + 170 项集成、前端 372 项单测及静态检查/构建、Python 11 项、浏览器 22 + 49 项均通过，无跳过。进度唯一入口为 [任务清单](../tasks/project-source/todo.md)，维护方法见 [使用说明](project-source.md)。这不是整体改造完成声明：默认关闭，尚未接入 Claude Code、公开源码 API 或新工作台，未推送/部署。
+2026-10-20 更新：PS21 完整快照只读门面已验收；Agent 内部接入另见 [Agent 记录](project-agent-verification.md)。新模式公开 API、构建运行和工作台尚未接通，未推送/部署。下文 2026-10-18 的原模块验收结果保留为历史，不将旧“尚未接入 Claude Code”描述当作当前状态。
+
+2026-10-18，`project-source` 内部模块本地验收完成。后端 213 项单测 + 170 项集成、前端 372 项单测及静态检查/构建、Python 11 项、浏览器 22 + 49 项均通过，无跳过。进度唯一入口为 [任务清单](../tasks/project-source/todo.md)，维护方法见 [使用说明](project-source.md)。当时默认关闭，尚未接入 Claude Code、公开源码 API 或新工作台，未推送/部署，不是整体改造完成声明。
+
+## PS21：跨模块完整快照读取（2026-10-20）
+
+代码提交 `d629052`，只新增门面与集成测试两个文件。门面复用 `SourceQuery`，没有复制 Git/授权逻辑、增加 HTTP 路由、修改迁移或调用模型。五项新集成覆盖完整 Vue/Java/SQL/依赖声明/配置、历史版本固定读取与返回值不可变、跨所有者/项目及所有权切换、禁用/缺失读取不建目录、事务内拒绝、引用损坏保留当前指针并阻断。五项为测试方法数量，覆盖条件有组合。
+
+RED：最初夹具误用了不存在的 `repository` 路径方法，修正为临时测试根下的实际目录后，13:26:32 `./mvnw -B test-compile` 仅因 `ProjectSourceReadGateway` 不存在出现三处编译错误；随后增加实现。
+
+首次 `verify` 在沙箱内于 13:28:54 失败：290 单元中 14 失败、55 错误、0 跳过，未进入新集成测试。日志为 Mockito/Byte Buddy 自附加失败、进程后代枚举受限及相应 Git 收尾错误。获准在沙箱外运行完全相同命令、代码不变后，13:31:58 **290 单元 + 8 集成全部通过，0 失败/错误/跳过，BUILD SUCCESS**，耗时 2:15：
+
+```sh
+# backend/；Oracle Java 17.0.5，专用本机测试库、atoms_test 非超级用户
+env PATH=/Users/wubingheng/.nvm/versions/node/v24.20.0/bin:$PATH \
+  SPRING_DATASOURCE_URL='jdbc:postgresql://127.0.0.1:5432/atoms_demo_test?currentSchema=atoms_verify_20261019_pa32b&connectTimeout=3&socketTimeout=5' \
+  ./mvnw -B -Dit.test=ProjectSourceReadGatewayIT,ProjectSourceQueryIT verify
+```
+
+反向验证：临时把门面的指定版本读取替换为当前最新版读取；同一环境前缀执行 `./mvnw -B '-Dit.test=ProjectSourceReadGatewayIT#returnsTheRequestedFullSnapshotWithoutExposingMutableStorage' test-compile failsafe:integration-test failsafe:verify`，13:34:27 **1 项明确失败**，断言指出返回版本 UUID 与请求历史版本不同。立即恢复，SHA-256 与变异前一致：`b2e605a83a6c757c4749e22a7a0e342253339e6a01fb3bf29c1abdebb50bb4ce`。没有提交变异。
+
+恢复后仍用上述环境前缀执行 `./mvnw -B -Dtest=ProjectSourcePolicyTest,ProjectSourceEnvironmentTest -Dit.test=ProjectSourceReadGatewayIT,ProjectSourceQueryIT verify`，13:41:14 **37 单元 + 8 集成通过，0 失败/错误/跳过，BUILD SUCCESS**，耗时 1:40；重新打包平台 JAR，未构建或启动生成的应用。前一次 290 单元对应同一恢复后的源码摘要；本次未重跑所有后端集成、前端、浏览器或真实 CLI，不扩大结果范围。
+
+数据库复核：仍使用既有 pa32b，23 迁移校验通过，无新迁移；`atoms_test` 无 CREATE schema 权限。旧 `f7e3d276-…` / `af6755c5-…` 的未决状态、执行标识、停止凭据缺失及原基线均保留，pa32b 的未决 Agent 任务/执行/活动租约均为 0。未改日常/远程配置、Docker、个人 Claude 配置或 OAuth 草稿。使用说明与源码规格已同步门面契约，并纠正旧 Agent “待实施”状态。
 
 ## 已验证的切片
 

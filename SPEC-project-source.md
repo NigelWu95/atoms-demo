@@ -184,12 +184,18 @@ npm run build
 
 本规格按上述默认文本文件范围和容量预算实施；如需第一阶段即支持图片等二进制资源，需要补充相应校验、预览和导出契约。
 
-Claude Code 本机路径已定位，但其版本、`--bare` 等隔离选项、DeepSeek 协议兼容性尚未联调。这些属于 `project-agent`，不阻塞本模块源码管理设计。新业务后端的执行授权、数据库供给及私有预览路由属于后续模块，不能沿用旧固定模板的安全假设直接开放。
+最初设计时仅定位了 Claude Code 路径；截至 2026-10-19，`project-agent` 已完成独立配置及真实 CLI + 假模型的离线验收，当前使用 `safe-mode + restricted`，并非最初候选 `bare`。真实 DeepSeek 仍未验收，详见 [Agent 验证记录](docs/project-agent-verification.md)。新业务后端的执行准入、数据库供给及私有预览路由属于后续模块，不能沿用旧固定模板的安全假设直接开放。
 
 规格批准不替代实现计划批准，也不代表上述测试已经通过。
 
-## 10. 已确认、待实施的 Agent 边界扩展
+## 10. 已实施的 Agent 边界扩展
 
 [project-agent 规格](SPEC-project-agent.md#5-源码模块提供的窄接口待实现)提出新增由源码模块所有的编辑租约和窄门面：在 Agent 修改期间阻止同项目的其他源码写入，确认执行结束后才允许封存、接受或释放；不将现有包内类型全部公开，不引入源码模块到 Agent 模块的反向依赖。
 
-这是随 project-agent 规格确认的后续增量，尚未实现，不是本模块已验收的行为。现有 V018/V019、测试证据和默认关闭状态不变；任何新增迁移均须追加，不改历史迁移。
+这是随 project-agent 规格确认并已通过 PA01–PA33 离线验收的后续增量，实际入口为 `ProjectSourceEditGateway`。租约及执行证据迁移均为追加，原 V018/V019 未重写；默认关闭状态不变。实际模型和新工程运行状态仍以 Agent 验证记录及后续模块为准。
+
+## 11. 完整快照读取门面
+
+`ProjectSourceReadGateway.read(UUID owner, UUID project, UUID version)` 将 §4.3 已有只读契约提供给后续模块，返回 `Snapshot(SourceVersion version, SourceTree tree)`；复用 `SourceQuery`，不复制权限或 Git 校验逻辑。只按项目下已发布版本 UUID 读取，不接受任意路径、Git 对象或调用方自报的树。
+
+返回完整不可变文本树，不按最新模板重新组装，也不因当前版本变化而改读最新版。该值是数据而非执行凭据；后续消费者必须独立授权。读操作保持原 300 秒上限、不持有数据库事务、不自动初始化、不构建运行。新增门面不改变源文件预算、迁移或旧网页流程；验证见 [PS21 任务](tasks/project-source/todo.md)。
