@@ -1,6 +1,6 @@
 # Spec: project-execution · 完整工程受控构建与本机进程
 
-状态：2026-10-20，用户已确认本规格及 §10 三项取舍；不是执行器已实现或已启用的声明。本地完整闭环的总体开发范围已获准，见 [Agent 规格 §10](SPEC-project-agent.md#10-2026-10-19-完整闭环实施授权)。细化的[实施计划](tasks/project-execution/plan.md)与[任务清单](tasks/project-execution/todo.md)待评审，执行代码尚未开始。
+状态：2026-10-20，用户已确认本规格及 §10 三项取舍，并确认[实施计划](tasks/project-execution/plan.md)与[任务清单](tasks/project-execution/todo.md)，从 EX01 开始实施；不是执行器已实现或已启用的声明。本地完整闭环的总体开发范围已获准，见 [Agent 规格 §10](SPEC-project-agent.md#10-2026-10-19-完整闭环实施授权)。
 
 模块 ID 沿用[能力地图](FULL-PROJECT-CAPABILITY-MAP.md)的 `project-execution`，依赖 `project-source`，不反向依赖 Agent、交付或工作台。上游只读门面 PS21 已完成；当前网页仍走旧固定模板链路。
 

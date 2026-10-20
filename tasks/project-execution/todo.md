@@ -1,6 +1,6 @@
 # project-execution · 开发任务
 
-状态：2026-10-20，规格已确认，计划/任务待评审，以下全部未实施。唯一依据为[规格](../../SPEC-project-execution.md)与[本模块计划](plan.md)，不复用旧工程导出的 PE 编号。任务勾选需附真实证据，不把下列拟新增类、命令或样本当作已有功能。
+状态：2026-10-20，规格及计划/任务已获用户确认，EX01 配置完成；下一项 EX02。唯一依据为[规格](../../SPEC-project-execution.md)与[本模块计划](plan.md)，不复用旧工程导出的 PE 编号。任务勾选需附真实证据，不把下列拟新增类、命令或样本当作已有功能。
 
 路径缩写：`E` = `backend/src/main/java/dev/atoms/demo/projectexecution`；`ET` = 对应 `src/test/java` 包；`ER` = `backend/src/test/resources/projectexecution`；`R` = `backend/src/main/resources/projectexecution`；`S/ST` = 现有 source 主/测试包；`X/XT` = execution 主/测试包；`M` = `backend/src/main/resources/db/migration`；`T` = `templates/full-project-v1`。这些是具体文件的前缀，不是用一个目录隐藏多文件变更。
 
@@ -8,11 +8,12 @@ U/I/REAL/ALL/COMPAT/DOC 的命令与权限条件见计划 §6。S = 1–2、M = 
 
 ## EX01 · 默认关闭与资源预算
 
-- [ ] 完成 EX01。依赖：用户批准本计划。规模：M（4 文件）。
+- [x] 完成 EX01。依赖：用户批准本计划。规模：M（4 文件）。
 - 描述：建立独立执行配置，不读取或修改日常私有 env。
 - 验收：禁用无目录/子进程/应用 DB 连接；启用须维护者 UUID、私有根及固定工具配置；严格保持构建 1/队列 8、各期限与容量，Agent 默认 4 不变。
 - 验证：U(ExecutionSettingsTest)；默认 Spring 上下文启动与配置非法值反例；DOC。
 - 主要文件：`E/ExecutionSettings.java`、`ET/ExecutionSettingsTest.java`、`backend/src/main/resources/application.yml`、`.env.example`。
+- 证据：RED 为缺类编译失败；14:24 全后端单元 297 + 源码读取集成 5 通过并打包；放宽并发上限的变异被拦住，恢复后 14 项定向及打包通过。见[验证记录](../../docs/project-execution-verification.md)。没有启用执行或改私有 env。
 
 ## EX02 · 私有执行根与排他租约
 
