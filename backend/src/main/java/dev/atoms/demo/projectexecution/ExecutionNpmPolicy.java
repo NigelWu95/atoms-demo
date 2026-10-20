@@ -28,7 +28,7 @@ final class ExecutionNpmPolicy {
     ExecutionNpmPolicy(byte[] approvedPolicy) throws IOException {
         try {
             JsonNode policy = object(approvedPolicy, 65536);
-            fields(policy, Set.of("schema", "npm"));
+            fields(policy, Set.of("schema", "npm", "maven"));
             if (!policy.path("schema").isInt() || policy.path("schema").intValue() != 1) throw rejected();
             JsonNode npm = policy.path("npm");
             fields(npm, Set.of("registry", "manifestSha256", "lockSha256"));

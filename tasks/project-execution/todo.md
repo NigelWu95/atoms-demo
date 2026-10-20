@@ -62,6 +62,8 @@ U/I/REAL/ALL/COMPAT/DOC 的命令与权限条件见计划 §6。S = 1–2、M = 
 ## EX06 · 固定工具与 Maven 执行策略
 
 - [ ] 完成 EX06。依赖：EX03、EX05。规模：M（5 文件）。
+- [x] EX06a：POM、源码配置入口与外部批准策略；npm 策略兼容新增 Maven 策略节。缺类 RED 后 16:20 定向 44 项及打包通过，见验证记录。
+- [ ] EX06b：固定工具身份、探测/构建 argv 与私有配置；需补进程调用的明确 Maven 根目录环境及回归，分开提交。
 - 描述：核对工具身份，构造平台拥有的 argv/settings/cache，检查 Maven 的全部受支持配置入口。
 - 验收：拒绝未知工具版本、个人配置继承与工具漂移；POM 父/插件/仓库/profile、`.mvn`/扩展或注入参数未批准则拒绝；不执行源码 `mvnw`/`build.mjs`，不静默改 registry/证书。
 - 验证：U(ExecutionToolchainTest,ExecutionMavenPolicyTest)，XML 外部实体/解析失败、属性覆盖和配置注入反例；官方固定版本参数核对记录。
