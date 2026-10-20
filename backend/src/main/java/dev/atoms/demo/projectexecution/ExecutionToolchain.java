@@ -139,7 +139,7 @@ final class ExecutionToolchain {
     }
     private ExecutionProcess.Invocation invocation(Kind executable, List<String> args, Path cwd, ExecutionToolHome home) throws IOException {
         return new ExecutionProcess.Invocation(resolved.get(executable), args, cwd, home.home(), home.temporary(),
-                javaHome, resolved.get(Kind.NODE).getParent());
+                javaHome, resolved.get(Kind.NODE).getParent()).withPrivateJvmHome();
     }
     private static void requireName(Path path, String name) throws IOException {
         if (path == null || !path.getFileName().toString().equals(name)) throw unsupported();

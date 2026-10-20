@@ -93,6 +93,21 @@ final class ExecutionProcess {
             return builder;
         }
 
+        /** Platform-generated only; inherited by cooperative descendant JVMs, never copied from the host. */
+        Invocation withPrivateJvmHome() throws IOException {
+            String home = environment.get("HOME"), temporary = environment.get("TMPDIR");
+            // Java launcher's quoted arguments preserve whitespace; reject ambiguous quote/escape input.
+            for (String value : List.of(home, temporary))
+                if (value.indexOf('"') >= 0 || value.indexOf('\\') >= 0) throw rejected();
+            var isolated = new java.util.HashMap<>(environment);
+            isolated.put("JDK_JAVA_OPTIONS", "\"-Duser.home=" + home + "\" \"-Djava.io.tmpdir=" + temporary + "\"");
+            return new Invocation(command, directory, Map.copyOf(isolated));
+        }
+
+        private Invocation(List<String> command, Path directory, Map<String, String> environment) {
+            this.command = command; this.directory = directory; this.environment = environment;
+        }
+
         private static void requirePath(Path path) throws IOException {
             if (path == null || !path.isAbsolute() || !path.normalize().equals(path)
                     || path.toString().chars().anyMatch(c -> c < 32 || c == 127 || c == ':')) throw rejected();

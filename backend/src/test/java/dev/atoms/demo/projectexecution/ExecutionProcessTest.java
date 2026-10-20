@@ -61,6 +61,27 @@ class ExecutionProcessTest {
                 });
     }
 
+    @Test void privateJvmHomeIsInheritedByARealChildWithoutCopyingAmbientJvmOptions() throws Exception {
+        Path home = Files.createDirectory(temporary.resolve("task home 'literal'"));
+        Path tmp = Files.createDirectory(home.resolve("tmp"));
+        Path java = Path.of(System.getProperty("java.home"));
+        var original = new ExecutionProcess.Invocation(java.resolve("bin/java"), args("private-home", "spawn"),
+                temporary, home, tmp, java, temporary);
+        var invocation = original.withPrivateJvmHome();
+        assertThat(original.builder().environment()).doesNotContainKey("JDK_JAVA_OPTIONS");
+        assertThat(invocation.builder().environment().get("JDK_JAVA_OPTIONS")).isEqualTo(
+                "\"-Duser.home=" + home + "\" \"-Djava.io.tmpdir=" + tmp + "\"");
+        assertThat(invocation.builder().environment()).doesNotContainKeys("JAVA_TOOL_OPTIONS", "_JAVA_OPTIONS", "MAVEN_OPTS");
+        UUID task = UUID.randomUUID(), execution = UUID.randomUUID();
+        var result = new ExecutionProcess().run(invocation, deadline(10), () -> false, task, execution, () -> {});
+        assertThat(result.summary().stdoutBytes()).isEqualTo(12); // Both JVMs validated properties before emitting.
+        assertThat(result.stopped().matches(task, execution, temporary)).isTrue();
+        for (String unsafe : List.of("home\" -javaagent=bad", "home\\\"bad"))
+            assertThatThrownBy(() -> new ExecutionProcess.Invocation(java.resolve("bin/java"), args("success"),
+                    temporary, temporary.resolve(unsafe), tmp, java, temporary).withPrivateJvmHome())
+                    .hasMessage("EXECUTION_INVOCATION_REJECTED").hasNoCause();
+    }
+
     @Test void floodsOnEitherStreamStopWithoutSavingRawOutput() throws Exception {
         for (String mode : List.of("stdout-flood", "stderr-flood"))
             assertFailure(mode, deadline(5), () -> false, "EXECUTION_OUTPUT_LIMIT", true);
@@ -159,6 +180,17 @@ class ExecutionProcessTest {
                 if (!args[1].equals(";$(touch must-not-exist)") || args.length != 2) System.exit(4);
                 if (System.getenv().keySet().stream().anyMatch(key -> key.contains("PASSWORD") || key.contains("API_KEY")
                         || key.contains("PROXY") || key.equals("JAVA_TOOL_OPTIONS") || key.equals("NODE_OPTIONS"))) System.exit(5);
+            }
+            if (args[0].equals("private-home")) {
+                if (!System.getProperty("user.home").equals(System.getenv("HOME"))
+                        || !System.getProperty("java.io.tmpdir").equals(System.getenv("TMPDIR"))) System.exit(6);
+                if (args.length == 2) {
+                    // No -D options: only the explicit environment of the parent is inherited.
+                    var child = new ProcessBuilder(Path.of(System.getProperty("java.home"), "bin", "java").toString(),
+                            "-cp", System.getProperty("java.class.path"), Fixture.class.getName(), "private-home")
+                            .inheritIO().start();
+                    if (child.waitFor() != 0) System.exit(7);
+                }
             }
             if (args[0].equals("ignore-term")) Runtime.getRuntime().addShutdownHook(new Thread(() -> {
                 try { Thread.sleep(60000); } catch (InterruptedException ignored) { }

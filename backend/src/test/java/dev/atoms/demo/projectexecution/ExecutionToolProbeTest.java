@@ -56,13 +56,17 @@ class ExecutionToolProbeTest {
         try (var paths = new ExecutionPaths(temporary.toRealPath().resolve("execution"), List.of())) {
             UUID task = UUID.randomUUID();
             var home = ExecutionToolHome.create(paths, paths.createBuild(task), budget);
-            for (String expected : List.of("EXECUTION_REPORT_INVALID", "EXECUTION_CANCELLED", "EXECUTION_TOOL_CHANGED")) {
+            for (String expected : List.of("EXECUTION_REPORT_INVALID", "EXECUTION_CANCELLED",
+                    "EXECUTION_STORAGE_UNAVAILABLE", "EXECUTION_TOOL_CHANGED")) {
+                if (expected.equals("EXECUTION_STORAGE_UNAVAILABLE"))
+                    Files.writeString(home.home().resolve("npmrc"), "PRIVATE_CONFIG_CANARY");
                 if (expected.equals("EXECUTION_TOOL_CHANGED")) Files.writeString(locations.node(), "changed");
                 UUID execution = UUID.randomUUID();
                 assertThatThrownBy(() -> new ExecutionToolProbe().run(tools, ExecutionToolchain.Kind.NODE, home, budget,
                         () -> expected.equals("EXECUTION_CANCELLED"), task, execution))
                         .isInstanceOfSatisfying(OwnedProcess.Failure.class, failure -> {
                             assertThat(failure.getMessage()).isEqualTo(expected);
+                            assertThat(failure.getMessage()).doesNotContain("PRIVATE_CONFIG_CANARY", home.home().toString());
                             assertThat(failure.stopped()).isNotNull();
                             assertThat(failure.stopped().matches(task, execution, home.home())).isTrue();
                         });

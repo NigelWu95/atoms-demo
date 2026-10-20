@@ -34,6 +34,8 @@ class ExecutionToolchainTest {
                     "-Djava.io.tmpdir=" + home.temporary());
             assertThat(maven.command()).endsWith("-Pfull-project-package", "verify");
             assertThat(maven.environment()).doesNotContainKeys("MAVEN_OPTS", "JAVA_TOOL_OPTIONS", "NODE_OPTIONS");
+            assertThat(maven.environment().get("JDK_JAVA_OPTIONS"))
+                    .isEqualTo("\"-Duser.home=" + home.home() + "\" \"-Djava.io.tmpdir=" + home.temporary() + "\"");
             for (var operation : ExecutionToolchain.Operation.values()) {
                 var command = tools.command(operation, home).builder().command();
                 assertThat(command).doesNotContain("sh", "-c", "npm", "mvnw", "build.mjs", "--ignore-scripts=false");
@@ -46,6 +48,8 @@ class ExecutionToolchainTest {
                     .contains("--package-lock-only", "--ignore-scripts");
             for (var kind : ExecutionToolchain.Kind.values()) {
                 assertThat(tools.probe(kind, home).builder().directory().toPath()).isEqualTo(home.home());
+                assertThat(tools.probe(kind, home).builder().environment().get("JDK_JAVA_OPTIONS"))
+                        .isEqualTo(maven.environment().get("JDK_JAVA_OPTIONS"));
                 assertThat(tools.identity(kind).sha256()).matches("[0-9a-f]{64}");
             }
             tools.verify(deadline());
