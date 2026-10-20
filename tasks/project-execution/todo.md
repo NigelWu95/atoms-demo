@@ -1,6 +1,6 @@
 # project-execution · 开发任务
 
-状态：2026-10-20，规格及计划/任务已获用户确认，EX01–08 及 C-EX02 完成，下一项 EX09 固定前端检查流水线。本机四套验收库已获准并创建。唯一依据为[规格](../../SPEC-project-execution.md)与[本模块计划](plan.md)，不复用旧工程导出的 PE 编号。任务勾选需附真实证据，不把下列拟新增类、命令或样本当作已有功能。
+状态：2026-10-21，规格及计划/任务已获用户确认，EX01–09 及 C-EX03 完成，下一项 EX10 Java 检查与 JAR 封存。本机四套验收库已获准并创建。唯一依据为[规格](../../SPEC-project-execution.md)与[本模块计划](plan.md)，不复用旧工程导出的 PE 编号。任务勾选需附真实证据，不把下列拟新增类、命令或样本当作已有功能。
 
 路径缩写：`E` = `backend/src/main/java/dev/atoms/demo/projectexecution`；`ET` = 对应 `src/test/java` 包；`ER` = `backend/src/test/resources/projectexecution`；`R` = `backend/src/main/resources/projectexecution`；`S/ST` = 现有 source 主/测试包；`X/XT` = execution 主/测试包；`M` = `backend/src/main/resources/db/migration`；`T` = `templates/full-project-v1`。这些是具体文件的前缀，不是用一个目录隐藏多文件变更。
 
@@ -103,18 +103,18 @@ U/I/REAL/ALL/COMPAT/DOC 的命令与权限条件见计划 §6。S = 1–2、M = 
 
 ## EX09 · 固定前端检查流水线
 
-- [ ] 完成 EX09。依赖：EX03–08。拆为以下小片，各不超过 5 个主要文件。
+- [x] 完成 EX09。依赖：EX03–08。拆为以下小片，各不超过 5 个主要文件。
   - [x] EX09a：有界 Vitest 5 JSON 报告校验，只输出数值摘要（`ExecutionDiagnostics` 及单测）；23:31:46 定向 9 项及打包通过，补齐变异揭示的用例计数反例。
   - [x] EX09b：固定前端流水线、共享取消/期限、干净报告目录与停止证据（`ExecutionFrontend` 及单测）；23:38:46 定向 11 项及打包通过，执行边界为受控 Java 夹具，真实 npm 留在 EX11。
-  - [ ] EX09c：持久阶段/执行意图接线及 PG 反例（内部 journal、repository 和集成测试，必要时补前端接线）；不提前实现 EX12 调度。
+  - [x] EX09c：持久阶段/执行意图接线及 PG 反例（`ExecutionBuildJournal` 与 `ExecutionFrontendJournalIT` 两个主要文件，无需改 repository）；2026-10-21 00:22 定向 9 单元 + 8 PG 集成通过并打包，错误停止证明变异被拦住。完整回归新报告为 356 单元 + 309 集成，零失败/错误/跳过；中断后重新执行报告校验成功，见验证记录。不提前实现 EX12 调度。
 - 描述：从持久任务运行冻结安装与平台固定的类型/lint/单测/构建入口，产生阶段事件。
 - 验收：显式 ci/ignore-scripts/no-audit/no-fund，源脚本不能替换平台编排；失败立即停止，取消/期限跨阶段共享；本次报告必须存在且有实际非跳过测试，原始输出不持久化。
 - 验证：U(ExecutionFrontendTest,ExecutionDiagnosticsTest)，确定性进程/报告反例；真实工具闭环在 EX11 单列。
-- 主要文件：`E/ExecutionFrontend.java`、`E/ExecutionDiagnostics.java`、`ET/ExecutionFrontendTest.java`、`ET/ExecutionDiagnosticsTest.java`。
+- 主要文件：EX09a 的 `E/ExecutionDiagnostics.java`、`ET/ExecutionDiagnosticsTest.java`；EX09b 的 `E/ExecutionFrontend.java`、`ET/ExecutionFrontendTest.java`；EX09c 的 `E/ExecutionBuildJournal.java`、`ET/ExecutionFrontendJournalIT.java`，每片分别验证和提交。
 
 ## C-EX03 · 可提交并观察构建阶段
 
-- [ ] EX07–09 的 PG/报告/流程测试与构建通过；不存在“提交成功就标构建成功”，新迁移只应用批准的测试 schema；真实 DB 环境不足明确列出。
+- [x] EX07–09 的 PG/报告/流程测试与平台后端构建通过；356 单元 + 309 集成全部通过，含 4 项专用数据库只读契约；不存在“提交成功就标构建成功”，迁移仅作用于批准的测试 schema。未执行真实 npm/Maven 用户工程构建，此项留在 EX11，不能以当前检查点替代。
 
 ## EX10 · Java 检查与 JAR 封存
 
