@@ -104,6 +104,7 @@ final class ExecutionToolHome {
     }
 
     Path home() { return home; }
+    Path project() throws IOException { return paths.project(task); }
     Path temporary() { return home.resolve("tmp"); }
     Path mavenRepository() { return home.resolve("maven-cache"); }
 

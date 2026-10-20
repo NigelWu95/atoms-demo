@@ -67,7 +67,8 @@ U/I/REAL/ALL/COMPAT/DOC 的命令与权限条件见计划 §6。S = 1–2、M = 
   - [x] EX06b1：任务私有 home/settings/cache、配置身份复验、明确 Maven 根目录；主要文件 `ExecutionToolHome`、`ExecutionPaths`、`ExecutionProcess` 及两个测试类。缺类 RED、移除等长字节比较的变异被拦截；恢复后 17:29 全后端 331 单元 + 19 源码集成及打包通过，见验证记录。
   - [ ] EX06b2：固定工具身份及漂移检测、版本探测、固定操作 argv；核对 JVM 实际 `user.home` 与子进程继承，不能只以生成了配置文件推断已隔离实际工具。
     - [x] EX06b2a：可执行文件及加载库树的有界 SHA-256、inode/权限/链接复验；17:50 定向 17 项与打包通过，移除身份比较的变异被拦截。
-    - [ ] EX06b2b：安装布局、版本探测及固定命令接线；真实工具验证与私有 JVM home 验收。
+    - [x] EX06b2b：安装布局、版本探测及固定命令目录；22 项定向及打包通过，本机四工具真实探测与主 JVM 私有 home 验收通过。
+    - [ ] EX06b2c：子 JVM 私有 home 继承、配置 canary 与完整回归；不把父 JVM 的 `-D` 视为自动继承。
 - 描述：核对工具身份，构造平台拥有的 argv/settings/cache，检查 Maven 的全部受支持配置入口。
 - 验收：拒绝未知工具版本、个人配置继承与工具漂移；POM 父/插件/仓库/profile、`.mvn`/扩展或注入参数未批准则拒绝；不执行源码 `mvnw`/`build.mjs`，不静默改 registry/证书。
 - 验证：U(ExecutionToolchainTest,ExecutionMavenPolicyTest)，XML 外部实体/解析失败、属性覆盖和配置注入反例；官方固定版本参数核对记录。
