@@ -1,8 +1,8 @@
 # project-execution · 开发任务
 
-状态：2026-10-21，规格及计划/任务已获用户确认，EX01–09、C-EX03、EX10a–c 及 EX10d1–d2 完成，正在按 EX10d3a–c 补齐专用测试库传递、构建结算及整体 worker；EX10 整体未完成。本机四套验收库已获准并创建。唯一依据为[规格](../../SPEC-project-execution.md)与[本模块计划](plan.md)，不复用旧工程导出的 PE 编号。任务勾选需附真实证据，不把下列拟新增类、命令或样本当作已有功能。
+状态：2026-10-21，规格及计划/任务已获用户确认，EX01–09、C-EX03、EX10a–c、EX10d1–d2、EX10d3a 及 b1 完成；用户批准隔离 JDK 对照后，23:58:57 完整回归通过，下一项为 b2 封存结算，EX10 整体未完成。本机四套验收库已获准并创建。唯一依据为[规格](../../SPEC-project-execution.md)与[本模块计划](plan.md)，不复用旧工程导出的 PE 编号。任务勾选需附真实证据，不把下列拟新增类、命令或样本当作已有功能。
 
-当前进度：补齐旧 Git 收尾的固定分类后，22:57:56 完整回归 **401 单元 + 325 集成通过，零失败/错误/跳过**，EX10d3a 已验收，继续 EX10d3b1。旧源码读取和 Agent 观察错误均未复现，但不宣称根因已修复；旧三份未决审计、失败报告和失败项目待核对状态保留，诊断继续监测。详见[验证记录](../../docs/project-execution-verification.md#git-收尾诊断补齐)。
+当前进度：原子领取专项 10 项通过，锁编号共存变异被捕获；随后 17.0.5 相关回归因 Git 原生枚举失败，现场保留。用户批准后仅在项目忽略目录安装 Liberica 17.0.14+10，命令级指定 JDK：23:42:49 **401 单元 + 33 相关集成通过**，23:58:57 **401 单元 + 335 完整集成通过，零失败/错误/跳过**，b1 验收。原生枚举未复现，但未捕获原 errno，不能宣布根因完全证实；原 Oracle 17.0.5、全局默认、私有 env、服务器和旧审计均不变。详见[验证记录](../../docs/project-execution-verification.md#获准的项目隔离-jdk-对照)。
 
 路径缩写：`E` = `backend/src/main/java/dev/atoms/demo/projectexecution`；`ET` = 对应 `src/test/java` 包；`ER` = `backend/src/test/resources/projectexecution`；`R` = `backend/src/main/resources/projectexecution`；`S/ST` = 现有 source 主/测试包；`X/XT` = execution 主/测试包；`M` = `backend/src/main/resources/db/migration`；`T` = `templates/full-project-v1`。这些是具体文件的前缀，不是用一个目录隐藏多文件变更。
 
@@ -130,7 +130,7 @@ U/I/REAL/ALL/COMPAT/DOC 的命令与权限条件见计划 §6。S = 1–2、M = 
     - [ ] EX10d3：整体 worker 与仓储封存成功接线，拆为以下依赖有序小片，父项全部完成后再勾选。
       - [x] EX10d3a：专用测试库到固定 Java 阶段的受控传递（`ExecutionPrivateConfig`、`ExecutionTestDatabase`、`ExecutionProcess`、`ExecutionJava`、`ExecutionDatabaseLaunchIT`，5 个主要文件）。一次性内部授权绑定项目/构建/执行/backend cwd，实际启动前复验文件及 DB 身份；只追加四个 `APP_*` 环境变量，密码不进 argv/源码/事件，不向前端发放。真实只读 PG + 受控 JVM 验证拒绝/继承/配置漂移/脱敏；22:57:56 完整 401 单元 + 325 集成通过，含本片 8 项。不替代真实 Maven 工程验收。
       - [ ] EX10d3b：持久构建领取与封存结算（仓储/内部结算服务、追加迁移及对应 PG 测试，最多 5 个主要文件，超出先拆）。短事务校验状态/阶段/授权/取消，成功绑定封存摘要并释放容量；失败保留旧成功记录，未知结果不释放。I(ExecutionBuildSettlementIT) + ALL，不提前实现 EX12 调度。
-        - [ ] EX10d3b1：原子领取排队任务（`ExecutionBuildRepository`、`ExecutionBuildClaim`、`ExecutionBuildClaimIT`，3 个主要文件）。项目行 → 构建行 → 容量事务锁；重新校验维护者/所有权/归档、原任务身份、取消和排队期限；双连接争用仅一方领取，缩容计入旧高槽位和未知执行。领取只到 PREPARING，不启动工具。将下述已知锁编号冲突提前在此片修复并验证与 Agent 协调锁共存，未完成前不启用两模块。
+        - [x] EX10d3b1：原子领取排队任务（`ExecutionBuildRepository`、`ExecutionBuildClaim`、`ExecutionBuildClaimIT`，3 个主要文件）。项目行 → 构建行 → 容量事务锁；重新校验维护者/所有权/归档、原任务身份、取消和排队期限；双连接争用仅一方领取，缩容计入旧高槽位和未知执行。领取只到 PREPARING，不启动工具。锁已分为构建 `718395203`、Agent `718395202`，10 项真实 PG 测试通过且旧编号变异被拦截；获准的隔离 JDK 对照相关回归及 23:58:57 完整 401 单元 + 335 集成均通过。默认仍关闭，不代表 worker/调度器已实现。
         - [ ] EX10d3b2：封存产物与整体成功的原子结算（`ExecutionArtifact`、`ExecutionBuildSettlement`、下一可用编号的追加迁移、`ExecutionBuildSettlementIT`，4 个主要文件）。绑定真实封存句柄和完整阶段证据，文件复验在事务外、身份/授权/取消复查及摘要入库在短事务内；失败不覆盖上一成功构建，未知 pending 不释放。新增迁移须先确认现有最大编号，再同步后续拟定编号；不改已应用 V023。
       - [ ] EX10d3c：`ExecutionBuildWorker` 串联冻结源码、策略、工具、测试库、前后端阶段和封存（worker 及测试/所需接线，最多 5 个主要文件，超出先拆）。产物复验后才交给结算，不继承平台环境；I(ExecutionBuildWorkerIT) + ALL。真实 npm/Maven 用户工程仍由 EX11 验收。
 - 描述：接入平台控制的前端资源装配和 Maven 测试打包，成功后封存来源及 JAR。
@@ -138,7 +138,7 @@ U/I/REAL/ALL/COMPAT/DOC 的命令与权限条件见计划 §6。S = 1–2、M = 
 - 验证：U(ExecutionPackagingTest) + I(ExecutionBuildWorkerIT)，篡改、硬链接、越界、跳过测试、来源改变及失败提交反例。
 - 主要文件：以上各片列出的 `E/` 实现与 `ET/` 测试，分别验证和提交；相较原五文件预估，独立拆出报告与封存测试，避免单类承载所有检查。
 - 待追查：旧 `ProjectAgentCoordinatorIT` 的取消后再次编辑场景曾出现一次 `SOURCE_STORAGE_UNAVAILABLE`，后续未复现，根因未确定。有界诊断小片已补 `source_snapshot_failed` 的阶段及固定错误分类，383 单元 + 309 集成通过；不把重跑通过当作修复，也不通过延长等待、跳过检查或自动重试掩盖。
-- 持续风险：首次四并发观察失败及随后旧 Git 收尾错误均保留现场，不能合并推断同一根因。`OwnedProcess` 与独立 `SourceGitProcess` 已分别补固定分类、首因及中断标志；22:57:56 全量通过后恢复后续开发，若再次出现即使用新诊断停止排查，不清记录、放宽停止证明、隐式重试或无授权切换 JDK。
+- 持续监测：23:21:50 旧 Git 收尾失败已识别到 `ProcessHandleImpl.getProcessPids0` 原生枚举分支，线程未中断；原生 errno 未捕获，不能直接断定 ENOMEM，也不能与首次 Agent 观察错误合并归因。根据 JDK-8339487 线索，经用户授权用项目隔离 17.0.14 对照，相关及完整回归均通过后恢复开发；不将此写成原 17.0.5 已修复。保留诊断和全部失败证据，不清记录、放宽停止证明或隐式重试。
 
 ## EX11 · 第一次真实种子工程构建
 
@@ -156,7 +156,7 @@ U/I/REAL/ALL/COMPAT/DOC 的命令与权限条件见计划 §6。S = 1–2、M = 
 - 验收：默认 1/排队 8、每项目一个活动构建，排队 300 秒及共享 1800 秒；启动意图先落库，取消先记录再由拥有者停止；未决不释放容量，Agent 并发配置不变。
 - 验证：I(ExecutionSchedulerIT,ExecutionCancellationIT)，真实受控子进程、多项目竞争、排队/执行取消及重复中断；核对测试进程退出。
 - 主要文件：`E/ExecutionCoordinator.java`、`E/ExecutionBuildRepository.java`、`E/ProjectExecutionService.java`、`ET/ExecutionSchedulerIT.java`、`ET/ExecutionCancellationIT.java`。
-- 已发现的接线前问题：当前构建准入事务锁与 Agent 协调者会话锁同为 `718395202`，同库启用两模块会互相等待。已提前排入 EX10d3b1 分配互不冲突的锁并验证 Agent/构建并行；EX12 仍需验证完整协调器共存，不能把串行测试通过当作共存证明。这不是上述观察失败的已证实根因；Git 诊断片不改锁或原未决状态。
+- 接线前锁问题已由 EX10d3b1 处理：构建准入原与 Agent 协调会话共用 `718395202`，现使用独立的 `718395203`，真实双连接共存及退回旧编号的变异已验证，隔离 JDK 完整回归通过。EX12 仍需验证完整协调器共存；锁冲突不是观察失败的已证实根因，不改原未决状态。
 
 ## C-EX04 · 真实构建成立
 

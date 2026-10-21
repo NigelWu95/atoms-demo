@@ -649,3 +649,73 @@ env PATH=/Users/wubingheng/.nvm/versions/node/v24.20.0/bin:$PATH \
 本轮平台 JAR 为 30,809,614 字节，SHA-256 `794bd7712eb380b3df4d2dbeecae4aa98403a2c7d9cdfef0415d9225a8612224`，仍不是用户工程构建结果。结束后过滤进程清单没有 Java/Git；没有 kill 或删除证据。本轮凭据值扫描、31 个本地文档链接及 30 项任务/10 个检查点、diff 格式检查通过。
 
 按调试流程对无法按需复现的风险保留条件和固定分类监测，并在完整验证通过后恢复开发：只勾选 EX10d3a；EX10d3b1 原子领取、b2 封存结算、c 整体 worker 以及 EX11 仍待实施。不把本次通过写成旧故障修复，不升级 JDK、不放宽停止条件、不增加重试；旧未决审计仍只读保留，默认执行器仍关闭。
+
+结束后的只读审计确认新 schema 的未决 Agent、关联 pending/活动源码租约及未决构建均为 0；测试角色仍没有数据库 CREATE 权限。`pa32b` 原未知执行仍为 ACTIVE/pending、缺停止证明、基线不变；上一轮源码读取失败项目仍为 NEEDS_RECONCILIATION，当前版本不变且无 pending 操作。未对这些记录作任何修复性写入。
+
+## EX10d3b1 · 原子领取与容量锁分离
+
+遵循原每片不超过 5 个主要文件的约束，把 EX10d3b 拆为 b1 领取、b2 封存结算。本片 3 个主要文件：`ExecutionBuildClaim`、`ExecutionBuildRepository`、`ExecutionBuildClaimIT`；无迁移、依赖、新公开入口或进程启动。内部领取按项目行 → 构建行 → 容量锁，短事务检查授权、原 owner、状态/取消、当前及原任务容量和最终排队期限，仅提交 PREPARING 与事件，不声称应用构建成功。
+
+原准入容量锁与 Agent 协调锁同为 `718395202`，提前修复为独立的 `718395203` 并供领取复用；旧 Agent 锁不变，EX12 仍负责完整协调器接线共存。容量统计包含未知执行和缩容前的高槽位，不凭槽 1 空闲就认为可以运行。队列期限按 PG 实时时间在 UPDATE 时验证；取消/超时/容量拒绝不改变任务，不私自补终态。默认关闭，不改私有 env、工具版本、服务器或旧审计。
+
+23:06:01，首测因缺领取类和容量锁接口编译失败（23.730 秒，退出码 1）。实现后 **23:08:10，10 项真实 PG 领取测试 + 8 项 Git 诊断单测通过**，零失败/错误/跳过，BUILD SUCCESS，1:19，退出码 0。覆盖双连接抢最后槽位、同任务重复领取、权限/归档/转让、原容量绑定、缩容及待核对容量保留、取消、事务边界、等待期间超时、故障回滚和锁编号共存。测试仅对本例从未执行工具的记录做显式终态收尾，记录/事件保留。
+
+23:14:48，临时把锁改回旧 `718395202` 的变异按预期失败：共存测试在准入时收到 PostgreSQL `55P03` 锁等待超时（单项错误，55.873 秒含编译，退出码 1），自身测试连接回滚后释放自身事务锁。随后恢复 `718395203`，运行全部单元测试及领取/原准入/约束/源码读取/Agent 调度相关集成回归。此变异证明了锁编号冲突的修复，**不是先前进程枚举或 Git 收尾偶发故障的根因证据**。
+
+### 相关回归失败与原生枚举定位
+
+2026-10-21 23:22:43（Asia/Shanghai），在上述已获准 Node/schema 前缀下执行：
+
+```sh
+./mvnw -B \
+  -Dit.test=ExecutionBuildClaimIT,ExecutionAdmissionIT,ExecutionBuildSchemaIT,ProjectAgentCoordinatorIT,ProjectSourceQueryIT verify
+```
+
+**401 单元通过；33 定向集成中 32 通过、1 失败、0 错误/跳过，BUILD FAILURE，4:47，退出码 1**。按本次开始时间独立汇总 89 份 Surefire / 5 份 Failsafe 新报告，18/92 份旧报告不计入。领取 10 项、原准入 8 项、数据库约束 2 项、源码查询 3 项全部通过；协调器 10 项中 1 项失败。报告另存忽略的 0700 目录 `.local/ex10-claim-native-failed.zkdnSe`，未覆盖 22:57 完整通过或其他失败证据；不将历史全绿当作最新代码已全绿。
+
+失败为 `ProjectAgentCoordinatorIT.unexpectedAdapterFailureCannotStrandAQueuedTaskOrSilentlyRetryIt` 第 199 行：适配器调用预期 1、实际 0。23:21:50.782 的真实生产路径事件 `source_snapshot_failed` 为 `TREE / GIT_PROCESS_UNSETTLED`，新增字段首次将该故障定位为 `gitStopStage=ENUMERATE`、`gitStopKind=NATIVE_ENUMERATION`、`gitStopInterrupted=false`，283 ms。请求 `3fe3ef87-c50b-400b-b999-0216f58b2486`、项目 `b7feb5fe-2625-4b35-b323-bdb6dbfef7ed`、源码版 `ac80827f-6f4c-469a-9ac6-08295e18878b`。固定分类只在前 16 个栈帧识别到 `java.lang.ProcessHandleImpl.getProcessPids0` native 调用时成立；本例不是注入枚举异常的诊断测试。源码准备提前失败，因此没有进入该测试预期的适配器；不改其断言、等待上限或自动重试。
+
+只读审计确认任务 `777da2c2-cf09-49c0-8e78-4453c4e4c1ce` 为 `FAILED / SOURCE_STORAGE_UNAVAILABLE`，未分配执行 ID；自身源码租约已 RELEASED、pending=false，源码基线不变，项目保留 `NEEDS_RECONCILIATION`。新 schema 的 Agent 未决、关联 pending/活动编辑租约及构建未决均为 0；这不表示失败源码项目已恢复。`pa32b` 原未知执行仍 ACTIVE/pending、停止证明缺失，先前源码失败项目也保留待核对状态；测试角色仍无数据库 CREATE 权限。结束后获准的只读进程清单未见 Java/Git/claude.exe，没有 kill、删除或强制恢复记录。
+
+当前机器仍用 Oracle 17.0.5。核对官方 [Liberica 17.0.14+10 PSU 发布记录](https://download.bell-sw.com/documentation/liberica-jdk/17.0.14%2B10-psu/release-notes-17.0.14%2B10-psu-liberica-jdk.pdf)第 26 页，列出 JDK-8339487：针对 `ProcessHandleImpl` 的 `sysctl` 调用在 ENOMEM 时重试并改善异常消息。当前 [OpenJDK 17 macOS 原生实现](https://github.com/openjdk/jdk17u/blob/master/src/java.base/macosx/native/libjava/ProcessHandleImpl_macosx.c)也可核对相关逻辑。这是有依据的排查方向，**现有事件未捕获 errno，尚不能认定为 ENOMEM 或保证更换补丁版即可解决**；更不能倒推所有历史观察故障为同一根因。
+
+按调试流程暂停新增功能并保存证据。下一步拟申请在项目忽略目录单独安装一份明确包含该修复的较新 JDK 17，使用命令级配置做同条件对照；不替换 Oracle 17.0.5、不改全局默认、日常私有 env 或服务器。工具安装/切换尚未获准，当前未执行。EX10d3b1、EX10、C-EX04、EX11 保持未完成，领取代码保留未提交工作区；前三个已验证小片分别本地提交为 `e9d1e2a`、`5d4958b`、`fa6d7db`，无合并、推送或部署。
+
+### 获准的项目隔离 JDK 对照
+
+用户随后回复“允许”，批准安装包含相关修复的独立 JDK 17 用于项目对照测试，原 Oracle 17.0.5、全局默认和服务器保持不变。2026-10-21 23:38，在本机 macOS 15.8.1 / x86_64 下载并解包 Liberica **17.0.14+10 PSU** 到忽略的私有目录 `.local/jdk17-comparison.LlvDQi/jdk-17.0.14.jdk`。按 [BellSoft 官方发现 API](https://bell-sw.com/pages/api/)核对唯一匹配的版本、平台、架构、包类型和校验值，使用官方 GitHub release 归档，不运行系统安装器、不写 SDKMAN 或 shell 配置。独立解包方式见[该版安装说明](https://docs.bell-sw.com/liberica-jdk/17.0.14b10/general/install-guide/)。
+
+安装包 `bellsoft-jdk17.0.14+10-macos-amd64.tar.gz` 为 **202,700,165 字节**；与官方元数据一致的 SHA-1 为 `801e44e9a8735cd79521b4940cd2caebf98ddaa0`，另记本地 SHA-256 `4cc0f3b7599abca5927ae86a0024b945a19a3c90f700efa56af28661f3bee464`。选择这个明确列有 JDK-8339487 的版本是为建立诊断基线；官方元数据标记该旧补丁 EOL，不将其推荐为长期生产升级版本。解包前检查全部 549 个条目的路径，单一根目录，无绝对路径或 `..` 越界。
+
+运行前确认全局 `java -version` 仍为 Oracle `17.0.5+9-LTS-191`，SDKMAN `current` 仍指向 `17.0.5-oracle`，没有其他 Java/Git/claude.exe 进程。命令级 `JAVA_HOME` 指定隔离目录后，Maven `-version` 显示 Java 17.0.14 / BellSoft / 该目录，Maven 仍是 3.9.11。源码、编译产物、测试断言/超时、Node 路径与已批准测试 schema 不变；没有清理数据或新建 schema。
+
+在 `backend` 目录运行与上一轮相同的 401 单元及 33 相关集成命令，只增加命令级 `JAVA_HOME`。结果另行记录，不以安装成功表示故障已修复。
+
+```sh
+env JAVA_HOME=/Users/wubingheng/atoms-demo/.local/jdk17-comparison.LlvDQi/jdk-17.0.14.jdk \
+  PATH=/Users/wubingheng/.nvm/versions/node/v24.20.0/bin:$PATH \
+  SPRING_DATASOURCE_URL='jdbc:postgresql://127.0.0.1:5432/atoms_demo_test?currentSchema=atoms_verify_20261021_ex10&connectTimeout=3&socketTimeout=5' \
+  ./mvnw -B \
+  -Dit.test=ExecutionBuildClaimIT,ExecutionAdmissionIT,ExecutionBuildSchemaIT,ProjectAgentCoordinatorIT,ProjectSourceQueryIT verify
+```
+
+**23:42:49，对照相关回归 401 单元 + 33 集成全部通过，0 失败/错误/跳过，BUILD SUCCESS，3:57，退出码 0**。按本次开始时间独立汇总 89/5 份新报告，18/92 份旧报告不加算。`ProjectAgentCoordinatorIT` 10 项通过（70.82 秒）；实际 Surefire 与 Failsafe XML 的 `java.version/java.vendor/java.home` 均确认隔离的 BellSoft 17.0.14，非只检查命令行显示。原生枚举错误本轮未复现，不据此宣称偶发根因已完全证实或原 Oracle 17.0.5 已修复。报告复制到忽略的 0700 目录 `.local/ex10-jdk17-focused-passed.lB9LSh`。
+
+随后在同一命令级 JDK/Node/schema 前缀下运行完整回归：
+
+```sh
+./mvnw -B -Pproject-execution-contract \
+  -Dexecution.test-config-directory=/Users/wubingheng/atoms-demo/.local/project-execution-acceptance.x5cvui verify
+```
+
+完整结果待结束后单独记录；尚不勾选 EX10d3b1，不将相关集成通过替代全量兼容验收。此次 profile 仍不启用真实 Agent CLI、模型或邮件调用，也不执行尚未实施的用户工程 npm/Maven 构建。
+
+**23:58:57，完整对照回归 401 单元 + 335 集成全部通过，0 失败/错误/跳过，BUILD SUCCESS，15:31，退出码 0**。按完整命令开始时间独立核对 89/94 份新 XML，排除 18/3 份旧报告；全部本轮报告的 Java 版本为 17.0.14。源码查询 3 项、原子领取 10 项、测试库传递 8 项、Agent 协调器 10 项（58.98 秒）及多轮编辑流程均通过。完整报告复制至忽略的 0700 目录 `.local/ex10-jdk17-full-passed.gE3KrZ`，相关回归及旧失败档案保留。
+
+平台 JAR 为 **30,813,197 字节**，SHA-256 `5109d051f1f41911177d1f9e38e81f252882280205a8becea22a81bbccfeeb38`；这仅是平台打包产物，不能替代 EX11 的真实用户工程构建证据。回归后全局 Java 仍为 Oracle `17.0.5+9-LTS-191`，SDKMAN `current` 仍指向 `17.0.5-oracle`。只读进程清单没有 Java/Git/claude.exe，无进程终止操作。
+
+回归后的只读 PG 审计确认新 schema 的 Agent 未决、关联 pending/活动编辑租约及构建未决均为 0，测试角色仍没有数据库 CREATE 权限。`pa32b` 原未知执行仍 ACTIVE/pending、缺停止证明且基线不变；两个旧源码失败项目保留 NEEDS_RECONCILIATION，任务 `777da2c2-cf09-49c0-8e78-4453c4e4c1ce` 仍 FAILED、无 execution ID、自身租约 RELEASED 且基线不变。未用本轮通过补发旧停止证明或恢复旧项目。
+
+按代码审查技能复核 b1 的正确性、结构、安全与性能：固定项目行 → 构建行 → 独立容量锁，原/当前容量取小值且计入未知及高槽位，所有 SQL 参数化，授权/归档/原所有者重新检查；事务外不发布可重放的领取成功，异常保留通用错误，未新增执行权限、公开端点、依赖或 I/O。领取测试中的双连接竞争和旧锁编号变异已有真实失败/通过证据，不重复无变化的变异测试。全量通过后只勾选 b1；b2 封存结算、c 整体 worker、EX10 整体、C-EX04 与 EX11 仍未完成。
+
+调试结论限定为：在获准的隔离 JDK 17 对照中，原场景和完整回归都未复现原生枚举错误，因此恢复后续开发；**尚无原 errno 或可按需复现的最小样本，不能保证已完全证明历史根因，也不能宣称原 17.0.5 已修复**。保留固定诊断，不修改停止判定、业务重试或超时来掩盖风险；隔离旧补丁不是长期生产版本升级承诺。没有改用户 OAuth 草稿、日常 env、服务器、模型或邮件配置，也没有合并、推送或部署。

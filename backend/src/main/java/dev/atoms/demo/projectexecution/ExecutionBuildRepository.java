@@ -39,10 +39,7 @@ class ExecutionBuildRepository {
     ExecutionBuild insert(UUID owner, UUID project, ExecutionBuild.Request request, String treeHash, ExecutionSettings.Configuration config) {
         if (!TransactionSynchronizationManager.isActualTransactionActive()) throw new IllegalStateException("Execution admission requires a transaction");
         requireIdle(project);
-        // This transaction-scoped lock serializes slot selection; unique indexes independently cap storage.
-        // https://www.postgresql.org/docs/17/explicit-locking.html#ADVISORY-LOCKS
-        jdbc.execute("SET LOCAL lock_timeout = '3s'");
-        jdbc.execute("SELECT pg_catalog.pg_advisory_xact_lock(718395202)");
+        lockCapacity();
         var slots = jdbc.queryForList("""
                 SELECT slot FROM generate_series(1,?) AS slot
                 WHERE (SELECT count(*) FROM execution_builds WHERE queue_slot IS NOT NULL) < ?
@@ -59,5 +56,15 @@ class ExecutionBuildRepository {
                 slots.get(0), config.queueCapacity(), config.maxConcurrentBuilds(), config.taskTimeout().toSeconds(), config.queueTimeout().toSeconds());
         // AFTER-trigger counters are visible on a fresh query, not the INSERT's RETURNING row.
         return get(project, id);
+    }
+
+    /** Project (and existing build) rows must be locked before capacity, never in the opposite order. */
+    void lockCapacity() {
+        if (!TransactionSynchronizationManager.isActualTransactionActive())
+            throw new IllegalStateException("Execution capacity requires a transaction");
+        // Agent admission/coordinator use 718395201/718395202; session and transaction locks share a namespace.
+        // https://www.postgresql.org/docs/17/explicit-locking.html#ADVISORY-LOCKS
+        jdbc.execute("SET LOCAL lock_timeout = '3s'");
+        jdbc.execute("SELECT pg_catalog.pg_advisory_xact_lock(718395203)");
     }
 }

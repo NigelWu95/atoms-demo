@@ -1,6 +1,6 @@
 # Spec: project-execution · 完整工程受控构建与本机进程
 
-状态：2026-10-21，用户已确认本规格及 §10 三项取舍，并确认[实施计划](tasks/project-execution/plan.md)与[任务清单](tasks/project-execution/todo.md)；EX01–09、C-EX03、EX10a–c 及 EX10d1–d2 已验证，Java 阶段已接持久日志，下一项 EX10d3 整体 worker 与封存成功接线。EX10 整体未完成，不是完整执行器已交付或已启用的声明。本地完整闭环的总体开发范围已获准，见 [Agent 规格 §10](SPEC-project-agent.md#10-2026-10-19-完整闭环实施授权)。
+状态：2026-10-21，用户已确认本规格及 §10 三项取舍，并确认[实施计划](tasks/project-execution/plan.md)与[任务清单](tasks/project-execution/todo.md)；EX01–09、C-EX03、EX10a–c、EX10d1–d2、EX10d3a 及 b1 原子领取已验证。原生进程枚举故障后，用户批准项目隔离 JDK 17 对照；23:58:57 使用 17.0.14 完整回归 401 单元 + 335 集成通过，旧 Oracle 17.0.5 与全局默认不变，偶发根因仍保留监测。下一步为 b2 封存成功结算及 c 整体 worker。EX10 整体未完成，不是完整执行器已交付或已启用的声明。本地完整闭环的总体开发范围已获准，见 [Agent 规格 §10](SPEC-project-agent.md#10-2026-10-19-完整闭环实施授权)。
 
 模块 ID 沿用[能力地图](FULL-PROJECT-CAPABILITY-MAP.md)的 `project-execution`，依赖 `project-source`，不反向依赖 Agent、交付或工作台。上游只读门面 PS21 已完成；当前网页仍走旧固定模板链路。
 
@@ -156,6 +156,12 @@ BuildView get(UUID owner, UUID project, UUID build);
 `submit` 必须在数据库事务外调用。先锁项目检查所有权/归档和幂等键，再在事务外读取准确版本的完整快照，最后重新授权并锁项目、分配等待槽位、原子保存意图/首条事件。不在持有项目锁时等待 Git。相同项目/键/版本返回原任务（包括终态），不同版本返回 `EXECUTION_IDEMPOTENCY_CONFLICT`，项目已有其他活动构建返回 `EXECUTION_PROJECT_BUSY`，队列满返回 `EXECUTION_QUEUE_FULL`。键最多 128 个 Java 字符，不允许空白键、控制字符或不完整的 Unicode 代理项；只保存 SHA-256，不保存原键。
 
 `get` 同样校验当前维护者、项目所有权及归档状态；视图只含任务/项目/来源 UUID、树摘要、状态、取消标记、稳定错误码、创建/完成时间和最后事件序号，不包含持久请求摘要、内部容量槽、路径或配置。配置及授权检查失败不能靠重放绕过。准入快照仅固定来源，不代表完成依赖批准、工具/应用库验证或可执行调度；后续 worker 仍需重新核对这些边界。
+
+内部 `ExecutionBuildClaim.claim(owner, project, build)` 只把 QUEUED 原子转为 PREPARING，不是公开接口或自动调度器。调用者不能带入现存事务；新建最长 5 秒的短事务，依次锁项目行、构建行和构建容量。当前维护者、所有权/归档及原构建 owner 必须一致；旧任务不会因项目转让而自动交给新所有者执行。重复领取返回 `EXECUTION_BUILD_NOT_QUEUED`，不重放一个可重复启动的成功结果；取消、过期、容量不足分别返回固定码，并保持队列及事件不变，终态清理留给调度器。
+
+可用 worker 容量取当前配置与原任务容量的较小值，全部仍占 worker 槽的记录均计入，包括待核对任务及缩容前占用的高编号槽。领取、归还队列槽与阶段事件在同一事务中提交；阶段仍没有 execution pending。排队时限以数据库 `clock_timestamp()` 在最终 UPDATE 时核对，不因等待锁而延长，也不使用固定于事务起点的 `now()` 判断剩余时间。[PostgreSQL 17 时间语义](https://www.postgresql.org/docs/17/functions-datetime.html#FUNCTIONS-DATETIME-CURRENT)
+
+构建准入/领取共用事务锁 `718395203`；Agent 的准入 `718395201` 与协调会话 `718395202` 不变。相同编号的会话锁与事务锁会互相阻塞，因此编号分开，并由真实双连接共存测试验证。[PostgreSQL 17 advisory locks](https://www.postgresql.org/docs/17/explicit-locking.html#ADVISORY-LOCKS) 这只是容量协调，不授予文件或进程执行权限，也不是完整协调器共存验收。worker 仍须持有执行根/协调权、重新检查来源和依赖/工具/数据库，外部执行前再通过 Journal 提交执行意图；提交结果未知不能盲目重新领取，恢复留给 EX13。
 
 取消构建、启动/停止/查询运行、列表/事件及交付身份仍按 EX12–24 实施。状态迁移事件包含状态、取消标记和平台错误码，任务 UUID 是关联标识；不提供任意原始输出写入 API。可按任务查询是否入队、当前阶段及拒绝/失败码，不用源码或凭据作为诊断。
 
