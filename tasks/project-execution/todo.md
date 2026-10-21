@@ -130,7 +130,7 @@ U/I/REAL/ALL/COMPAT/DOC 的命令与权限条件见计划 §6。S = 1–2、M = 
 - 验收：干净报告/测试数量和退出码通过后才封存；前后源码/lock 不变，产物非空普通文件且不超过 256 MiB；清单绑定来源/工具/策略/检查/JAR 摘要，失败保留上一成功记录。
 - 验证：U(ExecutionPackagingTest) + I(ExecutionBuildWorkerIT)，篡改、硬链接、越界、跳过测试、来源改变及失败提交反例。
 - 主要文件：以上各片列出的 `E/` 实现与 `ET/` 测试，分别验证和提交；相较原五文件预估，独立拆出报告与封存测试，避免单类承载所有检查。
-- 待追查：旧 `ProjectAgentCoordinatorIT` 的取消后再次编辑场景曾出现一次 `SOURCE_STORAGE_UNAVAILABLE`，第二轮未复现，根因未确定。后续先单列有界诊断小片收集源码读取失败类别，不把重跑通过当作修复，也不通过延长等待、跳过检查或自动重试掩盖。
+- 待追查：旧 `ProjectAgentCoordinatorIT` 的取消后再次编辑场景曾出现一次 `SOURCE_STORAGE_UNAVAILABLE`，后续未复现，根因未确定。有界诊断小片已补 `source_snapshot_failed` 的阶段及固定错误分类，383 单元 + 309 集成通过；不把重跑通过当作修复，也不通过延长等待、跳过检查或自动重试掩盖。
 
 ## EX11 · 第一次真实种子工程构建
 

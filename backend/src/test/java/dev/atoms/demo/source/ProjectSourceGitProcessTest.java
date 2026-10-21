@@ -32,6 +32,16 @@ class ProjectSourceGitProcessTest {
         assertThat(new String(git.run(root, List.of("--version"), new byte[0], 1024), StandardCharsets.UTF_8)).isEqualTo("::/dev/null");
     }
 
+    @Test void emptyInputStillSucceedsWhenChildExitsBeforeIoWorkersStart() throws Exception {
+        // Widen the real scheduling window deterministically; never delay production or retry a failure.
+        var git = new SourceGitProcess(executable("#!/bin/sh\nprintf 'completed'\n"), Duration.ofSeconds(5), handle -> {
+            try { handle.onExit().get(5, java.util.concurrent.TimeUnit.SECONDS); }
+            catch (Exception error) { throw new AssertionError("Fixture did not exit", error); }
+        });
+        assertThat(new String(git.run(temporary.toRealPath(), List.of("--version"), new byte[0], 1024),
+                StandardCharsets.UTF_8)).isEqualTo("completed");
+    }
+
     @Test void capsOutputWithoutReturningPartialSuccessfulData() throws Exception {
         var git = new SourceGitProcess(executable("#!/bin/sh\nprintf '1234567890'\n"));
         assertThatThrownBy(() -> git.run(temporary.toRealPath(), List.of("--version"), new byte[0], 8))

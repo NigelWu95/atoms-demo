@@ -58,8 +58,19 @@ class ProjectSourceQueryIT extends SourceIntegrationSupport {
                 .withProperty("atoms.source.work-root", root.resolve("work").toString())
                 .withProperty("atoms.source.git", "/usr/bin/git"));
         service = new ProjectSourceService(projects, repository, transactions, environment);
-        assertThatThrownBy(() -> query().snapshot(owner, project, operation.resultVersionId()))
-                .isInstanceOfSatisfying(ApiException.class, error -> assertThat(error.code()).isEqualTo("SOURCE_STORAGE_UNAVAILABLE"));
+        var logger = (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger(SourceQuery.class);
+        var logs = new ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent>();
+        logs.start(); logger.addAppender(logs);
+        try {
+            assertThatThrownBy(() -> query().snapshot(owner, project, operation.resultVersionId()))
+                    .isInstanceOfSatisfying(ApiException.class, error -> assertThat(error.code()).isEqualTo("SOURCE_STORAGE_UNAVAILABLE"));
+            assertThat(logs.list).singleElement().satisfies(event -> {
+                assertThat(event.getFormattedMessage()).contains("source_snapshot_failed", project.toString(),
+                        operation.resultVersionId().toString(), "ENVIRONMENT", "ENVIRONMENT_UNAVAILABLE")
+                        .doesNotContain(temporary.toString());
+                assertThat(event.getThrowableProxy()).isNull();
+            });
+        } finally { logger.detachAppender(logs); logs.stop(); }
         assertThat(Files.exists(temporary.resolve("source"))).isFalse();
         assertThat(repository.state(project).status()).isEqualTo("NEEDS_RECONCILIATION");
         assertThat(repository.state(project).versionId()).isEqualTo(operation.resultVersionId());
