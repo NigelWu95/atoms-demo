@@ -59,9 +59,12 @@ final class SourceQuery {
             throw new ApiException(408, "SOURCE_OPERATION_TIMEOUT", "源码操作已超时，请检查任务状态。");
         } catch (IOException | IllegalArgumentException | ApiException error) {
             // One bounded event per failed read; never log exceptions, source bytes, paths or raw Git output.
-            LOG.warn("{\"event\":\"source_snapshot_failed\",\"entryPoint\":\"source_snapshot\",\"requestId\":\"{}\",\"projectId\":\"{}\",\"sourceVersionId\":\"{}\",\"stage\":\"{}\",\"failureKind\":\"{}\",\"durationMs\":{}}",
+            var stop = error instanceof SourceGitProcess.GitFailure failure
+                    ? failure.stopDetail() : SourceGitProcess.StopDetail.NONE;
+            LOG.warn("{\"event\":\"source_snapshot_failed\",\"entryPoint\":\"source_snapshot\",\"requestId\":\"{}\",\"projectId\":\"{}\",\"sourceVersionId\":\"{}\",\"stage\":\"{}\",\"failureKind\":\"{}\",\"durationMs\":{},\"gitStopStage\":\"{}\",\"gitStopKind\":\"{}\",\"gitStopInterrupted\":{}}",
                     UUID.randomUUID(), project, versionId, stage, failureKind(error),
-                    java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started));
+                    java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started),
+                    stop.stage(), stop.kind(), stop.interrupted());
             service.storageUnavailable(owner, project);
             throw ProjectSourceEnvironment.unavailable();
         }

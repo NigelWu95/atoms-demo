@@ -113,32 +113,70 @@ final class SourceGitProcess {
 
     static void stop(Process process, java.util.function.Function<Process, List<ProcessHandle>> descendants) throws IOException {
         boolean interrupted = Thread.interrupted();
+        StopDetail detail = null;
+        StopStage stage = StopStage.ENUMERATE;
         try {
             // Only handles observed beneath this live owned process; never scan/kill by cached PID or name.
             List<ProcessHandle> children = List.of();
-            boolean uncertain = false;
             try { children = descendants.apply(process); }
-            catch (RuntimeException error) { uncertain = true; }
+            catch (RuntimeException error) { detail = first(detail, stage, error, interrupted); }
+            stage = StopStage.CHILD_STOP;
             for (var child : children) {
                 try { if (child.isAlive()) child.destroyForcibly(); }
-                catch (RuntimeException error) { uncertain = true; }
+                catch (RuntimeException error) { detail = first(detail, stage, error, interrupted); }
             }
+            stage = StopStage.PARENT_STOP;
             try { if (process.isAlive()) process.destroyForcibly(); }
-            catch (RuntimeException error) { uncertain = true; }
-            if (!process.waitFor(5, TimeUnit.SECONDS)) throw failure("GIT_PROCESS_UNSETTLED");
+            catch (RuntimeException error) { detail = first(detail, stage, error, interrupted); }
+            stage = StopStage.PARENT_WAIT;
+            if (!process.waitFor(5, TimeUnit.SECONDS))
+                throw new GitFailure(first(detail, stage, new TimeoutException(), interrupted));
+            stage = StopStage.CHILD_WAIT;
             for (var child : children) {
                 try { child.onExit().get(5, TimeUnit.SECONDS); }
-                catch (ExecutionException | TimeoutException | RuntimeException error) { uncertain = true; }
+                catch (ExecutionException | TimeoutException | RuntimeException error) { detail = first(detail, stage, error, interrupted); }
             }
-            if (uncertain) throw failure("GIT_PROCESS_UNSETTLED");
+            if (detail != null) throw new GitFailure(detail);
         } catch (InterruptedException error) {
             interrupted = true;
-            throw failure("GIT_PROCESS_UNSETTLED");
+            throw new GitFailure(first(detail, stage, error, true));
         } finally { if (interrupted) Thread.currentThread().interrupt(); }
+    }
+
+    enum StopStage { NONE, ENUMERATE, CHILD_STOP, PARENT_STOP, PARENT_WAIT, CHILD_WAIT }
+    enum StopKind { NONE, ACCESS_DENIED, UNSUPPORTED, INVALID_STATE, NATIVE_ENUMERATION, RUNTIME_FAILURE, TIMEOUT, WAIT_FAILED, INTERRUPTED }
+    record StopDetail(StopStage stage, StopKind kind, boolean interrupted) {
+        static final StopDetail NONE = new StopDetail(StopStage.NONE, StopKind.NONE, false);
+    }
+
+    private static StopDetail first(StopDetail existing, StopStage stage, Exception error, boolean interrupted) {
+        // Only fixed categories survive; neither the exception nor arbitrary class/message/stack text is retained.
+        return existing != null ? existing : new StopDetail(stage, stopKind(error), interrupted || Thread.currentThread().isInterrupted());
+    }
+
+    private static StopKind stopKind(Exception error) {
+        if (error instanceof InterruptedException) return StopKind.INTERRUPTED;
+        if (error instanceof TimeoutException) return StopKind.TIMEOUT;
+        if (error instanceof ExecutionException) return StopKind.WAIT_FAILED;
+        if (error instanceof SecurityException) return StopKind.ACCESS_DENIED;
+        if (error instanceof UnsupportedOperationException) return StopKind.UNSUPPORTED;
+        if (error instanceof IllegalStateException) return StopKind.INVALID_STATE;
+        if (error.getClass() == RuntimeException.class) {
+            var frames = error.getStackTrace();
+            for (int i = 0; i < Math.min(16, frames.length); i++) {
+                var frame = frames[i];
+                if (frame.isNativeMethod() && frame.getClassName().equals("java.lang.ProcessHandleImpl")
+                        && frame.getMethodName().equals("getProcessPids0")) return StopKind.NATIVE_ENUMERATION;
+            }
+        }
+        return StopKind.RUNTIME_FAILURE;
     }
 
     private static GitFailure failure(String code) { return new GitFailure(code); }
     static final class GitFailure extends IOException {
-        GitFailure(String code) { super(code); }
+        private final StopDetail stopDetail;
+        GitFailure(String code) { super(code); stopDetail = StopDetail.NONE; }
+        private GitFailure(StopDetail detail) { super("GIT_PROCESS_UNSETTLED"); stopDetail = detail; }
+        StopDetail stopDetail() { return stopDetail; }
     }
 }
