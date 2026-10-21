@@ -55,6 +55,45 @@ class OwnedProcessTest {
                 });
     }
 
+    @Test void fourConcurrentOwnersCanObserveAndCancelTheirOwnProcessesWithoutDatabaseState() throws Exception {
+        var ready = new java.util.concurrent.CountDownLatch(4);
+        var cancelled = new java.util.concurrent.atomic.AtomicBoolean();
+        var workers = java.util.concurrent.Executors.newFixedThreadPool(4);
+        record Run(UUID task, UUID execution, java.util.concurrent.Future<OwnedProcess.Failure> result) {}
+        var runs = new java.util.ArrayList<Run>();
+        try {
+            for (int i = 0; i < 4; i++) {
+                var task = UUID.randomUUID(); var execution = UUID.randomUUID();
+                runs.add(new Run(task, execution, workers.submit(() -> {
+                    var observations = new java.util.concurrent.atomic.AtomicInteger();
+                    var owner = new OwnedProcess(process -> {
+                        var children = process.descendants().limit(129).toList();
+                        if (observations.incrementAndGet() == 10) ready.countDown();
+                        return children;
+                    });
+                    long deadline = System.nanoTime() + Duration.ofSeconds(15).toNanos();
+                    try {
+                        owner.runCommand(command("hang"), () -> Duration.ofNanos(deadline - System.nanoTime()),
+                                cancelled::get, task, execution, stream -> stream.readNBytes(128),
+                                stream -> { stream.readNBytes(128); return null; }, () -> {});
+                        throw new AssertionError("Controlled hanging process unexpectedly succeeded");
+                    } catch (OwnedProcess.Failure failure) { return failure; }
+                })));
+            }
+            assertThat(ready.await(10, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+            assertThat(runs).allSatisfy(run -> assertThat(run.result().isDone()).isFalse());
+        } finally {
+            cancelled.set(true); workers.shutdown();
+            assertThat(workers.awaitTermination(12, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+        }
+        for (var run : runs) {
+            var failure = run.result().get(1, java.util.concurrent.TimeUnit.SECONDS);
+            assertThat(failure.getMessage()).isEqualTo("EXECUTION_CANCELLED");
+            assertThat(failure.stopped()).isNotNull();
+            assertThat(failure.stopped().matches(run.task(), run.execution(), temporary)).isTrue();
+        }
+    }
+
     private ProcessBuilder command(String mode) {
         var builder = new ProcessBuilder(List.of(Path.of(System.getProperty("java.home"), "bin/java").toString(),
                 "-cp", Path.of("target/test-classes").toAbsolutePath().toString(), Fixture.class.getName(), mode))

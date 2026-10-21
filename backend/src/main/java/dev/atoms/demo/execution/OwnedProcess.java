@@ -22,6 +22,18 @@ public final class OwnedProcess {
         DESCENDANT_LIMIT, DESCENDANT_IDENTITY_UNAVAILABLE, DESCENDANT_ENUMERATION_FAILED,
         DESCENDANT_IDENTITY_CHANGED, PROCESS_EXIT_TIMEOUT, IO_DRAIN_TIMEOUT, CLEANUP_FAILED
     }
+    private enum ObservationStage { NONE, PROCESS_ENUMERATION, CHILD_OBSERVATION }
+    private enum ObservationFailure {
+        NONE, ACCESS_DENIED, UNSUPPORTED, IO_FAILURE, CONCURRENT_CHANGE, INVALID_STATE, RUNTIME_FAILURE;
+        static ObservationFailure classify(RuntimeException error) {
+            if (error instanceof SecurityException) return ACCESS_DENIED;
+            if (error instanceof UnsupportedOperationException) return UNSUPPORTED;
+            if (error instanceof java.io.UncheckedIOException) return IO_FAILURE;
+            if (error instanceof java.util.ConcurrentModificationException) return CONCURRENT_CHANGE;
+            if (error instanceof IllegalStateException) return INVALID_STATE;
+            return RUNTIME_FAILURE;
+        }
+    }
     private static final Set<String> STREAM_FAILURES = Set.of("AGENT_PROTOCOL_INVALID", "AGENT_CLI_UNSUPPORTED",
             "AGENT_TOOL_FAILED", "AGENT_TOOL_PATH_REJECTED", "AGENT_OUTPUT_LIMIT", "AGENT_MODEL_INCOMPLETE");
     private static final Set<String> PREFLIGHT_FAILURES = Set.of("AGENT_CANCELLED", "AGENT_TIMEOUT",
@@ -160,8 +172,8 @@ public final class OwnedProcess {
             if (interrupted) Thread.currentThread().interrupt();
         }
         if (!settled) {
-            LOG.warn("{\"event\":\"owned_process_unsettled\",\"entryPoint\":\"owned_process\",\"requestId\":\"{}\",\"executionId\":\"{}\",\"reason\":\"{}\"}",
-                    task, execution, owner.reason);
+            LOG.warn("{\"event\":\"owned_process_unsettled\",\"entryPoint\":\"owned_process\",\"requestId\":\"{}\",\"executionId\":\"{}\",\"reason\":\"{}\",\"observationStage\":\"{}\",\"failureKind\":\"{}\",\"observationInterrupted\":{}}",
+                    task, execution, owner.reason, owner.observationStage, owner.observationFailure, owner.observationInterrupted);
             throw new Failure(policy.code("PROCESS_UNSETTLED"), null);
         }
         var stopped = new Stopped(task, execution, builder.directory().toPath());
@@ -205,19 +217,35 @@ public final class OwnedProcess {
         private final Map<ProcessHandle, java.time.Instant> children = new LinkedHashMap<>();
         private boolean uncertain;
         private UnsettledReason reason;
+        private ObservationStage observationStage = ObservationStage.NONE;
+        private ObservationFailure observationFailure = ObservationFailure.NONE;
+        private boolean observationInterrupted;
         Owned(Process process, java.util.function.Function<Process, List<ProcessHandle>> descendants) {
             this.process = process; this.descendants = descendants;
         }
 
         void observe() {
+            ObservationStage stage = ObservationStage.PROCESS_ENUMERATION;
             try {
-                if (process.isAlive()) descendants.apply(process).forEach(child -> {
-                    if (children.size() >= 128 && !children.containsKey(child)) { uncertain(UnsettledReason.DESCENDANT_LIMIT); return; }
-                    var start = child.info().startInstant();
-                    if (start.isPresent()) children.putIfAbsent(child, start.get());
-                    else if (child.isAlive()) uncertain(UnsettledReason.DESCENDANT_IDENTITY_UNAVAILABLE);
-                });
-            } catch (RuntimeException error) { uncertain(UnsettledReason.DESCENDANT_ENUMERATION_FAILED); }
+                if (process.isAlive()) {
+                    var observed = descendants.apply(process);
+                    stage = ObservationStage.CHILD_OBSERVATION;
+                    for (var child : observed) {
+                        if (children.size() >= 128 && !children.containsKey(child)) { uncertain(UnsettledReason.DESCENDANT_LIMIT); continue; }
+                        var start = child.info().startInstant();
+                        if (start.isPresent()) children.putIfAbsent(child, start.get());
+                        else if (child.isAlive()) uncertain(UnsettledReason.DESCENDANT_IDENTITY_UNAVAILABLE);
+                    }
+                }
+            } catch (RuntimeException error) {
+                // Preserve the first failure, without retaining exception text, classes or process info.
+                if (reason == null) {
+                    observationStage = stage;
+                    observationFailure = ObservationFailure.classify(error);
+                    observationInterrupted = Thread.currentThread().isInterrupted();
+                }
+                uncertain(UnsettledReason.DESCENDANT_ENUMERATION_FAILED);
+            }
         }
         private void uncertain(UnsettledReason cause) { uncertain = true; failed(cause); }
         private boolean failed(UnsettledReason cause) { if (reason == null) reason = cause; return false; }
