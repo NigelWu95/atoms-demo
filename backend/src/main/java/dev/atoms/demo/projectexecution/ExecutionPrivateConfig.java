@@ -76,6 +76,18 @@ final class ExecutionPrivateConfig {
     String marker() { return "atoms-project-execution:test:" + bindingId; }
     String jdbcUrl() { return values.getProperty("jdbcUrl").split("\\?", 2)[0]; }
 
+    /** Only the bound launch adapter calls this; never return a credential map or add JVM -D options. */
+    void applyTestEnvironment(ProcessBuilder builder) throws IOException {
+        verify();
+        // Spring Boot 3.5 placeholders resolve environment values; Surefire inherits the Maven environment.
+        // https://docs.spring.io/spring-boot/3.5/reference/features/external-config.html
+        // https://maven.apache.org/surefire-archives/surefire-3.5.6/maven-surefire-plugin/test-mojo.html#excludedEnvironmentVariables
+        builder.environment().put("APP_DB_URL", values.getProperty("jdbcUrl"));
+        builder.environment().put("APP_DB_USERNAME", role());
+        builder.environment().put("APP_DB_PASSWORD", values.getProperty("password"));
+        builder.environment().put("APP_PORT", "0");
+    }
+
     /** Fresh explicit properties only; the URL cannot override these with operator-supplied parameters. */
     Properties inspectionProperties(int seconds) throws IOException {
         verify();

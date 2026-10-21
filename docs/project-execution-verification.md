@@ -555,3 +555,97 @@ EX10c 按增量实现、TDD 与安全审查完成并记录边界；EX10d、EX10 
 平台 JAR **30,798,466 字节**，SHA-256 `713f03e4f94b4ced25a2e8f0f39c5f082a307e1ed3df35c5d190b5e57db7e741`；`ExecutionBuildJournal` 与 3 个嵌套记录的包内 class 字节和本轮编译输出一致。该包仍是平台包，不是用户工程真实构建结果。只读审计确认 `pa32b` Agent 未决/待停止/活动源码租约为 0、测试角色无创建 schema 权限；旧两份未决审计及基线不变。过滤后的进程清单未见 Java/claude.exe，未执行 kill 或删除历史证据。
 
 本片按增量实现、TDD、事件观测和安全/质量审查完成；只勾选 EX10d2，EX10/EX10d/C-EX04 和 EX11 均未完成。下一步接整体 worker、专用测试库私有配置与封存成功事务。源码诊断片是独立提交 `9eab1d3`，不把它当成偶发异常修复。默认开关、私有 env、个人工具、服务器和 OAuth 草稿均未改；未推送、合并、部署、调用真实模型或邮件。
+
+## EX10d3a · 专用测试库传递到 Java 阶段
+
+核对 EX10d3 后，将缺少的测试库传递、构建领取/封存结算和整体 worker 拆为 a/b/c，沿用每片最多 5 个主要文件的既定约束，不扩大产品或环境权限。本片只改 4 个执行模块类，新增 `ExecutionDatabaseLaunchIT`；无数据库迁移、依赖升级或公开接口。
+
+注册表在实际只读校验后签发不可自行构造的一次性句柄，绑定项目/构建/执行/backend cwd。实际子进程启动前再次校验原私有文件及实际 DB/角色身份与用途/权限；密码只进入本次 builder 的四项 `APP_*` 环境，原 Invocation 无凭据且保持不变，未写入源码、配置副本、argv 或 JVM 系统属性。前端仍走原无测试库入口。生产 `ExecutionJava` 构造器要求注册表和项目；测试 Runner 缝隙不作为生产无库兜底。
+
+测试使用真实专用 PostgreSQL 的只读查询、实际父子 JVM 和 Spring `StandardEnvironment` 占位符解析，不执行 npm/Maven 用户工程构建，不执行应用迁移或数据写入。进程可读取传给自己的凭据，其他同 UID 代码也不受本机制隔离；最后一次校验不锁住管理员后续改库行为。若 Java 意图提交后发放授权失败、尚未进入进程拥有者，则按原保守约定没有停止证明、保留待核对状态；worker 还需在阶段前检查绑定，不能把本片当作完整结算或调度实现。
+
+14:52:30 首次 RED 同时暴露新增测试中局部变量 `java` 遮蔽包名的编译笔误；修正后 14:53:51 仅因缺少 `authorizeLaunch` 接口失败。实现后 14:56:02 首 2 项真实 PG/父子进程测试通过（35.595 秒含编译）；14:58:57 新增 7 项及原数据库/执行器/Java 阶段共 **31 项通过**，零失败/错误/跳过（1:06）。覆盖 A/B 凭据分离、重放/错 build/execution/cwd、配置内容/文件/权限/硬链接变化、伪装业务库、错误绑定/密码、取消/超时、事务边界和生产入口拒绝未登记项目。
+
+15:00:30 临时移除进程启动前 `database.verify`，配置漂移反例按预期失败（“Expecting code to raise a throwable”，30.541 秒含编译）；随后恢复校验。补同一授权并发争用测试，再启动完整后端回归；完整结果在结束后补录，不将历史报告或默认排除测试算作通过。
+
+### EX10d3a 完整回归失败与保留现场
+
+2026-10-21 本次完整命令仍为上文 Node/schema/私有配置前缀下的 `project-execution-contract verify`。按 15:01 后的新报告独立汇总：87 份 Surefire 共 **383 项通过**，93 份 Failsafe 共 **325 项中 319 通过、6 失败，0 错误/跳过**。最后集成报告于 15:27:12 写入，Failsafe summary 为 `completed=325, failures=6, result=255, timeout=false`。恢复工作时原命令会话已不可读取，因此不补造 Maven 控制台最终退出码或精确总耗时。18/3 份旧报告不计入本轮；新增 `ExecutionDatabaseLaunchIT` 8 项通过，不能以局部通过替代完整通过。
+
+6 项失败均在旧 `ProjectAgentCoordinatorIT`：默认四槽位、单槽位、三槽位、关闭、单调度者和同项目串行编辑。逐个 testcase 对照日志确认，15:19:42 的停止属于主动释放锁的 `lostDispatchOwnershipStopsTheCurrentProcess`，该项通过；它不是随后故障的起点。四槽位用例中，任务 `2f263256-a499-4a61-ab1b-ae53849434e1` / 执行 `9c4ee2c1-d012-4907-95a6-3bff361dd015` 于 15:20:16 记录 `DESCENDANT_ENUMERATION_FAILED`，随后调度器保留未知执行与协调租约；后续用例拿不到协调权。这只定位到了观察失败及连锁阻断，原日志没有底层类别，尚不能归因于权限、JDK、线程中断或具体竞态，也不是此前源码读取异常的修复证据。
+
+只读 PG 审计确认 `atoms_verify_20261019_pa32b` 中该任务为 `NEEDS_RECONCILIATION / AGENT_PROCESS_UNSETTLED`，源码租约仍 ACTIVE、`execution_pending=true`、停止证明缺失、源码基线未改变；其余五个未启动任务已由原测试收尾为 FAILED 且释放各自租约。审计时该数据库没有对应的活动 advisory lock，Execution 模块未决/待停止记录均为 0；进程清单未见遗留 Java/claude.exe。连接或进程后来消失不能补发原拥有者的停止证明，因此不清记录、不伪造证明、不重放此任务。
+
+完整失败报告已复制至忽略的私有目录 `.local/ex10d3a-failed-regression.KD4BRu`（目录 0700），后续定向报告不覆盖这份证据。既有 `atoms`/`pa32` 审计也不修改。该 schema 不能再作为干净的协调器回归环境；新的隔离 schema 需额外环境授权，尚未创建。EX10d3a、EX10 整体及 EX11 保持未完成，不继续叠加 worker 功能，不提交为验收完成或推送/部署。
+
+### 观察失败诊断小片（未声称修复原故障）
+
+依据调试与可观测性流程，先补足两个问题：异常发生在进程枚举还是子进程观察？首次异常属于哪个固定类别、当时线程是否已中断？仅修改 `OwnedProcess` 并新增 `OwnedProcessDiagnosticsTest`；不改数据库、任务恢复、停止证明发行、重试或超时规则。既有单条 `owned_process_unsettled` 增加固定 `observationStage`、固定 `failureKind` 及布尔 `observationInterrupted`，保留第一次原因，不让收尾时的另一个错误覆盖。非观察错误显示 NONE，不从日志猜测缺失的历史类别。异常消息、动态类名、堆栈、ProcessHandle.Info、argv、路径和凭据均不输出。
+
+21:12:26，8 项新诊断测试因日志缺字段全部 RED（26.353 秒，退出码 1）。实现后 21:13:47，`OwnedProcessDiagnosticsTest,OwnedProcessTest,AgentProcessInterruptionTest,AgentProcessTest,ExecutionProcessTest,ExecutionJavaTest` 共 **38 项通过**，零失败/错误/跳过（48.787 秒，退出码 0）。覆盖固定类别、未知类名/消息 canary、首次原因保留、子进程身份读取及中断标志恢复；均保留未知执行无停止证明的断言。测试使用受控本地 Java 子进程，无平台 PG 写入、模型或邮件调用。后续验证与阻断状态继续记录在此，不把故障注入结果当作原四并发故障已复现或已修复。
+
+21:15:03，临时让收尾异常覆盖首次诊断，6 项分类反例中 5 项按预期失败（33.551 秒，退出码 1）；未知类别本来就是 RUNTIME_FAILURE，保持通过。随后恢复首次原因条件。为隔离数据库状态影响，在既有 `OwnedProcessTest` 补充四个真实子进程并行观察、取消及绑定停止证明的最小场景；本诊断小片共 3 个主要文件，不计入 EX10d3a 的 5 个文件。没有放宽进程观察失败后的拒绝策略。
+
+只读检查确认拟申请的 `atoms_verify_20261021_ex10` 不存在，`atoms_test` 没有数据库 CREATE 权限；尚未创建或授权。后续如获准，只需管理员一次创建该测试 schema 并交给现有测试角色，不需扩大角色对数据库的创建权限。旧未决记录仍原样保留。
+
+21:18:58，恢复生产条件后执行以下**定向验证，不是完整集成回归**：
+
+```sh
+env PATH=/Users/wubingheng/.nvm/versions/node/v24.20.0/bin:$PATH \
+  ./mvnw -B -Pproject-execution-contract \
+  -Dexecution.test-config-directory=/Users/wubingheng/atoms-demo/.local/project-execution-acceptance.x5cvui \
+  -Dit.test=ExecutionDatabaseLaunchIT verify
+```
+
+**392 单元 + 8 定向集成通过，0 失败/错误/跳过，BUILD SUCCESS，2:24，退出码 0**。按 21:16 开始后的 mtime 独立核对 88/1 份新报告；18/95 份旧报告保留但不加算。四并发最小场景通过，没有复现完整协调器用例中的观察错误；不能据此归因或标修复。测试库传递 8 项再次通过，未运行平台 PG 集成、真实用户工程 Maven/npm 或模型。平台 JAR 30,804,478 字节，SHA-256 `a1fac16380cf2f158c2e1cd587d0c143031a5def151ec34b1756fd347650edef`，仅证明平台打包成功。
+
+收尾只读进程清单未见 Java/claude.exe；没有终止外部进程或补发停止证明。文档 19 个本地链接/锚点、30 项任务/10 个检查点及 diff 格式检查通过。诊断改动按正确性、结构、安全与性能自审：新增字段均为枚举/布尔，每次失败仍仅一条事件；首次原因不被覆盖，原未知执行不发停止证明；不增加异常原文、凭据、数据库访问、依赖或重试。已另记 Agent/构建共用 advisory lock 编号的问题供接线前处理，它不是本次故障的已证实根因。
+
+**完整验收仍阻断**：未删除旧审计、未创建新的 schema，EX10d3a 和整体执行链路不勾选、不作为已完成提交。以上本地工作留在当前分支待续，无合并、推送、服务器部署或私有 env 改动，用户 OAuth 草稿不纳入此次变更。
+
+### 新隔离 schema 授权与复测
+
+2026-10-21 用户回复“允许”，明确批准 `atoms_demo_test.atoms_verify_20261021_ex10`，供现有 `atoms_test` 角色使用。创建前再次检查本机数据库/管理员身份、名称不存在和测试角色无数据库 CREATE 权限；仅新建准确 schema、设置 owner 并撤销 PUBLIC 权限。事务内对 `atoms`、`pa32`、`pa32b` 三份指定未决任务及租约逐项比较行摘要，前后相同后才提交。没有删除、解锁、修改旧任务，也没有提升测试角色的数据库 CREATE 权限。现有业务库、四个应用验收库、私有 env 与远程服务器未改。
+
+同一当前编译产物，先以新 schema 的 `SPRING_DATASOURCE_URL` 执行 `./mvnw -B -Dit.test=ProjectAgentCoordinatorIT failsafe:integration-test failsafe:verify`。这是聚焦原失败组，保留原等待时限、断言及默认四槽位，未跳过用例或添加隐式重试；不调用模型。Flyway 已在新 schema 成功应用现有 24 份迁移（V000–V023）。结果在命令完成后记录，新环境不是故障修复证明。
+
+21:25:30，聚焦调度组 **10 项通过，0 失败/错误/跳过，BUILD SUCCESS，1:54，退出码 0**。原四并发观察异常未复现。只读核对新 schema 的 Agent 未决/执行 pending/活动编辑租约及构建未决均为 0，测试角色仍无数据库 CREATE 权限，`pa32b` 的旧未知执行和不变基线保留。报告单独保存在忽略的 0700 目录 `.local/ex10-new-schema-focused.TG3IhN`。接下来执行同新 schema 前缀的完整显式 `project-execution-contract verify`，不把局部通过与旧报告拼接为完整通过。
+
+### 新 schema 完整回归结果与源码读取异常
+
+2026-10-21 21:53:32（Asia/Shanghai），完整命令结束，**392 单元通过；325 集成中 324 通过、0 失败、1 错误、0 跳过，BUILD FAILURE，17:31，退出码 1**：
+
+```sh
+env PATH=/Users/wubingheng/.nvm/versions/node/v24.20.0/bin:$PATH \
+  SPRING_DATASOURCE_URL='jdbc:postgresql://127.0.0.1:5432/atoms_demo_test?currentSchema=atoms_verify_20261021_ex10&connectTimeout=3&socketTimeout=5' \
+  ./mvnw -B -Pproject-execution-contract \
+  -Dexecution.test-config-directory=/Users/wubingheng/atoms-demo/.local/project-execution-acceptance.x5cvui verify
+```
+
+按本次运行开始后的报告 mtime 独立汇总 88 份 Surefire / 93 份 Failsafe XML；18/3 份旧报告不加算。`ExecutionDatabaseLaunchIT` 8 项通过，`ProjectAgentCoordinatorIT` 10 项通过（58.59 秒），原 Agent 四并发异常未复现。整套报告在后续复测前复制至忽略目录 `.local/ex10-new-schema-full-failed.od7gzt`（0700）；与首次 `pa32b` 失败报告分别保留。
+
+唯一错误是 `ProjectSourceQueryIT.readsImmutableHistoryWithKeysetPaginationAndRechecksCurrentOwner` 第 47 行，在切换所有者后读取先前版本时发生。21:44:38.720 的固定诊断定位为 `TREE / GIT_PROCESS_UNSETTLED`，读取事件 `1b8daec9-0616-475b-bb87-d963398fe5e4`、项目 `e92b1db9-a442-456e-b99f-f747f8099078`、读取版本 `8d0e77b7-c33b-4109-8c2c-d3855f709c17`，471 ms。代码追踪到独立的 `SourceGitProcess.stop`，并非本轮增强的 `OwnedProcess`；该旧 Git 路径仍把枚举、终止、等待及中断的不确定性合为同一错误，现有证据不能断言具体分支，更不能把它与旧 Agent 故障当作已证实的同一根因。
+
+只读审计：新 schema 的未决 Agent、与 Agent 关联的 pending/活动源码租约及未决构建均为 0；测试角色仍无数据库 CREATE 权限。不要将源码故障注入夹具留下的全表租约数量误称为 Agent 遗留。本次读取失败项目保持 `NEEDS_RECONCILIATION`，当前版本 `3414ba18-be70-4cbb-b0f5-62383d4b4892`，没有 pending 源码操作；未手工恢复 READY、删除项目或修改审计。`pa32b` 原未知执行、租约及未改基线保持原状，旧三份证据均保留。测试结束后的过滤进程清单没有 Java/claude.exe；这不是对历史未知执行补发停止证明。
+
+本机 Oracle 17.0.5 的两个独立探针只验证进程枚举：沙箱内 2000 次均因原生调用异常失败，不能作为沙箱外测试根因；获准在沙箱外枚举 2000 次无异常。随后另获准运行有界进程变化探针，最多 20 秒、20000 次枚举、500 个自有 `/usr/bin/true` 子进程均退出，0 枚举错误；不访问 DB、不终止其他进程、不输出进程信息或原始异常文本。这些未复现结果不证明环境没有竞态。核对[OpenJDK 17 macOS 原生实现](https://github.com/openjdk/jdk17u/blob/master/src/java.base/macosx/native/libjava/ProcessHandleImpl_macosx.c)发现其当前实现包含 sysctl 的 ENOMEM 处理；这仅是后续排查线索，未据此认定当前异常原因，也未更换用户指定的 JDK 或修改系统配置。
+
+保留完整失败报告后，同一 Node/schema 前缀运行 `./mvnw -B -Dit.test=ProjectSourceQueryIT failsafe:integration-test failsafe:verify`，不重新编译、不修改原断言/超时、不自动重试。**22:02:06，原 3 项聚焦测试通过，0 失败/错误/跳过，13.492 秒，退出码 0**。该结果单列，不覆盖完整失败结论。
+
+本次按调试技能保留现场并缩小问题范围，按文档与质量技能保持验收门槛：EX10d3a、EX10、C-EX04、EX11 均未完成，未继续新增 worker、提交为通过版本、合并、推送或部署。下一步先补旧 Git 收尾的有界分类并定位偶发原因；不靠新建 schema、清除证据、放宽停止检查或隐式重试换取绿灯。默认开关、用户 OAuth 草稿、私有 env、真实模型/邮件与服务器均未改。
+
+本轮五份维护文档的 31 个本地链接/锚点、30 项连续任务/10 个检查点及 `git diff --check` 通过；任务 diff 与两个新增测试文件未包含已配置的私有凭据值。以上仅为文档/秘密检查，不抵消完整回归的 1 项错误；改动保留在本地工作区，未提交为已验收切片。
+
+### Git 收尾诊断补齐
+
+用户继续后，先处理旧 Git 路径的诊断缺口；本片为 `SourceGitProcess`、`SourceQuery` 和两份定向测试，共 4 个主要文件。保持原 `GIT_PROCESS_UNSETTLED`、停止判定、父/子进程等待时限和中断恢复，不增加重试或伪造停止证明。内部失败携带固定枚举/布尔：枚举、子进程终止、父进程终止、父进程等待或子进程等待，以及权限/不支持/状态/原生枚举/等待失败/超时/中断等类别，第一次不确定原因不被后续收尾覆盖。
+
+既有单条 `source_snapshot_failed` 增加 `gitStopStage/gitStopKind/gitStopInterrupted`，非收尾错误为 NONE/NONE/false。对原生枚举只识别固定 JDK native 栈帧并转换成枚举，不保存/输出原始栈、动态类名、异常消息、路径、源码或凭据；仍需真实故障事件才能判定历史失败是否来自该分支。源码读取公共错误及存储待核对行为保持不变。
+
+2026-10-21 22:25:44，收尾测试因缺 `stopDetail` 接口编译失败；22:27:30，实现后原 Git 进程 10 项 + 新诊断 8 项通过（51.864 秒，退出码 0）。22:31:21，日志传播测试 3 项中 2 项因仅有原 8 字段而非预期 11 字段失败（26.118 秒，退出码 1）；接线后 22:32:18 三组共 **21 项通过，零失败/错误/跳过**（28.960 秒，退出码 0）。22:39:44 临时取消首因保留的变异被反例捕获：预期 ENUMERATE，实际 PARENT_WAIT（26.428 秒，退出码 1）；随后恢复原条件并在同一获准 schema 启动完整 `project-execution-contract verify`。完整结果另行记录，不把故障注入当作原偶发错误复现或根因修复。
+
+**22:57:56，完整回归 401 单元 + 325 集成通过，零失败/错误/跳过，BUILD SUCCESS，17:56，退出码 0**。命令同上新 schema 的显式契约命令。按开始时间独立汇总本轮 89/93 份新报告，18/3 份历史报告不计入。测试库传递 8 项、源码读取 3 项、Agent 协调器 10 项（75.78 秒）均通过。报告保存于忽略的 0700 目录 `.local/ex10-git-full-passed.kqSVOu`，不覆盖既有失败证据。
+
+本轮平台 JAR 为 30,809,614 字节，SHA-256 `794bd7712eb380b3df4d2dbeecae4aa98403a2c7d9cdfef0415d9225a8612224`，仍不是用户工程构建结果。结束后过滤进程清单没有 Java/Git；没有 kill 或删除证据。本轮凭据值扫描、31 个本地文档链接及 30 项任务/10 个检查点、diff 格式检查通过。
+
+按调试流程对无法按需复现的风险保留条件和固定分类监测，并在完整验证通过后恢复开发：只勾选 EX10d3a；EX10d3b1 原子领取、b2 封存结算、c 整体 worker 以及 EX11 仍待实施。不把本次通过写成旧故障修复，不升级 JDK、不放宽停止条件、不增加重试；旧未决审计仍只读保留，默认执行器仍关闭。

@@ -25,10 +25,13 @@ final class ExecutionJava {
     private final ExecutionFrontend.Runner runner;
     private boolean used;
 
-    /** Caller supplies current authorization, source/policy and already-assembled resource revalidation. */
+    /** Production entry: fixed Maven stage always requires the project's private test database. */
     ExecutionJava(ExecutionPaths paths, ExecutionPaths.Task task, ExecutionToolchain tools,
-                  ExecutionToolHome home, OwnedProcess.Preflight inputs) {
-        this(paths, task, tools, home, inputs, new ExecutionProcess()::run);
+                  ExecutionToolHome home, OwnedProcess.Preflight inputs, ExecutionTestDatabase databases, UUID project) {
+        this(paths, task, tools, home, inputs, (invocation, deadline, cancelled, build, execution, preflight) ->
+                new ExecutionProcess().run(invocation, deadline, cancelled, build, execution, preflight,
+                        databases.authorizeLaunch(project, build, execution, paths.project(task).resolve("backend"), deadline)));
+        Objects.requireNonNull(databases); Objects.requireNonNull(project);
     }
     // Deterministic test seam only, never configurable by users or maintenance settings.
     ExecutionJava(ExecutionPaths paths, ExecutionPaths.Task task, ExecutionToolchain tools,

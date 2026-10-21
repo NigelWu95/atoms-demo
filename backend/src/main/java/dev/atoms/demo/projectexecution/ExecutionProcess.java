@@ -20,9 +20,21 @@ final class ExecutionProcess {
 
     OwnedProcess.Result<Output> run(Invocation invocation, Deadline deadline, BooleanSupplier cancelled,
                                     UUID task, UUID execution, OwnedProcess.Preflight preflight) throws IOException {
+        return run(invocation, deadline, cancelled, task, execution, preflight, null);
+    }
+
+    /** Only a registry-issued test binding can extend the fixed environment; no arbitrary map setter. */
+    OwnedProcess.Result<Output> run(Invocation invocation, Deadline deadline, BooleanSupplier cancelled,
+                                    UUID task, UUID execution, OwnedProcess.Preflight preflight,
+                                    ExecutionTestDatabase.Launch database) throws IOException {
+        var builder = invocation.builder();
+        if (database != null) database.attach(builder, task, execution);
         long[] stderrBytes = {0};
-        var result = owner.runCommand(invocation.builder(), deadline::remaining, cancelled, task, execution,
-                ExecutionProcess::drain, stream -> { stderrBytes[0] = drain(stream); return null; }, preflight);
+        var result = owner.runCommand(builder, deadline::remaining, cancelled, task, execution,
+                ExecutionProcess::drain, stream -> { stderrBytes[0] = drain(stream); return null; }, () -> {
+                    preflight.check();
+                    if (database != null) database.verify(deadline);
+                });
         // Both futures have completed before runCommand returns; no raw output escapes this adapter.
         return new OwnedProcess.Result<>(new Output(result.summary(), stderrBytes[0]), result.stopped());
     }

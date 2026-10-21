@@ -1,6 +1,6 @@
 # project-execution · 实施计划
 
-状态：2026-10-21，用户已确认本计划及 EX01–EX30 任务，连续实施；检查点报告证据，不逐小项请求开始。依据[规格](../../SPEC-project-execution.md)，规划基线 `1e3a13a`、计划提交 `ee5096a`，当前分支 `feature/standalone-engineering`。EX01–09、C-EX03、EX10a–c 及 EX10d1–d2 已完成，下一项 EX10d3 整体 worker 与封存成功接线，见[验证记录](../../docs/project-execution-verification.md)；本文不表示新模式已能构建、启动或在网页使用。
+状态：2026-10-21，用户已确认本计划及 EX01–EX30 任务，连续实施；检查点报告证据，不逐小项请求开始。依据[规格](../../SPEC-project-execution.md)，规划基线 `1e3a13a`、计划提交 `ee5096a`，当前分支 `feature/standalone-engineering`。EX01–09、C-EX03、EX10a–c 及 EX10d1–d2 已完成，EX10d3 按依赖拆为 a 专用测试库传递、b 持久领取/封存结算、c 整体 worker，每片最多 5 个主要文件，见[任务清单](todo.md)与[验证记录](../../docs/project-execution-verification.md)；本文不表示新模式已能构建、启动或在网页使用。
 
 ## 1. 交付范围与组织
 
@@ -88,7 +88,11 @@ lock-only 是独立任务：批准待解析的清单/来源 → 编辑租约副�
 
 ### 4.4 数据库与运行
 
-平台元数据测试仅使用已获准的 `atoms_demo_test` / `atoms_test` / `atoms_verify_20261019_pa32b`。保留另两份旧未决审计，不删除、不强制解锁、不复用来掩盖失败。
+平台元数据测试使用已获准的 `atoms_demo_test` / `atoms_test`；2026-10-21 起当前回归 schema 为 `atoms_verify_20261021_ex10`。`atoms`、`atoms_verify_20261019_pa32`、`atoms_verify_20261019_pa32b` 的三份旧未决审计全部保留，只读核对，不删除、不强制解锁、不复用来掩盖失败。
+
+2026-10-21 EX10d3a 完整回归也在 `pa32b` 留下一条进程观察失败的未知执行，详见[验证记录](../../docs/project-execution-verification.md#ex10d3a-完整回归失败与保留现场)。用户随后回复“允许”，批准在同一测试库新建准确目标 `atoms_verify_20261021_ex10`，已创建并归现有 `atoms_test` 所有、撤销 PUBLIC 权限；未扩大角色的数据库 CREATE 权限，三份旧审计摘要前后不变。新 schema 仅解决复测环境授权，不是原故障修复；局部无数据库测试及应用测试库的只读检查不表示完整回归通过。
+
+21:53:32 新 schema 完整回归为 392 单元通过、325 集成中 1 项源码读取错误；原协调器 10 项及测试库传递 8 项通过。22:02:06 源码读取组 3 项单独复测通过；随后补齐 Git 收尾诊断，22:57:56 完整 **401 单元 + 325 集成通过**，EX10d3a 验收并继续构建领取/结算。根因仍未确定，失败报告与相应项目待核对状态保留；不把未复现称为修复，不以另建 schema 或清理证据代替排查。
 
 生成应用另有维护者配置的业务 DB 与测试 DB。凭据保存在源码树之外的私有文件；PG 只存不含密码的绑定身份/摘要。连接时只读检查实际 DB、角色权限、用途及项目绑定，不信任文件名；拒绝超级用户、平台库、系统库、跨项目/测试运行混用。缓存、端口与运行目录也不能跨项目冒用。
 
@@ -136,7 +140,7 @@ env PATH=/Users/wubingheng/.nvm/versions/node/v24.20.0/bin:$PATH \
   ./mvnw -B -Dtest=ExecutionSettingsTest test
 
 env PATH=/Users/wubingheng/.nvm/versions/node/v24.20.0/bin:$PATH \
-  SPRING_DATASOURCE_URL='jdbc:postgresql://127.0.0.1:5432/atoms_demo_test?currentSchema=atoms_verify_20261019_pa32b&connectTimeout=3&socketTimeout=5' \
+  SPRING_DATASOURCE_URL='jdbc:postgresql://127.0.0.1:5432/atoms_demo_test?currentSchema=atoms_verify_20261021_ex10&connectTimeout=3&socketTimeout=5' \
   ./mvnw -B -Dit.test=ExecutionAdmissionIT verify
 ```
 
@@ -155,7 +159,7 @@ EX11 的拟新增命令，当前不得当作已可执行：
 
 ```sh
 env PATH=/Users/wubingheng/.nvm/versions/node/v24.20.0/bin:$PATH \
-  SPRING_DATASOURCE_URL='jdbc:postgresql://127.0.0.1:5432/atoms_demo_test?currentSchema=atoms_verify_20261019_pa32b&connectTimeout=3&socketTimeout=5' \
+  SPRING_DATASOURCE_URL='jdbc:postgresql://127.0.0.1:5432/atoms_demo_test?currentSchema=atoms_verify_20261021_ex10&connectTimeout=3&socketTimeout=5' \
   ./mvnw -B -Pproject-execution-contract -Dit.test=ExecutionSeedBuildContractIT verify
 ```
 

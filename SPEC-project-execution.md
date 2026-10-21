@@ -90,7 +90,11 @@ Java 阶段 `ExecutionJava` 固定执行 `MAVEN_PACKAGE` 的 `verify` 命令，�
 
 注册表拒绝重复数据库名、角色名或绑定 UUID，并额外拒绝调用者传入的实际平台/业务库及角色集合，不能只依赖默认库名黑名单。数据库连接在只读事务中执行固定的系统目录查询，核对实际 DB/会话角色、库与角色的 `atoms-project-execution:test:<bindingId>` 标记，以及非超级用户/无建库建角色等高权限/无角色成员关系、目标 schema 所有权及访问权限。拒绝数据库 PUBLIC 授权、其他非系统 schema 权限、模板库或备库；不执行 DDL、DML、Flyway 或清理。返回项目/绑定 UUID、实际 DB/角色 OID 和 relation 数量，不返回 URL、密码或配置摘要。
 
-这些检查防止误配置及越界复用，不是 OS 隔离或对生成代码的安全认证；管理员可改变数据库，返回值仅是本次检查证据，执行前仍须重新核对。当前完整注册表内的唯一性检查不替代 EX17 的持久业务库绑定，也没有提供向任意进程发放数据库凭据的公开接口。
+注册表可签发一次性内部 `Launch` 句柄，绑定项目、构建、执行 UUID 和 backend cwd；数值 `Verified` 不能自行换取凭据。`ExecutionJava` 的生产入口必须提供注册表与项目，不再有无测试库的默认执行路径；确定性 Runner 重载只供内部测试夹具。句柄使用受同步保护，只可附加到一个执行，错误目标或失败后也不能重放。附加时验证私有文件，实际启动前在事务外重新读取 DB 身份/用途/权限并比较原绑定与 DB/角色 OID；不把会因测试正常变化的 relation 数量当恒定身份。
+
+`ExecutionProcess` 只在清空继承环境后的新建 builder 上追加 `APP_DB_URL`、`APP_DB_USERNAME`、`APP_DB_PASSWORD` 和固定 `APP_PORT=0`，不修改原 Invocation，不提供任意环境字典接口，不将密码放入 argv、JVM 系统属性、源码或新配置副本。前端流程不领取句柄。测试库凭据仍可被 Maven、其测试 JVM 及其他后代读取；这不是进程间秘密隔离，生成代码及批准的工具仍须受信。Spring Boot 3.5 支持环境占位符，Surefire 3.5.6 默认继承 Maven 环境；实际种子工程构建仍须通过 EX11，不以受控 JVM 试验替代。[Spring 配置](https://docs.spring.io/spring-boot/3.5/reference/features/external-config.html)、[Surefire 环境继承](https://maven.apache.org/surefire-archives/surefire-3.5.6/maven-surefire-plugin/test-mojo.html#excludedEnvironmentVariables)
+
+这些检查防止误配置及越界复用，不是 OS 隔离或对生成代码的安全认证；管理员可在最后检查后改变数据库，生成测试也可主动覆盖 Spring 配置。worker 仍须检查权限、源码/依赖策略和工具，并在阶段前核对绑定。阶段意图提交后、进入进程拥有者之前的授权失败没有停止证明，沿用保守的待核对状态，不能据此直接释放容量。当前完整注册表内的唯一性检查不替代 EX17 的持久业务库绑定，也没有提供向任意进程发放数据库凭据的公开接口。
 
 - 首次启动允许在已确认归该项目所有的空业务库初始化迁移；测试不得连接该业务库。
 - 同一项目重启使用同一绑定，数据保留；停进程不删除数据库，绑定不自动分配给其他项目。
@@ -189,7 +193,7 @@ finish 核对执行 UUID、操作及真实停止证明，才清除 pending；结
 ```sh
 cd /Users/wubingheng/atoms-demo/backend
 env PATH=/Users/wubingheng/.nvm/versions/node/v24.20.0/bin:$PATH \
-  SPRING_DATASOURCE_URL='jdbc:postgresql://127.0.0.1:5432/atoms_demo_test?currentSchema=atoms_verify_20261019_pa32b&connectTimeout=3&socketTimeout=5' \
+  SPRING_DATASOURCE_URL='jdbc:postgresql://127.0.0.1:5432/atoms_demo_test?currentSchema=atoms_verify_20261021_ex10&connectTimeout=3&socketTimeout=5' \
   ./mvnw -B verify
 ```
 
