@@ -1,6 +1,6 @@
 # Spec: project-execution · 完整工程受控构建与本机进程
 
-状态：2026-10-21，用户已确认本规格及 §10 三项取舍，并确认[实施计划](tasks/project-execution/plan.md)与[任务清单](tasks/project-execution/todo.md)；EX01–09、C-EX03 及 EX10a–c 已验证，下一项 EX10d Java 阶段与 worker 接线。EX10 整体未完成，不是完整执行器已交付或已启用的声明。本地完整闭环的总体开发范围已获准，见 [Agent 规格 §10](SPEC-project-agent.md#10-2026-10-19-完整闭环实施授权)。
+状态：2026-10-21，用户已确认本规格及 §10 三项取舍，并确认[实施计划](tasks/project-execution/plan.md)与[任务清单](tasks/project-execution/todo.md)；EX01–09、C-EX03、EX10a–c 及 EX10d1 已验证，下一项 EX10d2 持久 Java 阶段日志，再接整体 worker。EX10 整体未完成，不是完整执行器已交付或已启用的声明。本地完整闭环的总体开发范围已获准，见 [Agent 规格 §10](SPEC-project-agent.md#10-2026-10-19-完整闭环实施授权)。
 
 模块 ID 沿用[能力地图](FULL-PROJECT-CAPABILITY-MAP.md)的 `project-execution`，依赖 `project-source`，不反向依赖 Agent、交付或工作台。上游只读门面 PS21 已完成；当前网页仍走旧固定模板链路。
 
@@ -63,6 +63,8 @@
 前端阶段是一次性的 `npm ci → vue-tsc → ESLint → Vitest → Vite`，复用受信命令目录而不调用工程的 npm scripts。开始前要求输出目录不存在，单测前新建私有空报告文件并固定其 inode；已有报告、缺失/空/替换/链接报告均拒绝，不通过删除旧结果重试。解析上限为 1 MiB、32 层、512 测试文件和 10000 用例/套件；必须存在实际 passed 用例，无 failed/pending/todo，报告汇总与实际断言数一致。只返回文件/套件/用例计数，报告原文只在任务私有副本内，不进事件、浏览器或模型。[Vitest 5.0.3 报告格式](https://github.com/vitest-dev/vitest/blob/v5.0.3/packages/vitest/src/node/reporters/json.ts)
 
 Java 报告校验器 `ExecutionJavaReport` 按固定 Surefire 3.5.6 XML 格式逐条核对：每份报告必须包含实际 testcase，汇总与条数一致，不允许失败、错误、跳过或重跑失败。解析最多 512 份、单份 1 MiB、合计 16 MiB、合计 10000 用例；只返回文件/用例计数。使用 JDK 自带 StAX，不加载 schema，禁用并拒绝 DTD/实体，不回传系统属性、用例名称或日志。调用者仍须先证明文件来自本次干净构建且进程已停止；解析成功本身不证明来源新鲜、测试质量或构建成功。[Surefire 3.5.6 reporter](https://github.com/apache/maven-surefire/blob/surefire-3.5.6/maven-surefire-common/src/main/java/org/apache/maven/plugin/surefire/report/StatelessXmlReporter.java)
+
+Java 阶段 `ExecutionJava` 固定执行 `MAVEN_PACKAGE` 的 `verify` 命令，不运行工程 wrapper 或 Shell，也不增加跳过测试参数。前端资源须先装配，再通过 `ExecutionJavaReports` 新建私有 `backend/target/surefire-reports`，已有 target 拒绝且保留。Surefire 会重建 XML 文件，因此固定 target 与报告目录身份，而不预置 XML inode；成功退出且停止证据匹配构建 UUID、执行 UUID 和 backend cwd 后才读取。目录只接受有界的 `TEST-*.xml` 和配套 `.txt`（受限 ASCII 文件名，最长 255 字符），拒绝链接、非普通文件、目录替换、非当前 UID、特殊权限或组/其他用户可写文件；最多 1024 个成员、每个 1 MiB、全部合计 16 MiB，XML 仍遵守上述更严的 512 份限制。读取前后复核成员与文件身份，所有阶段共用取消/期限，来源及工具在前后复验。内部日志接口先提交执行意图，完成失败不重试提交；该阶段返回检查计数，不自行封存或发布整体构建成功。目录与进程证据仍不构成同 UID 恶意代码隔离。
 
 `ExecutionPackaging` 将 `frontend/dist` 复制为任务目录下的 `resources/static`，不写 `backend/src/main/resources` 或任何源码文件；固定 Maven 命令把该目录作为 `full-project.resources` 传给已批准 profile。装配要求 `resources` 和 `backend/target` 尚不存在，不自动删除旧结果。首版拒绝源码中的 `backend/src/main/resources/static`，避免两套资源覆盖顺序不明确；前端资源须由本次 dist 提供。[Maven 资源目录](https://maven.apache.org/plugins/maven-resources-plugin/examples/resource-directory.html)
 

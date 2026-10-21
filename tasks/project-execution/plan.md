@@ -1,6 +1,6 @@
 # project-execution · 实施计划
 
-状态：2026-10-21，用户已确认本计划及 EX01–EX30 任务，连续实施；检查点报告证据，不逐小项请求开始。依据[规格](../../SPEC-project-execution.md)，规划基线 `1e3a13a`、计划提交 `ee5096a`，当前分支 `feature/standalone-engineering`。EX01–09、C-EX03 及 EX10a–c 已完成，下一项 EX10d Java 阶段与 worker 接线，见[验证记录](../../docs/project-execution-verification.md)；本文不表示新模式已能构建、启动或在网页使用。
+状态：2026-10-21，用户已确认本计划及 EX01–EX30 任务，连续实施；检查点报告证据，不逐小项请求开始。依据[规格](../../SPEC-project-execution.md)，规划基线 `1e3a13a`、计划提交 `ee5096a`，当前分支 `feature/standalone-engineering`。EX01–09、C-EX03、EX10a–c 及 EX10d1 已完成，下一项 EX10d2 持久 Java 阶段日志，再接整体 worker，见[验证记录](../../docs/project-execution-verification.md)；本文不表示新模式已能构建、启动或在网页使用。
 
 ## 1. 交付范围与组织
 

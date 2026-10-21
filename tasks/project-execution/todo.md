@@ -1,6 +1,6 @@
 # project-execution · 开发任务
 
-状态：2026-10-21，规格及计划/任务已获用户确认，EX01–09、C-EX03 及 EX10a–c 完成，下一项 EX10d Java 阶段与 worker 接线；EX10 整体未完成。本机四套验收库已获准并创建。唯一依据为[规格](../../SPEC-project-execution.md)与[本模块计划](plan.md)，不复用旧工程导出的 PE 编号。任务勾选需附真实证据，不把下列拟新增类、命令或样本当作已有功能。
+状态：2026-10-21，规格及计划/任务已获用户确认，EX01–09、C-EX03、EX10a–c 及 EX10d1 完成，下一项 EX10d2 持久 Java 阶段日志，再接整体 worker；EX10 整体未完成。本机四套验收库已获准并创建。唯一依据为[规格](../../SPEC-project-execution.md)与[本模块计划](plan.md)，不复用旧工程导出的 PE 编号。任务勾选需附真实证据，不把下列拟新增类、命令或样本当作已有功能。
 
 路径缩写：`E` = `backend/src/main/java/dev/atoms/demo/projectexecution`；`ET` = 对应 `src/test/java` 包；`ER` = `backend/src/test/resources/projectexecution`；`R` = `backend/src/main/resources/projectexecution`；`S/ST` = 现有 source 主/测试包；`X/XT` = execution 主/测试包；`M` = `backend/src/main/resources/db/migration`；`T` = `templates/full-project-v1`。这些是具体文件的前缀，不是用一个目录隐藏多文件变更。
 
@@ -122,11 +122,15 @@ U/I/REAL/ALL/COMPAT/DOC 的命令与权限条件见计划 §6。S = 1–2、M = 
   - [x] EX10a：有界 Surefire XML 报告校验（`ExecutionJavaReport`、`ExecutionJavaReportTest`）。只返回数值，拒绝空/失败/跳过/重跑失败及计数不符、DTD/外部实体/畸形报告；缺类 RED，计数变异被拦住，01:59:42 报告校验定向 6 项及打包通过，见验证记录。
   - [x] EX10b：前端静态产物的私有资源装配与复验，固定 Maven 资源参数（`ExecutionPackaging`、`ExecutionPackagingTest`、`ExecutionToolchain`、`ExecutionToolchainTest`）。不写源码，不覆盖旧输出；拒绝链接/篡改/容量及来源漂移。缺类 RED、副本复验变异被拦住；02:28:46 完整回归 363 单元 + 309 集成全部通过并打包，见验证记录。
   - [x] EX10c：JAR 和构建清单封存（`ExecutionArtifact`、`ExecutionArtifactManifest`、`ExecutionArtifactTest`、`ExecutionPaths`，共 4 个主要文件）。清单校验与文件 I/O 分开，目录分配新增共享预算重载；来源/工具/策略/检查与产物摘要绑定，拒绝空/越界/链接/替换及重复封存，失败保留证据。缺类 RED、复验变异被拦住；修正测试错误码及 JSON 数值节点预期后，03:13:33 全后端 369 单元 + 309 集成通过并打包，见验证记录。不代表已实际构建用户工程或发布成功状态。
-  - [ ] EX10d：Java 阶段与 worker 接线（`ExecutionBuildWorker`、`ExecutionBuildWorkerIT`、`ExecutionBuildJournal`、`ExecutionBuildRepository`，必要时单列更多小片）。真实 PG 验证意图/取消/停止/提交失败，不提前实现调度；I(ExecutionBuildWorkerIT) + ALL。真实 npm/Maven 用户工程仍在 EX11。
+  - [ ] EX10d：Java 阶段与 worker 接线，按下面小片顺序实施，不提前实现调度。真实 npm/Maven 用户工程仍在 EX11。
+    - [x] EX10d1：固定 Java 阶段与本轮报告目录（`ExecutionJava`、`ExecutionJavaReports` 及对应两份单测，4 个主要文件）。只在匹配的停止证据之后读取新报告；拒绝旧输出、目录替换、链接、越界、空/失败/跳过测试，提交异常不重复完成。缺类 RED，定向 11 项通过；修正沙箱干扰后停止身份变异被捕获。首次全量有 1 项旧 Agent 存储失败，单独复测及第二轮全量通过，未修改原断言或生产逻辑；13:09:49 全后端 380 单元 + 309 集成通过，详情及未定位风险见验证记录。
+    - [ ] EX10d2：扩展 `ExecutionBuildJournal` 的 Java 意图及后端 cwd 停止校验，补真实 PG 测试（最多 5 个主要文件）。验证取消、停止、提交失败与资源保留，不发布整体成功；I + ALL。
+    - [ ] EX10d3：`ExecutionBuildWorker` 与仓储封存成功接线（最多 5 个主要文件，超出再拆）。验证源码/策略/工具/专用测试库授权、阶段结果和产物复验后才发布成功，失败保留上一成功记录；I(ExecutionBuildWorkerIT) + ALL。测试库配置仅经私有受控通道传递；不继承平台环境或暴露凭据。
 - 描述：接入平台控制的前端资源装配和 Maven 测试打包，成功后封存来源及 JAR。
 - 验收：干净报告/测试数量和退出码通过后才封存；前后源码/lock 不变，产物非空普通文件且不超过 256 MiB；清单绑定来源/工具/策略/检查/JAR 摘要，失败保留上一成功记录。
 - 验证：U(ExecutionPackagingTest) + I(ExecutionBuildWorkerIT)，篡改、硬链接、越界、跳过测试、来源改变及失败提交反例。
 - 主要文件：以上各片列出的 `E/` 实现与 `ET/` 测试，分别验证和提交；相较原五文件预估，独立拆出报告与封存测试，避免单类承载所有检查。
+- 待追查：旧 `ProjectAgentCoordinatorIT` 的取消后再次编辑场景曾出现一次 `SOURCE_STORAGE_UNAVAILABLE`，第二轮未复现，根因未确定。后续先单列有界诊断小片收集源码读取失败类别，不把重跑通过当作修复，也不通过延长等待、跳过检查或自动重试掩盖。
 
 ## EX11 · 第一次真实种子工程构建
 
