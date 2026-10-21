@@ -1,6 +1,7 @@
 package dev.atoms.demo.projectexecution;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import dev.atoms.demo.execution.OwnedProcess;
 import dev.atoms.demo.project.ProjectService;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -12,15 +13,17 @@ import org.springframework.transaction.support.TransactionTemplate;
 import static dev.atoms.demo.projectexecution.ExecutionToolchain.Operation.*;
 
 /** Internal journal for an already-claimed build. No scheduling, process launch or build-success transition. */
-final class ExecutionBuildJournal implements ExecutionFrontend.Journal {
-    private static final List<ExecutionToolchain.Operation> ORDER = List.of(NPM_CI, TYPECHECK, LINT, UNIT_TEST, FRONTEND_BUILD);
+final class ExecutionBuildJournal implements ExecutionFrontend.Journal, ExecutionJava.Journal {
+    private static final List<ExecutionToolchain.Operation> ORDER = List.of(NPM_CI, TYPECHECK, LINT, UNIT_TEST, FRONTEND_BUILD, MAVEN_PACKAGE);
     private static final ObjectMapper JSON = new ObjectMapper();
     private final ExecutionSettings settings;
     private final ProjectService projects;
     private final JdbcTemplate jdbc;
     private final TransactionTemplate transaction;
     private final ExecutionBuild build;
-    private final Path directory;
+    private final Path frontend, backend;
+    private final ExecutionPaths paths;
+    private final ExecutionPaths.Task task;
 
     ExecutionBuildJournal(ExecutionSettings settings, ProjectService projects, JdbcTemplate jdbc,
                           PlatformTransactionManager transactions, ExecutionBuild build,
@@ -29,11 +32,25 @@ final class ExecutionBuildJournal implements ExecutionFrontend.Journal {
         this.settings = settings; this.projects = projects; this.jdbc = jdbc; this.build = build;
         transaction = new TransactionTemplate(transactions); transaction.setTimeout(5);
         if (!paths.directory(task).getFileName().toString().equals(build.id().toString())) throw unavailable();
-        directory = paths.project(task).resolve("frontend");
-        paths.privateDirectoryKey(task, directory);
+        this.paths = paths; this.task = task;
+        frontend = paths.project(task).resolve("frontend");
+        backend = paths.project(task).resolve("backend");
+        paths.privateDirectoryKey(task, frontend);
     }
 
     @Override public void begin(ExecutionToolchain.Operation operation, UUID execution) throws IOException {
+        if (operation == MAVEN_PACKAGE) throw unavailable(); // Java has a separate typed entry point.
+        beginStage(operation, execution);
+    }
+
+    @Override public void begin(UUID execution) throws IOException {
+        if (TransactionSynchronizationManager.isActualTransactionActive()) throw unavailable();
+        try { paths.privateDirectoryKey(task, backend); }
+        catch (IOException | RuntimeException error) { throw unavailable(); }
+        beginStage(MAVEN_PACKAGE, execution);
+    }
+
+    private void beginStage(ExecutionToolchain.Operation operation, UUID execution) throws IOException {
         transact(() -> {
             if (execution == null || !settings.load().maintainerIds().contains(build.ownerId())
                     || projects.lock(build.ownerId(), build.projectId().toString()).archived()) reject();
@@ -50,22 +67,42 @@ final class ExecutionBuildJournal implements ExecutionFrontend.Journal {
                     SELECT EXISTS(SELECT 1 FROM execution_build_events WHERE build_id=? AND payload->>'executionId'=?)
                     """, Boolean.class, build.id(), execution.toString()))) reject();
             jdbc.update("UPDATE execution_builds SET status=?,execution_pending=true WHERE id=?",
-                    operation == NPM_CI ? "INSTALLING" : "CHECKING", build.id());
+                    operation == NPM_CI ? "INSTALLING" : operation == MAVEN_PACKAGE ? "PACKAGING" : "CHECKING", build.id());
             append(operation, execution, "started", null, null, null);
         });
     }
 
     @Override public void finish(ExecutionFrontend.Stage stage) throws IOException {
+        if (stage == null || stage.operation() == MAVEN_PACKAGE) throw unavailable();
+        var tests = stage.tests();
+        finishStage(new Completion(stage.operation(), stage.execution(), stage.code(), stage.stopped(), stage.output(),
+                tests == null ? null : new Counts(tests.files(), tests.suites(), tests.tests())));
+    }
+
+    @Override public void finish(ExecutionJava.Stage stage) throws IOException {
+        if (stage == null) throw unavailable();
+        var tests = stage.tests();
+        finishStage(new Completion(MAVEN_PACKAGE, stage.execution(), stage.code(), stage.stopped(), stage.output(),
+                tests == null ? null : new Counts(tests.files(), null, tests.tests())));
+    }
+
+    private record Counts(int files, Integer suites, int tests) {}
+    private record Completion(ExecutionToolchain.Operation operation, UUID execution, String code,
+                              OwnedProcess.Stopped stopped, ExecutionProcess.Output output, Counts tests) {}
+
+    private void finishStage(Completion stage) throws IOException {
         transact(() -> {
             // Cleanup must remain possible after permission/config changes. Lock the same project, not a new owner.
             jdbc.queryForObject("SELECT id FROM projects WHERE id=? FOR UPDATE", UUID.class, build.projectId());
             var row = locked();
             var previous = latest();
             if (stage == null || stage.execution() == null || !ORDER.contains(stage.operation())
-                    || !row.pending() || !Set.of("INSTALLING", "CHECKING").contains(row.status())
+                    || !row.pending() || (stage.operation() == MAVEN_PACKAGE ? !row.status().equals("PACKAGING")
+                        : !Set.of("INSTALLING", "CHECKING").contains(row.status()))
                     || !"started".equals(previous.get("phase"))
                     || !stage.execution().toString().equals(previous.get("executionId"))
                     || !stage.operation().name().equals(previous.get("operation"))) reject();
+            Path directory = stage.operation() == MAVEN_PACKAGE ? backend : frontend;
             if (stage.stopped() != null && !stage.stopped().matches(build.id(), stage.execution(), directory)) reject();
             String code = stage.code();
             if (code != null && !code.equals(ExecutionFrontend.failureCode(new IOException(code)))) reject();
@@ -77,7 +114,8 @@ final class ExecutionBuildJournal implements ExecutionFrontend.Journal {
                 return;
             }
             if (row.cancelled()) code = "EXECUTION_CANCELLED";
-            if (code == null && (stage.output() == null || stage.operation() == UNIT_TEST && stage.tests() == null)) reject();
+            if (code == null && (stage.output() == null
+                    || (stage.operation() == UNIT_TEST || stage.operation() == MAVEN_PACKAGE) && stage.tests() == null)) reject();
             // Separate statements intentionally satisfy V023's rule: a pending row cannot become terminal.
             // Both statements plus the event commit atomically; no visible partially released intent.
             jdbc.update("UPDATE execution_builds SET execution_pending=false WHERE id=?", build.id());
@@ -109,12 +147,15 @@ final class ExecutionBuildJournal implements ExecutionFrontend.Journal {
         return rows.isEmpty() ? Map.of() : rows.get(0);
     }
     private void append(ExecutionToolchain.Operation operation, UUID execution, String phase, String code,
-                        ExecutionProcess.Output output, ExecutionDiagnostics.Frontend tests) {
+                        ExecutionProcess.Output output, Counts tests) {
         var fields = new LinkedHashMap<String, Object>();
         fields.put("operation", operation.name()); fields.put("executionId", execution.toString()); fields.put("phase", phase);
         fields.put("code", code);
         if (output != null) { fields.put("stdoutBytes", output.stdoutBytes()); fields.put("stderrBytes", output.stderrBytes()); }
-        if (tests != null) { fields.put("files", tests.files()); fields.put("suites", tests.suites()); fields.put("tests", tests.tests()); }
+        if (tests != null) {
+            fields.put("files", tests.files()); fields.put("tests", tests.tests());
+            if (tests.suites() != null) fields.put("suites", tests.suites());
+        }
         final String payload;
         try { payload = JSON.writeValueAsString(fields); }
         catch (IOException error) { throw new IllegalStateException(); }
@@ -124,13 +165,17 @@ final class ExecutionBuildJournal implements ExecutionFrontend.Journal {
                 """, Integer.class, payload, build.id()));
         jdbc.update("INSERT INTO execution_build_events(build_id,seq,payload) VALUES (?,?,?::jsonb)", build.id(), sequence, payload);
     }
-    private static void validateNumbers(ExecutionFrontend.Stage stage) {
+    private static void validateNumbers(Completion stage) {
         if (stage.output() != null && (stage.output().stdoutBytes() < 0 || stage.output().stderrBytes() < 0
                 || stage.output().stdoutBytes() > ExecutionProcess.STREAM_MAX_BYTES
                 || stage.output().stderrBytes() > ExecutionProcess.STREAM_MAX_BYTES)) reject();
         var tests = stage.tests();
-        if (tests != null && (stage.operation() != UNIT_TEST || tests.files() < 1 || tests.files() > 512
-                || tests.suites() < tests.files() || tests.suites() > 10000 || tests.tests() < 1 || tests.tests() > 10000)) reject();
+        if (tests == null) return;
+        if (tests.files() < 1 || tests.files() > 512 || tests.tests() < 1 || tests.tests() > 10000) reject();
+        if (stage.operation() == MAVEN_PACKAGE) {
+            if (tests.suites() != null || tests.tests() < tests.files()) reject();
+        } else if (stage.operation() != UNIT_TEST || tests.suites() == null
+                || tests.suites() < tests.files() || tests.suites() > 10000) reject();
     }
     private void transact(Runnable action) throws IOException {
         if (TransactionSynchronizationManager.isActualTransactionActive()) throw unavailable();
