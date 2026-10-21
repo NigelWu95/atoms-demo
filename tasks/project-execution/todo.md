@@ -1,6 +1,6 @@
 # project-execution · 开发任务
 
-状态：2026-10-21，规格及计划/任务已获用户确认，EX01–09、C-EX03、EX10a–c、EX10d1–d2、EX10d3a 及 b1 完成；用户批准隔离 JDK 对照后，23:58:57 完整回归通过，下一项为 b2 封存结算，EX10 整体未完成。本机四套验收库已获准并创建。唯一依据为[规格](../../SPEC-project-execution.md)与[本模块计划](plan.md)，不复用旧工程导出的 PE 编号。任务勾选需附真实证据，不把下列拟新增类、命令或样本当作已有功能。
+状态：2026-10-22，规格及计划/任务已获用户确认，EX01–09、C-EX03、EX10a–c、EX10d1–d2、EX10d3a 及 b1/b2 完成；01:01:30 获准的隔离 JDK 完整回归 401 单元 + 350 集成通过，下一项为 c 整体 worker，EX10 整体未完成。本机四套验收库已获准并创建。唯一依据为[规格](../../SPEC-project-execution.md)与[本模块计划](plan.md)，不复用旧工程导出的 PE 编号。任务勾选需附真实证据，不把下列拟新增类、命令或样本当作已有功能。
 
 当前进度：原子领取专项 10 项通过，锁编号共存变异被捕获；随后 17.0.5 相关回归因 Git 原生枚举失败，现场保留。用户批准后仅在项目忽略目录安装 Liberica 17.0.14+10，命令级指定 JDK：23:42:49 **401 单元 + 33 相关集成通过**，23:58:57 **401 单元 + 335 完整集成通过，零失败/错误/跳过**，b1 验收。原生枚举未复现，但未捕获原 errno，不能宣布根因完全证实；原 Oracle 17.0.5、全局默认、私有 env、服务器和旧审计均不变。详见[验证记录](../../docs/project-execution-verification.md#获准的项目隔离-jdk-对照)。
 
@@ -129,9 +129,9 @@ U/I/REAL/ALL/COMPAT/DOC 的命令与权限条件见计划 §6。S = 1–2、M = 
     - [x] EX10d2：扩展 `ExecutionBuildJournal` 的 Java 意图及后端 cwd 停止校验，新增 `ExecutionJavaJournalIT`（2 个主要文件）。真实 PG 验证取消、停止、事件事务失败、资源保留和并发意图；成功仍为 PACKAGING，不发布整体成功。接口缺失 RED，16 项新旧日志测试通过，停止证明变异被捕获；14:07:28 完整后端 383 单元 + 317 集成通过，见验证记录。
     - [ ] EX10d3：整体 worker 与仓储封存成功接线，拆为以下依赖有序小片，父项全部完成后再勾选。
       - [x] EX10d3a：专用测试库到固定 Java 阶段的受控传递（`ExecutionPrivateConfig`、`ExecutionTestDatabase`、`ExecutionProcess`、`ExecutionJava`、`ExecutionDatabaseLaunchIT`，5 个主要文件）。一次性内部授权绑定项目/构建/执行/backend cwd，实际启动前复验文件及 DB 身份；只追加四个 `APP_*` 环境变量，密码不进 argv/源码/事件，不向前端发放。真实只读 PG + 受控 JVM 验证拒绝/继承/配置漂移/脱敏；22:57:56 完整 401 单元 + 325 集成通过，含本片 8 项。不替代真实 Maven 工程验收。
-      - [ ] EX10d3b：持久构建领取与封存结算（仓储/内部结算服务、追加迁移及对应 PG 测试，最多 5 个主要文件，超出先拆）。短事务校验状态/阶段/授权/取消，成功绑定封存摘要并释放容量；失败保留旧成功记录，未知结果不释放。I(ExecutionBuildSettlementIT) + ALL，不提前实现 EX12 调度。
+      - [x] EX10d3b：持久构建领取与封存结算，按 b1/b2 两片完成（分别 3/4 个主要文件）。短事务校验状态/阶段/授权/取消，成功绑定封存摘要并释放容量；失败保留旧成功记录，未知结果不释放。b2 的 15 项 PG 测试及 401 + 350 完整回归通过，不提前实现 EX12 调度。
         - [x] EX10d3b1：原子领取排队任务（`ExecutionBuildRepository`、`ExecutionBuildClaim`、`ExecutionBuildClaimIT`，3 个主要文件）。项目行 → 构建行 → 容量事务锁；重新校验维护者/所有权/归档、原任务身份、取消和排队期限；双连接争用仅一方领取，缩容计入旧高槽位和未知执行。领取只到 PREPARING，不启动工具。锁已分为构建 `718395203`、Agent `718395202`，10 项真实 PG 测试通过且旧编号变异被拦截；获准的隔离 JDK 对照相关回归及 23:58:57 完整 401 单元 + 335 集成均通过。默认仍关闭，不代表 worker/调度器已实现。
-        - [ ] EX10d3b2：封存产物与整体成功的原子结算（`ExecutionArtifact`、`ExecutionBuildSettlement`、下一可用编号的追加迁移、`ExecutionBuildSettlementIT`，4 个主要文件）。绑定真实封存句柄和完整阶段证据，文件复验在事务外、身份/授权/取消复查及摘要入库在短事务内；失败不覆盖上一成功构建，未知 pending 不释放。新增迁移须先确认现有最大编号，再同步后续拟定编号；不改已应用 V023。
+        - [x] EX10d3b2：封存产物与整体成功的原子结算（`ExecutionArtifact`、`ExecutionBuildSettlement`、V024 追加迁移、`ExecutionBuildSettlementIT`，4 个主要文件）。绑定真实封存句柄和六个完整阶段，事务外复验文件，项目/构建锁内重新授权及保存摘要/状态/事件/释放容量；失败不改旧成功、未知不释放。锁等待期间权限撤销的 RED 已修正，移除阶段校验的变异被捕获；2026-10-22 01:01:30 完整 **401 单元 + 350 集成通过**，含本片 15 项 PG 测试。旧 V023 不改，后续拟定迁移顺延 V025/V026。只读审计无新增 Agent/构建未决，旧故障现场保留，见[验证记录](../../docs/project-execution-verification.md#2026-10-22--ex10d3b2-封存产物的原子结算)。不替代真实工程构建验收。
       - [ ] EX10d3c：`ExecutionBuildWorker` 串联冻结源码、策略、工具、测试库、前后端阶段和封存（worker 及测试/所需接线，最多 5 个主要文件，超出先拆）。产物复验后才交给结算，不继承平台环境；I(ExecutionBuildWorkerIT) + ALL。真实 npm/Maven 用户工程仍由 EX11 验收。
 - 描述：接入平台控制的前端资源装配和 Maven 测试打包，成功后封存来源及 JAR。
 - 验收：干净报告/测试数量和退出码通过后才封存；前后源码/lock 不变，产物非空普通文件且不超过 256 MiB；清单绑定来源/工具/策略/检查/JAR 摘要，失败保留上一成功记录。
@@ -176,7 +176,7 @@ U/I/REAL/ALL/COMPAT/DOC 的命令与权限条件见计划 §6。S = 1–2、M = 
 - 描述：为 lock-only 准备增加独立持久意图，与源码编辑租约和构建容量一致准入。
 - 验收：绑定基线/修订号、清单及准备批准，原子领取租约；与同项目 Agent 编辑/源码恢复/构建冲突，不超共享队列；同键重放不重复解析或遗留租约。
 - 验证：I(ExecutionPreparationAdmissionIT)，真实 PG/source 双连接竞争及回滚；不调用模型。
-- 主要文件：`M/V024__project_dependency_preparations.sql`、`E/DependencyPreparationRepository.java`、`E/DependencyPreparationService.java`、`ET/ExecutionPreparationAdmissionIT.java`。
+- 主要文件：`M/V025__project_dependency_preparations.sql`、`E/DependencyPreparationRepository.java`、`E/DependencyPreparationService.java`、`ET/ExecutionPreparationAdmissionIT.java`。
 
 ## EX15 · lock-only 发布新源码版
 
@@ -204,7 +204,7 @@ U/I/REAL/ALL/COMPAT/DOC 的命令与权限条件见计划 §6。S = 1–2、M = 
 - 描述：追加运行、项目 DB 绑定和批准记录；绑定由维护者提供，不接受网页连接串。
 - 验收：每项目单一持久绑定、最多四个配置项目，端口/DB/角色不能跨项目复用；只读确认实际业务库及最小权限、拒绝测试/平台/系统库；停止不删除 DB、不释放给别项目。
 - 验证：I(ExecutionBindingIT)，双连接抢占、配置漂移、真实业务/测试库区分；准确目标创建须另获批准。
-- 主要文件：`M/V025__project_execution_runs.sql`、`E/ExecutionRun.java`、`E/ExecutionRunRepository.java`、`E/ExecutionDatabaseBinding.java`、`ET/ExecutionBindingIT.java`。
+- 主要文件：`M/V026__project_execution_runs.sql`、`E/ExecutionRun.java`、`E/ExecutionRunRepository.java`、`E/ExecutionDatabaseBinding.java`、`ET/ExecutionBindingIT.java`。
 
 ## EX18 · 迁移批准与兼容性判定
 

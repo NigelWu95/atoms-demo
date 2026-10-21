@@ -1,6 +1,6 @@
 # Spec: project-execution · 完整工程受控构建与本机进程
 
-状态：2026-10-21，用户已确认本规格及 §10 三项取舍，并确认[实施计划](tasks/project-execution/plan.md)与[任务清单](tasks/project-execution/todo.md)；EX01–09、C-EX03、EX10a–c、EX10d1–d2、EX10d3a 及 b1 原子领取已验证。原生进程枚举故障后，用户批准项目隔离 JDK 17 对照；23:58:57 使用 17.0.14 完整回归 401 单元 + 335 集成通过，旧 Oracle 17.0.5 与全局默认不变，偶发根因仍保留监测。下一步为 b2 封存成功结算及 c 整体 worker。EX10 整体未完成，不是完整执行器已交付或已启用的声明。本地完整闭环的总体开发范围已获准，见 [Agent 规格 §10](SPEC-project-agent.md#10-2026-10-19-完整闭环实施授权)。
+状态：2026-10-22，用户已确认本规格及 §10 三项取舍，并确认[实施计划](tasks/project-execution/plan.md)与[任务清单](tasks/project-execution/todo.md)；EX01–09、C-EX03、EX10a–c、EX10d1–d2、EX10d3a 及 b1/b2 领取与封存结算已验证。01:01:30 使用获准的隔离 JDK 17.0.14 完整回归 401 单元 + 350 集成通过，旧 Oracle 17.0.5 与全局默认不变，原生枚举偶发根因仍保留监测。下一步为 c 整体 worker。EX10 整体未完成，不是完整执行器已交付或已启用的声明。本地完整闭环的总体开发范围已获准，见 [Agent 规格 §10](SPEC-project-agent.md#10-2026-10-19-完整闭环实施授权)。
 
 模块 ID 沿用[能力地图](FULL-PROJECT-CAPABILITY-MAP.md)的 `project-execution`，依赖 `project-source`，不反向依赖 Agent、交付或工作台。上游只读门面 PS21 已完成；当前网页仍走旧固定模板链路。
 
@@ -164,6 +164,14 @@ BuildView get(UUID owner, UUID project, UUID build);
 构建准入/领取共用事务锁 `718395203`；Agent 的准入 `718395201` 与协调会话 `718395202` 不变。相同编号的会话锁与事务锁会互相阻塞，因此编号分开，并由真实双连接共存测试验证。[PostgreSQL 17 advisory locks](https://www.postgresql.org/docs/17/explicit-locking.html#ADVISORY-LOCKS) 这只是容量协调，不授予文件或进程执行权限，也不是完整协调器共存验收。worker 仍须持有执行根/协调权、重新检查来源和依赖/工具/数据库，外部执行前再通过 Journal 提交执行意图；提交结果未知不能盲目重新领取，恢复留给 EX13。
 
 取消构建、启动/停止/查询运行、列表/事件及交付身份仍按 EX12–24 实施。状态迁移事件包含状态、取消标记和平台错误码，任务 UUID 是关联标识；不提供任意原始输出写入 API。可按任务查询是否入队、当前阶段及拒绝/失败码，不用源码或凭据作为诊断。
+
+内部 `ExecutionBuildSettlement.succeed(build, artifact, budget)` 只接收 `ExecutionArtifact.seal` 发行的内存句柄，不能用客户端路径、摘要或模型文字重建。句柄固定原构建/项目/所有者/源码版本/树及请求身份和清单证据；事务外复验产物文件，事务内按项目行 → 构建行加锁，复查当前维护者、所有权、归档、PACKAGING 状态、取消及无 pending。必须存在按顺序成对的六个 started/completed 阶段、不同执行 UUID、无错误、有界输出字节数，以及与封存清单一致的前端/Java 检查计数。共享期限在最终更新前及返回前复核。
+
+V024 只追加 JAR 大小、JAR SHA-256、清单 SHA-256 三个元数据字段。成功状态、摘要、释放容量及阶段事件在一个短事务内提交；数据库拒绝缺失/越界摘要、非成功行携带摘要及完成后改写。文件仍在磁盘，不写入 PG。没有单独覆盖的“最后成功”指针：按项目查 SUCCEEDED 历史，因此后来失败不改变旧成功记录。新旧状态代码在默认关闭的回退部署下均可读取；回退采用关闭执行入口并回退代码，保留新增列、约束及全部审计，不执行 DROP 或伪造摘要回填。若历史库已有未绑定摘要的 SUCCEEDED 行，迁移须失败并人工核对，不能把无证据状态升级成成功。[PostgreSQL CHECK 的 NULL 语义](https://www.postgresql.org/docs/17/ddl-constraints.html#DDL-CONSTRAINTS-CHECK-CONSTRAINTS)、[Spring 6.2 TransactionTemplate](https://docs.spring.io/spring-framework/reference/6.2/data-access/transaction/programmatic.html)
+
+`fail(build, code)` 仅用于原任务的内部失败收尾，权限撤销不阻止无活动执行的收尾；已有取消优先于普通失败，超时单独标记。pending、既有 NEEDS_RECONCILIATION 或明确的执行结果未知始终保留容量和同项目阻断，不能靠重复失败调用释放。成功结算不是可重放的执行授权；重复或终态改写拒绝。数据库异常只返回固定码，不能把超时当作已回滚证明后盲目重试；提交结果不明留给 EX13 核对。
+
+上述原子性仅覆盖数据库元数据，不是文件系统与 PG 的分布式事务，也不防同 UID 进程恶意改写。调用者仍须持有正确执行根及协调权、完成来源/工具/策略/测试库复验，并证明各阶段进程停止；使用前仍需复验封存文件。此内部结算不替代 EX10d3c 整体 worker、EX11 真实 npm/Maven/JAR 验收或运行/网页接入。
 
 `ExecutionFrontend` 是单次内部前端阶段，不是自动 worker。调用者须提供当前授权、不可变快照及批准策略复验；每一步还复验工具与私有 home，并共享同一取消信号和 deadline。`ExecutionBuildJournal` 仅服务已被协调者领取为 `PREPARING` 的持久任务，不负责领取或启动。每次 begin 使用项目行 → 任务行的短事务重新授权，核对前一步完成和唯一执行 UUID，原子记录阶段/执行意图；拒绝嵌套在调用者事务中，避免尚未提交就启动进程。
 

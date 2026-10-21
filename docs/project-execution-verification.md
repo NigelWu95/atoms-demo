@@ -719,3 +719,42 @@ env JAVA_HOME=/Users/wubingheng/atoms-demo/.local/jdk17-comparison.LlvDQi/jdk-17
 按代码审查技能复核 b1 的正确性、结构、安全与性能：固定项目行 → 构建行 → 独立容量锁，原/当前容量取小值且计入未知及高槽位，所有 SQL 参数化，授权/归档/原所有者重新检查；事务外不发布可重放的领取成功，异常保留通用错误，未新增执行权限、公开端点、依赖或 I/O。领取测试中的双连接竞争和旧锁编号变异已有真实失败/通过证据，不重复无变化的变异测试。全量通过后只勾选 b1；b2 封存结算、c 整体 worker、EX10 整体、C-EX04 与 EX11 仍未完成。
 
 调试结论限定为：在获准的隔离 JDK 17 对照中，原场景和完整回归都未复现原生枚举错误，因此恢复后续开发；**尚无原 errno 或可按需复现的最小样本，不能保证已完全证明历史根因，也不能宣称原 17.0.5 已修复**。保留固定诊断，不修改停止判定、业务重试或超时来掩盖风险；隔离旧补丁不是长期生产版本升级承诺。没有改用户 OAuth 草稿、日常 env、服务器、模型或邮件配置，也没有合并、推送或部署。
+
+## 2026-10-22 · EX10d3b2 封存产物的原子结算
+
+沿用已批准的项目隔离 Liberica 17.0.14+10 和 `atoms_verify_20261021_ex10`，没有切换全局 Oracle、清理旧失败现场或启动子 Agent。主要文件仅四个：`ExecutionArtifact`、`ExecutionBuildSettlement`、追加的 `V024__execution_build_artifacts.sql`、`ExecutionBuildSettlementIT`。实施前确认已有迁移最大编号为 V023，后续计划中的依赖准备/运行迁移顺延到 V025/V026，不修改已应用 V023。
+
+威胁边界是封存文件 → 内存句柄 → 持久构建身份。调用者不能提供一个摘要或路径来声称已封存；句柄绑定构建/项目/原所有者/来源/请求。结算先在事务外复验文件，再在项目/任务短锁内验证授权、取消、pending 及六个完整阶段，最后一起写入成功状态、三项摘要、释放容量和已有触发器阶段事件。未知执行保留名额；普通失败及权限撤销后的收尾不改旧成功记录。错误不携带原始 SQL、配置或路径，不增加依赖、公开接口或模型调用。
+
+首条测试先出现夹具 Budget/Deadline 返回类型不一致，修正测试类型后，**00:22:29 RED** 仅剩尚未实现的 `ExecutionBuildSettlement` 缺类编译失败。实现后，**00:24:43** 为 6 项封存单元 + 1 项真实 PG 结算测试通过，迁移只应用于指定测试 schema（Flyway V000–V024，共 25 个）。**00:27:43** 增加反例后为 6 单元 + 13 集成通过，零失败/错误/跳过。
+
+审查补充了锁等待期间撤销维护者的时序测试：通过 JDBC 边界在实际取到构建行锁后改变测试配置，**00:29:14 RED** 确认原实现在等待前缓存授权、错误接受成功（预期拒绝而未抛异常）。报告保存在忽略的 0700 目录 `.local/ex10b2-auth-red.tsGefz`；仅测试构建产生的记录保留，不代表真实应用构建。修正为项目行 → 构建行 → 当前配置/维护者复查，再进行最终结算；不借放宽权限或重试消除失败。
+
+本片按 Spring Boot 3.5.16 管理的 Spring Framework 6.2.19 使用 `TransactionTemplate`，最长 5 秒事务/3 秒锁等待；哈希和文件扫描不放入事务。PG CHECK 显式拒绝 NULL，完成的摘要不可改写，非成功状态不能提前带上摘要。[Spring 6.2 编程式事务](https://docs.spring.io/spring-framework/reference/6.2/data-access/transaction/programmatic.html)、[PG 17 CHECK 约束](https://www.postgresql.org/docs/17/ddl-constraints.html#DDL-CONSTRAINTS-CHECK-CONSTRAINTS)。
+
+回退采用默认关闭执行开关并回退代码，保留新增元数据及约束，不 DROP/回填或改旧审计。集成测试中关闭执行开关后仍能查询既有成功记录、收尾无活动执行的失败任务；实际旧平台回归另由本轮完整 verify 验证。文件系统与数据库不构成共同事务，锁等待期间也没有 OS 级不可变文件保证；调用者仍须持有正确执行根/协调权及停止证明，后续使用产物必须复验。本片只用受控 no-op JVM + 七字节产物验证结算边界，**不是 EX11 真实 npm/Maven 或可执行用户 JAR 验收**。
+
+修正后的定向命令（工作目录 `backend`）：
+
+```sh
+env JAVA_HOME=/Users/wubingheng/atoms-demo/.local/jdk17-comparison.LlvDQi/jdk-17.0.14.jdk \
+  PATH=/Users/wubingheng/.nvm/versions/node/v24.20.0/bin:$PATH \
+  SPRING_DATASOURCE_URL='jdbc:postgresql://127.0.0.1:5432/atoms_demo_test?currentSchema=atoms_verify_20261021_ex10&connectTimeout=3&socketTimeout=5' \
+  ./mvnw -B -Dtest=ExecutionArtifactTest -Dit.test=ExecutionBuildSettlementIT verify
+```
+
+**00:31:14，6 单元 + 15 集成全部通过，0 失败/错误/跳过，BUILD SUCCESS，1:28，退出码 0**。按本轮开始时间核对各 1 份新 XML，排除 106/97 份旧 XML，Java 均为隔离 17.0.14。报告保存在 `.local/ex10b2-focused-passed.6yc2UO`（0700）。新增验证分别覆盖前端/Java 清单计数不符、缺阶段、真实句柄跨身份冒用、同长度/同修改时间篡改、授权/归档/所有者/取消变化、未知执行保留、后续失败保留旧成功、并发单赢家、UPDATE 后故障回滚及超时在 UPDATE 后发生时仍回滚。数据库自身拒绝不完整/越界摘要和成功后改写。
+
+**00:33:37 变异检查被捕获**：临时移除 `completedStages(build, evidence)`，运行 `-Dit.test=ExecutionBuildSettlementIT#rejectsMissingStagesEvenWithPackagingStatusAndARealSealedHandle`，1 项集成如预期失败（没有阶段证据却被错误接受）；不是凭代码阅读声称测试有效。报告保存于 `.local/ex10b2-mutation.SQgDUO`（0700），随后使用补丁恢复校验。实际坏变异产生的测试记录保留，不清库、不触碰真实应用记录。恢复后启动同一 JDK/schema 前缀的完整 `-Pproject-execution-contract -Dexecution.test-config-directory=/Users/wubingheng/atoms-demo/.local/project-execution-acceptance.x5cvui verify`；该 profile 不启用真实 Agent CLI、模型或 SMTP。
+
+**01:01:30，完整后端回归 401 单元 + 350 集成全部通过，0 失败/错误/跳过，BUILD SUCCESS，27:30，退出码 0**。按本次开始时间汇总 89/95 份新 XML，18/3 份旧报告不加算；所有新报告均为隔离 Java 17.0.14。包括封存结算 15 项、原子领取 10 项、Agent 协调器 10 项（74.74 秒）、多轮完整源码编辑 3 项（175.1 秒）及原账号、发布、预览、导出/运行链路。全报告复制到忽略的 0700 目录 `.local/ex10b2-full-passed.VzG9oZ`。真实 CLI、模型、SMTP 和尚未实现的用户工程构建不是本次通过范围。
+
+平台 JAR **30,821,531 字节**，SHA-256 `3b5004962559b1747d9dbdfc2ce4dc22f151109ffa5d3547724220df9efdecf5`；不是用户应用产物。回归后全局仍为 Oracle `17.0.5+9-LTS-191`，SDKMAN `current` 仍指向 `17.0.5-oracle`。只读进程清单未见 Java/Git/claude.exe，没有终止进程。
+
+结束后的只读 PG 审计：当前 schema 的 Agent 未决、Agent 关联 pending/活动编辑租约、构建未决均为 0；测试角色仍无数据库 CREATE 权限。旧 pa32b 未知执行仍 ACTIVE/pending、缺停止证明且来源基线未变；此前两个源码失败项目继续 NEEDS_RECONCILIATION，旧失败 Agent `777da2c2-cf09-49c0-8e78-4453c4e4c1ce` 仍 FAILED、租约 RELEASED、无执行 ID。没有写入旧 schema、强制恢复或清理证据。
+
+本轮日志中的 `source_operation_uncertain`（请求 `678e209a-cd0d-4457-8646-9e1a378a95d0`）已核对为 `ProjectSourceAgentCoexistenceIT` 主动注入 `Crash` 的恢复反例，不是新的原生枚举故障。该组 4 项通过；结束后准确记录为 FAILED / SOURCE_INTERRUPTED / pending=false，对应编辑租约 RELEASED / pending=false 且具有停止摘要。历史原生故障在隔离 JDK 本轮未复现，仍不据此断言根因完全确定或原 Oracle 已修复。
+
+按代码审查技能复核正确性、可读性、架构、安全、性能：四个主要文件保持单一结算职责，无公开端点/调度/新依赖；文件 I/O 在事务外，SQL 参数化，锁顺序固定且锁后重新核对权限；最多读取 13 个有界事件识别六阶段及多余记录；复用既有状态事件，无原始日志/路径/凭据落库。授权时序反例与阶段校验变异均有真实 RED/GREEN 证据。新增迁移的默认关闭回退路径、既有读写链路及旧功能已回归，不声称已执行远程回滚演练。只验收 b2 及 b 父项，EX10d3c、EX10 整体、C-EX04、EX11 继续未完成；无推送、合并、部署或配置变更。
+
+提交前 34 个本地文档链接/锚点全部有效，`git diff --cached --check` 通过；9 个任务文件及暂存补丁对 5 项本地私有配置值的内存扫描均无匹配，输出不包含配置值。平台 JAR 检查未包含 env、邮件测试夹具或本片测试类。用户原有 OAuth 草稿仍保持未跟踪，不加入本次提交。

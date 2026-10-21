@@ -25,9 +25,13 @@ final class ExecutionArtifact {
     private final ExecutionPaths.Task task;
     private final Stamp jar, manifest;
     private final Summary summary;
+    private final ExecutionBuild build;
+    private final Evidence evidence;
 
-    private ExecutionArtifact(ExecutionPaths paths, ExecutionPaths.Task task, Stamp jar, Stamp manifest) {
+    private ExecutionArtifact(ExecutionPaths paths, ExecutionPaths.Task task, Stamp jar, Stamp manifest,
+                              ExecutionBuild build, Evidence evidence) {
         this.paths = paths; this.task = task; this.jar = jar; this.manifest = manifest;
+        this.build = build; this.evidence = evidence;
         summary = new Summary(jar.size(), jar.sha256(), manifest.sha256());
     }
 
@@ -59,7 +63,7 @@ final class ExecutionArtifact {
             byte[] manifest = ExecutionArtifactManifest.bytes(build, evidence, copied.size(), copied.sha256());
             Path manifestPath = directory.resolve("manifest.json");
             write(manifestPath, new ByteArrayInputStream(manifest), manifest.length, budget);
-            var result = new ExecutionArtifact(paths, task, copied, scan(manifestPath, 16384, true, budget));
+            var result = new ExecutionArtifact(paths, task, copied, scan(manifestPath, 16384, true, budget), build, evidence);
             if (!result.manifest.sha256().equals(hash(manifest))) throw invalid();
             result.verify(budget);
             check(budget); preflight.check();
@@ -73,6 +77,14 @@ final class ExecutionArtifact {
 
     Path jar() throws IOException { return paths.directory(task).resolve("app.jar"); }
     Summary summary() { return summary; }
+    /** Immutable in-memory binding, not a capability reconstructed from caller-supplied hashes or paths. */
+    Evidence evidenceFor(ExecutionBuild expected) throws IOException {
+        if (expected == null || !build.id().equals(expected.id()) || !build.projectId().equals(expected.projectId())
+                || !build.ownerId().equals(expected.ownerId()) || !build.sourceVersionId().equals(expected.sourceVersionId())
+                || !build.treeSha256().equals(expected.treeSha256()) || !build.keySha256().equals(expected.keySha256())
+                || !build.requestSha256().equals(expected.requestSha256())) throw invalid();
+        return evidence;
+    }
     void verify(OwnedProcess.Budget budget) throws IOException {
         try {
             check(budget);
