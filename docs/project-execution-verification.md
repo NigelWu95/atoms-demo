@@ -758,3 +758,38 @@ env JAVA_HOME=/Users/wubingheng/atoms-demo/.local/jdk17-comparison.LlvDQi/jdk-17
 按代码审查技能复核正确性、可读性、架构、安全、性能：四个主要文件保持单一结算职责，无公开端点/调度/新依赖；文件 I/O 在事务外，SQL 参数化，锁顺序固定且锁后重新核对权限；最多读取 13 个有界事件识别六阶段及多余记录；复用既有状态事件，无原始日志/路径/凭据落库。授权时序反例与阶段校验变异均有真实 RED/GREEN 证据。新增迁移的默认关闭回退路径、既有读写链路及旧功能已回归，不声称已执行远程回滚演练。只验收 b2 及 b 父项，EX10d3c、EX10 整体、C-EX04、EX11 继续未完成；无推送、合并、部署或配置变更。
 
 提交前 34 个本地文档链接/锚点全部有效，`git diff --cached --check` 通过；9 个任务文件及暂存补丁对 5 项本地私有配置值的内存扫描均无匹配，输出不包含配置值。平台 JAR 检查未包含 env、邮件测试夹具或本片测试类。用户原有 OAuth 草稿仍保持未跟踪，不加入本次提交。
+
+## 2026-10-22 · EX10d3c1 工具版本探测的持久日志
+
+整体 worker 接线前核对发现，四种工具的版本探测本身也启动进程，现有 `ExecutionToolProbe` 要求调用者先登记持久意图。按已批准的增量/测试驱动流程，实施前把 c 拆为 c1 探测日志和 c2 整体 worker；本片两个主要文件为 `ExecutionProbeJournal`、`ExecutionProbeJournalIT`，不修改已应用迁移、旧六阶段日志或当前网页。沿用获准的隔离 JDK 17.0.14 和测试 schema，默认执行开关关闭，不启动子 Agent、不推送或部署。
+
+信任边界是本次固定工具身份/受控进程结果 → 任务 pending 与事件。begin 在 PREPARING 依 Node/npm/Java/Maven 顺序登记意图，项目行 → 构建行锁后检查当前权限及原身份；finish 必须匹配 build/execution/tool-home 停止证明，成功摘要及版本必须符合固定工具。缺证据或明确未知保留容量和 pending，取消优先于迟到成功；数据库异常不自动重试。工具 home 身份检查在事务外；事件预算及不可改写约束复用 V023，工具版本使用既有解析器。事务方式核对了 Spring Boot 3.5.16 管理的 Framework 6.2.19 [TransactionTemplate 文档](https://docs.spring.io/spring-framework/reference/6.2/data-access/transaction/programmatic.html)和 [PG 17 行锁文档](https://www.postgresql.org/docs/17/explicit-locking.html#LOCKING-ROWS)，未增加依赖。
+
+**01:17:30 RED**：新测试因尚无 `ExecutionProbeJournal` 类而编译失败。实现后，**01:20:16 首轮通过 3 项工具探测单元 + 3 项真实 PG 日志测试**，零失败/错误/跳过，1:34。随后补充并发、身份、取消、权限撤销及事件写库失败等反例，**01:23:27，3 单元通过、12 集成中 1 项失败**：明确 `EXECUTION_PROCESS_UNSETTLED` 同时带有停止证明时，第一版错误将其视为普通 FAILED 并释放容量。将未知结果分支改为缺停止证明或显式未知均保留，不能自行解释矛盾证据。失败 XML/txt 保留于 `.local/ex10c1-uncertain-red.c0EEnS`（0700），测试记录不删除。
+
+定向命令（工作目录 `backend`）：
+
+```sh
+env JAVA_HOME=/Users/wubingheng/atoms-demo/.local/jdk17-comparison.LlvDQi/jdk-17.0.14.jdk \
+  PATH=/Users/wubingheng/.nvm/versions/node/v24.20.0/bin:$PATH \
+  SPRING_DATASOURCE_URL='jdbc:postgresql://127.0.0.1:5432/atoms_demo_test?currentSchema=atoms_verify_20261021_ex10&connectTimeout=3&socketTimeout=5' \
+  ./mvnw -B -Dtest=ExecutionToolProbeTest -Dit.test=ExecutionProbeJournalIT verify
+```
+
+PG 测试使用受控 no-op JVM 获取真实停止证明，工具身份来自临时固定安装目录的字节摘要，版本值为明确夹具；不以这些夹具声称实际运行了 npm/Maven 用户工程。测试中的丢失结果仅在 teardown 有准确真实停止证明时核对收尾，原状态/事件始终保留；不清理任何历史未知进程或旧失败源码项目。整体 worker、EX11 真构建和网页接入仍待后续完成。
+
+**01:26:12，定向 3 单元 + 12 集成全部通过**，0 失败/错误/跳过，BUILD SUCCESS，2:10，退出码 0。按启动时间核对各 1 份新 XML，排除 106/98 份旧报告；Java 均为隔离 17.0.14。报告保存于 `.local/ex10c1-focused-passed.FXKFhj`（0700）。反例覆盖不支持/越界版本及工具摘要、错执行/cwd 停止证明、重复和乱序意图、权限/归档/所有者变更、锁后权限撤销、取消、超时、未知保留、并发单赢家、事件插入后抛错整笔回滚及拒绝调用者事务。
+
+**01:29:42 变异被捕获**：临时移除 `stopped.matches(build.id(), execution, cwd)`，执行 `-Dit.test=ExecutionProbeJournalIT#rejectsOutOfOrderDuplicateAndWrongStopProofWithoutClearingIntent`，1 项集成如预期失败（错误证明未被拒绝）。报告保存于 `.local/ex10c1-mutation.Xhnmtu`（0700），随后使用补丁恢复该校验，再启动完整后端回归；不存在变异代码部署或未恢复即验收。
+
+审查关注的可观测性问题为：哪个构建/哪次执行在探测哪个工具；它完成、失败还是结果未知；成功时具体核对了哪个版本和工具摘要。对应 `build_id`、`executionId`、`probe`、`phase`、固定 `code` 和成功摘要字段，事件自带时间；真实 PG 测试核对了事件数量、字节预算及失败回滚，不保存整段输出或账号信息。本片没有新 HTTP 端点、运行队列或外部遥测服务，不额外引入指标平台。未知时只查看该 build 的有序 probe 事件和 pending/容量，不能从 PID 或超时推断停止；生产恢复仍由后续 EX13 完成。
+
+### 2026-10-23 续接核对
+
+上轮工具会话在用户中断后已不可恢复，不能补称捕获了原命令的退出码。先只读检查确认无遗留 Java/Git 进程，再依据变异结束后的 `2026-10-22T01:29:45+08:00` 重建报告时间门槛：89 份 Surefire / 96 份 Failsafe 新 XML 合计 **401 单元 + 362 集成，0 失败/错误/跳过**，排除 18/3 份旧报告；新报告 Java 均为 17.0.14。首份报告为 01:31:35，最后一份为 01:55:09，Failsafe 汇总于 01:55:09 写入，completed=362、timeout=false、无 failureMessage。没有把先前定向或变异失败报告混入成功计数。
+
+不重复运行已完成且代码未变的测试；在 `backend` 仅执行 `env JAVA_HOME=/Users/wubingheng/atoms-demo/.local/jdk17-comparison.LlvDQi/jdk-17.0.14.jdk ./mvnw -B failsafe:verify` 读取现有汇总，**10-23 01:25:34 BUILD SUCCESS，1.590 秒，退出码 0**。完整报告复制到忽略的 0700 目录 `.local/ex10c1-full-passed.hEOUN9`。平台 JAR 于 10-22 01:34:51 生成，30,829,336 字节，SHA-256 `6f3e3f47b396665d3dbe00c360580edd012b4649646d786dff7f5c9c9c49dbcc`，包含新日志类，不含 `.env` 或本片测试类；原有工程模板自带的 `application-test.yml` 不属于平台私有配置。
+
+续接后的只读 PG 审计确认当前 schema 的 Agent 未决、关联 pending/活动编辑租约及构建未决均为 0，旧 Agent 协调锁无持有者，测试角色仍无数据库 CREATE 权限。旧 pa32b 未知执行仍 ACTIVE/pending、无停止证明且基线不变；两个旧源码失败项目及此前主动注入 Crash 的审计仍保留。SDKMAN 全局默认仍为 Oracle 17.0.5。未以新回归通过推断旧未知进程停止，也未删除旧记录。
+
+代码审查覆盖正确性、可读性、模块边界、安全和性能：两个主要文件只增加探测日志及其 PG 契约，SQL 参数化，短事务锁顺序固定、取锁后重新授权；最多读取 9 条探测事件，版本和事件体有界，文件检查不进入事务，拒绝调用者事务与提交失败重试。前述错误证明变异已捕获且恢复；未新增依赖、公开端点或默认执行。仅验收 c1，c2 整体 worker、EX10 整体、C-EX04 和 EX11 仍未完成；本次没有真实模型、SMTP、用户工程构建、推送或部署。
