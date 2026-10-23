@@ -937,3 +937,45 @@ EX11a 本地提交 `858bda8`，绿色报告归档 `.local/ex11a-passed.Q2e45z`�
 **19:29:19，本轮 33 单元通过、1 原生契约失败，03:50、退出码 1**。恢复后的源码测试及平台打包通过；真实构建 `4c9a3c6a-cd9a-4d66-b2dc-56891954a94d` 用时 166,707 ms，四个工具探测、npm ci、类型检查和 lint 均完成，原探测超时未重现。构建在 UNIT_TEST 后检查报 `EXECUTION_STORAGE_UNAVAILABLE`，pending=false、worker_slot=null；没有 JAR 或成功构建。报告 `.local/ex11b-vitest-home-failure.py6fhi`、`seed-build-5807344048823581784` 现场保留。
 
 定点检查发现实际 `test-results/unit.json` 为 0600/单链接/6034 字节，**15 项前端测试全部通过**。Vitest 5.0.3 在 `tool-home/Library/Application Support/vitest/.vitest-secret-token` 新增用户数据，而 `ExecutionToolHome.verify` 正确拒绝私有配置 HOME 的未批准顶级目录；未读取或输出该令牌。文件总数 8763、目录 1569、链接 21、特殊文件 0，不能误归因于十万项容量限制。新增 EX11d 仅调整 UNIT_TEST 的任务内 HOME，让此工具数据落在既有私有临时区；配置文件位置、摘要/身份复验、容量与无继承凭据保持不变。EX11c 的 33 项验证及性能收益足以保存本地兼容提交，完整 EX11 和整轮回归仍未完成。
+
+EX11c 本地提交 `59d82d9`。EX11d 依据固定版本官方 [apiToken.ts](https://raw.githubusercontent.com/vitest-dev/vitest/v5.0.3/packages/vitest/src/node/config/apiToken.ts) 和 [配置解析](https://raw.githubusercontent.com/vitest-dev/vitest/v5.0.3/packages/vitest/src/node/config/resolveConfig.ts) 核对：macOS 使用 HOME 的 Library/Application Support，Linux 使用 XDG_DATA_HOME 或 HOME 的 .local/share；此步骤不是仅开启 UI/API 后才发生。修复只让固定 UNIT_TEST 命令的 HOME 指向任务既有 tmp，并重新生成一致的子 JVM 属性；不从宿主读取 XDG/凭据，不扩大可变配置目录集合，不停用令牌或检查。
+
+**19:42:46 RED**：新增准确命令环境测试，UNIT_TEST 的 HOME 仍为配置目录而非 tmp，1 项失败、0 错误/跳过，31.120 秒、退出码 1；`.local/ex11d-red.Ak9JSr`。实现后 **20:18:12 GREEN**：`ExecutionProcessTest,ExecutionToolchainTest,ExecutionToolHomeTest` 共 **15 项通过，0 失败/错误/跳过**，54.663 秒、退出码 0；`.local/ex11d-focused.HyHmrz`。两个新增测试分别验证所有工具的环境区别与真实父子 JVM 的 HOME/属性一致，npm 配置/缓存路径不漂移。
+
+**20:19:55，EX11d 变异被捕获**：临时取消切换 HOME 后重新生成 JVM 属性的步骤，命令环境测试因 `user.home` 仍指向配置目录而失败，1 项失败、0 错误/跳过，37.409 秒、退出码 1；`.local/ex11d-mutation.e1aFIm`。随后恢复原实现，以已批准的 33 源码单元 + 1 原生种子契约命令继续验证；完整结果另记，不将前端 15 项通过等同于最终工程通过。
+
+### EX11b · 实际 JAR 与失败版本验收
+
+**20:32:57，33 项源码单元 + 1 项原生种子契约全部通过，0 失败/错误/跳过，BUILD SUCCESS，12:43、退出码 0。** 真实契约自身 703.6 秒，连续检查三个不可变源码版本，直接使用实际 npm/Node/Java/Maven，没有注入模拟命令或人工创建测试报告：
+
+| 构建 | 结果 | worker 用时 | 验证 |
+|---|---|---|---|
+| `bf09cff5-2299-4def-b3e2-5982dd1f833c` | SUCCEEDED | 291,358 ms | 原始 35 文件；前端 15 项、Java 2 项通过；JAR 包含 Java 类、静态首页和 SQL 迁移，首页与本次 dist 字节一致 |
+| `af3dae59-c456-4009-9eaa-ee086fc2246d` | FAILED / EXECUTION_PROCESS_FAILED | 164,217 ms | 添加前端失败断言，停止在 UNIT_TEST，无封存产物；旧成功记录与 JAR 摘要不变 |
+| `e903c8a0-e401-4187-bafd-3b4259d6ab3a` | FAILED / EXECUTION_PROCESS_FAILED | 218,635 ms | 添加无法编译的 Java 类，停止在 MAVEN_PACKAGE，无封存产物；旧成功记录与 JAR 摘要不变 |
+
+成功源码版本 `c7a6207c-798a-4743-9238-58a0dcf562db`，tree SHA-256 `836bbb221c92332f3d3f99a2f9c915a667867f34a7f78daa5031e54fe3070fc4`。实际应用 JAR **24,023,687 字节**，SHA-256 **`1833cd77564b203c9647134fda2a076e7b6360c0a5d14f612615f832bbb232d9`**，磁盘、清单和数据库记录一致。三次结束均 pending=false、worker_slot=null；专用测试库只读身份与 relation 数量前后相同。源码快照不变，不包含工具 HOME、私有 env 或测试报告。报告与 Failsafe 汇总保存 `.local/ex11b-real-passed.11oZja`（0700/0600），工程和产物保留在 `/private/tmp/atoms-ex11-contract.APT7Jb/seed-build-4079350537997949556`。
+
+这验证了原始 Vue + Spring Boot 种子的实际检查/编译/打包及失败保留；尚未启动应用 HTTP 服务、执行应用迁移或将新模式接到网页。EX12 协调/取消、常驻运行和后续交付仍未完成。
+
+### EX11 完整后端及离线 CLI 回归
+
+兼容回归前只读发现个人 npm 安装已为 Claude Code **2.1.308**，原 `bin/claude.exe` 是 500 字节不可执行占位文件，真正 Mach-O 位于平台包目录；没有修改该安装或配置。执行适配当前仅验收 2.1.302/303，故未放宽版本表。按计划申请并获准在忽略的私有 `.local/ex11-cli-2.1.303.XX2V2d` 安装单个官方 `@anthropic-ai/claude-code-darwin-x64@2.1.303`，npm 使用清空继承环境、私有 HOME/缓存/配置、固定官方 registry、`--ignore-scripts --no-audit --no-fund --save-exact`。官方包完整性 `sha512-U8onr6uQGcl6vOcelUmcwB+rtKljia90U82q5OLxfjbw415odmc1XHXRJcIa+TPxprFSIKbZH3x+EHwCHMOqEg==` 与 lock 精确匹配，实际二进制 SHA-256 `6c5d63b43568c5d60963d40f05b0087cb03ba44a90740d27adc505f4157806db`；未安装到个人全局目录。
+
+获准脚本 `.local/ex11-compat-regression.sh` 随后运行下列命令（`backend`）。本次不重复已通过且源码未变的 12 分钟原生构建；明确选择其他全部 IT 并开启真实 CLI 的 loopback 假上游契约，使用 canary Key，不连接真实模型。最终记录分别报告这轮与上述原生契约，不能伪装为同一次执行。新报告新鲜度门槛为 **2026-10-23T21:26:25+08:00**，旧报告保留但不计数；执行期间冻结生产/测试源码。
+
+```sh
+env JAVA_HOME=/Users/wubingheng/atoms-demo/.local/jdk17-comparison.LlvDQi/jdk-17.0.14.jdk \
+  PATH=/Users/wubingheng/.nvm/versions/node/v24.20.0/bin:$PATH \
+  SPRING_DATASOURCE_URL='jdbc:postgresql://127.0.0.1:5432/atoms_demo_test?currentSchema=atoms_verify_20261021_ex10&connectTimeout=3&socketTimeout=5' \
+  ./mvnw -B -Pproject-execution-contract,agent-cli-contract \
+  -Dexecution.test-config-directory=/Users/wubingheng/atoms-demo/.local/project-execution-acceptance.x5cvui \
+  -Datoms.agent.test.cli=/Users/wubingheng/atoms-demo/.local/ex11-cli-2.1.303.XX2V2d/node_modules/@anthropic-ai/claude-code-darwin-x64/claude \
+  '-Dit.test=*IT,!ExecutionSeedBuildContractIT' verify
+```
+
+**21:58:27，完整回归报告完成：417 单元 + 377 集成，全部零失败/错误/跳过。** 按上述时间门槛核对 90 份 Surefire 和 100 份 Failsafe 新 XML；包括 7 项真实 CLI + loopback 假上游契约，不计此前的原生种子契约旧 XML。会话中断后原 exec 句柄已失效，没有捕获原命令最终退出码；只读确认原测试 JVM 已退出。**22:06:02** 使用相同隔离 JDK、`./mvnw -B -o -Pproject-execution-contract,agent-cli-contract failsafe:verify` 对现有报告独立校验，**BUILD SUCCESS，1.811 秒、退出码 0**，未重跑测试。Failsafe 汇总 completed=377、failures/errors/skipped=0、timeout=false。报告和汇总归档 `.local/ex11-full-passed.zifl9wqq`（0700/0600）。与 20:32:57 的独立原生契约合计覆盖 378 个不同集成测试；这不是一次运行的 378 项。
+
+回归后的只读数据库核对：当前 schema 的新增 Agent 未决、pending、关联活动编辑租约和构建未决均为 0；旧 Agent 协调锁无持有者，测试角色仍无数据库 CREATE 权限。三份旧审计及已记录的源码失败/中断现场保留，没有删除、强制解锁或按 PID 收养进程。个人 Java 默认仍为 `17.0.5-oracle`，磁盘剩余约 11 GiB；没有修改日常私有 env、个人 Claude 安装或服务器。
+
+本轮自审覆盖正确性、接口边界、安全和性能：正式 35 文件模板不删改，`.npmrc` 必须同时满足准确路径、固定内容和外部摘要；Git 合并读取仍检查对象/大小/摘要，三个变异均被捕获后恢复；UNIT_TEST 的可变用户数据仅改到任务已有临时目录，npm 配置路径保持固定，真实子 JVM 验证了属性继承；实际 JAR 的数据库/清单/磁盘摘要一致，两个失败版本没有覆盖旧产物。未增加公开 API、数据库迁移或依赖，也未把本机定点读取约 55.9% 的收益声称为整轮构建性能保证。默认仍关闭，不构成任意代码安全沙箱；EX12、C-EX04、真实 HTTP 业务运行和新网页入口仍未完成。

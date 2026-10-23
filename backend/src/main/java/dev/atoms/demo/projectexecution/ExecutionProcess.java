@@ -116,6 +116,13 @@ final class ExecutionProcess {
             return new Invocation(command, directory, Map.copyOf(isolated));
         }
 
+        /** Mutable tool user data stays in the existing task-private temp area; package config stays pinned. */
+        Invocation withTemporaryHome() throws IOException {
+            var isolated = new java.util.HashMap<>(environment);
+            isolated.put("HOME", environment.get("TMPDIR"));
+            return new Invocation(command, directory, Map.copyOf(isolated)).withPrivateJvmHome();
+        }
+
         private Invocation(List<String> command, Path directory, Map<String, String> environment) {
             this.command = command; this.directory = directory; this.environment = environment;
         }

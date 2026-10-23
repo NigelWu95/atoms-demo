@@ -119,7 +119,10 @@ final class ExecutionToolchain {
             case FRONTEND_BUILD -> List.of("node_modules/vite/bin/vite.js", "build");
             default -> throw unsupported();
         };
-        return invocation(Kind.NODE, args, frontend, home);
+        var command = invocation(Kind.NODE, args, frontend, home);
+        // Vitest 5 writes user data even in run mode. Do not admit mutable files into the config HOME.
+        // https://raw.githubusercontent.com/vitest-dev/vitest/v5.0.3/packages/vitest/src/node/config/apiToken.ts
+        return operation == Operation.UNIT_TEST ? command.withTemporaryHome() : command;
     }
 
     private ExecutionProcess.Invocation maven(ExecutionToolHome home, Path cwd, boolean probe) throws IOException {

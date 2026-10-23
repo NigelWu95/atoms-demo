@@ -13,6 +13,22 @@ class ExecutionToolchainTest {
     @TempDir Path temporary;
     private ExecutionProcess.Deadline deadline() { return new ExecutionProcess.Deadline(Duration.ofSeconds(30)); }
 
+    @Test void unitTestUserDataStaysInPrivateTemporaryHomeWithPackageConfigurationPinned() throws Exception {
+        var tools = ExecutionToolchain.capture(installation(temporary.toRealPath()), List.of(), deadline());
+        try (var paths = new ExecutionPaths(temporary.toRealPath().resolve("execution"), List.of())) {
+            var home = ExecutionToolHome.create(paths, paths.createBuild(UUID.randomUUID()), deadline());
+            for (var operation : ExecutionToolchain.Operation.values()) {
+                var environment = tools.command(operation, home).builder().environment();
+                Path expected = operation == ExecutionToolchain.Operation.UNIT_TEST ? home.temporary() : home.home();
+                assertThat(environment.get("HOME")).as(operation.name()).isEqualTo(expected.toString());
+                assertThat(environment.get("JDK_JAVA_OPTIONS")).contains("\"-Duser.home=" + expected + "\"");
+                assertThat(environment.get("npm_config_userconfig")).isEqualTo(home.home().resolve("npmrc").toString());
+                assertThat(environment.get("npm_config_globalconfig")).isEqualTo(home.home().resolve("npm-globalrc").toString());
+                assertThat(environment.get("npm_config_cache")).isEqualTo(home.home().resolve("npm-cache").toString());
+            }
+        }
+    }
+
     @Test void fixedCommandsUsePinnedEntrypointsAndJvmPropertiesBeforeMainClass() throws Exception {
         var locations = installation(temporary.toRealPath());
         var tools = ExecutionToolchain.capture(locations, List.of(), deadline());

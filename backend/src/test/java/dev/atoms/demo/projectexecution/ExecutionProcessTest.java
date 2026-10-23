@@ -87,6 +87,24 @@ class ExecutionProcessTest {
             assertFailure(mode, deadline(5), () -> false, "EXECUTION_OUTPUT_LIMIT", true);
     }
 
+    @Test void temporaryHomeIsInheritedByRealChildWithoutMovingPinnedNpmConfig() throws Exception {
+        Path home = Files.createDirectory(temporary.resolve("config home"));
+        Path tmp = Files.createDirectory(home.resolve("tmp"));
+        Path java = Path.of(System.getProperty("java.home"));
+        var original = new ExecutionProcess.Invocation(java.resolve("bin/java"), args("private-home", "spawn"),
+                temporary, home, tmp, java, temporary).withPrivateJvmHome();
+        var invocation = original.withTemporaryHome();
+        assertThat(original.builder().environment().get("HOME")).isEqualTo(home.toString());
+        assertThat(invocation.builder().environment().get("HOME")).isEqualTo(tmp.toString());
+        assertThat(invocation.builder().environment().get("npm_config_userconfig")).isEqualTo(home.resolve("npmrc").toString());
+        assertThat(invocation.builder().environment().get("npm_config_globalconfig")).isEqualTo(home.resolve("npm-globalrc").toString());
+        assertThat(invocation.builder().environment().get("npm_config_cache")).isEqualTo(home.resolve("npm-cache").toString());
+        UUID task = UUID.randomUUID(), execution = UUID.randomUUID();
+        var result = new ExecutionProcess().run(invocation, deadline(10), () -> false, task, execution, () -> {});
+        assertThat(result.summary().stdoutBytes()).isEqualTo(12);
+        assertThat(result.stopped().matches(task, execution, temporary)).isTrue();
+    }
+
     @Test void cancellationStopsOnlyOurChildAndTimeoutHasOneCleanupBudget() throws Exception {
         var other = invocation(args("other")).builder().start();
         try {
