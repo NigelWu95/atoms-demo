@@ -1,6 +1,6 @@
 # Spec: project-execution · 完整工程受控构建与本机进程
 
-状态：2026-10-23，用户已确认本规格及 §10 三项取舍，并确认[实施计划](tasks/project-execution/plan.md)与[任务清单](tasks/project-execution/todo.md)；EX01–10 的内部能力已验证，包含 c2b 整体构建 worker。完整回归新报告 **408 单元 + 370 集成通过，零失败/错误/跳过**，中断后独立报告校验成功，详见[证据](docs/project-execution-verification.md#2026-10-23--ex10d3c2b-整体构建-worker)。使用获准的隔离 JDK 17.0.14，旧 Oracle 17.0.5 与全局默认不变，原生枚举偶发根因仍保留监测。下一步为 EX11 真实 npm/Maven 种子工程构建，须先解决模板 `.npmrc` 的策略兼容；受控流程测试不能替代真实工程或运行/网页验收，执行模块仍默认关闭。本地完整闭环的总体开发范围已获准，见 [Agent 规格 §10](SPEC-project-agent.md#10-2026-10-19-完整闭环实施授权)。
+状态：2026-10-23，用户已确认本规格及 §10 三项取舍，并确认[实施计划](tasks/project-execution/plan.md)与[任务清单](tasks/project-execution/todo.md)；EX01–11 已完成。原始 35 文件 Vue + Spring Boot 种子已通过实际 npm/Maven 构建并产生 JAR，前端失败及 Java 编译失败版本均保留旧成功产物；独立原生契约通过，随后完整回归 **417 单元 + 377 集成通过，零失败/错误/跳过**，22:06:02 独立汇总校验成功，详见[证据](docs/project-execution-verification.md#ex11b--实际-jar-与失败版本验收)。使用获准的隔离 JDK 17.0.14，旧 Oracle 17.0.5 与全局默认不变，原生枚举偶发根因仍保留监测。下一步为 EX12 调度与取消；运行、HTTP 业务验收和网页接入尚未完成，执行模块仍默认关闭。本地完整闭环的总体开发范围已获准，见 [Agent 规格 §10](SPEC-project-agent.md#10-2026-10-19-完整闭环实施授权)。
 
 模块 ID 沿用[能力地图](FULL-PROJECT-CAPABILITY-MAP.md)的 `project-execution`，依赖 `project-source`，不反向依赖 Agent、交付或工作台。上游只读门面 PS21 已完成；当前网页仍走旧固定模板链路。
 
