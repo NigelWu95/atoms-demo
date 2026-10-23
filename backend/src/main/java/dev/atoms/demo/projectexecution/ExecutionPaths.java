@@ -57,6 +57,9 @@ final class ExecutionPaths implements AutoCloseable {
     }
 
     synchronized Task createBuild(UUID id) throws IOException { return create(Area.BUILD, id); }
+    synchronized Task createBuild(UUID id, dev.atoms.demo.execution.OwnedProcess.Budget budget) throws IOException {
+        return create(Area.BUILD, id, budget);
+    }
     synchronized Task createArtifact(UUID id) throws IOException { return create(Area.ARTIFACT, id); }
     synchronized Task createArtifact(UUID id, dev.atoms.demo.execution.OwnedProcess.Budget budget) throws IOException {
         return create(Area.ARTIFACT, id, budget);
@@ -110,6 +113,12 @@ final class ExecutionPaths implements AutoCloseable {
         if (task.area != Area.BUILD || !task.projectKey.equals(lease.directoryKey(path)))
             throw ExecutionRootLease.unavailable();
         return path;
+    }
+
+    /** Revalidate the held root lease; the returned path is an identity, not a transferable capability. */
+    synchronized Path checkedRoot() throws IOException {
+        checkedAreas();
+        return root;
     }
 
     synchronized Object privateDirectoryKey(Task task, Path child) throws IOException {

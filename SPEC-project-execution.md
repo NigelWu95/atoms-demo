@@ -1,6 +1,6 @@
 # Spec: project-execution · 完整工程受控构建与本机进程
 
-状态：2026-10-23，用户已确认本规格及 §10 三项取舍，并确认[实施计划](tasks/project-execution/plan.md)与[任务清单](tasks/project-execution/todo.md)；EX01–09、C-EX03、EX10a–c、EX10d1–d2、EX10d3a、b1/b2 领取与封存结算及 c1 工具探测日志已验证。10-22 完整回归报告为 401 单元 + 362 集成通过；中断续接后于 10-23 核对报告及独立 Failsafe 验收成功，详见[证据](docs/project-execution-verification.md#2026-10-22--ex10d3c1-工具版本探测的持久日志)。使用获准的隔离 JDK 17.0.14，旧 Oracle 17.0.5 与全局默认不变，原生枚举偶发根因仍保留监测。下一步为 c2 整体 worker。EX10 整体未完成，不是完整执行器已交付或已启用的声明。本地完整闭环的总体开发范围已获准，见 [Agent 规格 §10](SPEC-project-agent.md#10-2026-10-19-完整闭环实施授权)。
+状态：2026-10-23，用户已确认本规格及 §10 三项取舍，并确认[实施计划](tasks/project-execution/plan.md)与[任务清单](tasks/project-execution/todo.md)；EX01–09、C-EX03、EX10a–c、EX10d1–d2、EX10d3a、b1/b2 领取与封存结算、c1 工具探测日志及 c2a 期限/启动复核接口已验证。12:32:29 完整回归 **405 单元 + 362 集成通过**，详见[证据](docs/project-execution-verification.md#2026-10-23--ex10d3c2a-接线接口)。使用获准的隔离 JDK 17.0.14，旧 Oracle 17.0.5 与全局默认不变，原生枚举偶发根因仍保留监测。下一步为 c2b 整体 worker。EX10 整体未完成，不是完整执行器已交付或已启用的声明。本地完整闭环的总体开发范围已获准，见 [Agent 规格 §10](SPEC-project-agent.md#10-2026-10-19-完整闭环实施授权)。
 
 模块 ID 沿用[能力地图](FULL-PROJECT-CAPABILITY-MAP.md)的 `project-execution`，依赖 `project-source`，不反向依赖 Agent、交付或工作台。上游只读门面 PS21 已完成；当前网页仍走旧固定模板链路。
 
@@ -139,6 +139,8 @@ V023 已增加持久构建及阶段事件记录；运行、数据库绑定仍待
 工具绝对路径、私有执行根、受信策略和数据库配置由维护者提供，不从用户 prompt 或 HTTP 参数取值。未知根标记、链接、配置漂移或工具不兼容均拒绝。
 
 工具命令目录固定 npm/检查入口与 Maven Classworlds 启动方式，不使用源码包装器或继承个人 JVM 参数。Java 主进程显式设置私有 `user.home` / `java.io.tmpdir`；任务环境的 `JDK_JAVA_OPTIONS` 由平台只生成这两个属性，使正常继承环境的子 JVM 也使用任务目录，拒绝无法安全表示的双引号/反斜杠路径。该环境不修改宿主配置，不能阻止同 UID 代码主动改写环境或读取其他磁盘位置；仍不是 OS 沙箱。工具版本探测只返回版本与文件摘要，每路输出最多 16 KiB、单次最多 10 秒且服从任务总剩余期限。
+
+worker 使用 `ExecutionPaths.createBuild(id, budget)` 将目录容量扫描和分配纳入整轮剩余期限；分配后超时仍保留任务目录，不覆盖或删除证据。`checkedRoot()` 每次核对当前持有的根租约及区域身份，返回的路径只用于匹配配置，不能代替租约。`ExecutionToolProbe.run(..., inputs)` 接受可信内部调用者的启动复核，在既有 `OwnedProcess` preflight 内验证当前授权/来源/策略；被拒绝时返回其发行的准确未启动证明及固定错误，不向调用者泄漏原始异常。该复核后再次检查取消/剩余时间才启动工具。旧重载兼容既有工具契约测试，不能被 worker 用来省略复核；这些接口不构成整体 worker 或 OS 沙箱。
 
 日志仅包含任务/项目/执行标识、阶段、错误码、耗时和有界数值。仅持久化可解析的白名单诊断字段，如相对文件名、行号、错误分类；原始 stdout/stderr、源码行、SQL 值及凭据不回传浏览器或模型。无法安全提取时提供阶段/退出码，不能以调试方便为由记录整份输出。
 

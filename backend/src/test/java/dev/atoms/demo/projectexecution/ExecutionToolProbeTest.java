@@ -74,6 +74,67 @@ class ExecutionToolProbeTest {
         }
     }
 
+    @Test void launchGuardDenialPreventsExecutionAndKeepsNoProcessProof() throws Exception {
+        var locations = ExecutionToolchainTest.installation(temporary.toRealPath());
+        // Test-owned executable only; no source-controlled npm scripts or project shell access is enabled.
+        Files.writeString(locations.node(), "#!/bin/sh\nprintf launched > probe-launched\nprintf 'v24.20.0\\n'\n");
+        var budget = new ExecutionProcess.Deadline(Duration.ofSeconds(30));
+        var tools = ExecutionToolchain.capture(locations, List.of(), budget);
+        try (var paths = new ExecutionPaths(temporary.toRealPath().resolve("execution"), List.of())) {
+            UUID task = UUID.randomUUID();
+            var home = ExecutionToolHome.create(paths, paths.createBuild(task), budget);
+            for (boolean checked : List.of(true, false)) {
+                UUID execution = UUID.randomUUID();
+                assertThatThrownBy(() -> new ExecutionToolProbe().run(tools, ExecutionToolchain.Kind.NODE, home,
+                        budget, () -> false, task, execution, () -> {
+                            if (checked) throw new java.io.IOException("PRIVATE_AUTH_CANARY");
+                            throw new IllegalStateException("PRIVATE_AUTH_CANARY");
+                        })).isInstanceOfSatisfying(OwnedProcess.Failure.class, failure -> {
+                            assertThat(failure).hasMessage("EXECUTION_PREFLIGHT_FAILED").hasNoCause();
+                            assertThat(failure.stopped()).isNotNull();
+                            assertThat(failure.stopped().matches(task, execution, home.home())).isTrue();
+                        });
+                assertThat(home.home().resolve("probe-launched")).doesNotExist();
+            }
+            UUID execution = UUID.randomUUID();
+            var checked = new java.util.concurrent.atomic.AtomicBoolean();
+            var result = new ExecutionToolProbe().run(tools, ExecutionToolchain.Kind.NODE, home, budget,
+                    () -> false, task, execution, () -> {
+                        assertThat(home.home().resolve("probe-launched")).doesNotExist();
+                        checked.set(true);
+                    });
+            assertThat(checked).isTrue();
+            assertThat(result.summary().version()).isEqualTo("24.20.0");
+            assertThat(result.summary().identity()).isEqualTo(tools.identity(ExecutionToolchain.Kind.NODE));
+            assertThat(result.stopped().matches(task, execution, home.home())).isTrue();
+            assertThat(home.home().resolve("probe-launched")).hasContent("launched");
+        }
+    }
+
+    @Test void cancellationOrDeadlineExpiryDuringGuardStillPreventsLaunch() throws Exception {
+        var locations = ExecutionToolchainTest.installation(temporary.toRealPath());
+        Files.writeString(locations.node(), "#!/bin/sh\nprintf launched > probe-launched\nprintf 'v24.20.0\\n'\n");
+        var deadline = new ExecutionProcess.Deadline(Duration.ofSeconds(30));
+        var tools = ExecutionToolchain.capture(locations, List.of(), deadline);
+        try (var paths = new ExecutionPaths(temporary.toRealPath().resolve("execution"), List.of())) {
+            UUID task = UUID.randomUUID();
+            var home = ExecutionToolHome.create(paths, paths.createBuild(task), deadline);
+            for (String code : List.of("EXECUTION_CANCELLED", "EXECUTION_TIMEOUT")) {
+                var changed = new java.util.concurrent.atomic.AtomicBoolean();
+                OwnedProcess.Budget budget = () -> changed.get() && code.equals("EXECUTION_TIMEOUT")
+                        ? Duration.ZERO : deadline.remaining();
+                UUID execution = UUID.randomUUID();
+                assertThatThrownBy(() -> new ExecutionToolProbe().run(tools, ExecutionToolchain.Kind.NODE, home,
+                        budget, () -> changed.get() && code.equals("EXECUTION_CANCELLED"), task, execution,
+                        () -> changed.set(true))).isInstanceOfSatisfying(OwnedProcess.Failure.class, failure -> {
+                            assertThat(failure).hasMessage(code).hasNoCause();
+                            assertThat(failure.stopped().matches(task, execution, home.home())).isTrue();
+                        });
+                assertThat(home.home().resolve("probe-launched")).doesNotExist();
+            }
+        }
+    }
+
     /** Explicit manual no-download contract; never silently runs or skips in the default unit suite. */
     public static void main(String[] args) throws Exception {
         if (args.length != 4) throw new IllegalArgumentException("Expected node, npm, java, maven absolute locations");

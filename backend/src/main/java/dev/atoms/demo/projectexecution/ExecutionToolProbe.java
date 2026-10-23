@@ -19,6 +19,13 @@ final class ExecutionToolProbe {
 
     OwnedProcess.Result<Version> run(ExecutionToolchain tools, ExecutionToolchain.Kind kind, ExecutionToolHome home,
                                     OwnedProcess.Budget taskBudget, BooleanSupplier cancelled, UUID task, UUID execution) throws IOException {
+        return run(tools, kind, home, taskBudget, cancelled, task, execution, () -> {});
+    }
+
+    /** Internal worker hook for current authorization/source/policy checks; not a user-supplied command. */
+    OwnedProcess.Result<Version> run(ExecutionToolchain tools, ExecutionToolchain.Kind kind, ExecutionToolHome home,
+                                    OwnedProcess.Budget taskBudget, BooleanSupplier cancelled, UUID task, UUID execution,
+                                    OwnedProcess.Preflight inputs) throws IOException {
         var probeDeadline = new ExecutionProcess.Deadline(Duration.ofSeconds(10));
         OwnedProcess.Budget budget = () -> {
             Duration total = taskBudget.remaining(), probe = probeDeadline.remaining();
@@ -30,7 +37,12 @@ final class ExecutionToolProbe {
                     if (kind == ExecutionToolchain.Kind.JAVA || kind == ExecutionToolchain.Kind.MAVEN)
                         jvmSettings(text, home.home(), home.temporary(), tools.javaHome());
                     return null;
-                }, () -> { tools.verify(budget); home.verify(budget); });
+                }, () -> {
+                    tools.verify(budget); home.verify(budget);
+                    // Keep this inside OwnedProcess: a refusal must carry its positive no-process proof.
+                    // OwnedProcess checks cancellation and the same budget again before builder.start().
+                    inputs.check();
+                });
     }
 
     static String read(InputStream stream) throws IOException {

@@ -109,4 +109,41 @@ class ExecutionPathsTest {
             assertThat(Files.readString(paths.project(task).resolve("evidence"))).isEqualTo("retained");
         }
     }
+
+    @Test void buildAllocationUsesSharedBudgetAndRetainsEvidenceIfItExpiresAfterAllocation() throws Exception {
+        Path root = temporary.toRealPath().resolve("execution");
+        try (var paths = new ExecutionPaths(root, List.of())) {
+            UUID expired = UUID.randomUUID();
+            assertThatThrownBy(() -> paths.createBuild(expired, () -> java.time.Duration.ZERO))
+                    .hasMessage("EXECUTION_TIMEOUT");
+            assertThat(root.resolve("builds").resolve(expired.toString())).doesNotExist();
+            UUID scanning = UUID.randomUUID();
+            var steps = new java.util.concurrent.atomic.AtomicInteger(2);
+            assertThatThrownBy(() -> paths.createBuild(scanning, () -> steps.getAndDecrement() > 0
+                    ? java.time.Duration.ofSeconds(5) : java.time.Duration.ZERO)).hasMessage("EXECUTION_TIMEOUT");
+            assertThat(root.resolve("builds").resolve(scanning.toString())).doesNotExist();
+            UUID allocated = UUID.randomUUID();
+            Path marker = root.resolve("builds").resolve(allocated.toString()).resolve(".atoms-execution-task");
+            assertThatThrownBy(() -> paths.createBuild(allocated, () -> Files.exists(marker)
+                    ? java.time.Duration.ZERO : java.time.Duration.ofSeconds(5))).hasMessage("EXECUTION_TIMEOUT");
+            assertThat(marker).isRegularFile(); // Partial allocation is evidence, not a reusable empty slot.
+            assertThatThrownBy(() -> paths.createBuild(allocated)).isInstanceOf(IOException.class);
+            UUID successful = UUID.randomUUID();
+            var task = paths.createBuild(successful, () -> java.time.Duration.ofSeconds(5));
+            assertThat(paths.directory(task)).isEqualTo(root.resolve("builds").resolve(successful.toString()));
+        }
+    }
+
+    @Test void checkedRootRequiresLiveLeaseAndUnchangedAreaIdentity() throws Exception {
+        Path root = temporary.toRealPath().resolve("execution");
+        var paths = new ExecutionPaths(root, List.of());
+        try {
+            assertThat(paths.checkedRoot()).isEqualTo(root);
+            Files.move(root.resolve("builds"), temporary.resolve("original-builds"));
+            Files.createDirectory(root.resolve("builds"),
+                    PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rwx------")));
+            assertThatThrownBy(paths::checkedRoot).hasMessage("EXECUTION_STORAGE_UNAVAILABLE");
+        } finally { paths.close(); }
+        assertThatThrownBy(paths::checkedRoot).hasMessage("EXECUTION_STORAGE_UNAVAILABLE");
+    }
 }

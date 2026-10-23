@@ -793,3 +793,39 @@ PG 测试使用受控 no-op JVM 获取真实停止证明，工具身份来自临
 续接后的只读 PG 审计确认当前 schema 的 Agent 未决、关联 pending/活动编辑租约及构建未决均为 0，旧 Agent 协调锁无持有者，测试角色仍无数据库 CREATE 权限。旧 pa32b 未知执行仍 ACTIVE/pending、无停止证明且基线不变；两个旧源码失败项目及此前主动注入 Crash 的审计仍保留。SDKMAN 全局默认仍为 Oracle 17.0.5。未以新回归通过推断旧未知进程停止，也未删除旧记录。
 
 代码审查覆盖正确性、可读性、模块边界、安全和性能：两个主要文件只增加探测日志及其 PG 契约，SQL 参数化，短事务锁顺序固定、取锁后重新授权；最多读取 9 条探测事件，版本和事件体有界，文件检查不进入事务，拒绝调用者事务与提交失败重试。前述错误证明变异已捕获且恢复；未新增依赖、公开端点或默认执行。仅验收 c1，c2 整体 worker、EX10 整体、C-EX04 和 EX11 仍未完成；本次没有真实模型、SMTP、用户工程构建、推送或部署。
+
+## 2026-10-23 · EX10d3c2a 接线接口
+
+c1 已本地提交为 `15967ff`。继续接线前，四个既有接口/测试文件加 worker/集成测试至少六个主要文件，按计划的五文件上限将 c2 在原清单内分为 c2a 兼容接口和 c2b 整体组合；不新增另一份任务清单，也未改 OAuth 草稿。
+
+新增 `ExecutionPaths.createBuild(id, budget)` 复用既有分配器，容量检查、扫描及分配完成均消耗调用者预算；失败保留已分配证据。`checkedRoot()` 复用执行根租约和区域身份校验，返回路径不是可转移的执行权限。`ExecutionToolProbe.run(..., inputs)` 增加仅限内部调用的启动复核，在 `OwnedProcess` 的 preflight 内执行，拒绝能得到准确未启动证明；随后原进程基元仍复查取消和总期限。旧重载保持兼容，没有新的框架调用、公开端点、命令解释或 shell 权限。
+
+先增加四项测试，覆盖预算在分配前/扫描中/分配后耗尽、根区域替换/租约关闭、启动复核拒绝及异常脱敏、复核期间取消/超时。**01:32:12 RED**：`./mvnw -B -Dtest=ExecutionPathsTest,ExecutionToolProbeTest test` 因上述接口尚不存在而编译失败，54.947 秒，退出码 1。实现接口后，同一隔离 JDK 命令于 **01:33:37 在 testCompile 阶段失败**：写入既有 `ProjectAgentQueryIT.class` 时操作系统返回 `No space left on device`，51.667 秒，退出码 1。未运行到测试，不能声称 GREEN，也未做变异或全量回归。
+
+随后暂停源代码改动，只读检查确认无 Java/Git 遗留进程；Data 卷显示总容量 233 GiB、剩余约 1.5 GiB、Capacity 100%。项目 `.local` 约 4.6 GiB，`backend/target` 仅 41 MiB，前端依赖约 175 MiB。采样时空间已不为零，无法由此判断编译报错瞬间的占用来源；不将其误报为业务测试失败，也不修改断言或降低磁盘保留线。没有删除任何缓存、失败证据、私有配置或数据库，没有更改全局 JDK。需先解决磁盘空间，再重跑本片定向测试、变异与全量验证；c2a/c2b/EX10 保持未完成，本片代码未提交，不推送或部署。
+
+### 清理后恢复验证
+
+用户自行清理后明确要求继续，只读检查 Data 卷可用空间约 12 GiB，工作区仍为原四个主要文件及计划/证据修改，没有遗留 Java/Git 进程。沿用原 RED，不重复删除实现来制造编译失败；未改源代码即重新编译和测试。
+
+**12:11:48，沙箱内定向运行 13 项，1 失败、1 错误**：8 项目录测试通过，工具探测新旧两条真实执行路径遇到 `DESCENDANT_ENUMERATION_FAILED / PROCESS_ENUMERATION / RUNTIME_FAILURE`，得到 `EXECUTION_PROCESS_UNSETTLED`。没有将未知结果改成成功。根据沙箱权限要求，申请沙箱外同代码、同 JDK 重跑；**12:13:16，13 项全部通过，0 失败/错误/跳过，BUILD SUCCESS，4.786 秒，退出码 0**。这支持与运行环境有关，不能仅凭一次通过宣称已定位原生错误的全部根因。首次失败保留在本次工具输出及此记录；XML 在复制前已被后续成功运行覆盖，不误称保存了失败 XML。成功的两份新报告保存在 `.local/ex10c2a-focused-passed.pSqMpj`（0700），Java 均为 17.0.14。
+
+**12:14:44，启动复核变异被捕获**：临时移除 `inputs.check()`，沙箱外执行 `-Dtest=ExecutionToolProbeTest#launchGuardDenialPreventsExecutionAndKeepsNoProcessProof test`，1 项如预期失败（Expecting code to raise a throwable），无错误/跳过，26.646 秒，退出码 1。报告保存在 `.local/ex10c2a-mutation.veVsMx`（0700）。随后用补丁恢复校验，并只读确认第 44 行仍调用 `inputs.check()`，没有变异代码遗留。
+
+12:15:14 启动完整回归，命令如下；运行期间不修改生产/测试源代码，最终结果另行记录，不提前勾选任务：
+
+```sh
+env JAVA_HOME=/Users/wubingheng/atoms-demo/.local/jdk17-comparison.LlvDQi/jdk-17.0.14.jdk \
+  PATH=/Users/wubingheng/.nvm/versions/node/v24.20.0/bin:$PATH \
+  SPRING_DATASOURCE_URL='jdbc:postgresql://127.0.0.1:5432/atoms_demo_test?currentSchema=atoms_verify_20261021_ex10&connectTimeout=3&socketTimeout=5' \
+  ./mvnw -B -Pproject-execution-contract \
+  -Dexecution.test-config-directory=/Users/wubingheng/atoms-demo/.local/project-execution-acceptance.x5cvui verify
+```
+
+开始前只读审计确认当前 schema 的 Agent 未决、关联 pending/活动编辑租约及构建未决均为 0，旧未知执行及失败源码状态保留。恢复过程没有删除测试记录、目录证据或私有配置，也未授权真实模型、SMTP、推送或部署。
+
+**12:32:29，完整后端回归 405 单元 + 362 集成全部通过，0 失败/错误/跳过，BUILD SUCCESS，17:12，退出码 0。** 按 `12:15:14.322` 启动门槛独立核对 89/96 份新 XML，排除 18/3 份旧报告，所有新报告 Java 均为 17.0.14；本片四项新增测试包含在 405 项中。完整报告保存于 `.local/ex10c2a-full-passed.yBuaWS`（0700）。原账号、发布、源码编辑、Agent 协调/恢复、多轮任务、导出等既有链路通过，真实 CLI、付费模型、SMTP 及尚未实现的真实用户工程构建不在本次验收范围内。
+
+本轮平台后端 JAR 为 30,829,588 字节，SHA-256 `33f4bb5476e0a5d45cd470878a3d5d3d02c6f9e104d35c8293dadddf30c50b58`，不含 `.env`、平台测试配置或本片测试类。结束后只读 PG 核对当前 schema 的 Agent 未决、关联 pending/活动编辑租约及构建未决仍全为 0，旧 Agent 协调锁无持有者、测试角色无数据库 CREATE 权限；旧 pa32b 未知执行及两个源码失败项目未改。恢复测试的 `source_operation_uncertain` 对应 `ProjectSourceAgentCoexistenceIT` 主动注入的四阶段 `Crash`，该组 4 项通过，不混同于首次沙箱内枚举失败。SDKMAN 默认仍为 Oracle 17.0.5，磁盘可用约 13 GiB。
+
+按代码审查技能检查四个主要文件：只增加兼容重载和已有租约校验，不复制执行/文件拥有关系逻辑，不增加配置开关、依赖、数据库迁移或外部接口；预算沿用有界扫描，失败保留分配证据，启动复核位于准确未启动证明的发行边界内，取消/超时在复核后再次检查。固定命令、清洁环境和输出脱敏规则不变；这些合作式检查仍不能隔离同 UID 的恶意代码，也不能保证操作系统调用本身瞬时返回。变异已捕获并恢复，完整回归验证通过后仅勾选 c2a；c2b、EX10、C-EX04 与 EX11 保持未完成。没有修改私有 env、OAuth 草稿、日常服务或远程服务器。
