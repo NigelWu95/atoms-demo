@@ -133,6 +133,74 @@ class ExecutionNpmPolicyTest {
         }
     }
 
+    @Test void originalSeedNpmrcNeedsExplicitExternalApprovalAndExactSafeBytes() throws Exception {
+        byte[] npmrc = Files.readAllBytes(seed.resolve(".npmrc"));
+        var source = withNpmrc("frontend/.npmrc", npmrc);
+        assertThatThrownBy(() -> new ExecutionNpmPolicy(approval(manifest(), lock())).checkBuild(source))
+                .hasMessage("EXECUTION_NPM_APPROVAL_REQUIRED");
+        var policy = new ExecutionNpmPolicy(approvalWithNpmrc(npmrc));
+        assertThat(policy.checkBuild(source).packages()).isEqualTo(237);
+        assertThat(policy.checkPreparation(source).manifestSha256()).isEqualTo(hash(manifest()));
+        // The optional grant permits this file; legacy snapshots without it remain valid.
+        assertThat(policy.checkBuild(tree(manifest(), lock())).packages()).isEqualTo(237);
+        byte[] reformatted = (new String(npmrc, java.nio.charset.StandardCharsets.UTF_8) + "\n").getBytes();
+        assertThatThrownBy(() -> policy.checkBuild(withNpmrc("frontend/.npmrc", reformatted)))
+                .hasMessage("EXECUTION_NPM_POLICY_REJECTED");
+        assertThatThrownBy(() -> new ExecutionNpmPolicy(approvalWithNpmrc("other".getBytes())).checkBuild(source))
+                .hasMessage("EXECUTION_NPM_APPROVAL_REQUIRED");
+    }
+
+    @Test void externalHashCannotApproveArbitraryNpmConfigOrAnotherLocation() throws Exception {
+        for (String content : List.of("ignore-scripts=false\nengine-strict=true\n",
+                "ignore-scripts=true\nengine-strict=false\n",
+                "ignore-scripts=true\nengine-strict=true\nregistry=https://example.invalid/\n",
+                "ignore-scripts=true\nengine-strict=true\nnode-options=--require=./hook.js\n",
+                "ignore-scripts=true\nengine-strict=true\n//registry.npmjs.org/:_authToken=${TOKEN}\n",
+                "ignore-scripts=true\r\nengine-strict=true\r\n")) {
+            byte[] bytes = content.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            var policy = new ExecutionNpmPolicy(approvalWithNpmrc(bytes));
+            assertThatThrownBy(() -> policy.checkBuild(withNpmrc("frontend/.npmrc", bytes)))
+                    .hasMessage("EXECUTION_NPM_POLICY_REJECTED").hasNoCause();
+            assertThatThrownBy(() -> policy.checkPreparation(withNpmrc("frontend/.npmrc", bytes)))
+                    .hasMessage("EXECUTION_NPM_POLICY_REJECTED");
+        }
+        byte[] safe = Files.readAllBytes(seed.resolve(".npmrc"));
+        var policy = new ExecutionNpmPolicy(approvalWithNpmrc(safe));
+        for (String name : List.of(".npmrc", "backend/.npmrc", "frontend/nested/.npmrc", "frontend/.NPMRC"))
+            assertThatThrownBy(() -> policy.checkBuild(withNpmrc(name, safe)))
+                    .as(name).hasMessage("EXECUTION_NPM_POLICY_REJECTED");
+    }
+
+    @Test void originalCompleteTemplatePassesThePublishedSeedApprovalWithoutFiltering() throws Exception {
+        var files = new ArrayList<SourceTree.File>();
+        for (String name : Files.readAllLines(Path.of("../templates/full-project-v1.files")))
+            files.add(new SourceTree.File(name, Files.readAllBytes(Path.of("../templates/full-project-v1").resolve(name)),
+                    name.equals("backend/mvnw") ? 0100755 : 0100644));
+        var policy = new ExecutionNpmPolicy(Files.readAllBytes(Path.of("src/main/resources/projectexecution/seed-dependency-policy.json")));
+        assertThat(files).hasSize(35);
+        assertThat(policy.checkBuild(new ProjectSourcePolicy().validate(files)).packages()).isEqualTo(237);
+    }
+
+    @Test void npmrcGrantMustBeAnExactLowercaseSha256String() throws Exception {
+        for (Object value : List.of("", "A".repeat(64), "0".repeat(63), 17, true)) {
+            ObjectNode policy = (ObjectNode) json.readTree(approval(manifest(), lock()));
+            ((ObjectNode) policy.path("npm")).set("npmrcSha256", json.valueToTree(value));
+            assertThatThrownBy(() -> new ExecutionNpmPolicy(json.writeValueAsBytes(policy)))
+                    .hasMessage("EXECUTION_DEPENDENCY_POLICY_INVALID").hasNoCause();
+        }
+    }
+
+    private SourceTree withNpmrc(String name, byte[] bytes) throws Exception {
+        var files = new ArrayList<>(tree(manifest(), lock()).files());
+        files.add(new SourceTree.File(name, bytes, 0100644));
+        return new ProjectSourcePolicy().validate(files);
+    }
+    private byte[] approvalWithNpmrc(byte[] npmrc) throws Exception {
+        ObjectNode policy = (ObjectNode) json.readTree(approval(manifest(), lock()));
+        ((ObjectNode) policy.path("npm")).put("npmrcSha256", hash(npmrc));
+        return json.writeValueAsBytes(policy);
+    }
+
     private byte[] manifest() throws Exception { return Files.readAllBytes(seed.resolve("package.json")); }
     private byte[] lock() throws Exception { return Files.readAllBytes(seed.resolve("package-lock.json")); }
     private byte[] approval(byte[] manifest, byte[] lock) throws Exception {

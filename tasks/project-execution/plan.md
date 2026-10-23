@@ -143,7 +143,7 @@ V023 构建/事件已应用，EX10d3b2 追加 V024 封存产物摘要；后续�
 
 ## 6. 验证命令与证据规则
 
-以下是验证命令模板。EX01–07 对应的 `Execution*` 测试已存在并有[验证记录](../../docs/project-execution-verification.md)；EX08 提前引入独立 `project-execution-contract` profile，仅承载真实测试数据库只读契约。`ExecutionSeedBuildContractIT` 及后续任务测试仍待实现。任务落地后记录实际完整命令、时间、数量、失败/跳过、产物摘要；不能把此处命令模板当作已通过的结果。
+以下是验证命令模板。EX01–07 对应的 `Execution*` 测试已存在并有[验证记录](../../docs/project-execution-verification.md)；EX08 提前引入独立 `project-execution-contract` profile。EX11 正在该 profile 中加入 `ExecutionSeedBuildContractIT`，必须显式传入四个工具路径、私有契约目录及已有专用测试数据库目录，缺少参数直接失败；完整命令见[EX11 记录](../../docs/project-execution-verification.md#2026-10-23--ex11-原始种子真实构建接入)。先前仅带数据库参数的历史命令不能直接作为新增契约后的完整运行命令。任务落地后记录实际完整命令、时间、数量、失败/跳过、产物摘要；不能把此处命令模板当作已通过的结果。
 
 所有后端命令工作目录 `/Users/wubingheng/atoms-demo/backend`。以 EX01 为例，`U(X)` 为单测、`I(X)` 为带平台专用 PG 的集成测试，逗号分隔多个类：
 

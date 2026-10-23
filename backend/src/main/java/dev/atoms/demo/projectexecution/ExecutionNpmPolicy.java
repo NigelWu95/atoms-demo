@@ -12,6 +12,7 @@ import java.util.regex.Pattern;
 /** Source-external approval of exact bytes. No network, install, lock repair or approval from project files. */
 final class ExecutionNpmPolicy {
     private static final String REGISTRY = "https://registry.npmjs.org/";
+    private static final byte[] SEED_NPMRC = "ignore-scripts=true\nengine-strict=true\n".getBytes(java.nio.charset.StandardCharsets.UTF_8);
     private static final String NAME = "(?:@[a-z0-9][a-z0-9._-]*/)?[a-z0-9][a-z0-9._-]*";
     private static final Pattern LOCATION = Pattern.compile("node_modules/" + NAME + "(?:/node_modules/" + NAME + ")*");
     private static final Pattern VERSION = Pattern.compile("[0-9]+\\.[0-9]+\\.[0-9]+(?:-[A-Za-z0-9.-]+)?(?:\\+[A-Za-z0-9.-]+)?");
@@ -20,7 +21,7 @@ final class ExecutionNpmPolicy {
     private static final ObjectMapper JSON = new ObjectMapper()
             .enable(JsonParser.Feature.STRICT_DUPLICATE_DETECTION)
             .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
-    private final String manifestSha, lockSha, policySha;
+    private final String manifestSha, lockSha, npmrcSha, policySha;
 
     record Preparation(String manifestSha256, String baseLockSha256, String policySha256) {}
     record Verified(String manifestSha256, String lockSha256, String policySha256, int packages) {}
@@ -31,11 +32,13 @@ final class ExecutionNpmPolicy {
             fields(policy, Set.of("schema", "npm", "maven"));
             if (!policy.path("schema").isInt() || policy.path("schema").intValue() != 1) throw rejected();
             JsonNode npm = policy.path("npm");
-            fields(npm, Set.of("registry", "manifestSha256", "lockSha256"));
+            fields(npm, Set.of("registry", "manifestSha256", "lockSha256", "npmrcSha256"));
             if (!REGISTRY.equals(text(npm, "registry"))) throw rejected();
             manifestSha = text(npm, "manifestSha256");
             lockSha = npm.has("lockSha256") ? text(npm, "lockSha256") : null;
-            if (!manifestSha.matches("[a-f0-9]{64}") || lockSha != null && !lockSha.matches("[a-f0-9]{64}")) throw rejected();
+            npmrcSha = npm.has("npmrcSha256") ? text(npm, "npmrcSha256") : null;
+            if (!manifestSha.matches("[a-f0-9]{64}") || lockSha != null && !lockSha.matches("[a-f0-9]{64}")
+                    || npmrcSha != null && !npmrcSha.matches("[a-f0-9]{64}")) throw rejected();
             policySha = hash(approvedPolicy);
         } catch (IOException | RuntimeException error) { throw new IOException("EXECUTION_DEPENDENCY_POLICY_INVALID"); }
     }
@@ -66,7 +69,13 @@ final class ExecutionNpmPolicy {
     private JsonNode manifest(SourceTree tree) throws IOException {
         for (var file : tree.files()) {
             String name = file.path().substring(file.path().lastIndexOf('/') + 1).toLowerCase(Locale.ROOT);
-            if (name.equals(".npmrc") || name.equals("npm-shrinkwrap.json")
+            if (name.equals(".npmrc")) {
+                // npm reads project config separately from userconfig. Permit no general INI expansion/overrides.
+                // https://raw.githubusercontent.com/npm/cli/v11.19.0/docs/lib/content/configuring-npm/npmrc.md
+                if (!file.path().equals("frontend/.npmrc") || !Arrays.equals(file.content(), SEED_NPMRC)) throw rejected();
+                if (npmrcSha == null || !npmrcSha.equals(hash(file.content()))) throw new IOException("EXECUTION_NPM_APPROVAL_REQUIRED");
+            }
+            if (name.equals("npm-shrinkwrap.json")
                     || name.equals("package.json") && !file.path().equals("frontend/package.json")
                     || name.equals("package-lock.json") && !file.path().equals("frontend/package-lock.json")) throw rejected();
         }

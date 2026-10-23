@@ -146,11 +146,14 @@ U/I/REAL/ALL/COMPAT/DOC 的命令与权限条件见计划 §6。S = 1–2、M = 
 
 ## EX11 · 第一次真实种子工程构建
 
-- [ ] 完成 EX11。依赖：EX08–10。规模：M（3 文件）。
+- [ ] 完成 EX11。依赖：EX08–10。先做输入兼容，再以真实工具验收；每片最多 5 个主要文件。
+  - [x] EX11a：准确的模板 `.npmrc` 外部批准（`ExecutionNpmPolicy`、对应单测、`seed-dependency-policy.json`）。可选摘要授权只允许原模板两行安全配置和准确路径，不接受其他设置；无该文件的旧快照保持兼容。正式模板不删改。19:07:30 相关 17 单测和打包通过；固定内容检查变异已捕获并恢复。只验收输入兼容，完整 EX11 仍待真实构建及回归。
+  - [ ] EX11b：`ExecutionSeedBuildContractIT`（1 个主要文件，不另抽仅单处使用的 support）。显式现有 profile 和工具/私有测试配置，真实 worker 构建原始种子，验证 JAR/源码/报告与失败反例。若实测暴露需修改其他模块，保留证据并单列兼容小片，不静默放宽预算或检查。
+  - [ ] EX11c（阻塞 b 的兼容片，先于 b 验收）：优化 `SourceGitStore` 单对象读取及对应测试，两个主要文件。35 文件基线每次 121 个 Git 进程、三次 4522/4970/4834 ms；尝试用单次 `cat-file --batch` 同时获取类型/大小/原始字节，保留完整 SHA-1/树摘要/权限/路径/容量/期限复核，不缓存。相同样本复测、有明显收益且安全反例通过才保留；不提高工具探测预算。
 - 描述：加入显式 profile，用原生种子快照实际运行 npm/前端/Maven，尽早验证执行方案可行。
 - 验收：真实工具和实际 JAR、静态资源、Java 类及报告可检查；指定 profile 缺环境明确失败，默认不偷装/执行，CLI 与执行 profile 不互相开启；源码版本及锁摘要与构建清单一致，无模型请求。
 - 验证：REAL(ExecutionSeedBuildContractIT)；记录精确命令、工具版本、耗时、测试数和 JAR 摘要；破坏一个前端测试或 Java 编译后不得成功。
-- 主要文件：`backend/pom.xml`、`ET/ExecutionContractSupport.java`、`ET/ExecutionSeedBuildContractIT.java`。
+- 主要文件：EX11a 三个，EX11c 两个，EX11b 一个；分片验证与提交，使用 EX08 已存在的显式 profile，不改 `backend/pom.xml`。
 - 前提：使用新建受控临时工程；网络下载/DB 配置按批准范围执行，不复用个人 Maven/npm 凭据。
 - 接线前必须处理：正式模板 `frontend/.npmrc` 与当前禁止项目 npmrc 的策略冲突；不能把 c2b 测试快照的显式移除冒充正式模板已兼容。另测重复 Git 快照复核和真实探测的期限；若需改模板/策略或读取实现，先列最多 5 个主要文件的兼容小片，不放宽任意项目配置或跳过来源复验。
 

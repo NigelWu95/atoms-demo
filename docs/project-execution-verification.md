@@ -884,3 +884,40 @@ env JAVA_HOME=/Users/wubingheng/atoms-demo/.local/jdk17-comparison.LlvDQi/jdk-17
 据此勾选 c2b 及 EX10 的父项；**EX11、EX12、C-EX04 以及运行/交付/工作台保持未完成**。下一步为正式种子的 `.npmrc` 兼容及真实 npm/Maven 构建，不将测试内移除文件或受控输出等同于实际工程成功。
 
 提交前仅暂存本片 4 个主要文件与 5 份规格/任务/证据文档；`git diff --cached --check` 通过，38 个相对文档链接目标存在。内存中将暂存内容与私有配置中的 5 个已知密钥/密码值比对，命中为 0，没有输出这些值；OAuth 草稿保持未跟踪且不纳入本片提交。
+
+## 2026-10-23 · EX11 原始种子真实构建接入
+
+从 `5c3949d` 继续。先将原模板 `.npmrc` 的不兼容作为 EX11a：正式模板不删改，外部批准加可选 `npmrcSha256`，只准许准确路径的固定两行安全配置；任意其他内容即使摘要获准也拒绝，旧无该文件的快照仍兼容。依据 [npm 11.19.0 npmrc](https://raw.githubusercontent.com/npm/cli/v11.19.0/docs/lib/content/configuring-npm/npmrc.md) 与 [npm ci](https://raw.githubusercontent.com/npm/cli/v11.19.0/docs/lib/content/commands/npm-ci.md)，保留冻结安装和禁用脚本，私有配置不变。
+
+**18:31:15 RED**：`ExecutionNpmPolicyTest` 的 10 项中 1 失败、2 错误，原始 35 文件准入被拒绝、新授权字段不支持；0 跳过，退出码 1，01:04。归档 `.local/ex11a-red.O5T47C`，目录 0700、XML 0600。随后实现准确字节与外部摘要的双重检查，种子批准记录 `33452a1dec6251147fd8c556a0c5d426b7af2e837fc12ca4e102bf1dd6e6262f`，未修改模板、依赖或锁文件。
+
+**18:33:12 GREEN**：`-Dtest=ExecutionNpmPolicyTest,ExecutionMavenPolicyTest,ExecutionApprovedPolicyTest package`，**17 项通过，0 失败/错误/跳过**，BUILD SUCCESS，01:10，退出码 0。这只证明原始模板准入和策略，不是实际工程构建。
+
+EX11b 新增 `ExecutionSeedBuildContractIT`，直接调用原生 worker/工具，不注入模拟 runner；显式 profile 缺工具或私有目录参数即失败。成功工程检查 JAR 内 Java 类、静态首页、迁移及清单/数据库摘要，然后发布两个测试版本分别引入前端断言失败和 Java 编译失败，验证不能覆盖旧产物。仅执行原始种子的 MVC 测试，不启动监听服务或应用迁移；本机受控目录与失败状态保留，未知执行不由测试强制结算。四个主要文件（策略、策略测试、批准资源、真实契约），无新生产依赖/迁移/公开入口。真实验收结果待后续实际命令完成记录，不预先勾选 EX11。
+
+**18:36:48，首次真实契约未通过**：17 项策略测试通过；1 项契约在分配执行根时返回 `EXECUTION_STORAGE_UNAVAILABLE`，没有创建构建任务或运行 npm/Maven。准确原因是测试参数错误地指定仓库 `.local` 作为父目录，`ExecutionRootLease.validateRoot` 明确拒绝与平台仓库重叠。报告保存在 `.local/ex11b-root-failure.4JH4gb`；只读审计无新增未决，旧记录不变。未改生产保护，改用 `mktemp -d` 创建的仓库外私有目录 `/private/tmp/atoms-ex11-contract.APT7Jb` 后重新运行；原目录保留。
+
+真实验收命令（`backend`，仅路径入参数，无密码；获准沙箱外固定工具与网络）：
+
+```sh
+env JAVA_HOME=/Users/wubingheng/atoms-demo/.local/jdk17-comparison.LlvDQi/jdk-17.0.14.jdk \
+  PATH=/Users/wubingheng/.nvm/versions/node/v24.20.0/bin:$PATH \
+  SPRING_DATASOURCE_URL='jdbc:postgresql://127.0.0.1:5432/atoms_demo_test?currentSchema=atoms_verify_20261021_ex10&connectTimeout=3&socketTimeout=5' \
+  ./mvnw -B -Pproject-execution-contract \
+  -Dexecution.test-config-directory=/Users/wubingheng/atoms-demo/.local/project-execution-acceptance.x5cvui \
+  -Dexecution.contract-directory=/private/tmp/atoms-ex11-contract.APT7Jb \
+  -Dexecution.contract-node=/Users/wubingheng/.nvm/versions/node/v24.20.0/bin/node \
+  -Dexecution.contract-npm=/Users/wubingheng/.nvm/versions/node/v24.20.0/bin/npm \
+  -Dexecution.contract-java=/Users/wubingheng/atoms-demo/.local/jdk17-comparison.LlvDQi/jdk-17.0.14.jdk/bin/java \
+  -Dexecution.contract-maven=/Users/wubingheng/.m2/wrapper/dists/apache-maven-3.9.11/a2d47e15/bin/mvn \
+  -Dtest=ExecutionNpmPolicyTest,ExecutionMavenPolicyTest,ExecutionApprovedPolicyTest \
+  -Dit.test=ExecutionSeedBuildContractIT verify
+```
+
+**18:41:05，第二次真实契约失败**：17 项策略测试通过，1 项契约因原始种子构建为 `TIMED_OUT / EXECUTION_TIMEOUT` 而断言失败，退出码 1；worker 耗时 48,976 ms，尚未开始依赖安装。私有报告 `.local/ex11b-probe-timeout.tgeb4x` 与 `/private/tmp/atoms-ex11-contract.APT7Jb/seed-build-4668504190981952349` 原样保留。只读查询确认 NODE 探测完成，NPM 探测超时，任务 `35898596-960a-4c08-ac6a-0179946eec1e` 的 pending=false、worker_slot=null，拥有停止证据后正常结算，没有强制解锁。
+
+随后独立原生 `ExecutionToolProbeTest.main` 使用相同四个工具通过，版本为 Node 24.20.0、npm 11.19.0、隔离 Java 17.0.14、Maven 3.9.11，私有 HOME/工具身份有效。该检查不含工程启动前复核，不能替代完整构建。只读定点测量同一 35 文件源码（`cee9efc4-2c51-477c-9ff0-100f0a0a91ca` / `b14b7bc6-252e-48e3-b868-c379cb24e16c`），三次均启动 **121 个 Git 进程**，耗时 **4522 / 4970 / 4834 ms**，摘要均为 `836bbb221c92332f3d3f99a2f9c915a667867f34a7f78daa5031e54fe3070fc4`。诊断类先由 javac 编译到私有 `/private/tmp/atoms-ex11-timing.3YU5BT` 再运行；此前 source-launcher 因不同 classloader 的包私有访问而报 `IllegalAccessError`，未更改生产可见性或源码内容。
+
+据此单列 EX11c 两文件兼容片：每个 Git 对象原先分别启动大小查询与内容查询，尝试以 `cat-file --batch` 单对象调用合并，保留对象类型、大小、摘要和所有权限/目录/树检查。当前 Git 为 2.39.5；[官方手册](https://git-scm.com/docs/git-cat-file/2.38.0#_batch_output) 的默认格式为对象 ID、类型、大小、原始内容与 LF，2.38.1–2.39.5 无该手册变更。不缓存、不放宽探测或总期限；只有同条件复测收益及正确性通过才保留。EX11a、c、b 按各自范围验证和提交，完整 EX11 仍以真实构建及失败反例为准。
+
+**19:06:36，EX11a 变异被捕获**：临时移除固定两行内容比较，保留路径与外部摘要，`externalHashCannotApproveArbitraryNpmConfigOrAnotherLocation` 1 项按预期失败（任意配置被错误批准），0 错误/跳过，26.242 秒、退出码 1。报告 `.local/ex11a-mutation.1DmtT3`。恢复后 **19:07:30，17 项相关策略测试全部通过，0 失败/错误/跳过，打包 BUILD SUCCESS，26.971 秒、退出码 0**。EX11a 仅提交策略/资源/测试及文档；真实构建测试仍在下一片，不把两次失败契约写为通过。审查确认不新增依赖/公开配置/迁移，不执行项目任意 npm 配置；固定字节、路径、外部授权三项同时成立，读取/扫描预算不变。

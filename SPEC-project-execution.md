@@ -52,6 +52,8 @@
 - `ignore-scripts` 不禁止显式 `npm run` 的目标脚本，因此不是禁用工程代码执行的保证；受控流水线不能仅靠这个开关信任可修改的 scripts。[npm 11.19.0 配置定义](https://raw.githubusercontent.com/npm/cli/v11.19.0/workspaces/config/lib/definitions/definitions.js)
 - Maven 使用平台指定的发行版、私有 settings 和专用仓库缓存；检查 POM 的仓库、插件、父 POM、profiles 和 `.mvn` 注入入口。Maven 的用户 settings/仓库是独立配置层，不能默认继承个人凭据。[官方配置说明](https://maven.apache.org/guides/mini/guide-configuring-maven.html)
 
+原始种子保留 `frontend/.npmrc`，准确字节仅为 `ignore-scripts=true\nengine-strict=true\n`。外部策略 schema 1 的 npm 节新增可选 `npmrcSha256` 授权：文件出现时必须同时满足准确路径、上述固定字节与批准摘要；更改 registry、认证、Node 参数、换行、大小写或位置均拒绝，批准任意内容的摘要也不能绕过固定内容限制。无文件的旧快照无需此授权；旧批准格式仍可用于无 `.npmrc` 的版本。新策略不被旧执行器识别时拒绝，而非忽略字段继续执行。项目配置与 userconfig 是独立配置层，因此不能只指定私有 userconfig 就假定项目配置不会加载。[npm 11.19.0 配置文件](https://raw.githubusercontent.com/npm/cli/v11.19.0/docs/lib/content/configuring-npm/npmrc.md)
+
 需要更新锁文件时，另建有界的依赖准备任务：取得源码编辑租约 → 在任务副本按批准策略执行固定的 lock-only 操作 → 确认子进程结束 → 验证只有允许的锁文件发生变化 → 通过源码模块发布新版本。请求绑定原基线/修订号，竞争修改则拒绝；不构建一个未保存的锁文件版本。缺少批准或无法安全解析时返回明确诊断，不无限重试。
 
 ### 4.2 构建顺序
