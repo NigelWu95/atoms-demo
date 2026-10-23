@@ -1,6 +1,6 @@
 # project-execution · 开发任务
 
-状态：2026-10-23，规格及计划/任务已获用户确认，EX01–09、C-EX03、EX10a–c、EX10d1–d2、EX10d3a、b1/b2、c1 及 c2a 完成；12:32:29 获准的隔离 JDK 完整回归 **405 单元 + 362 集成通过**，下一项为 c2b 整体 worker，EX10 整体未完成。本机四套验收库已获准并创建。唯一依据为[规格](../../SPEC-project-execution.md)与[本模块计划](plan.md)，不复用旧工程导出的 PE 编号。任务勾选需附真实证据，不把下列拟新增类、命令或样本当作已有功能。
+状态：2026-10-23，规格及计划/任务已获用户确认，EX01–10 的内部能力完成，包含 c2b 整体构建 worker；获准的隔离 JDK 完整回归新报告 **408 单元 + 370 集成通过，零失败/错误/跳过**，中断后独立报告校验成功。下一项为 EX11 真实 npm/Maven 种子工程构建；EX12、C-EX04 及运行/网页接入尚未完成，默认保持关闭。本机四套验收库已获准并创建。唯一依据为[规格](../../SPEC-project-execution.md)与[本模块计划](plan.md)，不复用旧工程导出的 PE 编号。任务勾选需附真实证据，不把受控输出或下列拟新增类、命令、样本当作真实工程验收。
 
 当前进度：原子领取专项 10 项通过，锁编号共存变异被捕获；随后 17.0.5 相关回归因 Git 原生枚举失败，现场保留。用户批准后仅在项目忽略目录安装 Liberica 17.0.14+10，命令级指定 JDK：23:42:49 **401 单元 + 33 相关集成通过**，23:58:57 **401 单元 + 335 完整集成通过，零失败/错误/跳过**，b1 验收。原生枚举未复现，但未捕获原 errno，不能宣布根因完全证实；原 Oracle 17.0.5、全局默认、私有 env、服务器和旧审计均不变。详见[验证记录](../../docs/project-execution-verification.md#获准的项目隔离-jdk-对照)。
 
@@ -120,23 +120,23 @@ U/I/REAL/ALL/COMPAT/DOC 的命令与权限条件见计划 §6。S = 1–2、M = 
 
 ## EX10 · Java 检查与 JAR 封存
 
-- [ ] 完成 EX10。依赖：EX04、EX06–09。拆成以下小片，每片最多 5 个主要文件；保持本模块默认关闭。
+- [x] 完成 EX10。依赖：EX04、EX06–09。以下内部组合与受控进程测试均完成，每片最多 5 个主要文件；保持本模块默认关闭，真实工具构建另见 EX11。
   - [x] EX10a：有界 Surefire XML 报告校验（`ExecutionJavaReport`、`ExecutionJavaReportTest`）。只返回数值，拒绝空/失败/跳过/重跑失败及计数不符、DTD/外部实体/畸形报告；缺类 RED，计数变异被拦住，01:59:42 报告校验定向 6 项及打包通过，见验证记录。
   - [x] EX10b：前端静态产物的私有资源装配与复验，固定 Maven 资源参数（`ExecutionPackaging`、`ExecutionPackagingTest`、`ExecutionToolchain`、`ExecutionToolchainTest`）。不写源码，不覆盖旧输出；拒绝链接/篡改/容量及来源漂移。缺类 RED、副本复验变异被拦住；02:28:46 完整回归 363 单元 + 309 集成全部通过并打包，见验证记录。
   - [x] EX10c：JAR 和构建清单封存（`ExecutionArtifact`、`ExecutionArtifactManifest`、`ExecutionArtifactTest`、`ExecutionPaths`，共 4 个主要文件）。清单校验与文件 I/O 分开，目录分配新增共享预算重载；来源/工具/策略/检查与产物摘要绑定，拒绝空/越界/链接/替换及重复封存，失败保留证据。缺类 RED、复验变异被拦住；修正测试错误码及 JSON 数值节点预期后，03:13:33 全后端 369 单元 + 309 集成通过并打包，见验证记录。不代表已实际构建用户工程或发布成功状态。
-  - [ ] EX10d：Java 阶段与 worker 接线，按下面小片顺序实施，不提前实现调度。真实 npm/Maven 用户工程仍在 EX11。
+  - [x] EX10d：Java 阶段与 worker 接线，按下面小片顺序完成，不提前实现调度。真实 npm/Maven 用户工程仍在 EX11。
     - [x] EX10d1：固定 Java 阶段与本轮报告目录（`ExecutionJava`、`ExecutionJavaReports` 及对应两份单测，4 个主要文件）。只在匹配的停止证据之后读取新报告；拒绝旧输出、目录替换、链接、越界、空/失败/跳过测试，提交异常不重复完成。缺类 RED，定向 11 项通过；修正沙箱干扰后停止身份变异被捕获。首次全量有 1 项旧 Agent 存储失败，单独复测及第二轮全量通过，未修改原断言或生产逻辑；13:09:49 全后端 380 单元 + 309 集成通过，详情及未定位风险见验证记录。
     - [x] EX10d2：扩展 `ExecutionBuildJournal` 的 Java 意图及后端 cwd 停止校验，新增 `ExecutionJavaJournalIT`（2 个主要文件）。真实 PG 验证取消、停止、事件事务失败、资源保留和并发意图；成功仍为 PACKAGING，不发布整体成功。接口缺失 RED，16 项新旧日志测试通过，停止证明变异被捕获；14:07:28 完整后端 383 单元 + 317 集成通过，见验证记录。
-    - [ ] EX10d3：整体 worker 与仓储封存成功接线，拆为以下依赖有序小片，父项全部完成后再勾选。
+    - [x] EX10d3：整体 worker 与仓储封存成功接线，以下依赖有序小片均已验证。
       - [x] EX10d3a：专用测试库到固定 Java 阶段的受控传递（`ExecutionPrivateConfig`、`ExecutionTestDatabase`、`ExecutionProcess`、`ExecutionJava`、`ExecutionDatabaseLaunchIT`，5 个主要文件）。一次性内部授权绑定项目/构建/执行/backend cwd，实际启动前复验文件及 DB 身份；只追加四个 `APP_*` 环境变量，密码不进 argv/源码/事件，不向前端发放。真实只读 PG + 受控 JVM 验证拒绝/继承/配置漂移/脱敏；22:57:56 完整 401 单元 + 325 集成通过，含本片 8 项。不替代真实 Maven 工程验收。
       - [x] EX10d3b：持久构建领取与封存结算，按 b1/b2 两片完成（分别 3/4 个主要文件）。短事务校验状态/阶段/授权/取消，成功绑定封存摘要并释放容量；失败保留旧成功记录，未知结果不释放。b2 的 15 项 PG 测试及 401 + 350 完整回归通过，不提前实现 EX12 调度。
         - [x] EX10d3b1：原子领取排队任务（`ExecutionBuildRepository`、`ExecutionBuildClaim`、`ExecutionBuildClaimIT`，3 个主要文件）。项目行 → 构建行 → 容量事务锁；重新校验维护者/所有权/归档、原任务身份、取消和排队期限；双连接争用仅一方领取，缩容计入旧高槽位和未知执行。领取只到 PREPARING，不启动工具。锁已分为构建 `718395203`、Agent `718395202`，10 项真实 PG 测试通过且旧编号变异被拦截；获准的隔离 JDK 对照相关回归及 23:58:57 完整 401 单元 + 335 集成均通过。默认仍关闭，不代表 worker/调度器已实现。
         - [x] EX10d3b2：封存产物与整体成功的原子结算（`ExecutionArtifact`、`ExecutionBuildSettlement`、V024 追加迁移、`ExecutionBuildSettlementIT`，4 个主要文件）。绑定真实封存句柄和六个完整阶段，事务外复验文件，项目/构建锁内重新授权及保存摘要/状态/事件/释放容量；失败不改旧成功、未知不释放。锁等待期间权限撤销的 RED 已修正，移除阶段校验的变异被捕获；2026-10-22 01:01:30 完整 **401 单元 + 350 集成通过**，含本片 15 项 PG 测试。旧 V023 不改，后续拟定迁移顺延 V025/V026。只读审计无新增 Agent/构建未决，旧故障现场保留，见[验证记录](../../docs/project-execution-verification.md#2026-10-22--ex10d3b2-封存产物的原子结算)。不替代真实工程构建验收。
-      - [ ] EX10d3c：整体 worker 接线；检查发现版本探测同样启动进程，但尚无持久意图，先按以下两片实施，不绕过进程证据要求。真实 npm/Maven 用户工程仍由 EX11 验收。
+      - [x] EX10d3c：整体 worker 接线；先补齐版本探测的持久意图，再接通整条流程，不绕过进程证据要求。真实 npm/Maven 用户工程仍由 EX11 验收。
         - [x] EX10d3c1：工具探测持久日志（`ExecutionProbeJournal`、`ExecutionProbeJournalIT`，2 个主要文件）。在 PREPARING 按 Node/npm/Java/Maven 顺序提交一次性意图；完成必须匹配 build/execution/tool-home 停止证明及固定工具摘要、受支持版本。取消/失败原子落账，未知保留容量；锁内重新授权、事件失败整笔回滚，事件不含原始输出或路径。12 项 PG 测试通过、停止证明变异被捕获；10-22 完整报告 **401 单元 + 362 集成通过**，10-23 续接核对并独立 Failsafe 验收成功；只读审计无新增 Agent/构建未决，见[验证记录](../../docs/project-execution-verification.md#2026-10-22--ex10d3c1-工具版本探测的持久日志)。不启动真实 npm/Maven 构建，不新增迁移。
-        - [ ] EX10d3c2：`ExecutionBuildWorker` 串联冻结源码、策略、工具探测日志、测试库、前后端阶段和封存（worker 及测试/所需接线，最多 5 个主要文件，超出先拆）。持有正确执行根与协调权，共享总期限和取消；产物复验后才交给结算，不继承平台环境；I(ExecutionBuildWorkerIT) + ALL。探测完成记录不得替代六个真实构建阶段。
+        - [x] EX10d3c2：`ExecutionBuildWorker` 串联冻结源码、策略、工具探测日志、测试库、前后端阶段和封存，分为下列两个四文件小片。持有正确执行根与协调权，共享总期限和取消；产物复验后才交给结算，不继承平台环境；I(ExecutionBuildWorkerIT) + ALL 通过。探测完成记录不得替代六个构建阶段。
           - [x] EX10d3c2a：共享期限与启动复核的兼容接口（`ExecutionPaths`、`ExecutionPathsTest`、`ExecutionToolProbe`、`ExecutionToolProbeTest`，4 个主要文件）。目录分配从检查到完成使用调用者预算，核对执行根的持有关系；探测启动前执行内部授权/源码 preflight，拒绝时仍有准确未启动证明且不泄漏原始异常；旧调用保留。清理磁盘后定向 13 项通过，移除 preflight 的变异被捕获；12:32:29 完整 **405 单元 + 362 集成通过**。沙箱内进程枚举失败及沙箱外通过的环境差异如实保留；只读审计无新增 Agent/构建未决，见[证据](../../docs/project-execution-verification.md#2026-10-23--ex10d3c2a-接线接口)。不代表整体 worker 已接通。
-          - [ ] EX10d3c2b：整体 worker 与集成测试（最多 5 个主要文件）。使用 c2a 接口，一次性领取 → 冻结输入及维护者策略 → 四次有日志探测 → 前后端阶段 → 封存 → 原子结算；共享期限/取消/授权检查、失败不重试未知提交。I(ExecutionBuildWorkerIT) + ALL；受控进程夹具不替代 EX11 的真实 npm/Maven 构建。
+          - [x] EX10d3c2b：整体 worker、外部批准文件身份句柄及各自测试（`ExecutionBuildWorker`、`ExecutionApprovedPolicy`、`ExecutionBuildWorkerIT`、`ExecutionApprovedPolicyTest`，4 个主要文件）。一次性领取 → 冻结输入及维护者策略 → 四次有日志探测 → 前后端阶段 → 封存 → 原子结算；共享期限/取消/授权检查、失败不重试未知提交。3 项策略单测与 8 项真实 PG/Git/受控子进程集成通过，停止收据变异被捕获并恢复；完整新报告 **408 单元 + 370 集成通过**，18:20:18 独立 Failsafe 校验成功。只读审计无新增 Agent/构建未决，旧故障保留，见[证据](../../docs/project-execution-verification.md#2026-10-23--ex10d3c2b-整体构建-worker)。受控工具输出/JAR 字节及移除 `.npmrc` 的明确测试快照不替代 EX11 原生构建。
 - 描述：接入平台控制的前端资源装配和 Maven 测试打包，成功后封存来源及 JAR。
 - 验收：干净报告/测试数量和退出码通过后才封存；前后源码/lock 不变，产物非空普通文件且不超过 256 MiB；清单绑定来源/工具/策略/检查/JAR 摘要，失败保留上一成功记录。
 - 验证：U(ExecutionPackagingTest) + I(ExecutionBuildWorkerIT)，篡改、硬链接、越界、跳过测试、来源改变及失败提交反例。
@@ -152,6 +152,7 @@ U/I/REAL/ALL/COMPAT/DOC 的命令与权限条件见计划 §6。S = 1–2、M = 
 - 验证：REAL(ExecutionSeedBuildContractIT)；记录精确命令、工具版本、耗时、测试数和 JAR 摘要；破坏一个前端测试或 Java 编译后不得成功。
 - 主要文件：`backend/pom.xml`、`ET/ExecutionContractSupport.java`、`ET/ExecutionSeedBuildContractIT.java`。
 - 前提：使用新建受控临时工程；网络下载/DB 配置按批准范围执行，不复用个人 Maven/npm 凭据。
+- 接线前必须处理：正式模板 `frontend/.npmrc` 与当前禁止项目 npmrc 的策略冲突；不能把 c2b 测试快照的显式移除冒充正式模板已兼容。另测重复 Git 快照复核和真实探测的期限；若需改模板/策略或读取实现，先列最多 5 个主要文件的兼容小片，不放宽任意项目配置或跳过来源复验。
 
 ## EX12 · 调度、取消与容量结算
 

@@ -829,3 +829,58 @@ env JAVA_HOME=/Users/wubingheng/atoms-demo/.local/jdk17-comparison.LlvDQi/jdk-17
 本轮平台后端 JAR 为 30,829,588 字节，SHA-256 `33f4bb5476e0a5d45cd470878a3d5d3d02c6f9e104d35c8293dadddf30c50b58`，不含 `.env`、平台测试配置或本片测试类。结束后只读 PG 核对当前 schema 的 Agent 未决、关联 pending/活动编辑租约及构建未决仍全为 0，旧 Agent 协调锁无持有者、测试角色无数据库 CREATE 权限；旧 pa32b 未知执行及两个源码失败项目未改。恢复测试的 `source_operation_uncertain` 对应 `ProjectSourceAgentCoexistenceIT` 主动注入的四阶段 `Crash`，该组 4 项通过，不混同于首次沙箱内枚举失败。SDKMAN 默认仍为 Oracle 17.0.5，磁盘可用约 13 GiB。
 
 按代码审查技能检查四个主要文件：只增加兼容重载和已有租约校验，不复制执行/文件拥有关系逻辑，不增加配置开关、依赖、数据库迁移或外部接口；预算沿用有界扫描，失败保留分配证据，启动复核位于准确未启动证明的发行边界内，取消/超时在复核后再次检查。固定命令、清洁环境和输出脱敏规则不变；这些合作式检查仍不能隔离同 UID 的恶意代码，也不能保证操作系统调用本身瞬时返回。变异已捕获并恢复，完整回归验证通过后仅勾选 c2a；c2b、EX10、C-EX04 与 EX11 保持未完成。没有修改私有 env、OAuth 草稿、日常服务或远程服务器。
+
+## 2026-10-23 · EX10d3c2b 整体构建 worker
+
+从本地 `d5d3d55` 继续，使用增量实现、测试驱动、接口设计、安全检查及代码审查流程。范围为 `ExecutionBuildWorker`、外部批准文件的有界身份复验 `ExecutionApprovedPolicy`，及对应两份测试，共四个主要文件；无新依赖、迁移、公开入口、自动协调器或开关变更。
+
+**13:21:46 RED**：先新增测试，`-Dtest=ExecutionApprovedPolicyTest test` 因两个目标类尚不存在而编译失败，18.827 秒、退出码 1。随后实现同步单次组合：领取 → 固定源码 → 外部批准文件/工具/测试库 → 四个有日志探测 → 五个前端阶段 → 私有资源装配 → Java 阶段 → 产物封存 → 原子结算。任务期限取准入时与当前配置的较小值，过程中不重置；不自动重试未知日志或结算提交。
+
+沿用 Spring Boot 3.5.16 / Framework 6.2.19。只读参数绑定查询和各既有短事务组件分别使用 [JdbcTemplate](https://docs.spring.io/spring-framework/reference/6.2/data-access/jdbc/core.html#jdbc-JdbcTemplate) 与 [TransactionTemplate](https://docs.spring.io/spring-framework/reference/6.2/data-access/transaction/programmatic.html)，磁盘/工具/子进程不包在元数据事务中。接口仍要求未来协调者提供存活校验并保持执行根租约；本片不宣称已实现 EX12 的数据库协调锁。
+
+运维问题沿用既有持久事件回答：停在哪个阶段（build/probe/operation/phase）、是否确实停止（匹配的执行证明与 pending）、哪份产物成功（来源及摘要）。不复制原始 stdout/stderr、路径、SQL、密码或源码到事件；日志提交失败由调用者收到固定状态不可用错误，保留原意图等待 EX13 核对，不追加猜测性成功/失败事件。
+
+测试使用真实测试 PG、Git 和拥有停止证明的受控 JVM。版本输出、前端产物及 JAR 字节由测试夹具产生，不代表真实 npm/Maven 构建或可执行 JAR 已验收。完整模板样本移除项目内 `frontend/.npmrc` 后冻结为新版本，因为当前执行策略明确只允许平台私有 npmrc；未修改正式模板或放宽策略。专用应用测试库只读检查及向受控 Java 子进程的凭据传递不执行应用 DDL/DML。定向、变异和完整回归结果如下；不以夹具结果勾选 EX11 或 C-EX04。
+
+**13:43:42，首轮定向 3 单元 + 5 集成全部通过，零失败/错误/跳过，BUILD SUCCESS，14:48，退出码 0。** 私有归档 `.local/ex10c2b-focused-initial.Em6Lsi`（目录 0700、两份 XML 0600）。整体流程集成类耗时 856.6 秒；两次主线程只读采样分别在完整版本成功场景、取消/策略漂移场景的 Git 对象读取中，已确认推进而非凭无输出猜测卡死。完整源码复验仍逐对象启动 Git，未跳过检查或做未经测量的缓存优化；该耗时作为后续 EX11 性能观察项，不据此声称真实构建已满足时延要求。然后补充启动权限/根/事务边界、配置漂移、停止收据丢失测试，并加强入队上限测试为 60 秒入队后调大到 600 秒仍在原上限停止。
+
+**13:48:06，补充定向 3 单元 + 4 集成全部通过，零失败/错误/跳过，BUILD SUCCESS，03:04，退出码 0。** 归档 `.local/ex10c2b-boundaries-passed.ZTVF9T`。集成测试总数为 8，补充运行含 3 个新增场景及加强后的原期限场景，不把两轮相加误报为 9 个不同测试。
+
+**13:52:15，停止收据变异被捕获**：临时移除 worker 探测结果的 `stopped == null / matches` 校验，单独运行 `lostStopReceiptKeepsIntentAndCapacityWithoutAnotherLaunch`。出现 1 个预期错误 `EXECUTION_STATE_UNAVAILABLE`，无跳过，BUILD FAILURE，01:23，退出码 1；缺少该检查后流程继续尝试下一探测意图，未按契约直接返回待核对状态。持久日志仍拒绝后续执行，没有真正启动第二个工具。报告保存 `.local/ex10c2b-mutation.zREDqi`。随后补丁恢复第 162 行校验，再只读审计：当前 schema 新 Agent 未决、pending、关联活动编辑及构建未决均为 0，旧审计和源码失败项目保持不变，测试角色 CREATE 权限仍为 false。只有确实持有真实受控子进程停止证明的故障夹具才由测试收尾，不从 PID 猜测停止。
+
+**13:53 启动完整回归**，之后冻结生产/测试源码，仅补文档；报告新鲜度门槛为 `2026-10-23T13:53:00+08:00`，排除先前定向和变异报告。命令（`backend`）：
+
+```sh
+env JAVA_HOME=/Users/wubingheng/atoms-demo/.local/jdk17-comparison.LlvDQi/jdk-17.0.14.jdk \
+  PATH=/Users/wubingheng/.nvm/versions/node/v24.20.0/bin:$PATH \
+  SPRING_DATASOURCE_URL='jdbc:postgresql://127.0.0.1:5432/atoms_demo_test?currentSchema=atoms_verify_20261021_ex10&connectTimeout=3&socketTimeout=5' \
+  ./mvnw -B -Pproject-execution-contract \
+  -Dexecution.test-config-directory=/Users/wubingheng/atoms-demo/.local/project-execution-acceptance.x5cvui verify
+```
+
+### 完整回归续接核对与验收
+
+会话中断后，原 Maven 会话句柄已不可用，没有取得该次命令的最终退出码，故不补写为原命令 `exit 0`。只读检查确认没有遗留 Java/Git 进程；按上述启动门槛核对 **90 份单元报告：408 项，97 份集成报告：370 项，全部零失败/错误/跳过**，排除 18/3 份旧报告。新报告均使用 Java 17.0.14，最后一份集成报告时间为 **14:26:25**，`failsafe-summary.xml` 于 **14:26:26** 记录 completed=370、errors/failures/skipped/flakes=0、timeout=false。本片 3 项策略测试及 8 项 worker 集成均包含在总数内；worker 类耗时 864.188 秒，不作为真实工具构建性能结论。
+
+**18:20:18，独立校验已有报告成功，BUILD SUCCESS，1.210 秒，退出码 0**；没有重复运行测试、跳过测试或覆盖原报告。命令（`backend`）：
+
+```sh
+env JAVA_HOME=/Users/wubingheng/atoms-demo/.local/jdk17-comparison.LlvDQi/jdk-17.0.14.jdk \
+  PATH=/Users/wubingheng/.nvm/versions/node/v24.20.0/bin:$PATH \
+  ./mvnw -B -Pproject-execution-contract failsafe:verify
+```
+
+完整新报告归档于 `.local/ex10c2b-full-passed.vnnL8g`：目录 0700、XML 0600，90 份 Surefire、97 份 Failsafe 及一份汇总。本轮平台后端 JAR 为 **30,845,687 字节**，SHA-256 `c84ceb0f0dc7587b2da2c2dd729e965548b1def227ffb733990586fa3490f068`，包含两个新增生产类；这不是生成应用的可运行 JAR 证据。
+
+结束后只读审计确认当前 schema 的 Agent 未决、pending、关联活动编辑以及构建未决全为 0，旧 Agent 协调锁无持有者、测试角色数据库 CREATE 权限为 false。旧 pa32b 未知执行仍保留 pending/活动租约，两个旧源码失败项目状态及恢复夹具证据不变。SDKMAN 全局默认仍是 `17.0.5-oracle`；没有清理旧现场、改私有 env 或个人 Claude 配置、调用真实模型/SMTP、推送或部署。
+
+五轴自审结论：
+
+- 正确性：一次性领取、固定版本与旧产物保留、共享期限/取消、启动控制变化、停止收据丢失及未知提交均有测试；移除收据校验的变异已捕获且恢复后进入完整回归。
+- 可读性与架构：四个主要文件，worker 只组合既有快照/策略/日志/阶段/封存/结算，不复制进程拥有关系或恢复逻辑；测试接缝不向配置/API 暴露。无新依赖、迁移或公开接口。
+- 安全：授权在领取/启动/短事务内复核，参数化 SQL；外部批准文件按身份、字节和 64 KiB 上限检查，专用 DB 凭据仅进入受控 Java 启动环境，持久事件无原始输出。仍非 OS 沙箱，不对任意用户开启。
+- 性能：阶段数量固定，文件读取有界且受共享期限约束，Git/I/O/子进程不占元数据事务；重复 Git 对象读取已有明显耗时，EX11 须测真实探测预算并处理兼容，不宣称性能验收通过。
+
+据此勾选 c2b 及 EX10 的父项；**EX11、EX12、C-EX04 以及运行/交付/工作台保持未完成**。下一步为正式种子的 `.npmrc` 兼容及真实 npm/Maven 构建，不将测试内移除文件或受控输出等同于实际工程成功。
+
+提交前仅暂存本片 4 个主要文件与 5 份规格/任务/证据文档；`git diff --cached --check` 通过，38 个相对文档链接目标存在。内存中将暂存内容与私有配置中的 5 个已知密钥/密码值比对，命中为 0，没有输出这些值；OAuth 草稿保持未跟踪且不纳入本片提交。
