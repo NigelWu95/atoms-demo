@@ -981,3 +981,37 @@ env JAVA_HOME=/Users/wubingheng/atoms-demo/.local/jdk17-comparison.LlvDQi/jdk-17
 本轮自审覆盖正确性、接口边界、安全和性能：正式 35 文件模板不删改，`.npmrc` 必须同时满足准确路径、固定内容和外部摘要；Git 合并读取仍检查对象/大小/摘要，三个变异均被捕获后恢复；UNIT_TEST 的可变用户数据仅改到任务已有临时目录，npm 配置路径保持固定，真实子 JVM 验证了属性继承；实际 JAR 的数据库/清单/磁盘摘要一致，两个失败版本没有覆盖旧产物。未增加公开 API、数据库迁移或依赖，也未把本机定点读取约 55.9% 的收益声称为整轮构建性能保证。默认仍关闭，不构成任意代码安全沙箱；EX12、C-EX04、真实 HTTP 业务运行和新网页入口仍未完成。
 
 EX11d 本地提交 `2c65c1b`，仅四个实现/测试文件及对应文档；提交前 5 个私有值内存比对命中为 0，19 个相对链接有效。EX11b 单独保存原生契约与最终状态文档；该契约显式启用才执行，默认不连接真实工具或安装依赖。OAuth 草稿保持未跟踪，未推送或部署。
+
+EX11b 本地提交 `59c9700`。提交前 5 个私有值内存比对命中为 0，41 个相对链接有效；源码/测试在原生与完整回归后没有改动，状态文档更新不重跑验收。
+
+## 2026-10-23 · EX12a 持久取消入口
+
+按已确认的 EX12 拆成取消入口、独立协调租约、调度接线，先实现三个主要文件：`ProjectExecutionService`、`ExecutionBuildRepository`、`ExecutionCancellationIT`。沿用 [PostgreSQL 17 行锁](https://www.postgresql.org/docs/17/explicit-locking.html#LOCKING-ROWS) 与 [Spring 6.2 TransactionTemplate](https://docs.spring.io/spring-framework/reference/6.2/data-access/transaction/programmatic.html)，项目 → 构建锁的顺序和事务结束释放规则不变；锁后复核权限，取消 API 不持有进程句柄、不直接终止或启动进程。
+
+**22:15:06，首次 RED 为缺少 cancel 方法的编译失败，01:04、退出码 1**；同时发现新测试的 Stage 构造参数顺序错误，按实际记录声明修正。此时没有执行测试，不能将编译失败记作业务断言覆盖。实现后按下列命令在批准 schema 验证：
+
+```sh
+env JAVA_HOME=/Users/wubingheng/atoms-demo/.local/jdk17-comparison.LlvDQi/jdk-17.0.14.jdk \
+  PATH=/Users/wubingheng/.nvm/versions/node/v24.20.0/bin:$PATH \
+  SPRING_DATASOURCE_URL='jdbc:postgresql://127.0.0.1:5432/atoms_demo_test?currentSchema=atoms_verify_20261021_ex10&connectTimeout=3&socketTimeout=5' \
+  ./mvnw -B -o -Dtest=ExecutionSettingsTest -Dit.test=ExecutionCancellationIT verify
+```
+
+**22:36:49，7 单元通过，9 集成中 2 错误、0 失败/跳过，39.160 秒、退出码 1**。两项错误均在设置 Mockito stub 时发生，`spy` Spring AOP 代理导致 `SpringMockResolver` 的 `UnfinishedStubbingException`；业务方法尚未执行。报告保留 `.local/ex12a-proxy-fixture-failure.etg7hgq0`。修正为窄的项目服务委托，将锁操作继续交给原 Spring 代理，保留真实事务/行锁及原断言；不绕开生产权限检查。其他七项已覆盖排队原子取消、已领取与待核对容量、真实停止收据迟到时取消优先、终态/归档、越权、回滚脱敏和外部事务拒绝。最终通过及变异结果另记。
+
+**22:39:10 GREEN，7 单元 + 9 集成全部通过，零失败/错误/跳过，BUILD SUCCESS，01:15、退出码 0**；报告 `.local/ex12a-focused-passed.3kozv2wj`。取消/领取竞争实际使用两个 PG backend，结果只允许“先取消而不可领取”或“先领取，取消后仍保留 worker 容量”。真实子进程测试使用 Java `-version`，其停止收据暂不提交时仍为 pending；取消入口不能清除该意图，原 journal 收到实际停止收据后才结算 CANCELLED。不是模拟 npm 成功，也不替代 EX12c 的正在执行进程取消验收。
+
+**22:41:04，权限变异被捕获**：临时移除拿到项目/构建锁后的维护者复核，同一 9 项集成中恰有 `permissionIsRecheckedAfterTheProjectLock` 失败，0 错误/跳过，01:34、退出码 1；报告 `.local/ex12a-permission-mutation.9noaojgs`。随后恢复检查，运行全部单元及本片影响的准入/领取/结算集成，不重复刚通过且未改动的原生构建或 CLI 契约：
+
+```sh
+env JAVA_HOME=/Users/wubingheng/atoms-demo/.local/jdk17-comparison.LlvDQi/jdk-17.0.14.jdk \
+  PATH=/Users/wubingheng/.nvm/versions/node/v24.20.0/bin:$PATH \
+  SPRING_DATASOURCE_URL='jdbc:postgresql://127.0.0.1:5432/atoms_demo_test?currentSchema=atoms_verify_20261021_ex10&connectTimeout=3&socketTimeout=5' \
+  ./mvnw -B -o -Dit.test=ExecutionCancellationIT,ExecutionAdmissionIT,ExecutionBuildClaimIT,ExecutionBuildSettlementIT verify
+```
+
+自审：新增入口复用现有五秒事务、项目/构建行锁和 V023 事件触发器，没有引入迁移或依赖；所有权与维护者检查相互独立，归档的放行仅适用于取消。请求范围只含 UUID，不读取源码或接收命令/路径。排队释放与事件同事务，执行中/待核对状态不能仅凭 pending=false 就释放容量；返回字段沿用 BuildView，异常不包含 SQL/驱动信息。测试夹具仅保留其自身元数据，真实子进程通过原 journal 的停止收据收尾，没有清理旧未决现场。EX12a 通过后继续协调租约/调度，完整 EX12 与 C-EX04 仍不勾选。
+
+**22:46:54，恢复后的全部 417 单元 + 42 相关集成全部通过，0 失败/错误/跳过，BUILD SUCCESS，05:19、退出码 0。** 集成为取消 9、准入 8、领取 10、结算 15；按 22:41:05 门槛仅计 90 份新单元报告及 4 份新集成报告，旧 XML 不计数。报告与汇总归档 `.local/ex12a-related-passed.zl8hkqun`（0700/0600）。EX11 的完整 377 集成和独立原生契约保持原记录，不将本次 42 项称为完整集成回归。
+
+完成后的只读审计仍为新增 Agent 未决/pending/关联活动编辑租约及构建未决全部 0，旧协调锁无持有者，测试角色 CREATE 权限为 false；旧 Agent 未决和源码失败/中断记录不变。仅保存本地提交，未启用新模式、推送或部署。

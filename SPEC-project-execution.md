@@ -4,6 +4,8 @@
 
 模块 ID 沿用[能力地图](FULL-PROJECT-CAPABILITY-MAP.md)的 `project-execution`，依赖 `project-source`，不反向依赖 Agent、交付或工作台。上游只读门面 PS21 已完成；当前网页仍走旧固定模板链路。
 
+EX12 最新进度：EX12a 内部持久取消入口完成，22:46:54 全部 417 单元及 42 项相关集成通过；权限变异被捕获后恢复。下一项为协调租约和调度接线，EX12/C-EX04 尚未完成，见[记录](docs/project-execution-verification.md#2026-10-23--ex12a-持久取消入口)。此处相关回归与上方 EX11 完整回归分别记录。
+
 ## 1. 目标与边界
 
 把已保存的完整 Vue + Spring Boot 17 + PostgreSQL 源码版本，变成经检查的构建结果，并由平台在本机启动真实 Java 进程。新增业务接口、Java 服务和 SQL 不是导出时才套入的固定通用后端。
@@ -162,6 +164,8 @@ BuildView get(UUID owner, UUID project, UUID build);
 `submit` 必须在数据库事务外调用。先锁项目检查所有权/归档和幂等键，再在事务外读取准确版本的完整快照，最后重新授权并锁项目、分配等待槽位、原子保存意图/首条事件。不在持有项目锁时等待 Git。相同项目/键/版本返回原任务（包括终态），不同版本返回 `EXECUTION_IDEMPOTENCY_CONFLICT`，项目已有其他活动构建返回 `EXECUTION_PROJECT_BUSY`，队列满返回 `EXECUTION_QUEUE_FULL`。键最多 128 个 Java 字符，不允许空白键、控制字符或不完整的 Unicode 代理项；只保存 SHA-256，不保存原键。
 
 `get` 同样校验当前维护者、项目所有权及归档状态；视图只含任务/项目/来源 UUID、树摘要、状态、取消标记、稳定错误码、创建/完成时间和最后事件序号，不包含持久请求摘要、内部容量槽、路径或配置。配置及授权检查失败不能靠重放绕过。准入快照仅固定来源，不代表完成依赖批准、工具/应用库验证或可执行调度；后续 worker 仍需重新核对这些边界。
+
+`cancel(owner, project, build)` 是内部持久取消入口，仍无 HTTP 控制器。拒绝调用者已有事务，在独立短事务中依次锁当前所有者的项目和准确构建，再复核维护者配置及原任务 owner；归档允许所有者停止既有任务，项目转让不自动授予原任务执行/取消身份。QUEUED 受数据库约束保证没有执行意图，可原子写入 CANCELLED、固定错误码、完成时间及事件并归还队列。已领取、正在执行或 NEEDS_RECONCILIATION 只设置单调取消标记，即使 pending=false 也不释放 worker；原拥有者完成实际停止及日志结算后才能结束。终态原样返回，重复请求不追加事件，不调用工具、Git 或模型。数据库/提交异常返回固定 `EXECUTION_STATE_UNAVAILABLE`，不自动重试不明结果；调用者先查询持久状态。
 
 内部 `ExecutionBuildClaim.claim(owner, project, build)` 只把 QUEUED 原子转为 PREPARING，不是公开接口或自动调度器。调用者不能带入现存事务；新建最长 5 秒的短事务，依次锁项目行、构建行和构建容量。当前维护者、所有权/归档及原构建 owner 必须一致；旧任务不会因项目转让而自动交给新所有者执行。重复领取返回 `EXECUTION_BUILD_NOT_QUEUED`，不重放一个可重复启动的成功结果；取消、过期、容量不足分别返回固定码，并保持队列及事件不变，终态清理留给调度器。
 

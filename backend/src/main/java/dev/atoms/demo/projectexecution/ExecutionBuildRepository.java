@@ -29,6 +29,31 @@ class ExecutionBuildRepository {
                 .stream().findFirst().orElseThrow(() -> new ApiException(404, "EXECUTION_BUILD_NOT_FOUND", "构建不存在或无权访问。"));
     }
 
+    /** Caller first locks the project; keep the same ordering as claims and stage completion. */
+    ExecutionBuild lock(UUID project, UUID build) {
+        if (!TransactionSynchronizationManager.isActualTransactionActive())
+            throw new IllegalStateException("Execution cancellation requires a transaction");
+        return jdbc.query("SELECT * FROM execution_builds WHERE project_id=? AND id=? FOR UPDATE", ROW, project, build)
+                .stream().findFirst().orElseThrow(() -> new ApiException(404, "EXECUTION_BUILD_NOT_FOUND", "构建不存在或无权访问。"));
+    }
+
+    /** Accept only the row locked by this transaction. A non-queued task belongs to its executing worker. */
+    ExecutionBuild requestCancel(ExecutionBuild build) {
+        if (!TransactionSynchronizationManager.isActualTransactionActive())
+            throw new IllegalStateException("Execution cancellation requires a transaction");
+        if (build.finishedAt() != null) return build;
+        if (build.status().equals("QUEUED")) {
+            // QUEUED has no process intent by schema. Cancel plus capacity/event settlement is atomic.
+            jdbc.update("""
+                    UPDATE execution_builds SET cancel_requested=true,status='CANCELLED',error_code='EXECUTION_CANCELLED',
+                        queue_slot=null,finished_at=clock_timestamp() WHERE id=?
+                    """, build.id());
+        } else if (!build.cancelRequested()) {
+            jdbc.update("UPDATE execution_builds SET cancel_requested=true WHERE id=?", build.id());
+        }
+        return get(build.projectId(), build.id());
+    }
+
     void requireIdle(UUID project) {
         if (Boolean.TRUE.equals(jdbc.queryForObject(
                 "SELECT EXISTS(SELECT 1 FROM execution_builds WHERE project_id=? AND finished_at IS NULL)", Boolean.class, project)))

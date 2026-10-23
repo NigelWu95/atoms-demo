@@ -6,11 +6,13 @@ import dev.atoms.demo.source.ProjectSourceReadGateway;
 import java.time.Instant;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
+import org.springframework.dao.DataAccessException;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionException;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/** Internal opt-in admission only. No HTTP endpoint, worker, build command or automatic publication. */
+/** Internal opt-in admission, query and cancellation. No HTTP endpoint or process launch. */
 @Service
 public final class ProjectExecutionService {
     private final ExecutionSettings settings;
@@ -52,6 +54,27 @@ public final class ProjectExecutionService {
         authorize(owner);
         if (project == null || build == null) throw new ApiException(422, "EXECUTION_INVALID_INPUT", "项目或构建标识无效。");
         return transaction.execute(tx -> { lockProject(owner, project); return view(builds.get(project, build)); });
+    }
+
+    /** Commit the intent before returning. Only a never-claimed queued task can settle here. */
+    public BuildView cancel(UUID owner, UUID project, UUID build) {
+        authorize(owner);
+        if (project == null || build == null) throw new ApiException(422, "EXECUTION_INVALID_INPUT", "项目或构建标识无效。");
+        if (TransactionSynchronizationManager.isActualTransactionActive())
+            throw new IllegalStateException("Cancellation must commit independently before worker action");
+        try {
+            return transaction.execute(tx -> {
+                // An archive prevents new work, but must not prevent stopping the owner's existing task.
+                projects.lock(owner, project.toString());
+                var current = builds.lock(project, build);
+                authorize(owner); // Configuration may change while either row lock is awaited.
+                if (!current.ownerId().equals(owner)) throw ExecutionBuild.conflict("EXECUTION_BUILD_OWNER_CHANGED");
+                return view(builds.requestCancel(current));
+            });
+        } catch (DataAccessException | TransactionException error) {
+            // Unknown commit outcomes are queried explicitly, never retried or exposed with driver details.
+            throw new ApiException(503, "EXECUTION_STATE_UNAVAILABLE", "构建状态暂不可用，请查询任务状态。");
+        }
     }
 
     private ExecutionBuild existing(UUID owner, UUID project, ExecutionBuild.Request request) {
