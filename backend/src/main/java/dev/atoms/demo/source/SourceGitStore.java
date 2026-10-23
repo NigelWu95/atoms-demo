@@ -156,13 +156,27 @@ final class SourceGitStore {
     }
 
     private byte[] object(Path repo, String type, String id, int limit) throws IOException {
-        String length = text(run(repo, List.of("cat-file", "-s", validOid(id)), EMPTY, 32)).strip();
+        // One bounded process returns type, size and raw bytes; no filters, cache or persistent Git session.
+        // https://git-scm.com/docs/git-cat-file/2.38.0#_batch_output (unchanged through 2.39.5)
+        byte[] output = run(repo, List.of("cat-file", "--batch"),
+                (validOid(id) + "\n").getBytes(StandardCharsets.US_ASCII), limit + 128);
+        return decodeObject(type, id, limit, output);
+    }
+
+    static byte[] decodeObject(String type, String id, int limit, byte[] output) throws IOException {
+        int newline = index(output, 0, (byte) '\n');
+        if (newline >= 128) throw failure("SOURCE_STORAGE_UNAVAILABLE");
+        String header = text(Arrays.copyOfRange(output, 0, newline)), prefix = id + " " + type + " ";
+        if (!header.startsWith(prefix)) throw failure("SOURCE_STORAGE_UNAVAILABLE");
+        String length = header.substring(prefix.length());
+        if (!length.matches("0|[1-9][0-9]{0,9}")) throw failure("SOURCE_STORAGE_UNAVAILABLE");
         final int size;
         try { size = Integer.parseInt(length); }
         catch (NumberFormatException error) { throw failure("SOURCE_STORAGE_UNAVAILABLE"); }
-        if (size < 0 || size > limit) throw failure("SOURCE_STORAGE_UNAVAILABLE");
-        byte[] bytes = run(repo, List.of("cat-file", type, id), EMPTY, Math.max(1, limit));
-        if (bytes.length != size || !gitHash(type, bytes).equals(id)) throw failure("SOURCE_STORAGE_UNAVAILABLE");
+        if (size > limit || output.length - newline - 2 != size || output[output.length - 1] != '\n')
+            throw failure("SOURCE_STORAGE_UNAVAILABLE");
+        byte[] bytes = Arrays.copyOfRange(output, newline + 1, output.length - 1);
+        if (!gitHash(type, bytes).equals(id)) throw failure("SOURCE_STORAGE_UNAVAILABLE");
         return bytes;
     }
 

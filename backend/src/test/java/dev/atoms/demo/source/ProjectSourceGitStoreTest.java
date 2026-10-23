@@ -17,6 +17,47 @@ class ProjectSourceGitStoreTest {
     private final ProjectSourcePolicy policy = new ProjectSourcePolicy();
     private final SourceGitProcess git = new SourceGitProcess(Path.of("/usr/bin/git"));
 
+    @Test void decodesExactGitBatchBytesIncludingEmptyBlobs() throws Exception {
+        String empty = "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391";
+        assertThat(SourceGitStore.decodeObject("blob", empty, 0, (empty + " blob 0\n\n").getBytes(StandardCharsets.UTF_8)))
+                .isEmpty();
+        String hello = "ce013625030ba8dba906f756967f9e9ca394464a";
+        assertThat(SourceGitStore.decodeObject("blob", hello, 6, (hello + " blob 6\nhello\n\n").getBytes(StandardCharsets.UTF_8)))
+                .isEqualTo("hello\n".getBytes(StandardCharsets.UTF_8));
+    }
+
+    @Test void rejectsWrongBatchIdentityTypeSizeDigestTruncationAndAdditionalOutput() {
+        String id = "ce013625030ba8dba906f756967f9e9ca394464a";
+        for (String output : List.of("", id + " missing\n", id + " ambiguous\n", "0".repeat(40) + " blob 6\nhello\n\n",
+                id + " tree 6\nhello\n\n", id + " blob -1\n\n", id + " blob 2147483648\n\n",
+                id + " blob 06\nhello\n\n", id + " blob 5\nhello\n\n", id + " blob 7\nhello\n\n",
+                id + " blob 6\njello\n\n", id + " blob 6\nhello\n", id + " blob 6\nhello\n\r",
+                id + " blob 6\r\nhello\n\n", id + " blob 6\nhello\n\nextra", "x".repeat(128) + "\n"))
+            assertThatThrownBy(() -> SourceGitStore.decodeObject("blob", id, 6, output.getBytes(StandardCharsets.UTF_8)))
+                    .isInstanceOf(IOException.class).hasMessage("SOURCE_STORAGE_UNAVAILABLE");
+        assertThatThrownBy(() -> SourceGitStore.decodeObject("blob", id, 5,
+                (id + " blob 6\nhello\n\n").getBytes(StandardCharsets.UTF_8)))
+                .isInstanceOf(IOException.class).hasMessage("SOURCE_STORAGE_UNAVAILABLE");
+    }
+
+    @Test void readsEachObjectOnceWithoutLosingEmptyFilesUtf8OrTrailingNewlines() throws Exception {
+        Path parent = temporary.toRealPath();
+        UUID project = UUID.randomUUID(), version = UUID.randomUUID();
+        var count = new java.util.concurrent.atomic.AtomicInteger();
+        var measured = new SourceGitProcess(Path.of("/usr/bin/git"), java.time.Duration.ofSeconds(60),
+                handle -> count.incrementAndGet());
+        SourceTree input = policy.validate(List.of(file("empty.txt", ""), file("notes.md", "原始字节\n\n")));
+        try (var paths = new ProjectSourcePaths(parent.resolve("source"), parent.resolve("work"))) {
+            var store = new SourceGitStore(paths, measured, policy);
+            store.initialize(project);
+            store.save(project, version, null, input);
+            count.set(0);
+            assertTree(input, store.read(project, version));
+            // One reference lookup, one commit, one root tree and two blobs. No per-object size probe.
+            assertThat(count.get()).isEqualTo(5);
+        }
+    }
+
     @Test void roundTripsFullTreeAfterClosingAndReopeningStorage() throws Exception {
         Path parent = temporary.toRealPath();
         UUID project = UUID.randomUUID(), version = UUID.randomUUID();

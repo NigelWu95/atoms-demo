@@ -921,3 +921,19 @@ env JAVA_HOME=/Users/wubingheng/atoms-demo/.local/jdk17-comparison.LlvDQi/jdk-17
 据此单列 EX11c 两文件兼容片：每个 Git 对象原先分别启动大小查询与内容查询，尝试以 `cat-file --batch` 单对象调用合并，保留对象类型、大小、摘要和所有权限/目录/树检查。当前 Git 为 2.39.5；[官方手册](https://git-scm.com/docs/git-cat-file/2.38.0#_batch_output) 的默认格式为对象 ID、类型、大小、原始内容与 LF，2.38.1–2.39.5 无该手册变更。不缓存、不放宽探测或总期限；只有同条件复测收益及正确性通过才保留。EX11a、c、b 按各自范围验证和提交，完整 EX11 仍以真实构建及失败反例为准。
 
 **19:06:36，EX11a 变异被捕获**：临时移除固定两行内容比较，保留路径与外部摘要，`externalHashCannotApproveArbitraryNpmConfigOrAnotherLocation` 1 项按预期失败（任意配置被错误批准），0 错误/跳过，26.242 秒、退出码 1。报告 `.local/ex11a-mutation.1DmtT3`。恢复后 **19:07:30，17 项相关策略测试全部通过，0 失败/错误/跳过，打包 BUILD SUCCESS，26.971 秒、退出码 0**。EX11a 仅提交策略/资源/测试及文档；真实构建测试仍在下一片，不把两次失败契约写为通过。审查确认不新增依赖/公开配置/迁移，不执行项目任意 npm 配置；固定字节、路径、外部授权三项同时成立，读取/扫描预算不变。
+
+EX11a 本地提交 `858bda8`，绿色报告归档 `.local/ex11a-passed.Q2e45z`；提交前 27 个相对文档链接有效、5 个私有值内存比对命中为 0。未纳入 OAuth 草稿或未通过的真实构建测试。
+
+### EX11c · Git 单对象读取优化
+
+**19:10:22 RED**：先增加真实 Git 进程计数与空文件/中文/换行保持测试，期望单次完整读取为 5 个进程，原实现为 9，1 项失败、0 错误/跳过，22.707 秒、退出码 1；归档 `.local/ex11c-red.v7h74J`。随后仅改 `SourceGitStore` 的对象读取和其测试，默认 batch 格式准确匹配预期对象 ID/类型/非负规范大小，要求只有一个响应、准确内容长度和结尾 LF，重新计算对象摘要；输出仍有硬容量与共享期限，实际 Git 的停止/取消规则未改。
+
+**19:12:11 GREEN**：`ProjectSourceGitStoreTest,ProjectSourceGitProcessTest,SourceGitStopDiagnosticsTest,ProjectSourceDeadlineTest,ProjectSourceStorageBudgetTest` 共 **33 项全部通过，0 失败/错误/跳过**，43.324 秒、退出码 0；归档 `.local/ex11c-focused.AZdQMu`。包含损坏摘要、错误对象/类型/大小、缺失对象、超额输出、截断、别名目录、root 替换及既有取消/收尾场景。
+
+同一 JVM/命令/35 文件与三次样本、无同时运行测试的复测结果为 **61 个 Git 进程，2591 / 2132 / 2095 ms**；摘要三次均与基线相同。中位数由 4834 降为 2132 ms，约下降 **55.9%**，差值超过本轮样本波动，保留优化继续验证实际构建。该数据仅代表本机定点读取，不称为整轮构建时延或线上 SLA。
+
+**19:13:17，摘要变异被捕获**：临时取消返回内容的 SHA-1 检查，`rejectsWrongBatchIdentityTypeSizeDigestTruncationAndAdditionalOutput` 因损坏内容未被拒绝而失败，1 项失败、0 错误/跳过，25.821 秒、退出码 1；归档 `.local/ex11c-mutation.WZkKpu`。随后恢复校验；只读审计当前 schema 新 Agent/构建未决及关联活动租约均为 0，原未决记录保留。恢复后真实契约使用上方 EX11 命令，将 `-Dtest` 改为五个源码相关测试类（共 33 项），`-Dit.test` 保持原生种子构建；没有扩大工具 10 秒或任务 1800 秒期限。
+
+**19:29:19，本轮 33 单元通过、1 原生契约失败，03:50、退出码 1**。恢复后的源码测试及平台打包通过；真实构建 `4c9a3c6a-cd9a-4d66-b2dc-56891954a94d` 用时 166,707 ms，四个工具探测、npm ci、类型检查和 lint 均完成，原探测超时未重现。构建在 UNIT_TEST 后检查报 `EXECUTION_STORAGE_UNAVAILABLE`，pending=false、worker_slot=null；没有 JAR 或成功构建。报告 `.local/ex11b-vitest-home-failure.py6fhi`、`seed-build-5807344048823581784` 现场保留。
+
+定点检查发现实际 `test-results/unit.json` 为 0600/单链接/6034 字节，**15 项前端测试全部通过**。Vitest 5.0.3 在 `tool-home/Library/Application Support/vitest/.vitest-secret-token` 新增用户数据，而 `ExecutionToolHome.verify` 正确拒绝私有配置 HOME 的未批准顶级目录；未读取或输出该令牌。文件总数 8763、目录 1569、链接 21、特殊文件 0，不能误归因于十万项容量限制。新增 EX11d 仅调整 UNIT_TEST 的任务内 HOME，让此工具数据落在既有私有临时区；配置文件位置、摘要/身份复验、容量与无继承凭据保持不变。EX11c 的 33 项验证及性能收益足以保存本地兼容提交，完整 EX11 和整轮回归仍未完成。

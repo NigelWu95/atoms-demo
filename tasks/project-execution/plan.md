@@ -156,7 +156,7 @@ env PATH=/Users/wubingheng/.nvm/versions/node/v24.20.0/bin:$PATH \
   ./mvnw -B -Dit.test=ExecutionAdmissionIT verify
 ```
 
-`REAL(X)` 使用显式 `project-execution-contract` 套件；当前只有 EX08 数据库契约，真实工程构建/运行仍待 EX11 等任务。默认平台 `verify` 不自动连接这些私有验收库、安装嵌套工程依赖或运行生成后端，默认排除不算通过真实验收。新 profile 与既有 `agent-cli-contract` 使用两个独立排除组，启用其中一个不会启用另一个；只有同时显式启用才运行两者。指定 profile 时缺工具/应用 DB 配置须失败或明确阻断，不能 skip 后报完成。
+`REAL(X)` 使用显式 `project-execution-contract` 套件；包含 EX08 数据库契约与正在验收的 EX11 原生种子构建。默认平台 `verify` 不自动连接这些私有验收库、安装嵌套工程依赖或运行生成后端，默认排除不算通过真实验收。新 profile 与既有 `agent-cli-contract` 使用两个独立排除组，启用其中一个不会启用另一个；只有同时显式启用才运行两者。指定 profile 时缺工具/应用 DB 配置须失败或明确阻断，不能 skip 后报完成。
 
 EX08 的准确本机只读验收命令如下（仅私有目录路径作为参数，密码不进入命令行；这些四库仅在已批准本机环境存在）：
 
@@ -167,15 +167,23 @@ env PATH=/Users/wubingheng/.nvm/versions/node/v24.20.0/bin:$PATH \
   -Dtest=ExecutionTestDatabaseTest,ExecutionSettingsTest -Dit.test=ExecutionTestDatabaseIT verify
 ```
 
-EX11 的拟新增命令，当前不得当作已可执行：
+EX11 定向命令（私有契约目录先由维护者创建在平台仓库之外；工具路径仅为本机获准环境）：
 
 ```sh
-env PATH=/Users/wubingheng/.nvm/versions/node/v24.20.0/bin:$PATH \
+env JAVA_HOME=/Users/wubingheng/atoms-demo/.local/jdk17-comparison.LlvDQi/jdk-17.0.14.jdk \
+  PATH=/Users/wubingheng/.nvm/versions/node/v24.20.0/bin:$PATH \
   SPRING_DATASOURCE_URL='jdbc:postgresql://127.0.0.1:5432/atoms_demo_test?currentSchema=atoms_verify_20261021_ex10&connectTimeout=3&socketTimeout=5' \
-  ./mvnw -B -Pproject-execution-contract -Dit.test=ExecutionSeedBuildContractIT verify
+  ./mvnw -B -Pproject-execution-contract \
+  -Dexecution.test-config-directory=/Users/wubingheng/atoms-demo/.local/project-execution-acceptance.x5cvui \
+  -Dexecution.contract-directory=/private/tmp/atoms-ex11-contract.APT7Jb \
+  -Dexecution.contract-node=/Users/wubingheng/.nvm/versions/node/v24.20.0/bin/node \
+  -Dexecution.contract-npm=/Users/wubingheng/.nvm/versions/node/v24.20.0/bin/npm \
+  -Dexecution.contract-java=/Users/wubingheng/atoms-demo/.local/jdk17-comparison.LlvDQi/jdk-17.0.14.jdk/bin/java \
+  -Dexecution.contract-maven=/Users/wubingheng/.m2/wrapper/dists/apache-maven-3.9.11/a2d47e15/bin/mvn \
+  -Dit.test=ExecutionSeedBuildContractIT verify
 ```
 
-EX11 固定测试私有配置的入口及校验契约后，补充具体、不含凭据的配置路径参数；不提前提供一个虚构可执行的应用配置。真实网络依赖下载遇权限限制按工具流程请求授权；不修改个人 registry、代理或证书校验。
+结果以验证记录为准，命令可执行不代表已通过。真实网络依赖下载遇权限限制按工具流程请求授权；不修改个人 registry、代理或证书校验。
 
 `ALL` 为同上述 Node/schema 前缀的 `./mvnw -B verify`。`COMPAT` 至少包括被改动进程/源码的原测试、Agent 显式离线 CLI 契约和旧固定模板构建/运行测试；不得使用 PA-LIVE。源码 Python 和前端回归沿用：
 
