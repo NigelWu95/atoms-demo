@@ -1,6 +1,6 @@
 # project-execution · 实施计划
 
-状态：2026-10-24，用户已确认本计划及 EX01–EX30 任务，连续实施；检查点报告证据，不逐小项请求开始。依据[规格](../../SPEC-project-execution.md)，规划基线 `1e3a13a`、计划提交 `ee5096a`，当前分支 `feature/standalone-engineering`。EX01–14 和 C-EX04 已完成：实际构建和崩溃恢复已验收，依赖准备任务与构建共享容量、原子绑定源码编辑租约。16:29:39 全部 **439 单元 + 156 项相关集成通过**，零失败/错误/跳过；见[任务清单](todo.md)与[验收记录](../../docs/project-execution-verification.md#2026-10-24--ex14b-依赖准备准入)。下一项 EX15 实际 lock-only 与新源码发布，每片仍最多 5 个主要文件。新模式默认关闭，尚未启动实际 HTTP 服务或接入网页。
+状态：2026-10-24，用户已确认本计划及 EX01–EX30 任务，连续实施；检查点报告证据，不逐小项请求开始。依据[规格](../../SPEC-project-execution.md)，规划基线 `1e3a13a`、计划提交 `ee5096a`，当前分支 `feature/standalone-engineering`。EX01–14、C-EX04 及 EX15a/b 已完成：实际构建、崩溃恢复和依赖准备准入已验收，真实 npm 锁文件生成经最终候选校验保存为新源码版，重复执行无变更不造版本；见[任务清单](todo.md)与[验收记录](../../docs/project-execution-verification.md#2026-10-24--ex15b-实际-npm-锁文件与源码发布)。下一项 EX15c 接通准备任务 worker，每片仍最多 5 个主要文件。新模式默认关闭，准备调度恢复、实际 HTTP 服务和网页尚未接通。
 
 ## 1. 交付范围与组织
 

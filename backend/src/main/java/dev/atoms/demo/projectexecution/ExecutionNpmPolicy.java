@@ -103,7 +103,9 @@ final class ExecutionNpmPolicy {
                 if (!file.path().equals("frontend/.npmrc") || !Arrays.equals(file.content(), SEED_NPMRC)) throw rejected();
                 if (npmrcSha == null || !npmrcSha.equals(hash(file.content()))) throw new IOException("EXECUTION_NPM_APPROVAL_REQUIRED");
             }
-            if (name.equals("npm-shrinkwrap.json")
+            // npm install also consults yarn.lock; it is not covered by our approved npm lock digest.
+            // https://raw.githubusercontent.com/npm/cli/v11.19.0/docs/lib/content/commands/npm-install.md
+            if (name.equals("npm-shrinkwrap.json") || name.equals("yarn.lock")
                     || name.equals("package.json") && !file.path().equals("frontend/package.json")
                     || name.equals("package-lock.json") && !file.path().equals("frontend/package-lock.json")) throw rejected();
         }

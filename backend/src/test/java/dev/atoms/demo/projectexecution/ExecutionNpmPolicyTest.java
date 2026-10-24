@@ -70,6 +70,17 @@ class ExecutionNpmPolicyTest {
         assertThatThrownBy(() -> policy.checkPrepared(base, tree(manifest, unapproved))).hasMessage("EXECUTION_NPM_POLICY_REJECTED");
     }
 
+    @Test void rejectsYarnLockBeforeNpmCanUseAnUnapprovedResolutionInput() throws Exception {
+        byte[] manifest = manifest();
+        var policy = new ExecutionNpmPolicy(approval(manifest, null));
+        for (String name : List.of("frontend/yarn.lock", "yarn.lock", "frontend/YARN.LOCK")) {
+            var files = new ArrayList<>(tree(manifest, null).files());
+            files.add(new SourceTree.File(name, "unapproved-resolution-input".getBytes(), 0100644));
+            var base = new ProjectSourcePolicy().validate(files);
+            assertThatThrownBy(() -> policy.checkPreparation(base)).hasMessage("EXECUTION_NPM_POLICY_REJECTED");
+        }
+    }
+
     @Test void eitherInputChangingInvalidatesApprovalEvenWhenTheOtherStillMatches() throws Exception {
         byte[] manifest = manifest(), lock = lock();
         var policy = new ExecutionNpmPolicy(approval(manifest, lock));

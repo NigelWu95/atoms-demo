@@ -1239,3 +1239,24 @@ EX14 完成。真实 npm lock-only、停写核对、只接受锁文件变化及�
 `ExecutionNpmPolicy.checkPrepared` 比较基线与候选的全部路径、文件模式和字节，只允许普通文本模式的 `frontend/package-lock.json` 新增或变化；新锁必须与清单匹配，且满足 registry、完整性及依赖图检查。返回独立的 `Prepared` 结果，不复用构建批准类型；仅有准备批准时，合法的新锁仍不能通过 `checkBuild`。
 
 16:43:26，缺少新接口的红灯编译失败；16:46:28，12 单元 + 22 相关集成全部通过，零失败/错误/跳过。16:49:15 移除文件集合检查后，“额外源码不得进入候选”的测试按预期失败，已恢复并重新验证。日志为 `.local/ex15a-red.log`、`ex15a-green.log`、`ex15a-mutation.log`、`ex15a-restored.log`。数据库仍使用批准 schema，无新迁移、模型或 SMTP 调用；本片不代表实际 npm 准备 worker 已完成。
+
+## 2026-10-24 · EX15b 实际 npm 锁文件与源码发布
+
+新增固定的 lock-only 命令适配：在源码副本根目录启动一个受控 Node 进程，先核对 Node 24.20.x/npm 11.19.0，再通过 `npm install --prefix frontend --package-lock-only --ignore-scripts --no-audit --no-fund` 生成锁。两次子调用同属该进程，返回根目录身份的停止证明；不使用 shell，HOME、npm 配置及缓存均为执行任务私有目录。旧 Agent 无验证器入口继续走原发布路径，不因新校验接口额外读取候选；新入口仍校验最终封存内容。
+
+命令语义依据 [npm 11.19.0 install](https://raw.githubusercontent.com/npm/cli/v11.19.0/docs/lib/content/commands/npm-install.md)、[prefix 配置](https://raw.githubusercontent.com/npm/cli/v11.19.0/docs/lib/content/using-npm/config.md)和 [Node 24.20.0 child_process](https://raw.githubusercontent.com/nodejs/node/v24.20.0/doc/api/child_process.md)。代码检查与真实测试不代表同 UID 恶意进程隔离。
+
+受控 CLI 的真实 Node 父子进程覆盖正确参数和隔离环境、版本不符不执行安装，以及版本探测中取消后的停止证明；17:00:13，10 项相关单元通过。17:05:07，显式 `project-execution-contract` 的 3 单元 + 1 实际 npm/source 集成通过，耗时 2:32；没有假 npm runner，没有生成或启动 JAR，也没有访问业务数据库。结果如下：
+
+- 完整种子移除锁后作为基线，真实 npm 只新增 `frontend/package-lock.json`，项目内未生成 `node_modules`。250 个依赖条目通过来源、完整性和清单一致性检查。
+- 项目 `a34e8fa4-2353-4055-8214-58469c3c2b06`，基线 `8b81db1a-ce1c-42c3-9167-88a916eed2b7`，新源码版 `44f41410-50d9-4398-84d4-d89482e311c6`；旧基线摘要不变。
+- 新锁 SHA-256：`19f70f91a7c9f65b0d794e9e8abd8d72adfb2fbaf61f50c441c2b8290862c8cc`。准备批准不含锁摘要时，构建检查仍拒绝新锁；测试明确更新源码外批准后再次运行，返回无变更，项目仍为三版（初始化、缺锁基线、准备结果）。
+- 原始现场保留在 `/private/tmp/atoms-ex11-contract.APT7Jb/lock-preparation-11705763089731212365`；报告/日志私有归档 `.local/ex15b-native-passed.5zu7xobm`。
+
+这是命令、源码网关和 npm 策略的真实组合验收。准备任务的领取、执行意图/状态结算及 worker 尚待 EX15c 接入；完整任务路径的真实契约仍是 EX15d，不提前勾选 EX15 或 C-EX05。
+
+17:11:41，全部 **444 单元 + 68 项相关集成通过**，零失败/错误/跳过，BUILD SUCCESS、5:20、退出码 0。95 份新单元报告、14 份相关集成报告与日志私有归档 `.local/ex15ab-compat-passed.h6qe578p`；覆盖源码编辑、租约、停写、发布期限、恢复及旧 Agent 准入/执行/取消/恢复。旧入口避免额外候选读取的兼容修正单独提交 `2620634`。
+
+核对固定版本 npm install 文档发现，它也可能以 `yarn.lock` 为解析输入。17:12:43 新拒绝用例先红灯（1 失败）；随后在已有清单扫描中明确拒绝该文件。17:16:39，**16 单元 + 10 项准备准入集成通过**，零失败/错误/跳过，BUILD SUCCESS、1:49、退出码 0；归档 `.local/ex15b-policy-passed.n50hvmo7`（0700/0600）。此定向运行与前一轮 444 单元分开记载，不声称执行过 445 项全单元回归。
+
+收尾只读审计：当前 schema 累计 38 条准备记录均已结束，pending、活动编辑、共享槽、投影不一致与协调锁均为 0；新 Agent/构建没有未决执行。三份历史未知执行的任务/租约摘要、旧源码失败现场及误运行的 15 条任务/34 条事件不变。自审确认固定 argv、不继承个人环境、校验最终封存内容、真实父子进程停止证明和新锁批准边界；命令、策略及测试共 5 个主要文件。未推送、部署、调用模型/SMTP或修改私有 env；准备后台任务链路仍待下一片。

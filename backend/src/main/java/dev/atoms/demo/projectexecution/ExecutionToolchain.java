@@ -98,6 +98,32 @@ final class ExecutionToolchain {
     ExecutionToolFiles.Summary identity(Kind kind) { return identities.get(kind).summary(); }
     Path javaHome() { return javaHome; }
 
+    /**
+     * One owned root process covers both the npm version probe and lock generation.
+     * npm --prefix selects frontend without changing the root receipt's cwd.
+     * https://raw.githubusercontent.com/npm/cli/v11.19.0/docs/lib/content/using-npm/config.md
+     * https://raw.githubusercontent.com/nodejs/node/v24.20.0/doc/api/child_process.md
+     * Caller must hold the source edit capability and validate it again in process preflight.
+     */
+    ExecutionProcess.Invocation lockPreparation(ExecutionToolHome home, Path editableProject) throws IOException {
+        String controller = """
+                const child = require('node:child_process');
+                if (!/^24\\.20\\.\\d+$/.test(process.versions.node)) process.exit(71);
+                const cli = process.argv[1];
+                let version;
+                try { version = child.execFileSync(process.execPath, [cli, '--version'],
+                    {encoding:'utf8', maxBuffer:1024, stdio:['ignore','pipe','pipe'], shell:false}).trim(); }
+                catch (_) { process.exit(72); }
+                if (version !== '11.19.0') process.exit(72);
+                const result = child.spawnSync(process.execPath, [cli, ...process.argv.slice(2)],
+                    {stdio:['ignore','inherit','inherit'], shell:false});
+                process.exit(result.error || result.signal || !Number.isInteger(result.status) ? 73 : result.status);
+                """.replace('\n', ' ');
+        return invocation(Kind.NODE, List.of("--input-type=commonjs", "-e", controller,
+                resolved.get(Kind.NPM).toString(), "install", "--prefix", editableProject.resolve("frontend").toString(),
+                "--package-lock-only", "--ignore-scripts", "--no-audit", "--no-fund"), editableProject, home);
+    }
+
     ExecutionProcess.Invocation probe(Kind kind, ExecutionToolHome home) throws IOException {
         return switch (kind) {
             case NODE -> invocation(Kind.NODE, List.of("--version"), home.home(), home);

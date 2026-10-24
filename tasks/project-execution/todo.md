@@ -1,6 +1,6 @@
 # project-execution · 开发任务
 
-状态：2026-10-24，规格及 EX01–EX30 计划已获用户确认，EX01–14 和 C-EX04 已完成。原始种子实际构建、启动恢复及依赖准备准入通过；准备任务与构建共享容量，并原子绑定源码编辑租约。16:29:39 全部 **439 单元 + 156 项相关集成通过**，零失败/错误/跳过，详见[证据](../../docs/project-execution-verification.md#2026-10-24--ex14b-依赖准备准入)。此前原生构建及 EX11 完整回归证据单独保留。下一项 EX15 实际 lock-only 与新源码发布；准备调度恢复、应用运行和网页接入尚未完成，默认保持关闭。本机四套验收库已获准并创建。唯一依据为[规格](../../SPEC-project-execution.md)与[本模块计划](plan.md)，不复用旧工程导出的 PE 编号；任务勾选须附真实证据。
+状态：2026-10-24，规格及 EX01–EX30 计划已获用户确认，EX01–14、C-EX04 及 EX15a/b 已完成。真实 npm 仅生成锁文件并通过封存校验发布新源码版，第二轮无变更不造版本。17:11:41 全部 **444 单元 + 68 项相关集成通过**；补齐 yarn.lock 输入拒绝后，17:16:39 定向 **16 单元 + 10 集成通过**，与真实契约分开记录，详见[证据](../../docs/project-execution-verification.md#2026-10-24--ex15b-实际-npm-锁文件与源码发布)。下一项 EX15c 接入准备任务 worker；准备调度恢复、应用运行和网页接入尚未完成，默认保持关闭。本机四套验收库已获准并创建。唯一依据为[规格](../../SPEC-project-execution.md)与[本模块计划](plan.md)，不复用旧工程导出的 PE 编号；任务勾选须附真实证据。
 
 执行环境沿用已获准的项目隔离 Liberica 17.0.14+10，仅命令级指定；原 Oracle 17.0.5、全局默认、私有 env、服务器和旧审计均不变。原生枚举故障未捕获原 errno，不能宣布根因完全证实，保留监测。EX11 原生构建、完整回归和变异证据见[验证记录](../../docs/project-execution-verification.md#ex11b--实际-jar-与失败版本验收)。
 
@@ -207,13 +207,13 @@ U/I/REAL/ALL/COMPAT/DOC 的命令与权限条件见计划 §6。S = 1–2、M = 
 
 - [ ] 完成 EX15。依赖：EX03、EX05、EX06、EX14。接入时发现可编辑源码目录、最终候选校验及一次性执行意图需要独立适配，按每片最多 5 个主要文件拆分。
   - [x] EX15a：源码网关提供受租约保护的副本读取及最终候选校验；npm 策略检查仅锁文件变化、依赖来源/完整性及清单一致性，新锁不自动获得构建批准。16:46:28，12 单元 + 22 相关集成通过；移除文件集合限制的变异被捕获并恢复（4 个主要文件）。
-  - [ ] EX15b：私有工具环境中的 lock-only 命令，使用源码副本作为执行身份，固定版本/参数并保留完整停写证明；受控进程与真实 npm 验证。
+  - [x] EX15b：私有工具环境中的 lock-only 命令，使用源码副本作为执行身份，固定版本/参数并保留完整停写证明。17:00:13，10 项受控进程/工具单元通过；17:05:07，实际 npm 生成 250 项依赖的锁文件并发布新源码版，第二轮无变更不新增版本。补齐未批准 yarn.lock 输入的拒绝，17:16:39，16 单元 + 10 集成通过。准备任务 worker 仍由 c 接入。
   - [ ] EX15c：准备任务一次性领取、执行意图及发布结果结算；接入 worker，覆盖失败/无变更/CAS 和异常停写（实施前列出最多 5 文件的子片）。
   - [ ] EX15d：实际 npm lock-only 经完整任务发布新源码版本，并核对后续构建仍需新锁批准；记录真实输出及旧版本保留证据。
 - 描述：在源模块持有的任务副本执行批准的固定锁文件准备，再经停写证明发布新版本。
 - 验收：只允许目标锁文件变化，无 node_modules/秘密进入候选；确认进程及 I/O 停止后才能接受，CAS 冲突不覆盖他人修改；新锁不自动取得构建批准，无变更不造版本。
 - 验证：U(ExecutionLockPreparationTest) + I(ExecutionPreparationPublicationIT)；真实 npm lock-only 另由 REAL(ExecutionSeedBuildContractIT) 增补场景，不仅用手写锁夹具。
-- 主要文件：a 为 `source/ProjectSourceEditGateway.java`、`source/ProjectSourceEditAcceptanceIT.java`、`E/ExecutionNpmPolicy.java`、`ET/ExecutionNpmPolicyTest.java`。b/c/d 的命令适配、worker/生命周期及真实契约分别落地，原 4 文件估计不足以覆盖这些边界，不把 I/O 放进数据库事务或用最后一个子进程的 receipt 冒充全部执行已停止。
+- 主要文件：a 为 `source/ProjectSourceEditGateway.java`、`source/ProjectSourceEditAcceptanceIT.java`、`E/ExecutionNpmPolicy.java`、`ET/ExecutionNpmPolicyTest.java`；旧入口免额外读取的兼容调整已单独提交 `2620634`。b 为 `E/ExecutionToolchain.java`、`E/ExecutionNpmPolicy.java`、`ET/ExecutionNpmPolicyTest.java`、`ET/ExecutionLockPreparationTest.java`、`ET/ExecutionLockPreparationContractIT.java`（5 文件）。c/d 的 worker/生命周期及完整任务契约分别落地，原 4 文件估计不足以覆盖这些边界，不把 I/O 放进数据库事务或用最后一个子进程的 receipt 冒充全部执行已停止。
 
 ## C-EX05 · 构建恢复与依赖准备
 
