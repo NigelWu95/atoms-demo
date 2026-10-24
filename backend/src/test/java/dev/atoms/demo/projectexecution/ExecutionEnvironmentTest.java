@@ -21,6 +21,8 @@ class ExecutionEnvironmentTest {
     private ProjectSourceEnvironment sourceEnvironment;
     private JdbcTemplate jdbc;
     private ExecutionEnvironment environment;
+    private ProjectSourceEditGateway edits;
+    private DependencyPreparationService preparations;
     private Path root;
 
     @BeforeEach void prepare() throws Exception {
@@ -37,8 +39,9 @@ class ExecutionEnvironmentTest {
         jdbc = mock(JdbcTemplate.class);
         when(jdbc.queryForMap("SELECT current_database() AS database_name, current_user AS role_name"))
                 .thenReturn(Map.of("database_name", "custom_platform", "role_name", "custom_platform_role"));
+        edits = mock(ProjectSourceEditGateway.class); preparations = mock(DependencyPreparationService.class);
         environment = new ExecutionEnvironment(new ExecutionSettings(config), config, source, sourceEnvironment,
-                mock(ProjectService.class), jdbc, mock(PlatformTransactionManager.class));
+                mock(ProjectService.class), jdbc, mock(PlatformTransactionManager.class), edits, preparations);
     }
 
     @Test void disabledOrUnreadyNeverOpensStorageOrReadsDatabaseIdentity() {
@@ -106,6 +109,18 @@ class ExecutionEnvironmentTest {
         when(jdbc.queryForMap(anyString())).thenThrow(new IllegalStateException("private-database-canary"));
         assertThatThrownBy(environment::open).hasMessage("EXECUTION_ENVIRONMENT_UNAVAILABLE").hasNoCause();
         assertThat(root).doesNotExist();
+    }
+
+    @Test void preparationEntryUsesTheSameReadinessGateWithoutClaimingAnEditDuringOpen() throws Exception {
+        register(privateConfig(Map.of()));
+        try (var resources = environment.open()) {
+            verifyNoInteractions(edits, preparations);
+            when(source.readyForExecution()).thenReturn(false);
+            assertThatThrownBy(() -> resources.runPreparation(mock(DependencyPreparationRepository.Task.class), () -> false, () -> {}))
+                    .hasMessage("EXECUTION_ENVIRONMENT_UNAVAILABLE").hasNoCause();
+            verifyNoInteractions(edits, preparations);
+            assertThat(root.resolve("builds")).isEmptyDirectory();
+        }
     }
 
     private Path privateConfig(Map<String, String> changes) throws Exception {

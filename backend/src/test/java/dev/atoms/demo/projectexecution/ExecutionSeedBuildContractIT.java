@@ -133,11 +133,16 @@ class ExecutionSeedBuildContractIT {
             // The enclosing test context owns the pool; the execution context must not destroy it.
             context.registerBean(DataSource.class, () -> database, definition -> definition.setDestroyMethodName(""));
             context.registerBean(ProjectSourceReadGateway.class, source::readGateway);
+            context.registerBean(ProjectSourceEditGateway.class, source::gateway);
+            context.registerBean(DependencyPreparationService.class, () -> new DependencyPreparationService(
+                    context.getBean(ExecutionSettings.class), context.getBean(DependencyPreparationRepository.class), projects,
+                    context.getBean(ProjectSourceReadGateway.class), source.gateway(), source.environment(), config, transactions));
             // Keep the fixture-owned source environment (including its @PreDestroy) outside this child context.
             context.registerBean(ExecutionEnvironment.class, () -> new ExecutionEnvironment(context.getBean(ExecutionSettings.class),
-                    config, context.getBean(ProjectSourceReadGateway.class), source.environment(), projects, jdbc, transactions));
+                    config, context.getBean(ProjectSourceReadGateway.class), source.environment(), projects, jdbc, transactions,
+                    source.gateway(), context.getBean(DependencyPreparationService.class)));
             context.register(ExecutionSettings.class, ExecutionBuildRepository.class,
-                    ProjectExecutionService.class, ExecutionCoordinator.class);
+                    ProjectExecutionService.class, DependencyPreparationRepository.class, ExecutionCoordinator.class);
             context.refresh();
             assertThat(context.getBean(ExecutionCoordinator.class).isRunning()).isTrue();
             return context;

@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.atoms.demo.execution.OwnedProcess;
 import dev.atoms.demo.project.ProjectService;
 import dev.atoms.demo.source.ProjectSourceEnvironment;
+import dev.atoms.demo.source.ProjectSourceEditGateway;
 import dev.atoms.demo.source.ProjectSourceReadGateway;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -29,12 +30,15 @@ final class ExecutionEnvironment implements ExecutionCoordinator.Factory {
     private final ProjectService projects;
     private final JdbcTemplate jdbc;
     private final PlatformTransactionManager transactions;
+    private final ProjectSourceEditGateway edits;
+    private final DependencyPreparationService preparations;
 
     ExecutionEnvironment(ExecutionSettings settings, Environment configuration, ProjectSourceReadGateway source,
             ProjectSourceEnvironment sourceEnvironment, ProjectService projects, JdbcTemplate jdbc,
-            PlatformTransactionManager transactions) {
+            PlatformTransactionManager transactions, ProjectSourceEditGateway edits, DependencyPreparationService preparations) {
         this.settings = settings; this.configuration = configuration; this.source = source;
         this.sourceEnvironment = sourceEnvironment; this.projects = projects; this.jdbc = jdbc; this.transactions = transactions;
+        this.edits = edits; this.preparations = preparations;
     }
 
     @Override public ExecutionCoordinator.WorkerResources open() throws IOException {
@@ -64,10 +68,12 @@ final class ExecutionEnvironment implements ExecutionCoordinator.Factory {
         private final Map<UUID, Path> bindings;
         private final List<Path> protectedRoots;
         private final ExecutionBuildWorker worker;
+        private final DependencyPreparationWorker preparationWorker;
 
         NativeResources(ExecutionPaths paths, Map<UUID, Path> bindings, List<Path> protectedRoots, ExecutionTestDatabase databases) {
             this.paths = paths; this.bindings = bindings; this.protectedRoots = protectedRoots;
             worker = new ExecutionBuildWorker(settings, projects, jdbc, transactions, paths, source, databases, protectedRoots);
+            preparationWorker = new DependencyPreparationWorker(settings, projects, jdbc, transactions, paths, source, edits, preparations, protectedRoots);
         }
         @Override public void check() throws IOException {
             try {
@@ -79,6 +85,11 @@ final class ExecutionEnvironment implements ExecutionCoordinator.Factory {
         @Override public ExecutionBuild run(ExecutionBuild build, BooleanSupplier cancelled, OwnedProcess.Preflight coordination) throws IOException {
             check();
             return worker.run(build.ownerId(), build.projectId(), build.id(), cancelled, coordination);
+        }
+        @Override public DependencyPreparationRepository.Task runPreparation(DependencyPreparationRepository.Task task,
+                BooleanSupplier cancelled, OwnedProcess.Preflight coordination) throws IOException {
+            check();
+            return preparationWorker.run(task.ownerId(), task.projectId(), task.id(), cancelled, coordination);
         }
         @Override public void close() throws IOException { paths.close(); }
     }

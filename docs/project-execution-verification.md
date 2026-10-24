@@ -1338,3 +1338,9 @@ EX14 完成。真实 npm lock-only、停写核对、只接受锁文件变化及�
 00:56:59，`ExecutionPreparationQueueIT,ExecutionPreparationCancelIT,ExecutionPreparationRecoveryIT` 的 **30 项集成全部通过**，无跳过，耗时 3:41：队列 12、取消 7、恢复 11。报告 `.local/ex16b2-queue-passed.caspa75v`。队列场景没有启动工具或分配执行身份；另有 EX16a 的真实 Node 取消及 EX15 的实际 npm 证据，不混淆验证层级。本片 3 个主要文件。EX16c 自动协调器、统一公平调度和关闭接线仍待完成，不能将队列策略通过称为整体调度交付。
 
 最终只读核对：新 schema 共 87 条准备记录，未完成、pending、活动准备编辑、共享名额、投影差异和协调租约均为 0。旧 `atoms_verify_20261021_ex10` 保留首轮失败现场：135 条准备记录中 1 条执行意图 pending，另有后续测试领取失败留下的 8 条 QUEUED，合计 9 条未完成/活动编辑/占用；未清理或强制结算，投影仍一致、无协调租约。所有后续验证已显式使用新目标，默认测试配置也已同步。源码、文档本地提交，未推送、部署、调用真实模型或 SMTP，也未改动私有 env 与全局工具配置。
+
+## 2026-10-25 · EX16c1 原生工厂准备入口
+
+原生 `ExecutionEnvironment` 在同一执行根租约下装配已有 `DependencyPreparationWorker`，提供 `runPreparation`；源码未就绪时在读取任务或领取编辑能力之前拒绝。打开工厂不提前领取任务、创建工作副本或启动 npm；旧只构建资源适配器默认拒绝准备调用。原生种子契约的手动 Spring 上下文补齐实际源码编辑门面与准备服务。
+
+01:06:20，`ExecutionEnvironmentTest` 6 项与 `ExecutionCoordinatorSpringTest` 2 项，共 **8 单元通过**，耗时 44.861 秒；所有测试源码含原生契约已编译，未重跑网络安装。命令中误写的 `ExecutionConfigurationTest` 在仓库不存在，不计入验证；实际配置/默认关闭保护由上述两类覆盖。4 个主要文件；自动派发逻辑在 c2 接通，未宣称本片完成统一调度。

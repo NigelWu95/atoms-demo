@@ -25,6 +25,10 @@ final class ExecutionCoordinator implements SmartLifecycle, AutoCloseable {
     interface WorkerResources extends AutoCloseable {
         void check() throws IOException;
         ExecutionBuild run(ExecutionBuild build, BooleanSupplier cancelled, OwnedProcess.Preflight coordination) throws IOException;
+        default DependencyPreparationRepository.Task runPreparation(DependencyPreparationRepository.Task task,
+                BooleanSupplier cancelled, OwnedProcess.Preflight coordination) throws IOException {
+            throw new IOException("EXECUTION_PREPARATION_UNAVAILABLE");
+        }
         @Override void close() throws IOException;
     }
     /** Trusted resource assembly only; never supplied by a request or generated source. */
