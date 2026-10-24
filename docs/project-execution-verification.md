@@ -1420,3 +1420,13 @@ V028 追加 `execution_runs` 和 `execution_migration_reviews`。运行身份固
 测试先独立编译失败（缺少 history 方法/类型），再实现。03:01:27 初次 6 单元 + 8 契约通过；补充查询端文本上界及 RLS 后，03:03:56 **6 单元 + 9 契约全部通过**，零失败/错误/跳过，耗时 1:46。命令 `-Dtest=ExecutionMigrationsTest,ExecutionMigrationPolicyTest -Pproject-execution-contract -Dit.test=ExecutionMigrationHistoryIT,ExecutionBindingContractIT -Dexecution.test-config-directory=<原已批准私有目录> verify`。
 
 两套真实业务库的完整生产入口只读重复检查；异常历史夹具只在原已批准 B 业务验收库的显式回滚事务中创建，直接调用同一历史查询器，没有提交 DDL/DML 或调用 Flyway。夹具每次先确认空 schema，拒绝覆盖已有数据；回滚后再次用完整只读入口确认对象数为 0。五项新历史契约、四项原绑定契约全部通过，未创建新 DB/角色或更改凭据。此项证明历史读取/拒绝，不是应用迁移执行验收；真实升级与失败升级仍由 EX25/后续常驻进程验收承担。3 个主要文件，EX18c 待接批准及启动前复查。
+
+## 2026-10-25 · EX18c 维护者批准与启动前复核
+
+内部 `ExecutionMigrationReview` 提供检查、明确批准和启动前复核三个操作：每次通过当前维护者权限取得成功构建身份，在事务外读取原版本源码、原封存 JAR 和最新业务历史，再在项目锁内核对来源、产物和永久绑定。输出只含项目/构建/绑定 UUID、摘要与判定，无配置路径、角色、JDBC 或 SQL 内容；默认开关和 HTTP 接口不变。批准必须携带用户所确认的准确历史/目标摘要；变化则拒绝，不自动批准最新状态。
+
+`ExecutionMigrationReviewRepository` 仅做短元数据事务：现有 V028 记录保存准确批准，同身份重复操作返回原 UUID；实际启动检查必须匹配当前批准人、项目、绑定、构建/JAR、原历史和目标摘要。错误库、错误 JAR、另一个构建、历史变化及部分升级后不能复用批准；失败/不兼容迁移不能通过批准绕过。空库初始化和完全一致重启不新增批准。该内部检查结果不是进程/凭据能力，EX19–22 还需在启动 preflight 接入并管理真实进程。
+
+新增仓库测试先编译失败（缺少类型），03:09:57 `-Dtest=ExecutionMigrationsTest,ExecutionMigrationPolicyTest -Dit.test=ExecutionMigrationReviewIT,ExecutionRunIT,ExecutionBindingIT verify` **6 单元 + 18 项集成通过**，零失败/错误/跳过，耗时 1:59。其中批准 5、运行 6、绑定 7；元数据夹具均回滚，来源/构建/历史为显式受控样本，不声称真实迁移或应用启动已通过。后续 6 项编排单测使用真实封存 ZIP、Spring 事务边界和受控外部依赖，覆盖外层事务拒绝、当前维护者、读源码时撤权、批准后撤权回滚、敏感连接异常脱敏及每次重新读取历史。
+
+03:16:03 **全部 460 单元 + 36 项相关集成通过**，零失败/错误/跳过，耗时 4:40。命令 `-Pproject-execution-contract -Dit.test=ExecutionMigrationReviewIT,ExecutionRunIT,ExecutionBindingIT,ExecutionAdmissionIT,ExecutionMigrationHistoryIT,ExecutionBindingContractIT -Dexecution.test-config-directory=<原已批准私有目录> verify`。36 项为批准 5、运行 6、绑定 7、原构建准入 9、历史 5、真实绑定 4；没有重跑 npm/Maven 用户工程构建、启动 JAR 或执行真实迁移。自审发现 schema 只有排序规则时原对象计数不完整，已拆为 b2 补测修正；EX18 尚未标记整体完成。

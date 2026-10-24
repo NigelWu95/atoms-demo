@@ -254,11 +254,12 @@ U/I/REAL/ALL/COMPAT/DOC 的命令与权限条件见计划 §6。S = 1–2、M = 
 - [ ] 完成 EX18。依赖：EX10、EX17。原 4 文件估计未包含源码/JAR 对照和实际历史读取，实施前拆分，每片最多 5 个主要文件。
   - [x] EX18a：有界 SQL 迁移集合、源码/JAR 一致性及纯兼容性规则（Migrations、MigrationPolicy 及两项单测，4 文件）。02:55:01，12 项单元通过，含原产物封存 6 项；不启动 JAR 或连接业务库。历史读取和批准仍待 b/c。
   - [x] EX18b：业务库只读历史快照、身份复核及 PG 契约（MigrationHistory、DatabaseBinding、MigrationHistoryIT，3 文件）。03:03:56，6 单元 + 9 真实 PG 契约通过，覆盖历史文本/数量、伪装视图、RLS、非表对象及原业务绑定；异常 SQL 夹具全部回滚，A/B 验收库仍为空。
-  - [ ] EX18c：维护者批准、准确历史/构建绑定与启动前复核（MigrationReview、MigrationReviewIT 及必要接线，最多 5 文件）。
+  - [ ] EX18b2：自审补充仅有排序规则等对象的非空 schema 检查（MigrationHistory、MigrationHistoryIT，2 文件）；不能用表/函数/类型计数穷举所有对象，改用 schema 依赖目录并以真实回滚夹具验证。
+  - [x] EX18c：维护者批准、准确历史/构建绑定与启动前复核（MigrationReview、MigrationReviewRepository、MigrationReviewTest、MigrationReviewIT，4 文件）。03:16:03，全部 460 单元 + 36 项相关集成通过；原 6+18 首轮结果另存，编排权限变化/事务/脱敏覆盖通过。EX18 尚待 b2 非表对象补充。
 - 描述：在新进程获得业务 DB 配置前检查已有历史、目标迁移集合及准确批准。
 - 验收：已确认空库才允许首次初始化；非空库变化返回 RUN_MIGRATION_REVIEW_REQUIRED，批准绑定项目/库/原历史/目标摘要；失败升级、历史不兼容或旧版恢复不可自动 repair/clean/降级。
 - 验证：U(ExecutionMigrationPolicyTest) + I(ExecutionMigrationReviewIT)，批准错项目/错历史/错 JAR、校验和改变和部分升级；检查拒绝时 DB 未写入。
-- 主要文件：`E/ExecutionMigrationPolicy.java`、`E/ExecutionMigrationReview.java`、`ET/ExecutionMigrationPolicyTest.java`、`ET/ExecutionMigrationReviewIT.java`。
+- 主要文件：a 为 `E/ExecutionMigrations.java`、`E/ExecutionMigrationPolicy.java` 及对应单测；b 为 `E/ExecutionMigrationHistory.java`、`E/ExecutionDatabaseBinding.java`、`ET/ExecutionMigrationHistoryIT.java`；c 如上四文件。
 
 ## C-EX06 · 数据库边界明确
 
