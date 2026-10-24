@@ -132,17 +132,17 @@ class ExecutionTestDatabaseTest {
         when(rows.getString("role_marker")).thenReturn(config.marker());
         var flags = List.of("readonly", "writable_target", "limited_role", "limited_database", "owns_schema", "no_other_schema");
         for (String field : flags) when(rows.getBoolean(field)).thenReturn(true);
-        assertThat(ExecutionTestDatabase.inspect(connection, PROJECT, config, 2).bindingId()).isEqualTo(BINDING);
+        assertThat(ExecutionDatabaseInspection.inspect(connection, config, 2)).isNotNull();
         for (String field : flags) {
             when(rows.getBoolean(field)).thenReturn(false);
-            assertThatThrownBy(() -> ExecutionTestDatabase.inspect(connection, PROJECT, config, 2))
+            assertThatThrownBy(() -> ExecutionDatabaseInspection.inspect(connection, config, 2))
                     .as(field).hasMessage("EXECUTION_DB_TARGET_REJECTED").hasNoCause();
             when(rows.getBoolean(field)).thenReturn(true);
         }
         for (String field : List.of("database_name", "role_name", "session_name", "database_marker", "role_marker")) {
             String original = rows.getString(field);
             when(rows.getString(field)).thenReturn("wrong-identity-canary");
-            assertThatThrownBy(() -> ExecutionTestDatabase.inspect(connection, PROJECT, config, 2))
+            assertThatThrownBy(() -> ExecutionDatabaseInspection.inspect(connection, config, 2))
                     .as(field).hasMessage("EXECUTION_DB_TARGET_REJECTED").hasNoCause();
             when(rows.getString(field)).thenReturn(original);
         }

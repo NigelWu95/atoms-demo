@@ -1370,3 +1370,11 @@ EX14 完成。真实 npm lock-only、停写核对、只接受锁文件变化及�
 最终只读审计：117 条准备任务全部终结，pending、活动准备编辑、共享名额、投影差异及协调锁均为 0；本次崩溃任务为 SOURCE_SAVED，原源码操作 COMMITTED、租约 RELEASED、停止记录存在。自审确认没有用父进程停止证明冒充子任务事实、恢复不会重新取得编辑能力、没有隐式执行或发布；目录/凭据权限及故障现场保留。旧源码和 Agent 兼容通过，c2 两轮基线竞争已覆盖，EX16 标记完成。
 
 本轮只提交本地代码和记录；既有原生构建/npm 证据不重复运行或计数，默认开关、私有 env、全局配置与服务器未改动。下一项 EX17 持久运行身份和独立业务库绑定；完整工程的常驻应用、HTTP 业务验收与网页接入仍未交付。
+
+## 2026-10-25 · EX17a 业务配置与测试库兼容
+
+`ExecutionPrivateConfig.readBusiness` 读取明确 `purpose=runtime` 的私有八键文件，包含固定应用端口；原 `read` 仍只接受七键 test 文件。端口限定规范十进制 1024–65535，文件/父目录身份、权限、无链接、用途及连接参数限制沿用原检查。实际验收文件已存在 runtime/port，不改写原配置。测试环境注入函数再次核对 test 用途，拒绝把业务凭据附加到构建 JVM。
+
+把现有只读连接及系统目录查询原样提取到 `ExecutionDatabaseInspection`，两种用途共用实际身份、标记及最小权限检查；没有业务启动凭据接口、DDL/DML 或新配置开关。测试注册表仍只能读 test 文件，旧返回类型和启动句柄不变。
+
+新测试先因缺少 `readBusiness` 编译失败。01:53:25，**9 单元 + 12 既有真实数据库/受控 JVM 契约全部通过**，无跳过，耗时 1:38。命令：`-Dtest=ExecutionBusinessConfigTest,ExecutionTestDatabaseTest -Pproject-execution-contract -Dit.test=ExecutionTestDatabaseIT,ExecutionDatabaseLaunchIT -Dexecution.test-config-directory=<原已批准私有目录> verify`，沿用获准隔离 JDK。只读连接既有四库，测试库身份检查 4 项、环境传递和拒绝 8 项；未启动业务应用或改写库/角色。原红灯及通过日志私有归档。5 个主要文件，持久绑定和运行记录留给 EX17b/c。
