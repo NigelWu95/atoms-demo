@@ -159,15 +159,38 @@ class ExecutionSchedulerIT {
         try (var next = new ExecutionCoordinatorLease(database)) { assertThat(next.healthy()).isTrue(); }
     }
 
-    @Test void preexistingClaimedOrUnresolvedWorkBlocksStartupWithoutReplaying() {
+    @Test void abandonedWorkWithoutIntentIsSettledBeforeTheNextQueueItemStarts() throws Exception {
         var build = enqueue();
         new ExecutionBuildClaim(settings, projects, builds, jdbc, transactions).claim(owner, build.projectId(), build.id());
-        for (String status : List.of("PREPARING", "NEEDS_RECONCILIATION")) {
-            if (status.equals("NEEDS_RECONCILIATION")) jdbc.update("UPDATE execution_builds SET status=? WHERE id=?", status, build.id());
-            var before = row(build); coordinator = create(); coordinator.start(); coordinator.close();
-            assertThat(coordinator.isRunning()).isFalse(); assertThat(opens).hasValue(0);
-            assertThat(row(build)).isEqualTo(before);
-        }
+        var waiting = enqueue(); start();
+        assertThat(builds.get(build.projectId(), build.id()).status()).isEqualTo("FAILED");
+        assertThat(row(build).get("error_code")).isEqualTo("EXECUTION_INTERRUPTED");
+        await(() -> Files.exists(marker(waiting)));
+        assertThat(resources.launches).hasValue(1); assertThat(marker(build)).doesNotExist();
+        coordinator.close();
+    }
+
+    @Test void unresolvedWorkBlocksStartupAndLeavesTheQueueUntouched() throws Exception {
+        var build = enqueue();
+        new ExecutionBuildClaim(settings, projects, builds, jdbc, transactions).claim(owner, build.projectId(), build.id());
+        jdbc.update("UPDATE execution_builds SET status='NEEDS_RECONCILIATION',error_code='EXECUTION_RECOVERY_UNCERTAIN' WHERE id=?", build.id());
+        var waiting = enqueue(); var before = row(build); var queued = row(waiting);
+        coordinator = create(); coordinator.start(); coordinator.close();
+        assertThat(coordinator.isRunning()).isFalse(); assertThat(opens).hasValue(1);
+        assertThat(resources.launches).hasValue(0); assertThat(resources.closed).isTrue();
+        assertThat(row(build)).isEqualTo(before); assertThat(row(waiting)).isEqualTo(queued);
+        try (var next = new ExecutionCoordinatorLease(database)) { assertThat(next.healthy()).isTrue(); }
+    }
+
+    @Test void unavailableExecutionRootCannotSettleOldWorkOrStartNewWork() {
+        var build = enqueue();
+        new ExecutionBuildClaim(settings, projects, builds, jdbc, transactions).claim(owner, build.projectId(), build.id());
+        var before = row(build);
+        coordinator = new ExecutionCoordinator(settings, builds, jdbc, transactions, pool, sourceReady::get,
+                () -> { opens.incrementAndGet(); throw new java.io.IOException("EXECUTION_STORAGE_UNAVAILABLE"); });
+        coordinator.start(); coordinator.close();
+        assertThat(coordinator.isRunning()).isFalse(); assertThat(opens).hasValue(1);
+        assertThat(row(build)).isEqualTo(before);
     }
 
     @Test void losingOwnDatabaseLeaseStopsTheChildButDoesNotCancelUnclaimedWork() throws Exception {

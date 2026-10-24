@@ -69,14 +69,22 @@ final class ExecutionCoordinator implements SmartLifecycle, AutoCloseable {
             if (running.get() || stopping.get()) return;
             try {
                 if (!settings.enabled()) return;
-                concurrency = settings.load().maxConcurrentBuilds();
+                var initial = settings.load();
+                concurrency = initial.maxConcurrentBuilds();
                 if (!sourceReady.getAsBoolean()) throw unavailable();
                 lease = new ExecutionCoordinatorLease(database);
-                // EX13 will reconcile prior work. Until then, never replay an old claimed/unknown execution.
-                if (!builds.inFlight().isEmpty()) throw unavailable();
                 resources = Objects.requireNonNull(factory.open());
                 resources.check(); requireLease();
-                if (!sourceReady.getAsBoolean()) throw unavailable();
+                if (!sourceReady.getAsBoolean() || !initial.equals(settings.load())) throw unavailable();
+                var recovery = new ExecutionRecovery(settings, builds, jdbc, transactions, lease, sourceReady);
+                for (var abandoned : builds.inFlight()) {
+                    // Filesystem checks remain outside the recovery transaction; no worker exists yet.
+                    resources.check();
+                    recovery.reconcile(abandoned);
+                }
+                resources.check(); requireLease();
+                if (!sourceReady.getAsBoolean() || !initial.equals(settings.load()) || !builds.inFlight().isEmpty())
+                    throw unavailable();
                 queue = new ExecutionBuildQueue(settings, builds, jdbc, transactions, lease);
                 // Bound both live workers and handoffs. The durable queue remains the source of waiting work.
                 // https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/util/concurrent/ThreadPoolExecutor.html

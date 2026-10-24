@@ -1164,3 +1164,9 @@ env JAVA_HOME=/Users/wubingheng/atoms-demo/.local/jdk17-comparison.LlvDQi/jdk-17
 14:48:22 RED 为缺少恢复类，另有一处测试断言 API 拼写错误，已修正。14:49:56 首轮 2 单元 + 9 集成通过。14:51:08 临时删除历史核对条件，针对 pending 标志与执行历史不一致的测试失败（预期 NEEDS_RECONCILIATION，实际 FAILED），证明确实能发现错误释放；变异归档 `.local/ex13a-history-mutation.ai9d68fy`，随后恢复源码。
 
 **14:53:44，2 单元 + 52 相关集成通过，零失败/错误/跳过，BUILD SUCCESS，02:19、退出码 0**。命令沿用隔离 JDK 与显式批准 schema：`./mvnw -B -o -Dtest=ExecutionCoordinatorSpringTest -Dit.test=ExecutionRecoveryIT,ExecutionBuildSettlementIT,ExecutionProbeJournalIT,ExecutionFrontendJournalIT,ExecutionJavaJournalIT verify`。本轮只增加恢复结算，启动接线与真实 JVM 崩溃窗口分别由 EX13b/c 完成，尚不标记整个 EX13 完成。私有配置、旧审计和原网页功能不变。
+
+## 2026-10-24 · EX13b 启动先恢复再调度
+
+EX13a 本地提交 `93d4994`，报告 `.local/ex13a-passed.yw3k2aym`。EX13b 修改协调器及调度集成测试两个主要文件：获得协调锁、打开并检查原生资源，再核对旧任务；恢复前后复验源码就绪、配置与资源，仍有未决则不创建 worker 或启动队列。启动失败时只释放本实例刚取得的资源，不取消既有队列；已经开始运行的协调器仍执行原有停止与未知资源保留规则。
+
+14:55:14 三个新启动场景 RED（3 失败、0 错误/跳过）。实现后 **14:56:49，7 单元 + 29 相关集成全部通过，零失败/错误/跳过，BUILD SUCCESS，01:16、退出码 0**。命令 `./mvnw -B -o -Dtest=ExecutionCoordinatorSpringTest,ExecutionEnvironmentTest -Dit.test=ExecutionSchedulerIT,ExecutionRecoveryIT,ExecutionBuildQueueIT verify`，同一显式 schema 与隔离 JDK。恢复未执行任务后下一队列项实际启动；原未决阻断时排队项不变；目录打不开时不修改旧任务。EX13c 的真实 JVM 异常退出场景尚待完成。
