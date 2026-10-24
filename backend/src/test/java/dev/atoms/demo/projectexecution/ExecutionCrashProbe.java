@@ -45,7 +45,7 @@ public final class ExecutionCrashProbe {
         database.setMinimumIdle(0); database.setConnectionTimeout(3000);
         var jdbc = new JdbcTemplate(database); jdbc.setQueryTimeout(3);
         phase = "database";
-        if (!"atoms_demo_test.atoms_verify_20261021_ex10".equals(
+        if (!"atoms_demo_test.atoms_verify_20261024_ex16".equals(
                 jdbc.queryForObject("SELECT current_database() || '.' || current_schema()", String.class)))
             throw new IllegalStateException("Unapproved crash fixture database");
         var transactions = new DataSourceTransactionManager(database);

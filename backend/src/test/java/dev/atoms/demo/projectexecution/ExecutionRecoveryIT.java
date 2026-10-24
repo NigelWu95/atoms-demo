@@ -49,7 +49,7 @@ class ExecutionRecoveryIT {
 
     @BeforeEach void setup() throws Exception {
         assertThat(jdbc.queryForObject("SELECT current_database() || '.' || current_schema()", String.class))
-                .isEqualTo("atoms_demo_test.atoms_verify_20261021_ex10");
+                .isEqualTo("atoms_demo_test.atoms_verify_20261024_ex16");
         jdbc.update("INSERT INTO guest_users(id) VALUES (?)", owner);
         config = new MockEnvironment().withProperty("atoms.project-execution.enabled", "true")
                 .withProperty("atoms.project-execution.maintainer-ids", owner.toString());
