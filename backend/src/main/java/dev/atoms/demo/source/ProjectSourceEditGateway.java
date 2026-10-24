@@ -228,21 +228,34 @@ public class ProjectSourceEditGateway {
         owned(handle); return handle.accepted instanceof NoChanges;
     }
 
+    /** Startup-only fact lookup under the caller's exclusive coordinator lease. Does not release or recreate an edit. */
+    public RecoveryFact inspectAbandonedEdit(UUID project, UUID leaseId, UUID task) {
+        return transaction.execute(status -> recoveryFact(abandonedLease(project, leaseId, task)));
+    }
+
     /** Startup-only, behind the caller's exclusive coordinator lease. Never recreates a writable capability. */
     public RecoveryFact reconcileAbandonedEdit(UUID project, UUID leaseId, UUID task) {
         return transaction.execute(status -> {
-            repository.lockEvidence(project);
-            var lease = leases.get(project, leaseId);
-            if (!lease.taskId().equals(task)) throw ProjectSourceService.conflict("SOURCE_EDIT_UNAVAILABLE");
-            var operation = leases.operation(lease);
-            boolean uncertain = lease.executionPending() || operation != null && (!operation.terminal() || operation.executionPending());
-            if (uncertain) leases.uncertain(lease);
+            var lease = abandonedLease(project, leaseId, task);
+            var fact = recoveryFact(lease);
+            if (fact.uncertain()) leases.uncertain(lease);
             else {
                 leases.release(lease);
                 forgetAfterCommit(leaseId);
             }
-            return new RecoveryFact(uncertain, operation);
+            return fact;
         });
+    }
+    private SourceEditLeaseRepository.Lease abandonedLease(UUID project, UUID leaseId, UUID task) {
+        repository.lockEvidence(project);
+        var lease = leases.get(project, leaseId);
+        if (!lease.taskId().equals(task)) throw ProjectSourceService.conflict("SOURCE_EDIT_UNAVAILABLE");
+        return lease;
+    }
+    private RecoveryFact recoveryFact(SourceEditLeaseRepository.Lease lease) {
+        var operation = leases.operation(lease);
+        boolean uncertain = lease.executionPending() || operation != null && (!operation.terminal() || operation.executionPending());
+        return new RecoveryFact(uncertain, operation);
     }
     public record RecoveryFact(boolean uncertain, SourceOperation operation) {}
 

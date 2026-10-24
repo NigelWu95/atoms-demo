@@ -50,6 +50,21 @@ class DependencyPreparationRepository {
     }
     void requireIdle(UUID project) { capacity.requireIdle(project); }
 
+    /** Exclusive coordinator only. Includes queued tasks whose original in-memory edit was lost on restart. */
+    List<Task> unfinished() {
+        return jdbc.query("SELECT * FROM dependency_preparations WHERE finished_at IS NULL ORDER BY created_at,id LIMIT 12", ROW);
+    }
+
+    static void requireSameTask(Task expected, Task actual) {
+        if (!expected.id().equals(actual.id()) || !expected.projectId().equals(actual.projectId())
+                || !expected.ownerId().equals(actual.ownerId()) || !expected.editLeaseId().equals(actual.editLeaseId())
+                || !expected.baseVersionId().equals(actual.baseVersionId()) || expected.baseRevision() != actual.baseRevision()
+                || !expected.treeSha256().equals(actual.treeSha256()) || !expected.manifestSha256().equals(actual.manifestSha256())
+                || !Objects.equals(expected.baseLockSha256(), actual.baseLockSha256()) || !expected.policySha256().equals(actual.policySha256())
+                || !expected.requestSha256().equals(actual.requestSha256()) || !expected.createdAt().equals(actual.createdAt()))
+            throw new IllegalStateException("Preparation identity changed");
+    }
+
     Task lock(UUID project, UUID task) {
         if (!TransactionSynchronizationManager.isActualTransactionActive()) throw new IllegalStateException("Preparation lock requires a transaction");
         jdbc.execute("SET LOCAL lock_timeout = '3s'");

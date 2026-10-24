@@ -1318,3 +1318,11 @@ EX14 完成。真实 npm lock-only、停写核对、只接受锁文件变化及�
 22:49:09，`ExecutionNpmPolicyTest,ExecutionLockPreparationTest` 的 **16 单元**和 `ExecutionPreparationCancelIT,ExecutionPreparationWorkerIT,ExecutionPreparationLifecycleIT` 的 **21 集成**全部通过，无跳过，耗时 4:08。覆盖取消/领取竞争、归档、转让与权限、外部事务拒绝、事务失败回滚、内存能力丢失、已提交源码结果和真实 Node 父子进程通过持久取消意图停止。私有报告 `.local/ex16a-cancel-passed.xzxjvj3w`。23:01:48 将 QUEUED 判断反向后单用例正确失败（期望 CANCELLED、实际 QUEUED）；立即恢复并逐字比对通过版本，反向日志 `.local/ex16a-cancel-mutation.log`。
 
 最后新 schema 23 条准备记录无未完成/pending、活动源码编辑、共享槽、投影差异或协调锁。EX16a 的主要文件共 5 个，准备队列、恢复和统一调度仍待完成；本片不改变现有网页、服务器或个人配置。
+
+## 2026-10-25 · EX16b1 依赖准备恢复
+
+`DependencyPreparationRecovery` 仅在独占协调权、源码就绪、无当前 worker 时使用。先经源码门面只读查询原编辑租约对应的 source operation，再决定是否释放；不从 PID、目录或停止收据推导新编辑能力。QUEUED 且仍持原能力留给正常队列；丢失能力的旧排队任务按取消/原始数据库期限/中断结算，不重新安装。ACCEPTING 的原操作已 COMMITTED 时绑定准确操作与结果版本，一次结算为 SOURCE_SAVED；重复恢复不新增操作或版本。任务或源码仍 pending、原操作未终结、以及已有未知结果但尚无实际提交时，保留源码租约与占用。内存中的 NoChanges 结果丢失后不凭停止收据宣称成功，只结算已确认安全中断。
+
+2026-10-25 00:20:40，**16 单元 + 30 集成全部通过**，无跳过，耗时 4:33。集成为恢复 11、取消 7、源码接受 6、源码取消 2、旧 Agent 生命周期 4。覆盖已发布但绑定/响应未登记、发布进行中后实际提交、丢失停止登记、取消优先于排队期限、原 owner 变化、重复恢复、源码租约/名额与任务结算原子回滚，以及写入后失去协调权回滚。使用真实 PG、Git 和本测试持有的 JVM 停止收据；重启通过服务对象丢失内存能力模拟，真正 JVM 崩溃窗口和统一调度将在后续接线验证，不以本组替代。
+
+本片 4 个主要文件，源码门面的原 `reconcileAbandonedEdit` 保持原行为，新增只读 inspect；未新增依赖、迁移或启用开关。验证命令继续显式限定 `atoms_demo_test.atoms_verify_20261024_ex16`。取消源码已恢复为 EX16a 通过版本，反向检查修改未保留。
