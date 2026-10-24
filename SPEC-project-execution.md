@@ -94,6 +94,8 @@ Java 阶段 `ExecutionJava` 固定执行 `MAVEN_PACKAGE` 的 `verify` 命令，�
 
 注册表拒绝重复数据库名、角色名或绑定 UUID，并额外拒绝调用者传入的实际平台/业务库及角色集合，不能只依赖默认库名黑名单。数据库连接在只读事务中执行固定的系统目录查询，核对实际 DB/会话角色、库与角色的 `atoms-project-execution:test:<bindingId>` 标记，以及非超级用户/无建库建角色等高权限/无角色成员关系、目标 schema 所有权及访问权限。拒绝数据库 PUBLIC 授权、其他非系统 schema 权限、模板库或备库；不执行 DDL、DML、Flyway 或清理。返回项目/绑定 UUID、实际 DB/角色 OID 和 relation 数量，不返回 URL、密码或配置摘要。
 
+原生资源工厂通过 `PROJECT_EXECUTION_TEST_DATABASES` 读取 JSON 对象：规范项目 UUID → 私有 `.properties` 文件绝对路径，1–4 项、最多 16 Ki 字符；拒绝重复键、尾随 JSON、非文本路径及不规范 UUID/路径。凭据不写入该 JSON。工厂在源码就绪后查询平台实际库名/角色并纳入禁用目标，保护源码根、编辑根、已配置的 Agent 根及执行根；加载私有配置后才打开执行根。注册表、执行根或受保护根变化会停止原协调器，须明确重启重新装配。Bean 构造本身没有 I/O；本片尚未启用 Spring 调度，后续 b2b 验收实际原生组合。
+
 注册表可签发一次性内部 `Launch` 句柄，绑定项目、构建、执行 UUID 和 backend cwd；数值 `Verified` 不能自行换取凭据。`ExecutionJava` 的生产入口必须提供注册表与项目，不再有无测试库的默认执行路径；确定性 Runner 重载只供内部测试夹具。句柄使用受同步保护，只可附加到一个执行，错误目标或失败后也不能重放。附加时验证私有文件，实际启动前在事务外重新读取 DB 身份/用途/权限并比较原绑定与 DB/角色 OID；不把会因测试正常变化的 relation 数量当恒定身份。
 
 `ExecutionProcess` 只在清空继承环境后的新建 builder 上追加 `APP_DB_URL`、`APP_DB_USERNAME`、`APP_DB_PASSWORD` 和固定 `APP_PORT=0`，不修改原 Invocation，不提供任意环境字典接口，不将密码放入 argv、JVM 系统属性、源码或新配置副本。前端流程不领取句柄。测试库凭据仍可被 Maven、其测试 JVM 及其他后代读取；这不是进程间秘密隔离，生成代码及批准的工具仍须受信。Spring Boot 3.5 支持环境占位符，Surefire 3.5.6 默认继承 Maven 环境；实际种子工程构建仍须通过 EX11，不以受控 JVM 试验替代。[Spring 配置](https://docs.spring.io/spring-boot/3.5/reference/features/external-config.html)、[Surefire 环境继承](https://maven.apache.org/surefire-archives/surefire-3.5.6/maven-surefire-plugin/test-mojo.html#excludedEnvironmentVariables)

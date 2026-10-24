@@ -1,0 +1,123 @@
+package dev.atoms.demo.projectexecution;
+
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import dev.atoms.demo.execution.OwnedProcess;
+import dev.atoms.demo.project.ProjectService;
+import dev.atoms.demo.source.ProjectSourceEnvironment;
+import dev.atoms.demo.source.ProjectSourceReadGateway;
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.*;
+import java.util.function.BooleanSupplier;
+import org.springframework.core.env.Environment;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+
+/** Lazy native assembly. Only the coordinator opens it, after acquiring its database lease. */
+@Component
+final class ExecutionEnvironment implements ExecutionCoordinator.Factory {
+    private static final ObjectMapper JSON = new ObjectMapper().enable(JsonParser.Feature.STRICT_DUPLICATE_DETECTION)
+            .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
+    private final ExecutionSettings settings;
+    private final Environment configuration;
+    private final ProjectSourceReadGateway source;
+    private final ProjectSourceEnvironment sourceEnvironment;
+    private final ProjectService projects;
+    private final JdbcTemplate jdbc;
+    private final PlatformTransactionManager transactions;
+
+    ExecutionEnvironment(ExecutionSettings settings, Environment configuration, ProjectSourceReadGateway source,
+            ProjectSourceEnvironment sourceEnvironment, ProjectService projects, JdbcTemplate jdbc,
+            PlatformTransactionManager transactions) {
+        this.settings = settings; this.configuration = configuration; this.source = source;
+        this.sourceEnvironment = sourceEnvironment; this.projects = projects; this.jdbc = jdbc; this.transactions = transactions;
+    }
+
+    @Override public ExecutionCoordinator.WorkerResources open() throws IOException {
+        ExecutionPaths paths = null;
+        try {
+            requireReady();
+            var config = settings.load();
+            var bindings = bindings();
+            var protectedRoots = protectedRoots();
+            var database = jdbc.queryForMap("SELECT current_database() AS database_name, current_user AS role_name");
+            var privateRoots = new ArrayList<>(protectedRoots); privateRoots.add(config.root());
+            var databases = ExecutionTestDatabase.load(bindings, privateRoots,
+                    Set.of((String) database.get("database_name")), Set.of((String) database.get("role_name")));
+            paths = new ExecutionPaths(config.root(), protectedRoots);
+            var resources = new NativeResources(paths, bindings, protectedRoots, databases);
+            resources.check();
+            return resources;
+        } catch (IOException | RuntimeException error) {
+            // Nothing has been launched by this factory; release only the resource opened by this attempt.
+            if (paths != null) try { paths.close(); } catch (IOException ignored) { /* No driver/path detail escapes. */ }
+            throw unavailable();
+        }
+    }
+
+    private final class NativeResources implements ExecutionCoordinator.WorkerResources {
+        private final ExecutionPaths paths;
+        private final Map<UUID, Path> bindings;
+        private final List<Path> protectedRoots;
+        private final ExecutionBuildWorker worker;
+
+        NativeResources(ExecutionPaths paths, Map<UUID, Path> bindings, List<Path> protectedRoots, ExecutionTestDatabase databases) {
+            this.paths = paths; this.bindings = bindings; this.protectedRoots = protectedRoots;
+            worker = new ExecutionBuildWorker(settings, projects, jdbc, transactions, paths, source, databases, protectedRoots);
+        }
+        @Override public void check() throws IOException {
+            try {
+                requireReady();
+                if (!paths.checkedRoot().equals(settings.load().root()) || !bindings.equals(bindings())
+                        || !protectedRoots.equals(protectedRoots())) throw unavailable();
+            } catch (IOException | RuntimeException error) { throw unavailable(); }
+        }
+        @Override public ExecutionBuild run(ExecutionBuild build, BooleanSupplier cancelled, OwnedProcess.Preflight coordination) throws IOException {
+            check();
+            return worker.run(build.ownerId(), build.projectId(), build.id(), cancelled, coordination);
+        }
+        @Override public void close() throws IOException { paths.close(); }
+    }
+
+    private void requireReady() throws IOException {
+        if (TransactionSynchronizationManager.isActualTransactionActive() || !settings.enabled() || !source.readyForExecution())
+            throw unavailable();
+    }
+
+    private List<Path> protectedRoots() throws IOException {
+        var paths = sourceEnvironment.settings().paths();
+        var roots = new ArrayList<>(List.of(paths.root(), paths.workRoot()));
+        String agentRoot = configuration.getProperty("atoms.agent.state-root", "");
+        if (!agentRoot.isBlank()) roots.add(path(agentRoot));
+        else if (configuration.getProperty("atoms.agent.enabled", Boolean.class, false)) throw unavailable();
+        return List.copyOf(roots);
+    }
+
+    private Map<UUID, Path> bindings() throws IOException {
+        String raw = configuration.getProperty("atoms.project-execution.test-databases", "");
+        if (raw.length() > 16384 || raw.isBlank()) throw unavailable();
+        var json = JSON.readTree(raw);
+        if (!json.isObject() || json.isEmpty() || json.size() > 4) throw unavailable();
+        var bindings = new HashMap<UUID, Path>();
+        var fields = json.fields();
+        while (fields.hasNext()) {
+            var field = fields.next();
+            UUID project = UUID.fromString(field.getKey());
+            if (!project.toString().equals(field.getKey()) || !field.getValue().isTextual()) throw unavailable();
+            bindings.put(project, path(field.getValue().textValue()));
+        }
+        return Map.copyOf(bindings);
+    }
+
+    private static Path path(String raw) throws IOException {
+        if (raw.length() > 4096 || raw.codePoints().anyMatch(Character::isISOControl)) throw unavailable();
+        Path path = Path.of(raw);
+        if (!path.isAbsolute() || path.getNameCount() < 2 || !path.normalize().equals(path)) throw unavailable();
+        return path;
+    }
+    private static IOException unavailable() { return new IOException("EXECUTION_ENVIRONMENT_UNAVAILABLE"); }
+}

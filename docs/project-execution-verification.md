@@ -1108,3 +1108,13 @@ EX12c1 本地提交为 `867e559`，随后继续 c2 调度接线。
 13:57:44 RED：缺就绪方法/构造的 11 处编译错误，退出码 1。第一次实现后测试因沙箱阻止 Mockito JVM attach 报 2 错误；获准沙箱外执行后发现测试 Spring 环境未开启条件 bean，修正测试上下文开关并断言 bean 已注册，没有修改生产开关或个人 Java 配置。
 
 **14:00:51，4 单元 + 8 源码读取集成全部通过，零失败/错误/跳过，BUILD SUCCESS，01:10、退出码 0**。使用既有隔离 JDK 和显式 `atoms_verify_20261021_ex10` URL，执行 `./mvnw -B -o -Dtest=ProjectSourceReadinessTest -Dit.test=ProjectSourceReadGatewayIT verify`。验证生命周期变化、失败关闭、Spring 可选提供者以及指定历史版本、越权、预算、事务和存储漂移拒绝。该片不启动原生构建；EX12/C-EX04 继续待 b2 装配与实际 worker 验收。
+
+本地提交 `f145042`；报告归档 `.local/ex12c2b1-passed.wml1jju9`，0700/0600。
+
+## 2026-10-24 · EX12c2b2a 原生资源工厂
+
+四个主要文件实现懒加载原生 worker 装配。私有测试库注册表只由维护者配置，最多四个规范项目 UUID；严格 JSON、绝对规范路径、平台实际库/角色排除沿用已有私有配置校验。源码/编辑/Agent/执行根作为受保护位置，配置通过后才打开排他执行根。资源检查复核就绪、根身份和配置一致性，关闭只释放自身句柄；没有在构造 bean 时读私有配置或连接测试库。
+
+14:02:50 缺类 RED（2 编译错误、退出码 1）；14:04:19，19 项相关单元通过。**14:05:20 注册表漂移变异被捕获**：临时移除持有期间的注册表一致性检查，1 项测试失败、无错误/跳过，资源由原 try-with-resources 关闭；归档 `.local/ex12c2b2a-registry-mutation.t8af8m3c`，随后恢复校验。
+
+**14:07:10，23 单元 + 8 源码读取集成通过，零失败/错误/跳过，BUILD SUCCESS，01:36、退出码 0**。沿用隔离 JDK/显式批准 schema，命令为 `./mvnw -B -o -Dtest=ExecutionEnvironmentTest,ExecutionTestDatabaseTest,ExecutionSettingsTest,ProjectSourceReadinessTest -Dit.test=ProjectSourceReadGatewayIT verify`。验证禁用/源码未就绪无副作用、无效/过量/重复注册、真实临时根排他与释放、运行期间配置变化、平台身份及受保护目录拒绝、事务内拒绝和异常脱敏。新工厂的测试没有启动 npm/Maven 或实际测试库连接，不将这些结果记为原生构建验收；该验收由 b2b 完成。未更改私有 env、个人工具配置或历史审计，没有推送/部署。
