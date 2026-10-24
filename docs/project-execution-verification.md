@@ -1015,3 +1015,30 @@ env JAVA_HOME=/Users/wubingheng/atoms-demo/.local/jdk17-comparison.LlvDQi/jdk-17
 **22:46:54，恢复后的全部 417 单元 + 42 相关集成全部通过，0 失败/错误/跳过，BUILD SUCCESS，05:19、退出码 0。** 集成为取消 9、准入 8、领取 10、结算 15；按 22:41:05 门槛仅计 90 份新单元报告及 4 份新集成报告，旧 XML 不计数。报告与汇总归档 `.local/ex12a-related-passed.zl8hkqun`（0700/0600）。EX11 的完整 377 集成和独立原生契约保持原记录，不将本次 42 项称为完整集成回归。
 
 完成后的只读审计仍为新增 Agent 未决/pending/关联活动编辑租约及构建未决全部 0，旧协调锁无持有者，测试角色 CREATE 权限为 false；旧 Agent 未决和源码失败/中断记录不变。仅保存本地提交，未启用新模式、推送或部署。
+
+EX12a 本地提交 `24fe978`；提交前 5 个私有值内存比对无命中，44 个本地文档链接及锚点有效，OAuth 草稿未纳入。
+
+## 2026-10-24 · EX12b 独立构建协调租约
+
+三个主要文件：`ExecutionCoordinatorLease`、对应单元测试和 `ExecutionCoordinatorLeaseIT`。只读核对现有源码/Agent/新旧构建锁编号后，选择未占用的会话锁 `718395204`。开工时既有只读审计无新增未决，数据库连接正常；一次 Docker 状态查询无响应，用其 exec 会话的 Ctrl-C 结束（退出码 130），未停止 Docker Desktop 或数据库。
+
+**10:04:42 RED，缺少租约类的编译失败，18 处引用缺类，01:51、退出码 1**；没有运行测试。实现复用现有协调租约的独立连接模式，同时增加失效不可恢复、错误脱敏及 abort 失败不归还连接的约束，未修改旧模块。
+
+**10:51:48，9 单元通过，4 集成中 2 错误、0 失败/跳过，01:34、退出码 1**。归档 `.local/ex12b-pool-failure.bw7a4isq`。真实 HikariCP 6.3.3 在 `abort` 后的 `ProxyConnection.close → clearWarnings` 报连接已关闭：一次来自新租约收尾，另一次来自共存测试自身连接的相同回收方式。没有把该异常归为数据库不可用，也没有忽略关闭错误。
+
+核对固定版本官方 [HikariDataSource.evictConnection](https://raw.githubusercontent.com/brettwooldridge/HikariCP/HikariCP-6.3.3/src/main/java/com/zaxxer/hikari/HikariDataSource.java)、[ProxyConnection.close](https://raw.githubusercontent.com/brettwooldridge/HikariCP/HikariCP-6.3.3/src/main/java/com/zaxxer/hikari/pool/ProxyConnection.java) 与 [HikariPool](https://raw.githubusercontent.com/brettwooldridge/HikariCP/HikariCP-6.3.3/src/main/java/com/zaxxer/hikari/pool/HikariPool.java)：物理连接 abort 不等于池条目已移除；明确驱逐后 close 才按驱逐状态完成处理。修复为 abort → evict → close，不改池全局校验窗口、不升级依赖；真实夹具的自有连接也采用同样回收规则。已取得的句柄失效后不可恢复，unknown pool 在借连接前拒绝。依据同时包括 [PostgreSQL 17 会话锁](https://www.postgresql.org/docs/17/explicit-locking.html#ADVISORY-LOCKS) 与 [JDBC 17 abort](https://docs.oracle.com/en/java/javase/17/docs/api/java.sql/java/sql/Connection.html#abort(java.util.concurrent.Executor))。
+
+**10:55:51 GREEN，11 单元 + 4 真实数据库集成全部通过，0 失败/错误/跳过，BUILD SUCCESS，01:06、退出码 0**；归档 `.local/ex12b-focused-passed.dpu2mtjj`。覆盖单一持有者、关闭后新租约、失锁后重新加锁仍不可恢复、仅断开自己的物理连接，以及源码/Agent/新旧构建六个独立锁与新协调租约共存。本次命令（backend）如下；新模式保持关闭，没有自动调度：
+
+```sh
+env JAVA_HOME=/Users/wubingheng/atoms-demo/.local/jdk17-comparison.LlvDQi/jdk-17.0.14.jdk \
+  PATH=/Users/wubingheng/.nvm/versions/node/v24.20.0/bin:$PATH \
+  SPRING_DATASOURCE_URL='jdbc:postgresql://127.0.0.1:5432/atoms_demo_test?currentSchema=atoms_verify_20261021_ex10&connectTimeout=3&socketTimeout=5' \
+  ./mvnw -B -o -Dtest=ExecutionCoordinatorLeaseTest -Dit.test=ExecutionCoordinatorLeaseIT verify
+```
+
+**10:59:06，回收变异被捕获**：仅对模拟连接的单测临时取消 `evict`，11 项中 3 项失败、0 错误/跳过，24.827 秒、退出码 1；归档 `.local/ex12b-eviction-mutation.lzibh6o4`。本次不运行真实数据库测试，避免将故意错误的回收策略用于真实连接。随后恢复驱逐，移除构造器的无用占位参数，再运行全部单元及相关回归。
+
+**11:06:06，428 单元 + 28 相关集成全部通过，0 失败/错误/跳过，BUILD SUCCESS，04:53、退出码 0**。91 份单元报告、6 份集成报告按 11:00:15 新鲜度门槛核对，归档 `.local/ex12b-related-passed.0rjmb02a`（0700/0600）；未将旧完整回归 XML 混入计数。命令沿用上方 JDK/Node/schema 前缀，改为 `./mvnw -B -o -Dit.test=ExecutionCoordinatorLeaseIT,ExecutionCancellationIT,ExecutionBuildClaimIT,AgentCoordinatorLeaseIT,ProjectSourceCoordinatorLeaseIT,BuildCoordinatorLeaseIT verify`。
+
+完成后的只读审计无新增 Agent 未决/pending/活动编辑租约或构建未决；旧失败、未决、源码中断记录保持原样，测试角色无 CREATE 权限。自审确认新类无 Spring 自动启动副作用，固定锁编号和限定查询，不接受请求提供的 SQL/路径/连接目标；异常无驱动 cause/suppressed。真实连接支持现有 Hikari，未知连接池在借出前拒绝；回收回调仅供可信内部接线和模拟测试，不能通过配置/HTTP 指定。没有修改旧协调器、平台依赖、私有 env 或个人配置。EX12c 及 C-EX04 仍未完成，仅本地提交，不推送或部署。
