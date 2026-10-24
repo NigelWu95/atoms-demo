@@ -109,6 +109,13 @@ public class ProjectSourceEditGateway {
         return workspaces.checked(handle.workspace, deadline(handle));
     }
 
+    /** Bounded snapshot of the owned edit; reading is not a stop receipt or a publication permit. */
+    public synchronized SourceTree readEdit(EditHandle handle) {
+        requireOutsideTransaction(); owned(handle);
+        if (handle.workspace == null) throw ProjectSourceService.conflict("SOURCE_EDIT_UNAVAILABLE");
+        return workspaces.read(handle.workspace, deadline(handle));
+    }
+
     /** Durable intent is committed before the caller starts its process. May join Agent admission's transaction. */
     public void markExecutionStarted(EditHandle handle, UUID execution) {
         owned(handle);
@@ -138,6 +145,16 @@ public class ProjectSourceEditGateway {
 
     /** Only a stopped task can freeze files. Replays return the durable operation, not a second Git write. */
     public synchronized Acceptance sealAndAccept(EditHandle handle, String idempotencyKey) {
+        return sealAndAccept(handle, idempotencyKey, tree -> {});
+    }
+
+    /**
+     * Trusted caller validation runs on the sealed candidate before any new publication/no-change result.
+     * A successful replay returns the original fact; it never authorizes different content or a second write.
+     */
+    public synchronized Acceptance sealAndAccept(EditHandle handle, String idempotencyKey,
+                                                 java.util.function.Consumer<SourceTree> validation) {
+        java.util.Objects.requireNonNull(validation);
         requireOutsideTransaction(); owned(handle);
         String key = SourceRequest.key(idempotencyKey);
         var lease = handle.lease;
@@ -155,6 +172,7 @@ public class ProjectSourceEditGateway {
         });
         var deadline = deadline(handle);
         if (handle.candidate == null) handle.candidate = candidates.seal(handle.workspace, deadline);
+        validation.accept(candidates.read(lease.ownerId(), lease.projectId(), handle.candidate, deadline));
         if (handle.candidate.treeSha256().equals(repository.version(lease.projectId(), lease.baseVersionId()).treeSha256())) {
             handle.acceptanceKey = key;
             handle.accepted = new NoChanges(lease.baseVersionId());

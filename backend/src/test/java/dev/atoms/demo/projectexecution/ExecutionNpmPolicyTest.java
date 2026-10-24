@@ -31,6 +31,45 @@ class ExecutionNpmPolicyTest {
         assertThat(verified.toString()).doesNotContain("https://", "node_modules", "scripts");
     }
 
+    @Test void preparedLockMayBeSavedButIsNotAutomaticallyApprovedForBuild() throws Exception {
+        byte[] manifest = manifest(), lock = lock();
+        var policy = new ExecutionNpmPolicy(approval(manifest, null));
+        var prepared = policy.checkPrepared(tree(manifest, null), tree(manifest, lock));
+        assertThat(prepared.changed()).isTrue();
+        assertThat(prepared.lockSha256()).isEqualTo(hash(lock));
+        assertThat(prepared.packages()).isEqualTo(237);
+        assertThatThrownBy(() -> policy.checkBuild(tree(manifest, lock))).hasMessage("EXECUTION_NPM_APPROVAL_REQUIRED");
+        var approved = new ExecutionNpmPolicy(approval(manifest, lock));
+        assertThat(approved.checkPrepared(tree(manifest, lock), tree(manifest, lock)).changed()).isFalse();
+    }
+
+    @Test void preparationRejectsNonLockChangesAndInvalidResolvedGraphs() throws Exception {
+        byte[] manifest = manifest(), lock = lock();
+        var policy = new ExecutionNpmPolicy(approval(manifest, null));
+        var base = tree(manifest, null);
+        for (String path : List.of("frontend/App.vue", "backend/App.java", "README.md", "frontend/node_modules/pkg/index.js")) {
+            var files = new ArrayList<>(tree(manifest, lock).files());
+            files.add(new SourceTree.File(path, "changed".getBytes(), 0100644));
+            // The real source gateway also rejects generated/dependency directories; do not rely on it alone.
+            assertThatThrownBy(() -> policy.checkPrepared(base, new SourceTree(files, "untrusted", 1)))
+                    .hasMessage("EXECUTION_LOCK_CHANGES_REJECTED");
+        }
+        var executable = new ArrayList<>(base.files());
+        executable.add(new SourceTree.File("frontend/package-lock.json", lock, 0100755));
+        assertThatThrownBy(() -> policy.checkPrepared(base, new SourceTree(executable, "untrusted", 1)))
+                .hasMessage("EXECUTION_LOCK_CHANGES_REJECTED");
+        assertThatThrownBy(() -> policy.checkPrepared(base, base)).hasMessage("EXECUTION_NPM_LOCK_REQUIRED");
+        ObjectNode changed = (ObjectNode) json.readTree(lock);
+        ((ObjectNode) changed.path("packages").path("").path("dependencies")).put("vue", "1.0.0");
+        byte[] mismatched = json.writeValueAsBytes(changed);
+        assertThatThrownBy(() -> policy.checkPrepared(base, tree(manifest, mismatched)))
+                .hasMessage("EXECUTION_NPM_POLICY_REJECTED");
+        changed = (ObjectNode) json.readTree(lock);
+        ((ObjectNode) changed.path("packages").path("node_modules/vue")).put("resolved", "https://unapproved.invalid/vue.tgz");
+        byte[] unapproved = json.writeValueAsBytes(changed);
+        assertThatThrownBy(() -> policy.checkPrepared(base, tree(manifest, unapproved))).hasMessage("EXECUTION_NPM_POLICY_REJECTED");
+    }
+
     @Test void eitherInputChangingInvalidatesApprovalEvenWhenTheOtherStillMatches() throws Exception {
         byte[] manifest = manifest(), lock = lock();
         var policy = new ExecutionNpmPolicy(approval(manifest, lock));

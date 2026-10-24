@@ -25,6 +25,8 @@ final class ExecutionNpmPolicy {
 
     record Preparation(String manifestSha256, String baseLockSha256, String policySha256) {}
     record Verified(String manifestSha256, String lockSha256, String policySha256, int packages) {}
+    /** Validation of a preparation result, deliberately distinct from a build approval. */
+    record Prepared(String manifestSha256, String lockSha256, String policySha256, int packages, boolean changed) {}
 
     ExecutionNpmPolicy(byte[] approvedPolicy) throws IOException {
         try {
@@ -61,6 +63,32 @@ final class ExecutionNpmPolicy {
         int packages = lock(manifest, object(bytes, 2 << 20), true);
         return new Verified(manifestSha, lockSha, policySha, packages);
     }
+
+    Prepared checkPrepared(SourceTree base, SourceTree candidate) throws IOException {
+        checkPreparation(base);
+        var before = indexed(base); var after = indexed(candidate);
+        var oldLock = before.remove("frontend/package-lock.json");
+        var newLock = after.remove("frontend/package-lock.json");
+        if (!before.keySet().equals(after.keySet())) throw changesRejected();
+        for (var entry : before.entrySet()) {
+            var actual = after.get(entry.getKey());
+            if (entry.getValue().mode() != actual.mode() || !Arrays.equals(entry.getValue().content(), actual.content()))
+                throw changesRejected();
+        }
+        if (newLock == null) throw new IOException("EXECUTION_NPM_LOCK_REQUIRED");
+        if (newLock.mode() != 0100644) throw changesRejected();
+        byte[] bytes = newLock.content();
+        int packages = lock(manifest(candidate), object(bytes, 2 << 20), true);
+        boolean changed = oldLock == null || oldLock.mode() != newLock.mode() || !Arrays.equals(oldLock.content(), bytes);
+        return new Prepared(manifestSha, hash(bytes), policySha, packages, changed);
+    }
+
+    private static Map<String, SourceTree.File> indexed(SourceTree tree) throws IOException {
+        var files = new HashMap<String, SourceTree.File>();
+        for (var file : tree.files()) if (files.putIfAbsent(file.path(), file) != null) throw changesRejected();
+        return files;
+    }
+    private static IOException changesRejected() { return new IOException("EXECUTION_LOCK_CHANGES_REJECTED"); }
 
     private void approveLock(byte[] bytes) throws IOException {
         if (lockSha == null || !lockSha.equals(hash(bytes))) throw new IOException("EXECUTION_NPM_APPROVAL_REQUIRED");

@@ -100,6 +100,54 @@ class ProjectSourceEditAcceptanceIT extends SourceIntegrationSupport {
         gateway.releaseEdit(handle);
     }
 
+    @Test void validationSeesTheSealedTreeAndLaterWorkspaceWritesCannotChangeThePublishedVersion() throws Exception {
+        try (var coordinator = new SourceCoordinator(service, repository, environment, database)) {
+            coordinator.start();
+            var gateway = gateway(coordinator);
+            var handle = gateway.claimEdit(owner, project, base, 1, UUID.randomUUID());
+            gateway.prepareEdit(handle);
+            var work = gateway.workPath(handle);
+            assertThat(gateway.readEdit(handle).files().get(0).content()).isEqualTo("one".getBytes());
+            Files.writeString(work.resolve("README.md"), "approved");
+            var execution = UUID.randomUUID(); gateway.markExecutionStarted(handle, execution);
+            gateway.confirmExecutionStopped(handle, stopped(handle.taskId(), execution, work));
+            var validated = new java.util.concurrent.atomic.AtomicInteger();
+            var accepted = (ProjectSourceEditGateway.Submitted) gateway.sealAndAccept(handle, "validated", tree -> {
+                validated.incrementAndGet();
+                assertThat(tree.files().get(0).content()).isEqualTo("approved".getBytes());
+                try { Files.writeString(work.resolve("README.md"), "changed after validation"); }
+                catch (java.io.IOException error) { throw new AssertionError(error); }
+            });
+            var saved = accepted.completion().get(30, TimeUnit.SECONDS);
+            assertThat(saved.status()).isEqualTo("COMMITTED");
+            assertThat(validated.get()).isEqualTo(1);
+            assertThat(new SourceQuery(service, repository, environment).file(owner, project, saved.resultVersionId(), "README.md").content())
+                    .isEqualTo("approved".getBytes());
+            gateway.releaseEdit(handle);
+        }
+    }
+
+    @Test void rejectedFinalValidationCannotCreateAnOperationEvenForUnchangedFiles() throws Exception {
+        var gateway = gateway(null);
+        var handle = gateway.claimEdit(owner, project, base, 1, UUID.randomUUID());
+        gateway.prepareEdit(handle);
+        var work = gateway.workPath(handle); var execution = UUID.randomUUID();
+        var called = new java.util.concurrent.atomic.AtomicInteger();
+        java.util.function.Consumer<SourceTree> reject = tree -> {
+            called.incrementAndGet(); throw new ApiException(409, "SOURCE_CANDIDATE_REJECTED", "fixture rejection");
+        };
+        gateway.markExecutionStarted(handle, execution);
+        assertThatThrownBy(() -> gateway.sealAndAccept(handle, "rejected", reject)).isInstanceOf(ApiException.class);
+        assertThat(called.get()).isZero();
+        gateway.confirmExecutionStopped(handle, stopped(handle.taskId(), execution, work));
+        assertThatThrownBy(() -> gateway.sealAndAccept(handle, "rejected", reject))
+                .isInstanceOfSatisfying(ApiException.class, error -> assertThat(error.code()).isEqualTo("SOURCE_CANDIDATE_REJECTED"));
+        assertThat(called.get()).isEqualTo(1);
+        assertThat(gateway.operationFact(handle)).isNull();
+        assertThat(repository.state(project).versionId()).isEqualTo(base);
+        gateway.releaseEdit(handle);
+    }
+
     private ProjectSourceEditGateway gateway(SourceCoordinator coordinator) {
         return new ProjectSourceEditGateway(service, repository, environment, transactions,
                 (java.util.function.Supplier<SourceCoordinator>) () -> coordinator);

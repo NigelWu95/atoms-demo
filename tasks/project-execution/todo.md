@@ -205,11 +205,15 @@ U/I/REAL/ALL/COMPAT/DOC 的命令与权限条件见计划 §6。S = 1–2、M = 
 
 ## EX15 · lock-only 发布新源码版
 
-- [ ] 完成 EX15。依赖：EX03、EX05、EX06、EX14。规模：M（4 文件）。
+- [ ] 完成 EX15。依赖：EX03、EX05、EX06、EX14。接入时发现可编辑源码目录、最终候选校验及一次性执行意图需要独立适配，按每片最多 5 个主要文件拆分。
+  - [x] EX15a：源码网关提供受租约保护的副本读取及最终候选校验；npm 策略检查仅锁文件变化、依赖来源/完整性及清单一致性，新锁不自动获得构建批准。16:46:28，12 单元 + 22 相关集成通过；移除文件集合限制的变异被捕获并恢复（4 个主要文件）。
+  - [ ] EX15b：私有工具环境中的 lock-only 命令，使用源码副本作为执行身份，固定版本/参数并保留完整停写证明；受控进程与真实 npm 验证。
+  - [ ] EX15c：准备任务一次性领取、执行意图及发布结果结算；接入 worker，覆盖失败/无变更/CAS 和异常停写（实施前列出最多 5 文件的子片）。
+  - [ ] EX15d：实际 npm lock-only 经完整任务发布新源码版本，并核对后续构建仍需新锁批准；记录真实输出及旧版本保留证据。
 - 描述：在源模块持有的任务副本执行批准的固定锁文件准备，再经停写证明发布新版本。
 - 验收：只允许目标锁文件变化，无 node_modules/秘密进入候选；确认进程及 I/O 停止后才能接受，CAS 冲突不覆盖他人修改；新锁不自动取得构建批准，无变更不造版本。
 - 验证：U(ExecutionLockPreparationTest) + I(ExecutionPreparationPublicationIT)；真实 npm lock-only 另由 REAL(ExecutionSeedBuildContractIT) 增补场景，不仅用手写锁夹具。
-- 主要文件：`E/DependencyPreparationWorker.java`、`ET/ExecutionLockPreparationTest.java`、`ET/ExecutionPreparationPublicationIT.java`、`ET/ExecutionSeedBuildContractIT.java`。
+- 主要文件：a 为 `source/ProjectSourceEditGateway.java`、`source/ProjectSourceEditAcceptanceIT.java`、`E/ExecutionNpmPolicy.java`、`ET/ExecutionNpmPolicyTest.java`。b/c/d 的命令适配、worker/生命周期及真实契约分别落地，原 4 文件估计不足以覆盖这些边界，不把 I/O 放进数据库事务或用最后一个子进程的 receipt 冒充全部执行已停止。
 
 ## C-EX05 · 构建恢复与依赖准备
 
