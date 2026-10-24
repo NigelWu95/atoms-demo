@@ -36,10 +36,8 @@ final class ExecutionMigrationHistory {
     static State read(Connection db, OwnedProcess.Budget budget) throws SQLException, IOException {
         long objects;
         try (var query = prepare(db, """
-                SELECT (SELECT count(*) FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='generated_app')
-                  + (SELECT count(*) FROM pg_catalog.pg_proc p JOIN pg_catalog.pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='generated_app')
-                  + (SELECT count(*) FROM pg_catalog.pg_type t JOIN pg_catalog.pg_namespace n ON n.oid=t.typnamespace
-                       WHERE n.nspname='generated_app' AND t.typrelid=0 AND t.typelem=0)
+                SELECT count(*) FROM pg_catalog.pg_depend d JOIN pg_catalog.pg_namespace n ON d.refobjid=n.oid
+                WHERE d.refclassid='pg_catalog.pg_namespace'::pg_catalog.regclass AND n.nspname='generated_app'
                 """, budget); var row = query.executeQuery()) { row.next(); objects = row.getLong(1); }
         long oid = 0;
         try (var query = prepare(db, """

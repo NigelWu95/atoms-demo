@@ -1,6 +1,6 @@
 # project-execution · 开发任务
 
-状态：2026-10-25，规格及 EX01–EX30 计划已获确认，EX01–17、C-EX05 已完成。持久业务库绑定、运行身份与批准元数据通过验收；最新全部 448 单元 + 22 项相关集成通过，两套既有业务库的只读契约另有记录，见[证据](../../docs/project-execution-verification.md#2026-10-25--ex17c-运行身份与迁移批准元数据)。下一项 EX18 迁移兼容性判定与批准。常驻应用与网页接入未完成，新模式保持默认关闭。当前回归使用本轮获准的新 schema，旧失败现场和真实 npm 的既有通过/超时记录全部保留。唯一依据为[规格](../../SPEC-project-execution.md)与[计划](plan.md)，不复用旧工程导出的 PE 编号；勾选须附真实证据。
+状态：2026-10-25，规格及 EX01–EX30 计划已获确认，EX01–18、C-EX06 已完成。迁移源码/JAR 对照、只读业务历史和批准流程已验收；本轮全部 460 单元 + 36 项相关集成通过，补充空 schema 修正后 12 单元 + 37 项相关集成通过，见[证据](../../docs/project-execution-verification.md#2026-10-25--ex18b2-空-schema-判定修正与收尾)。下一项 EX19 常驻应用进程与健康身份。常驻应用与网页接入未完成，新模式保持默认关闭。当前回归使用本轮获准的新 schema，旧失败现场和真实 npm 的既有通过/超时记录全部保留。唯一依据为[规格](../../SPEC-project-execution.md)与[计划](plan.md)，不复用旧工程导出的 PE 编号；勾选须附真实证据。
 
 执行环境沿用已获准的项目隔离 Liberica 17.0.14+10，仅命令级指定；原 Oracle 17.0.5、全局默认、私有 env、服务器和旧审计均不变。原生枚举故障未捕获原 errno，不能宣布根因完全证实，保留监测。EX11 原生构建、完整回归和变异证据见[验证记录](../../docs/project-execution-verification.md#ex11b--实际-jar-与失败版本验收)。
 
@@ -251,11 +251,11 @@ U/I/REAL/ALL/COMPAT/DOC 的命令与权限条件见计划 §6。S = 1–2、M = 
 
 ## EX18 · 迁移批准与兼容性判定
 
-- [ ] 完成 EX18。依赖：EX10、EX17。原 4 文件估计未包含源码/JAR 对照和实际历史读取，实施前拆分，每片最多 5 个主要文件。
+- [x] 完成 EX18。依赖：EX10、EX17。原 4 文件估计未包含源码/JAR 对照和实际历史读取，实施前拆分，每片最多 5 个主要文件。
   - [x] EX18a：有界 SQL 迁移集合、源码/JAR 一致性及纯兼容性规则（Migrations、MigrationPolicy 及两项单测，4 文件）。02:55:01，12 项单元通过，含原产物封存 6 项；不启动 JAR 或连接业务库。历史读取和批准仍待 b/c。
   - [x] EX18b：业务库只读历史快照、身份复核及 PG 契约（MigrationHistory、DatabaseBinding、MigrationHistoryIT，3 文件）。03:03:56，6 单元 + 9 真实 PG 契约通过，覆盖历史文本/数量、伪装视图、RLS、非表对象及原业务绑定；异常 SQL 夹具全部回滚，A/B 验收库仍为空。
-  - [ ] EX18b2：自审补充仅有排序规则等对象的非空 schema 检查（MigrationHistory、MigrationHistoryIT，2 文件）；不能用表/函数/类型计数穷举所有对象，改用 schema 依赖目录并以真实回滚夹具验证。
-  - [x] EX18c：维护者批准、准确历史/构建绑定与启动前复核（MigrationReview、MigrationReviewRepository、MigrationReviewTest、MigrationReviewIT，4 文件）。03:16:03，全部 460 单元 + 36 项相关集成通过；原 6+18 首轮结果另存，编排权限变化/事务/脱敏覆盖通过。EX18 尚待 b2 非表对象补充。
+  - [x] EX18b2：自审补充仅有排序规则等对象的非空 schema 检查（MigrationHistory、MigrationHistoryIT，2 文件）。03:19:21 真实排序规则夹具复现误判；改用 schema 依赖目录后，03:22:32，12 单元 + 37 项相关集成通过，零失败/错误/跳过，耗时 2:39。最终审计仅保留原 A/B 两条绑定，运行/批准/共享占位/绑定锁均为 0。
+  - [x] EX18c：维护者批准、准确历史/构建绑定与启动前复核（MigrationReview、MigrationReviewRepository、MigrationReviewTest、MigrationReviewIT，4 文件）。03:16:03，全部 460 单元 + 36 项相关集成通过；原 6+18 首轮结果另存，编排权限变化/事务/脱敏覆盖通过。非表对象边界的补充修正及最终回归另见 b2。
 - 描述：在新进程获得业务 DB 配置前检查已有历史、目标迁移集合及准确批准。
 - 验收：已确认空库才允许首次初始化；非空库变化返回 RUN_MIGRATION_REVIEW_REQUIRED，批准绑定项目/库/原历史/目标摘要；失败升级、历史不兼容或旧版恢复不可自动 repair/clean/降级。
 - 验证：U(ExecutionMigrationPolicyTest) + I(ExecutionMigrationReviewIT)，批准错项目/错历史/错 JAR、校验和改变和部分升级；检查拒绝时 DB 未写入。
@@ -263,7 +263,7 @@ U/I/REAL/ALL/COMPAT/DOC 的命令与权限条件见计划 §6。S = 1–2、M = 
 
 ## C-EX06 · 数据库边界明确
 
-- [ ] EX16–18 完成，准备任务恢复与真实迁移护栏通过；批准不等于可自动回滚，所有新 DB 精确目标已另行获准并记录。
+- [x] EX16–18 完成，准备任务恢复、真实 PG 历史读取/拒绝及批准绑定通过。批准不等于可自动回滚；本轮只用已批准四库中的 A/B 业务验收库，异常夹具全回滚，不新增 DB/角色。真实 JAR 升级和失败迁移执行仍按 EX25/后续应用验收完成。
 
 ## EX19 · 持有常驻应用进程
 

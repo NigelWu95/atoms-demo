@@ -92,6 +92,19 @@ class ExecutionMigrationHistoryIT {
         }
         assertThat(registry().history(B,budget()).state().objects()).isZero();
     }
+    @Test void schemaWithOnlyACollationIsNotAnEmptyInitializationTarget() throws Exception {
+        try (var db=fixture()) {
+            try {
+                try (var command=db.createStatement()) { command.execute("CREATE COLLATION generated_app.ex18_collation FROM pg_catalog.\"C\""); }
+                var state=ExecutionMigrationHistory.read(db,budget());
+                assertThat(state.exists()).isFalse(); assertThat(state.objects()).isPositive();
+                var target=ExecutionMigrations.catalog(Map.of("V001__first.sql","CREATE TABLE first_table(id int);".getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+                assertThatThrownBy(() -> ExecutionMigrationPolicy.evaluate(target,state.exists(),state.objects(),state.applied()))
+                        .hasMessage("RUN_MIGRATION_INCOMPATIBLE");
+            } finally { db.rollback(); }
+        }
+        assertThat(registry().history(B,budget()).state().objects()).isZero();
+    }
     private Connection fixture() throws Exception {
         var config = ExecutionPrivateConfig.readBusiness(file("atoms_exec_b_app_20261020"), List.of());
         assertThat(registry().history(B, budget()).state().objects()).as("Never overwrite existing application state").isZero();

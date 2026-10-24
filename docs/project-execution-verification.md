@@ -1411,7 +1411,7 @@ V028 追加 `execution_runs` 和 `execution_migration_reviews`。运行身份固
 
 `ExecutionMigrationPolicy` 只允许已确认空 schema 初始化；已应用历史须是目标的准确前缀，核对顺序、名称、类型、成功标记及校验和。新增迁移需批准；修改、删除、乱序、失败或回退到缺失已应用版本的目标一律不兼容。CRC32 对照当前 Flyway 11.7.2 实现验证，另以 SHA-256 固定原 SQL 字节及目标集合。[官方校验说明](https://documentation.red-gate.com/flyway/reference/commands/validate)、[11.7.2 校验源码](https://github.com/flyway/flyway/blob/flyway-11.7.2/flyway-core/src/main/java/org/flywaydb/core/internal/resolver/ChecksumCalculator.java)。
 
-初次测试编译暴露缺少类型；该次未等待编译结束便启动下一命令，日志还含并发编译造成的其他缺符号错误，因此不把该红灯当作有效的独立回归证据。两命令结束后单独执行验证：02:55:01，`-Dtest=ExecutionMigrationsTest,ExecutionMigrationPolicyTest,ExecutionArtifactTest test`，**12 项通过**，零失败/错误/跳过，48.924 秒。实际 ZIP 字节和封存句柄受测，构建成功记录是显式元数据夹具，不表示运行过生成应用；本片未连接业务库。4 个主要文件，EX18b/c 仍待完成。
+初次测试编译暴露缺少类型；该次未等待编译结束便启动下一命令，运行重叠且日志还含其他缺符号错误，因此不把该红灯当作有效的独立回归证据。两命令结束后单独执行验证：02:55:01，`-Dtest=ExecutionMigrationsTest,ExecutionMigrationPolicyTest,ExecutionArtifactTest test`，**12 项通过**，零失败/错误/跳过，48.924 秒。实际 ZIP 字节和封存句柄受测，构建成功记录是显式元数据夹具，不表示运行过生成应用；本片未连接业务库。4 个主要文件，EX18b/c 仍待完成。
 
 ## 2026-10-25 · EX18b 业务库迁移历史只读检查
 
@@ -1430,3 +1430,13 @@ V028 追加 `execution_runs` 和 `execution_migration_reviews`。运行身份固
 新增仓库测试先编译失败（缺少类型），03:09:57 `-Dtest=ExecutionMigrationsTest,ExecutionMigrationPolicyTest -Dit.test=ExecutionMigrationReviewIT,ExecutionRunIT,ExecutionBindingIT verify` **6 单元 + 18 项集成通过**，零失败/错误/跳过，耗时 1:59。其中批准 5、运行 6、绑定 7；元数据夹具均回滚，来源/构建/历史为显式受控样本，不声称真实迁移或应用启动已通过。后续 6 项编排单测使用真实封存 ZIP、Spring 事务边界和受控外部依赖，覆盖外层事务拒绝、当前维护者、读源码时撤权、批准后撤权回滚、敏感连接异常脱敏及每次重新读取历史。
 
 03:16:03 **全部 460 单元 + 36 项相关集成通过**，零失败/错误/跳过，耗时 4:40。命令 `-Pproject-execution-contract -Dit.test=ExecutionMigrationReviewIT,ExecutionRunIT,ExecutionBindingIT,ExecutionAdmissionIT,ExecutionMigrationHistoryIT,ExecutionBindingContractIT -Dexecution.test-config-directory=<原已批准私有目录> verify`。36 项为批准 5、运行 6、绑定 7、原构建准入 9、历史 5、真实绑定 4；没有重跑 npm/Maven 用户工程构建、启动 JAR 或执行真实迁移。自审发现 schema 只有排序规则时原对象计数不完整，已拆为 b2 补测修正；EX18 尚未标记整体完成。
+
+## 2026-10-25 · EX18b2 空 schema 判定修正与收尾
+
+自审发现仅计表、函数与类型会漏掉独立排序规则。03:19:21，在原 B 验收库的回滚事务内创建 `generated_app.ex18_collation`，新单例准确失败：读取对象数为 0，证明原实现会把该 schema 当空库；没有留下数据库对象。修复改查 `pg_depend` 中引用准确 `generated_app` namespace 的依赖记录，覆盖排序规则等 schema 对象，仍是固定只读查询；该数量只用于非空检查和历史摘要，不宣称数据库结构完整性证明。[PG 17 依赖目录](https://www.postgresql.org/docs/17/catalog-pg-depend.html)。
+
+03:22:32，`-Dtest=ExecutionMigrationsTest,ExecutionMigrationPolicyTest,ExecutionMigrationReviewTest -Pproject-execution-contract -Dit.test=ExecutionMigrationReviewIT,ExecutionRunIT,ExecutionBindingIT,ExecutionAdmissionIT,ExecutionMigrationHistoryIT,ExecutionBindingContractIT -Dexecution.test-config-directory=<原已批准私有目录> verify`，**12 单元 + 37 项相关集成通过**，零失败/错误/跳过，耗时 2:39。37 项中历史检查增加为 6，其他组与 c 相同；本次仅修改历史查询及其契约两个主要文件，没有重新计数此前全部 460 单元。业务库真实读/拒绝夹具与元数据夹具均回滚，测试最后确认 A/B schema 仍为空。
+
+最终只读核对原获准平台 schema：V027/V028 均成功，既有 2 项目/2 端口/2 独立物理库角色绑定不变；运行、未结束运行、批准、共享占位与绑定锁均为 0。没有新增库/角色、启动生成应用、调用模型/SMTP、改私有 env 或全局配置。日志及审核输出按 0700 目录/0600 文件私有归档，公开差异的敏感值检查零匹配。
+
+EX18 与 C-EX06 完成，下一项 EX19 真实常驻进程与健康身份。当前交付的是内部可调用的只读检查/批准流程，不是网页启动功能；执行升级、失败迁移、进程启停/恢复、真实模型及网页接入仍按后续计划验收。本轮本地提交，未推送或部署；回退代码保留已有迁移表和不可变审计记录，不清理历史现场。
