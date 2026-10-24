@@ -1,6 +1,9 @@
 package dev.atoms.demo.source;
 
 import java.util.UUID;
+import java.util.function.Supplier;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 /** Read boundary for other modules; never accepts filesystem paths or arbitrary Git objects. */
@@ -8,11 +11,33 @@ import org.springframework.stereotype.Service;
 public final class ProjectSourceReadGateway {
     private final SourceQuery query;
     private final ProjectSourceEnvironment environment;
+    private final Supplier<SourceCoordinator> coordinator;
 
     ProjectSourceReadGateway(ProjectSourceService service, SourceRepository repository,
                              ProjectSourceEnvironment environment) {
+        this(service, repository, environment, (Supplier<SourceCoordinator>) () -> null);
+    }
+
+    @Autowired
+    ProjectSourceReadGateway(ProjectSourceService service, SourceRepository repository,
+                             ProjectSourceEnvironment environment, ObjectProvider<SourceCoordinator> coordinator) {
+        this(service, repository, environment, (Supplier<SourceCoordinator>) coordinator::getIfAvailable);
+    }
+
+    ProjectSourceReadGateway(ProjectSourceService service, SourceRepository repository,
+                             ProjectSourceEnvironment environment, Supplier<SourceCoordinator> coordinator) {
         this.query = new SourceQuery(service, repository, environment);
         this.environment = environment;
+        this.coordinator = coordinator;
+    }
+
+    /** Lifecycle signal only; does not authorize execution, read storage or acquire a coordinator lease. */
+    public boolean readyForExecution() {
+        try {
+            if (!environment.enabled()) return false;
+            var current = coordinator.get();
+            return current != null && current.isRunning();
+        } catch (RuntimeException unavailable) { return false; }
     }
 
     /**

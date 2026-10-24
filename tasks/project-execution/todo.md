@@ -168,8 +168,10 @@ U/I/REAL/ALL/COMPAT/DOC 的命令与权限条件见计划 §6。S = 1–2、M = 
     - [ ] EX12c2：在 c1 上接实际调度器、worker 及生命周期；开始前核对所需文件并继续遵守每片五文件限制。覆盖启动前未决阻断、容量/多项目竞争、实际子进程取消和关闭；尚未完成恢复机制时不重放旧执行。
       - [x] EX12c2a：调度核心（`ExecutionCoordinator`、`ExecutionBuildRepository`、`ExecutionSchedulerIT`、`ExecutionSchedulerFixture`，4 个主要文件）。10 项真实 PG/JVM 测试覆盖默认/四并发、旧容量、取消、关闭、失锁和启动未决阻断；未决保留变异被捕获。13:49:05 全部 **428 单元 + 54 相关集成通过**，零失败/错误/跳过，见[证据](../../docs/project-execution-verification.md#2026-10-24--ex12c2a-调度核心与实际子进程取消)。内部工厂持有根及 worker，尚未增加 Spring 自动装配，不把受控 JVM 称为实际工程构建成功。
       - [ ] EX12c2b：源码就绪、维护者测试库注册表及原生 `ExecutionBuildWorker` 的 Spring 启动接线；开始前按实际文件继续拆片。默认关闭保持无副作用，完整 EX12 需此接线与实际 worker 组合验收后再勾选。
-        - [ ] EX12c2b1：`ProjectSourceReadGateway`、`ProjectSourceReadinessTest`、`SourceAgentFixture`（3 个主要文件），只添加源码生命周期就绪查询和相应测试夹具接线，保持既有读版本接口兼容。
-        - [ ] EX12c2b2：原生资源工厂、协调器 Spring 装配、配置项与验收接线；依据 b1 后的实际文件数继续拆片，不跳过原生构建验证。
+        - [x] EX12c2b1：`ProjectSourceReadGateway`、`ProjectSourceReadinessTest`、`SourceAgentFixture`（3 个主要文件），添加无 I/O 的源码生命周期就绪查询，保留既有读版本接口。14:00:51，4 单元 + 8 源码读取集成及打包通过，零失败/错误/跳过；详见验证记录。
+        - [ ] EX12c2b2：原生资源工厂、协调器 Spring 装配、配置项与验收接线；拆为以下小片，不跳过原生构建验证。
+          - [ ] EX12c2b2a：`ExecutionEnvironment`、`ExecutionEnvironmentTest`、`application.yml`、`.env.example`（4 个主要文件）。懒加载维护者注册表、受保护根及原生 worker，只在调度器取得协调权后打开资源。
+          - [ ] EX12c2b2b：`ExecutionCoordinator`、Spring 装配测试、`ExecutionSeedBuildContractIT`（3 个主要文件）。接入生命周期后通过实际原生构建验证，与默认关闭及旧协调器兼容检查一并验收。
 - 描述：唯一协调者驱动默认一个构建，支持显式 1–4 并发和持久取消。
 - 验收：默认 1/排队 8、每项目一个活动构建，排队 300 秒及共享 1800 秒；启动意图先落库，取消先记录再由拥有者停止；未决不释放容量，Agent 并发配置不变。
 - 验证：I(ExecutionSchedulerIT,ExecutionCancellationIT)，真实受控子进程、多项目竞争、排队/执行取消及重复中断；核对测试进程退出。
