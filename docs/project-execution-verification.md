@@ -1156,3 +1156,11 @@ env JAVA_HOME=/Users/wubingheng/atoms-demo/.local/jdk17-comparison.LlvDQi/jdk-17
 自审确认三个主要实现/测试文件内完成原生 Spring 接线和扫描公平性修复，未更改默认开关、工具/任务预算或真实模型预算。EX12 与 C-EX04 已完成；EX13 崩溃恢复、本机常驻应用、HTTP 业务验收及工作台仍待继续，不能把本次构建 JAR 当作网页已切换新链路或应用已部署。
 
 收尾只读审计：当前批准 schema 的新 Agent 未决/pending/活动编辑与构建未决均为 0，执行协调锁持有者为 0；测试角色仍无建 schema 权限。三份旧未决审计的任务/租约 MD5 与原记录一致，旧源码失败现场与 c1 误运行的 15 个任务、34 条事件保持不变。未删除或强行结算未知记录，未读取旧 PID 补发停止证明。
+
+## 2026-10-24 · EX13a 中断构建的元数据恢复
+
+增加内部 `ExecutionRecovery` 与 9 项真实 PG 集成测试。仅在独立协调租约、源码就绪和固定配置下核对原构建绑定；短事务统一项目→构建加锁。无意图、或非 PACKAGING 阶段完整成对结束的执行可结算为 FAILED/EXECUTION_INTERRUPTED，已请求取消则为 CANCELLED。pending、未配对历史和 PACKAGING 保留容量转为 NEEDS_RECONCILIATION；原未决、终态和排队任务不被重复处理。没有重新执行工具、重建产物句柄或按旧 PID 寻找进程。
+
+14:48:22 RED 为缺少恢复类，另有一处测试断言 API 拼写错误，已修正。14:49:56 首轮 2 单元 + 9 集成通过。14:51:08 临时删除历史核对条件，针对 pending 标志与执行历史不一致的测试失败（预期 NEEDS_RECONCILIATION，实际 FAILED），证明确实能发现错误释放；变异归档 `.local/ex13a-history-mutation.ai9d68fy`，随后恢复源码。
+
+**14:53:44，2 单元 + 52 相关集成通过，零失败/错误/跳过，BUILD SUCCESS，02:19、退出码 0**。命令沿用隔离 JDK 与显式批准 schema：`./mvnw -B -o -Dtest=ExecutionCoordinatorSpringTest -Dit.test=ExecutionRecoveryIT,ExecutionBuildSettlementIT,ExecutionProbeJournalIT,ExecutionFrontendJournalIT,ExecutionJavaJournalIT verify`。本轮只增加恢复结算，启动接线与真实 JVM 崩溃窗口分别由 EX13b/c 完成，尚不标记整个 EX13 完成。私有配置、旧审计和原网页功能不变。
