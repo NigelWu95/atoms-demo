@@ -195,11 +195,13 @@ U/I/REAL/ALL/COMPAT/DOC 的命令与权限条件见计划 §6。S = 1–2、M = 
 
 ## EX14 · 依赖准备任务与编辑互斥
 
-- [ ] 完成 EX14。依赖：EX05、EX07、EX12、EX13。规模：M（4 文件）。
+- [ ] 完成 EX14。依赖：EX05、EX07、EX12、EX13。按每片最多 5 个主要文件拆分。
+  - [x] EX14a：共享容量迁移及原构建兼容，统一排队/执行占位；16:04:08，7 单元 + 45 相关集成通过。V025 只应用于批准的测试 schema（4 个主要文件）。
+  - [ ] EX14b：依赖准备持久意图、准备批准及源码编辑租约原子准入，覆盖双连接竞争、重放和回滚（4 个主要文件）。
 - 描述：为 lock-only 准备增加独立持久意图，与源码编辑租约和构建容量一致准入。
 - 验收：绑定基线/修订号、清单及准备批准，原子领取租约；与同项目 Agent 编辑/源码恢复/构建冲突，不超共享队列；同键重放不重复解析或遗留租约。
 - 验证：I(ExecutionPreparationAdmissionIT)，真实 PG/source 双连接竞争及回滚；不调用模型。
-- 主要文件：`M/V025__project_dependency_preparations.sql`、`E/DependencyPreparationRepository.java`、`E/DependencyPreparationService.java`、`ET/ExecutionPreparationAdmissionIT.java`。
+- 主要文件：a 为 `M/V025__execution_task_slots.sql`、`E/ExecutionBuildRepository.java`、`E/ExecutionBuildClaim.java`、`ET/ExecutionAdmissionIT.java`；b 为 `M/V026__project_dependency_preparations.sql`、`E/DependencyPreparationRepository.java`、`E/DependencyPreparationService.java`、`ET/ExecutionPreparationAdmissionIT.java`。运行/绑定迁移顺延为 V027；不编辑已应用迁移。
 
 ## EX15 · lock-only 发布新源码版
 
@@ -227,7 +229,7 @@ U/I/REAL/ALL/COMPAT/DOC 的命令与权限条件见计划 §6。S = 1–2、M = 
 - 描述：追加运行、项目 DB 绑定和批准记录；绑定由维护者提供，不接受网页连接串。
 - 验收：每项目单一持久绑定、最多四个配置项目，端口/DB/角色不能跨项目复用；只读确认实际业务库及最小权限、拒绝测试/平台/系统库；停止不删除 DB、不释放给别项目。
 - 验证：I(ExecutionBindingIT)，双连接抢占、配置漂移、真实业务/测试库区分；准确目标创建须另获批准。
-- 主要文件：`M/V026__project_execution_runs.sql`、`E/ExecutionRun.java`、`E/ExecutionRunRepository.java`、`E/ExecutionDatabaseBinding.java`、`ET/ExecutionBindingIT.java`。
+- 主要文件：`M/V027__project_execution_runs.sql`、`E/ExecutionRun.java`、`E/ExecutionRunRepository.java`、`E/ExecutionDatabaseBinding.java`、`ET/ExecutionBindingIT.java`。
 
 ## EX18 · 迁移批准与兼容性判定
 

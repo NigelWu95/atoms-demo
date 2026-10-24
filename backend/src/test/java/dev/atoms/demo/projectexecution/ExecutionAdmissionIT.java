@@ -221,6 +221,30 @@ class ExecutionAdmissionIT {
         }
     }
 
+    @Test void sharedSlotsFollowBuildTransactionsAndCannotBeReleasedIndependently() {
+        var base = source.create(owner);
+        var task = service.submit(owner, base.projectId(), base.versionId(), "shared-slots");
+        var slot = jdbc.queryForMap("SELECT * FROM execution_task_slots WHERE task_id=?", task.id());
+        assertThat(slot).containsEntry("task_kind", "BUILD").containsEntry("project_id", base.projectId())
+                .containsEntry("queue_slot", 1).containsEntry("worker_slot", null);
+        assertThatThrownBy(() -> jdbc.update("DELETE FROM execution_task_slots WHERE task_id=?", task.id()))
+                .isInstanceOf(org.springframework.dao.DataAccessException.class);
+        var claim = new ExecutionBuildClaim(new ExecutionSettings(configuration), projects, repository, jdbc, transactions);
+        claim.claim(owner, base.projectId(), task.id());
+        assertThat(jdbc.queryForMap("SELECT * FROM execution_task_slots WHERE task_id=?", task.id()))
+                .containsEntry("queue_slot", null).containsEntry("worker_slot", 1);
+        var tx = new TransactionTemplate(transactions);
+        tx.executeWithoutResult(status -> {
+            jdbc.update("UPDATE execution_builds SET status='FAILED',error_code='EXECUTION_INTERRUPTED',worker_slot=null,finished_at=now() WHERE id=?", task.id());
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM execution_task_slots WHERE task_id=?", Integer.class, task.id())).isZero();
+            status.setRollbackOnly();
+        });
+        assertThat(jdbc.queryForObject("SELECT worker_slot FROM execution_task_slots WHERE task_id=?", Integer.class, task.id())).isEqualTo(1);
+        jdbc.update("UPDATE execution_builds SET status='FAILED',error_code='EXECUTION_INTERRUPTED',worker_slot=null,finished_at=now() WHERE id=?", task.id());
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM execution_task_slots WHERE task_id=?", Integer.class, task.id())).isZero();
+        assertThat(repository.get(base.projectId(), task.id()).status()).isEqualTo("FAILED");
+    }
+
     private void assertCode(String code, org.assertj.core.api.ThrowableAssert.ThrowingCallable call) {
         assertThatThrownBy(call).isInstanceOfSatisfying(ApiException.class, error -> assertThat(error.code()).isEqualTo(code));
     }

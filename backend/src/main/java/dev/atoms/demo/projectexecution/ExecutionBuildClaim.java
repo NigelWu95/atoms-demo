@@ -48,8 +48,8 @@ final class ExecutionBuildClaim {
                 int capacity = Math.min(config.maxConcurrentBuilds(), ((Number) row.get("worker_capacity")).intValue());
                 var slots = jdbc.queryForList("""
                         SELECT slot FROM generate_series(1,?) AS slot
-                        WHERE (SELECT count(*) FROM execution_builds WHERE worker_slot IS NOT NULL) < ?
-                            AND NOT EXISTS(SELECT 1 FROM execution_builds WHERE worker_slot=slot)
+                        WHERE (SELECT count(*) FROM execution_task_slots WHERE worker_slot IS NOT NULL) < ?
+                            AND NOT EXISTS(SELECT 1 FROM execution_task_slots WHERE worker_slot=slot)
                         ORDER BY slot LIMIT 1
                         """, Integer.class, capacity, capacity);
                 if (slots.isEmpty()) throw new ApiException(429, "EXECUTION_WORKER_FULL", "构建执行容量已满，任务仍在排队。");

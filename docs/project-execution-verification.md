@@ -1204,3 +1204,12 @@ env JAVA_HOME=/Users/wubingheng/atoms-demo/.local/jdk17-comparison.LlvDQi/jdk-17
 本命令未开启 `project-execution-contract`，列表中的 `ExecutionBuildWorkerIT` 被原有标签规则排除，不计入 121 项；实际通过的是其余 15 个集成类。原生工程构建和离线 CLI 契约没有变更，本轮未重复执行，也不以本次字节夹具替代此前真实 JAR 验收。
 
 收尾只读核对：批准 schema 的新 Agent 未决/pending/活动编辑和构建未决均为 0，执行协调锁持有者为 0；三份历史未决审计 MD5、旧源码失败现场和此前误运行的 15 任务/34 事件不变。自审确认恢复不执行命令、不清理未知文件、不按旧 PID 获取停止证明；参数化 SQL、最多 21 条执行历史、短事务和原租约检查保持有界。私有 env 五个敏感值与本轮差异核对零匹配。EX13 完成，下一项 EX14；没有推送、部署、真实模型调用、SMTP 调用或修改个人工具配置。
+# 2026-10-24 · EX14a 共享执行容量
+
+V025 增加由任务事务维护的 `execution_task_slots`：构建和后续依赖准备共用项目、队列及 worker 唯一占位；旧未决构建原样回填。任务转执行/结算同步投影，事务回滚恢复原占位，禁止直接删除占位绕过任务状态。原构建准入和领取改为统计共享表；尚未提交准备任务或执行 npm。
+
+- RED：16:01:01，新用例因缺少共享表失败，7 单元通过、1 集成错误。
+- GREEN：16:04:08，7 单元 + 45 相关集成全部通过，零失败/错误/跳过，退出码 0。覆盖准入双连接、动态降容量、领取、调度及真实 JVM 恢复；新增用例核对占位随任务迁移、结算回滚和审计保留。
+- 命令：项目隔离 JDK 17 + Node 24 PATH，显式 `atoms_demo_test?currentSchema=atoms_verify_20261021_ex10`，`./mvnw -B -o -Dtest=ExecutionSettingsTest -Dit.test=ExecutionAdmissionIT,ExecutionBuildClaimIT,ExecutionSchedulerIT,ExecutionRecoveryIT verify`。
+- 本地日志 `.local/ex14a-red.log`、`.local/ex14a-green.log`；不修改日常库、旧 schema、模型配置或远程部署。
+

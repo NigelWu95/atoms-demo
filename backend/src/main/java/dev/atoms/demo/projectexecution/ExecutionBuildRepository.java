@@ -72,7 +72,7 @@ class ExecutionBuildRepository {
 
     void requireIdle(UUID project) {
         if (Boolean.TRUE.equals(jdbc.queryForObject(
-                "SELECT EXISTS(SELECT 1 FROM execution_builds WHERE project_id=? AND finished_at IS NULL)", Boolean.class, project)))
+                "SELECT EXISTS(SELECT 1 FROM execution_task_slots WHERE project_id=?)", Boolean.class, project)))
             throw ExecutionBuild.conflict("EXECUTION_PROJECT_BUSY");
     }
 
@@ -83,8 +83,8 @@ class ExecutionBuildRepository {
         lockCapacity();
         var slots = jdbc.queryForList("""
                 SELECT slot FROM generate_series(1,?) AS slot
-                WHERE (SELECT count(*) FROM execution_builds WHERE queue_slot IS NOT NULL) < ?
-                    AND NOT EXISTS(SELECT 1 FROM execution_builds WHERE queue_slot=slot)
+                WHERE (SELECT count(*) FROM execution_task_slots WHERE queue_slot IS NOT NULL) < ?
+                    AND NOT EXISTS(SELECT 1 FROM execution_task_slots WHERE queue_slot=slot)
                 ORDER BY slot LIMIT 1
                 """, Integer.class, config.queueCapacity(), config.queueCapacity());
         if (slots.isEmpty()) throw new ApiException(429, "EXECUTION_QUEUE_FULL", "构建队列已满，请稍后重试。");
