@@ -1204,7 +1204,8 @@ env JAVA_HOME=/Users/wubingheng/atoms-demo/.local/jdk17-comparison.LlvDQi/jdk-17
 本命令未开启 `project-execution-contract`，列表中的 `ExecutionBuildWorkerIT` 被原有标签规则排除，不计入 121 项；实际通过的是其余 15 个集成类。原生工程构建和离线 CLI 契约没有变更，本轮未重复执行，也不以本次字节夹具替代此前真实 JAR 验收。
 
 收尾只读核对：批准 schema 的新 Agent 未决/pending/活动编辑和构建未决均为 0，执行协调锁持有者为 0；三份历史未决审计 MD5、旧源码失败现场和此前误运行的 15 任务/34 事件不变。自审确认恢复不执行命令、不清理未知文件、不按旧 PID 获取停止证明；参数化 SQL、最多 21 条执行历史、短事务和原租约检查保持有界。私有 env 五个敏感值与本轮差异核对零匹配。EX13 完成，下一项 EX14；没有推送、部署、真实模型调用、SMTP 调用或修改个人工具配置。
-# 2026-10-24 · EX14a 共享执行容量
+
+## 2026-10-24 · EX14a 共享执行容量
 
 V025 增加由任务事务维护的 `execution_task_slots`：构建和后续依赖准备共用项目、队列及 worker 唯一占位；旧未决构建原样回填。任务转执行/结算同步投影，事务回滚恢复原占位，禁止直接删除占位绕过任务状态。原构建准入和领取改为统计共享表；尚未提交准备任务或执行 npm。
 
@@ -1213,3 +1214,20 @@ V025 增加由任务事务维护的 `execution_task_slots`：构建和后续依�
 - 命令：项目隔离 JDK 17 + Node 24 PATH，显式 `atoms_demo_test?currentSchema=atoms_verify_20261021_ex10`，`./mvnw -B -o -Dtest=ExecutionSettingsTest -Dit.test=ExecutionAdmissionIT,ExecutionBuildClaimIT,ExecutionSchedulerIT,ExecutionRecoveryIT verify`。
 - 本地日志 `.local/ex14a-red.log`、`.local/ex14a-green.log`；不修改日常库、旧 schema、模型配置或远程部署。
 
+## 2026-10-24 · EX14b 依赖准备准入
+
+V026 新增独立 `dependency_preparations`，固定基线版本、修订号、完整树摘要、清单/原锁/准备批准摘要，并通过复合外键绑定同一个源码编辑租约。提交先在事务外读取指定版本和私有批准文件，再在项目锁下重新检查身份、配置与源码基线，把编辑租约、任务和共享占位一并提交。重复已落库的请求不再读取源码或批准文件；无文件副本、npm 执行、模型调用或源码发布。
+
+内部提交和查询沿用默认关闭及维护者限制，没有新增 HTTP 入口。准备占用源码模块原有编辑租约，因此与 Agent 编辑、源码恢复或新版本提交互斥；构建和准备通过共享占位互斥、共用队列及 worker 容量。动态降低容量时按实际占位总数检查，不能利用低编号空槽超额。批准文件的捕获不是执行许可，EX15 执行时仍须核对该固定摘要；新锁图也不会自动获得构建批准。
+
+局部证据：缺少服务时红灯编译失败；16:09:51 基础 2 项集成通过；16:13:56，13 单元 + 10 准入集成通过。双连接测试确认两个不同 PG backend 同时争抢最后名额，另覆盖同键重放、源码变更/恢复标记、权限及配置变化、写入后抛错回滚，以及不可改写的批准和租约绑定。16:20:05 临时恢复构建独占计数后，降容量用例按预期失败（本应拒绝却接受）；正确实现已恢复，日志及 XML 保留于 `.local/ex14-capacity-mutation.kf5r8_7r`。
+
+最终回归：**16:29:39，全部 439 单元 + 156 项相关集成通过，零失败/错误/跳过，BUILD SUCCESS，退出码 0，耗时 7:30**。94 份本轮 Surefire XML、19 份 Failsafe XML 和各阶段日志归档于 `.local/ex14-final-passed.u2l5740j`，目录 0700、文件 0600，仅统计本次运行新报告。使用项目隔离 JDK 17、Node 24 PATH 和批准的 `atoms_verify_20261021_ex10` schema；未启用真实原生构建/CLI 契约 profile，不把本次准入回归视为再次生成 JAR。
+
+```text
+./mvnw -B -o -Dit.test=ExecutionPreparationAdmissionIT,ExecutionAdmissionIT,ExecutionBuildClaimIT,ExecutionSchedulerIT,ExecutionRecoveryIT,ExecutionBuildQueueIT,ExecutionBuildSettlementIT,ExecutionProbeJournalIT,ExecutionFrontendJournalIT,ExecutionJavaJournalIT,ExecutionCancellationIT,ExecutionCoordinatorLeaseIT,ProjectSourceReadGatewayIT,ProjectSourceEditLeaseIT,ProjectSourceEditGuardIT,ProjectSourceEditAcceptanceIT,ProjectSourceEditCancellationIT,ProjectSourceRecoveryIT,ProjectAgentAdmissionIT verify
+```
+
+收尾只读核对：V025/V026 仅在批准 schema 生效；累积 17 条准备任务审计保留，未完成/pending、关联活动编辑、共享槽、投影不一致和协调锁均为 0。原三份未知 Agent 审计摘要、旧源码失败记录及原误运行的 15 个构建/34 条事件不变；无 Java/Maven 遗留进程。自审核对参数化 SQL、输入/读取/事务上限、权限二次检查、复合外键与触发器占位一致性；五项私有 env 敏感值与本轮差异核对零匹配。
+
+EX14 完成。真实 npm lock-only、停写核对、只接受锁文件变化及发布新版本属于 EX15，准备任务的调度/取消/重启恢复接线属于 EX16。没有推送、部署或调用模型/SMTP；日常 `.env.local`、个人工具配置和旧 OAuth 草稿未改动。

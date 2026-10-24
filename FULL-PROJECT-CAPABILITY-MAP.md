@@ -1,6 +1,6 @@
 # 完整源码工程与 Coding Agent · 能力地图
 
-状态：2026-10-24，`project-source` 内部模块与 `project-agent` 的 PA01–PA33 离线能力已验收；`project-execution` 的 EX01–13 和 C-EX04 完成。完整工程已通过 Spring 任务调度实际构建 JAR，失败后续版本保留旧产物；启动恢复及五个真实 JVM 崩溃/重新启动窗口通过。最新全部 **439 单元 + 121 项相关集成通过**；此前原生构建及 EX11 完整回归证据单独保留。沿用获准的隔离 JDK 17.0.14，旧原生枚举问题仍保留监测。下一项 EX14 依赖准备与编辑互斥；新模块默认关闭，真实模型、应用运行、交付和工作台仍待完成，尚未部署。
+状态：2026-10-24，`project-source` 内部模块与 `project-agent` 的 PA01–PA33 离线能力已验收；`project-execution` 的 EX01–14 和 C-EX04 完成。完整工程实际构建和启动恢复通过，依赖准备准入已与构建共享容量、原子绑定源码编辑租约。最新全部 **439 单元 + 156 项相关集成通过**；此前原生构建及 EX11 完整回归证据单独保留。沿用获准的隔离 JDK 17.0.14，旧原生枚举问题仍保留监测。下一项 EX15 实际 lock-only 与新源码发布；新模块默认关闭，真实模型、应用运行、交付和工作台仍待完成，尚未部署。
 
 ## 目标与现状
 
@@ -18,7 +18,7 @@
 |---|---|---|---|
 | `project-source` | 每项目完整源码 Git 仓库、不可变版本、工作副本、元数据、旧产物显式导入 | 现有项目身份与所有权 | 内部模块已验收、默认关闭；[使用说明](docs/project-source.md)、[测试证据](docs/project-source-verification.md)、[任务清单](tasks/project-source/todo.md) |
 | `project-agent` | Claude Code + DeepSeek 在任务副本中读取及修改 Vue、Java、SQL 等文件，提交可检查的变更 | `project-source` | PA01–PA33 内部离线验收完成，默认 4 并发；最终后端 290 单元 + 272 集成通过，CLI 2.1.302 / 2.1.303 精确适配。见[维护说明](docs/project-agent.md)、[证据](docs/project-agent-verification.md)、[任务清单](tasks/project-agent/todo.md)。真实模型 PA-LIVE 未完成，旧两份测试未决审计保留；不代表实际构建运行或工作台已交付 |
-| `project-execution` | 对固定源码版本测试、构建、启动本机进程；构建失败保留上一可用结果，数据库迁移另行核对 | `project-source` | [规格](SPEC-project-execution.md)、[实施计划](tasks/project-execution/plan.md)与 [EX 任务清单](tasks/project-execution/todo.md)已确认；EX01–13 完成。Spring 调度原始种子实际构建 JAR，失败后续版本保留旧产物；重启先恢复、未知执行保留容量及原审计。五个真实 JVM 崩溃/重启窗口及 **439 单元 + 121 相关集成**通过，见[证据](docs/project-execution-verification.md#2026-10-24--ex13c-真实-jvm-崩溃与重新启动)。依赖准备、常驻进程、HTTP 业务验收及网页尚待接通 |
+| `project-execution` | 对固定源码版本测试、构建、启动本机进程；构建失败保留上一可用结果，数据库迁移另行核对 | `project-source` | [规格](SPEC-project-execution.md)、[实施计划](tasks/project-execution/plan.md)与 [EX 任务清单](tasks/project-execution/todo.md)已确认；EX01–14 完成。原始种子实际构建、五个 JVM 崩溃/重启窗口和依赖准备原子准入通过；构建/准备共享容量，未知执行保留原审计。最新 **439 单元 + 156 相关集成**通过，见[证据](docs/project-execution-verification.md#2026-10-24--ex14b-依赖准备准入)。实际 lock-only、常驻进程、HTTP 业务验收及网页尚待接通 |
 | `project-delivery` | 实际应用预览、同快照下载、代码版本恢复；明确业务数据边界 | `project-source`、`project-execution` | 待规格评审 |
 | `project-workbench` | 文件树、差异、任务与构建状态、实际进程预览及增量开发入口 | 以上模块 | 待规格评审 |
 
