@@ -116,6 +116,18 @@ public class ProjectSourceEditGateway {
         return workspaces.read(handle.workspace, deadline(handle));
     }
 
+    /** DB-only check of the held, never-executed edit. May join a caller's short claim transaction. */
+    public void requireUnstartedEdit(EditHandle handle) {
+        owned(handle);
+        transaction.executeWithoutResult(status -> {
+            var lease = handle.lease;
+            service.writableBase(lease.ownerId(), lease.projectId(), lease.baseVersionId(), lease.baseRevision(), lease);
+            var current = leases.get(lease.projectId(), lease.id());
+            if (current.executionId() != null || current.executionPending() || leases.operation(lease) != null)
+                throw ProjectSourceService.conflict("SOURCE_EDIT_UNAVAILABLE");
+        });
+    }
+
     /** Durable intent is committed before the caller starts its process. May join Agent admission's transaction. */
     public void markExecutionStarted(EditHandle handle, UUID execution) {
         owned(handle);
