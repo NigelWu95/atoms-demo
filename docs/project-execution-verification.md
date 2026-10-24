@@ -1404,3 +1404,11 @@ V028 追加 `execution_runs` 和 `execution_migration_reviews`。运行身份固
 最终只读审计确认 V027/V028 均成功，固定 A/B 项目各保留一条独立绑定（2 项目、2 端口，物理数据库/角色 OID 不同）；运行与批准测试记录均回滚，运行数、未终结运行、批准数、共享占位及绑定协调锁均为 0。没有回收既有绑定或改动业务库。红灯、初次通过、最终回归及本次审计输出私有归档。
 
 自审核对参数化 SQL、项目锁与幂等作用域、不可变证据、凭据用途隔离和对外无执行能力的边界；4 个主要文件。EX17 完成，下一项 EX18 实际迁移历史检查与批准流程。回退代码须保留 V027/V028 及不可变记录，不 DROP 表或释放项目归属。本轮只做本地提交与文档更新，未推送、部署、调用模型/SMTP或改变日常配置；新完整工程链路尚未接入网页。
+
+## 2026-10-25 · EX18a 迁移集合与兼容性规则
+
+`ExecutionMigrations` 在事务外读取已有封存句柄，复核构建、源码树及产物摘要，逐字节比较源码与 JAR 的固定迁移目录。首版只接受 UTF-8、正整数版本的 `V数字__英文描述.sql`；最多 128 份、单份 2 MiB、合计 16 MiB。重复版本、额外/缺失/变化 SQL、Java/重复迁移、回调、旁路配置与 SQL 占位符均拒绝。只读取 ZIP，不加载类或执行 SQL；生成代码主动迁移或自定义配置不属于这一检查的安全保证。
+
+`ExecutionMigrationPolicy` 只允许已确认空 schema 初始化；已应用历史须是目标的准确前缀，核对顺序、名称、类型、成功标记及校验和。新增迁移需批准；修改、删除、乱序、失败或回退到缺失已应用版本的目标一律不兼容。CRC32 对照当前 Flyway 11.7.2 实现验证，另以 SHA-256 固定原 SQL 字节及目标集合。[官方校验说明](https://documentation.red-gate.com/flyway/reference/commands/validate)、[11.7.2 校验源码](https://github.com/flyway/flyway/blob/flyway-11.7.2/flyway-core/src/main/java/org/flywaydb/core/internal/resolver/ChecksumCalculator.java)。
+
+初次测试编译暴露缺少类型；该次未等待编译结束便启动下一命令，日志还含并发编译造成的其他缺符号错误，因此不把该红灯当作有效的独立回归证据。两命令结束后单独执行验证：02:55:01，`-Dtest=ExecutionMigrationsTest,ExecutionMigrationPolicyTest,ExecutionArtifactTest test`，**12 项通过**，零失败/错误/跳过，48.924 秒。实际 ZIP 字节和封存句柄受测，构建成功记录是显式元数据夹具，不表示运行过生成应用；本片未连接业务库。4 个主要文件，EX18b/c 仍待完成。

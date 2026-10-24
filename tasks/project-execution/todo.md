@@ -251,7 +251,10 @@ U/I/REAL/ALL/COMPAT/DOC 的命令与权限条件见计划 §6。S = 1–2、M = 
 
 ## EX18 · 迁移批准与兼容性判定
 
-- [ ] 完成 EX18。依赖：EX10、EX17。规模：M（4 文件）。
+- [ ] 完成 EX18。依赖：EX10、EX17。原 4 文件估计未包含源码/JAR 对照和实际历史读取，实施前拆分，每片最多 5 个主要文件。
+  - [x] EX18a：有界 SQL 迁移集合、源码/JAR 一致性及纯兼容性规则（Migrations、MigrationPolicy 及两项单测，4 文件）。02:55:01，12 项单元通过，含原产物封存 6 项；不启动 JAR 或连接业务库。历史读取和批准仍待 b/c。
+  - [ ] EX18b：业务库只读历史快照、身份复核及 PG 契约（MigrationHistory、DatabaseBinding、MigrationHistoryIT，最多 3 文件）。
+  - [ ] EX18c：维护者批准、准确历史/构建绑定与启动前复核（MigrationReview、MigrationReviewIT 及必要接线，最多 5 文件）。
 - 描述：在新进程获得业务 DB 配置前检查已有历史、目标迁移集合及准确批准。
 - 验收：已确认空库才允许首次初始化；非空库变化返回 RUN_MIGRATION_REVIEW_REQUIRED，批准绑定项目/库/原历史/目标摘要；失败升级、历史不兼容或旧版恢复不可自动 repair/clean/降级。
 - 验证：U(ExecutionMigrationPolicyTest) + I(ExecutionMigrationReviewIT)，批准错项目/错历史/错 JAR、校验和改变和部分升级；检查拒绝时 DB 未写入。
