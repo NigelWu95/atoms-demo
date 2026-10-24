@@ -1326,3 +1326,5 @@ EX14 完成。真实 npm lock-only、停写核对、只接受锁文件变化及�
 2026-10-25 00:20:40，**16 单元 + 30 集成全部通过**，无跳过，耗时 4:33。集成为恢复 11、取消 7、源码接受 6、源码取消 2、旧 Agent 生命周期 4。覆盖已发布但绑定/响应未登记、发布进行中后实际提交、丢失停止登记、取消优先于排队期限、原 owner 变化、重复恢复、源码租约/名额与任务结算原子回滚，以及写入后失去协调权回滚。使用真实 PG、Git 和本测试持有的 JVM 停止收据；重启通过服务对象丢失内存能力模拟，真正 JVM 崩溃窗口和统一调度将在后续接线验证，不以本组替代。
 
 本片 4 个主要文件，源码门面的原 `reconcileAbandonedEdit` 保持原行为，新增只读 inspect；未新增依赖、迁移或启用开关。验证命令继续显式限定 `atoms_demo_test.atoms_verify_20261024_ex16`。取消源码已恢复为 EX16a 通过版本，反向检查修改未保留。
+
+随后完成测试环境接续：`application-test.yml` 和现有准确目标守卫同步至新 schema，历史失败记录不变。00:47:32，`ExecutionPreparationClaimIT,ExecutionBuildQueueIT,ExecutionRecoveryIT` 的 **30 项集成通过**（含五个真实 JVM 崩溃窗口），耗时 3:00，报告 `.local/ex16-schema-core-passed.m3fldvce`。00:49:46，`ExecutionSchedulerIT` 的 **12 项通过**，耗时 1:19。两项原生契约只有目标名守卫变化，已编译核对，未再运行实际 npm/Maven 下载。默认测试目标现已安全接续，无需依赖记忆手动覆盖；命令示例也已更新。

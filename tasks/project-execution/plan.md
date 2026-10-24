@@ -170,7 +170,7 @@ env PATH=/Users/wubingheng/.nvm/versions/node/v24.20.0/bin:$PATH \
   ./mvnw -B -Dtest=ExecutionSettingsTest test
 
 env PATH=/Users/wubingheng/.nvm/versions/node/v24.20.0/bin:$PATH \
-  SPRING_DATASOURCE_URL='jdbc:postgresql://127.0.0.1:5432/atoms_demo_test?currentSchema=atoms_verify_20261021_ex10&connectTimeout=3&socketTimeout=5' \
+  SPRING_DATASOURCE_URL='jdbc:postgresql://127.0.0.1:5432/atoms_demo_test?currentSchema=atoms_verify_20261024_ex16&connectTimeout=3&socketTimeout=5' \
   ./mvnw -B -Dit.test=ExecutionAdmissionIT verify
 ```
 
@@ -190,7 +190,7 @@ EX11 定向命令（私有契约目录先由维护者创建在平台仓库之外
 ```sh
 env JAVA_HOME=/Users/wubingheng/atoms-demo/.local/jdk17-comparison.LlvDQi/jdk-17.0.14.jdk \
   PATH=/Users/wubingheng/.nvm/versions/node/v24.20.0/bin:$PATH \
-  SPRING_DATASOURCE_URL='jdbc:postgresql://127.0.0.1:5432/atoms_demo_test?currentSchema=atoms_verify_20261021_ex10&connectTimeout=3&socketTimeout=5' \
+  SPRING_DATASOURCE_URL='jdbc:postgresql://127.0.0.1:5432/atoms_demo_test?currentSchema=atoms_verify_20261024_ex16&connectTimeout=3&socketTimeout=5' \
   ./mvnw -B -Pproject-execution-contract \
   -Dexecution.test-config-directory=/Users/wubingheng/atoms-demo/.local/project-execution-acceptance.x5cvui \
   -Dexecution.contract-directory=/private/tmp/atoms-ex11-contract.APT7Jb \

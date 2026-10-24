@@ -35,7 +35,7 @@ class ExecutionSeedBuildContractIT {
 
     @Test void originalSeedBuildsWithRealToolsAndBrokenVersionsCannotReplaceIt() throws Exception {
         assertThat(jdbc.queryForObject("SELECT current_database() || '.' || current_schema()", String.class))
-                .isEqualTo("atoms_demo_test.atoms_verify_20261021_ex10");
+                .isEqualTo("atoms_demo_test.atoms_verify_20261024_ex16");
         // Source startup must not reconcile another test's retained evidence in a new temporary root.
         assertThat(jdbc.queryForObject("SELECT count(*) FROM source_operations WHERE status IN ('PREPARING','CANDIDATE_READY','NEEDS_RECONCILIATION')", Integer.class))
                 .as("No unrelated source startup recovery in this native contract").isZero();

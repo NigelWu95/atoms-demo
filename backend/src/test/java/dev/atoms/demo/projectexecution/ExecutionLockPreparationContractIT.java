@@ -28,7 +28,7 @@ class ExecutionLockPreparationContractIT {
 
     @Test void realNpmCreatesOnlyALockPublishesANewVersionAndThenMakesNoChanges() throws Exception {
         assertThat(jdbc.queryForObject("SELECT current_database() || '.' || current_schema()", String.class))
-                .isEqualTo("atoms_demo_test.atoms_verify_20261021_ex10");
+                .isEqualTo("atoms_demo_test.atoms_verify_20261024_ex16");
         assertThat(jdbc.queryForObject("SELECT count(*) FROM source_operations WHERE status IN ('PREPARING','CANDIDATE_READY','NEEDS_RECONCILIATION')", Integer.class)).isZero();
         var locations = new ExecutionToolchain.Locations(required("execution.contract-node"), required("execution.contract-npm"),
                 required("execution.contract-java"), required("execution.contract-maven"));
