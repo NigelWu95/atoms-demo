@@ -3,12 +3,19 @@ package dev.atoms.demo.projectexecution;
 import com.zaxxer.hikari.HikariDataSource;
 import dev.atoms.demo.execution.OwnedProcess;
 import dev.atoms.demo.project.ProjectService;
+import java.io.File;
 import java.nio.file.*;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.time.Duration;
 import java.util.*;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.BooleanSupplier;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -161,6 +168,109 @@ class ExecutionRecoveryIT {
         };
         assertThatThrownBy(() -> recovery(changed).reconcile(build)).hasMessage("EXECUTION_RECOVERY_UNAVAILABLE");
         assertThat(row(build)).isEqualTo(before);
+    }
+
+    @ParameterizedTest @EnumSource(ExecutionCrashProbe.Window.class)
+    void actualJvmHaltAndReopenPreserveCrashEvidence(ExecutionCrashProbe.Window window) throws Exception {
+        var build = enqueue();
+        // These evidence directories deliberately survive the test; only the temporary credential file is removed by JUnit.
+        Path evidence = Files.createTempDirectory(Path.of(System.getProperty("java.io.tmpdir")).toRealPath(), "atoms-ex13-crash-");
+        Path processDirectory = ExecutionRootLease.directory(evidence.resolve("coordinator"));
+        Path root = evidence.resolve("execution");
+        var input = new Properties();
+        input.setProperty("url", database.getJdbcUrl()); input.setProperty("user", database.getUsername());
+        input.setProperty("password", database.getPassword()); input.setProperty("root", root.toString());
+        input.setProperty("owner", owner.toString()); input.setProperty("project", build.projectId().toString());
+        input.setProperty("build", build.id().toString()); input.setProperty("window", window.name());
+        Path credentials = Files.createFile(temporary.resolve("crash-input.properties"),
+                PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rw-------")));
+        try (var output = Files.newOutputStream(credentials)) { input.store(output, "isolated test input"); }
+        paths.close(); paths = null; lease.close(); lease = null;
+        Path java = Path.of(System.getProperty("java.home"));
+        String classpath = Arrays.stream(System.getProperty("surefire.test.class.path", System.getProperty("java.class.path"))
+                .split(File.pathSeparator)).map(p -> Path.of(p).toAbsolutePath().toString())
+                .collect(Collectors.joining(File.pathSeparator));
+        UUID childTask = UUID.randomUUID(), childExecution = UUID.randomUUID();
+        var invocation = new ExecutionProcess.Invocation(java.resolve("bin/java"),
+                List.of("-cp", classpath, ExecutionCrashProbe.class.getName(), credentials.toString()),
+                processDirectory, processDirectory, processDirectory, java, java.resolve("bin"));
+        var thread = Executors.newSingleThreadExecutor();
+        var child = thread.submit((Callable<Void>) () -> {
+            try {
+                new ExecutionProcess().run(invocation, new ExecutionProcess.Deadline(Duration.ofSeconds(60)),
+                        () -> false, childTask, childExecution, () -> {});
+                throw new AssertionError("Crash probe must halt with a nonzero exit");
+            } catch (OwnedProcess.Failure failure) {
+                assertThat(failure.stopped()).isNotNull();
+                assertThat(failure.stopped().matches(childTask, childExecution, processDirectory)).isTrue();
+            }
+            return null;
+        });
+        try {
+            if (window == ExecutionCrashProbe.Window.LOST_COMPLETION) {
+                Path request = evidence.resolve("request");
+                await(() -> Files.exists(request) || child.isDone());
+                assertThat(request).exists();
+                UUID execution = UUID.fromString(Files.readString(request));
+                Path cwd = root.resolve("builds/" + build.id() + "/project/frontend");
+                executions.put(build.id(), execution); directories.put(build.id(), cwd);
+                assertThat(row(build).get("execution_pending")).isEqualTo(true);
+                // The harness owns this actual execution so it can retain its original receipt after the coordinator JVM dies.
+                var result = new ExecutionProcess().run(new ExecutionProcess.Invocation(java.resolve("bin/java"),
+                        List.of("-version"), cwd, cwd, cwd, java, java.resolve("bin")),
+                        new ExecutionProcess.Deadline(Duration.ofSeconds(20)), () -> false, build.id(), execution, () -> {});
+                receipts.put(build.id(), result.stopped());
+                Files.writeString(evidence.resolve("executed"), "stopped", StandardOpenOption.CREATE_NEW);
+            }
+            child.get(50, TimeUnit.SECONDS);
+            assertThat(evidence.resolve("fixture-failure")).as(Files.exists(evidence.resolve("fixture-failure"))
+                    ? Files.readString(evidence.resolve("fixture-failure")) : "No fixture failure").doesNotExist();
+            assertThat(Files.readString(evidence.resolve("halt-window"))).isEqualTo(window.name());
+            assertThat(evidence.resolve("graceful-shutdown")).doesNotExist();
+            config.withProperty("atoms.project-execution.root", root.toString());
+            var before = row(build); var history = events(build);
+            String expected = switch (window) {
+                case BEFORE_INTENT, AFTER_STAGE -> "FAILED";
+                case LOST_COMPLETION, AFTER_SEAL -> "NEEDS_RECONCILIATION";
+                case AFTER_COMMIT -> "SUCCEEDED";
+            };
+            byte[] jar = null, manifest = null;
+            Path artifact = root.resolve("artifacts/" + build.id());
+            if (window == ExecutionCrashProbe.Window.AFTER_SEAL || window == ExecutionCrashProbe.Window.AFTER_COMMIT) {
+                jar = Files.readAllBytes(artifact.resolve("app.jar")); manifest = Files.readAllBytes(artifact.resolve("manifest.json"));
+            }
+            var restarted = new ExecutionProcess.Invocation(java.resolve("bin/java"),
+                    List.of("-cp", classpath, ExecutionCrashProbe.class.getName(), credentials.toString(), "recover"),
+                    processDirectory, processDirectory, processDirectory, java, java.resolve("bin"));
+            new ExecutionProcess().run(restarted, new ExecutionProcess.Deadline(Duration.ofSeconds(20)),
+                    () -> false, UUID.randomUUID(), UUID.randomUUID(), () -> {});
+            assertThat(Files.readString(evidence.resolve("restarted"))).isEqualTo(expected);
+            paths = new ExecutionPaths(root, List.of()); lease = new ExecutionCoordinatorLease(database);
+            var recovery = recovery(jdbc);
+            assertThat(recovery.reconcile(build).status()).isEqualTo(expected);
+            var recovered = row(build); var recoveredEvents = events(build);
+            recovery.reconcile(build);
+            assertThat(row(build)).isEqualTo(recovered); assertThat(events(build)).isEqualTo(recoveredEvents);
+            assertThat(events(build).subList(0, history.size())).isEqualTo(history);
+            assertThat(row(build).get("execution_pending")).isEqualTo(window == ExecutionCrashProbe.Window.LOST_COMPLETION);
+            assertThat(row(build).get("worker_slot")).isEqualTo(expected.equals("NEEDS_RECONCILIATION") ? 1 : null);
+            if (window == ExecutionCrashProbe.Window.AFTER_COMMIT) assertThat(row(build)).isEqualTo(before);
+            else assertThat(row(build).get("jar_sha256")).isNull();
+            if (jar != null) {
+                assertThat(Files.readAllBytes(artifact.resolve("app.jar"))).isEqualTo(jar);
+                assertThat(Files.readAllBytes(artifact.resolve("manifest.json"))).isEqualTo(manifest);
+            }
+            Files.writeString(evidence.resolve("verified"), build.id() + "\n" + expected + "\n", StandardOpenOption.CREATE_NEW);
+        } finally {
+            if (!child.isDone()) child.cancel(true);
+            thread.shutdownNow(); assertThat(thread.awaitTermination(15, TimeUnit.SECONDS)).isTrue();
+        }
+    }
+
+    private static void await(BooleanSupplier condition) throws Exception {
+        long end = System.nanoTime() + Duration.ofSeconds(20).toNanos();
+        while (!condition.getAsBoolean() && System.nanoTime() < end) Thread.sleep(25);
+        assertThat(condition.getAsBoolean()).as("Expected owned crash probe within bounded wait").isTrue();
     }
 
     private ExecutionRecovery recovery(JdbcTemplate db) {

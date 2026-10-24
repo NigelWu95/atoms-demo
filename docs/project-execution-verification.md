@@ -1170,3 +1170,37 @@ env JAVA_HOME=/Users/wubingheng/atoms-demo/.local/jdk17-comparison.LlvDQi/jdk-17
 EX13a 本地提交 `93d4994`，报告 `.local/ex13a-passed.yw3k2aym`。EX13b 修改协调器及调度集成测试两个主要文件：获得协调锁、打开并检查原生资源，再核对旧任务；恢复前后复验源码就绪、配置与资源，仍有未决则不创建 worker 或启动队列。启动失败时只释放本实例刚取得的资源，不取消既有队列；已经开始运行的协调器仍执行原有停止与未知资源保留规则。
 
 14:55:14 三个新启动场景 RED（3 失败、0 错误/跳过）。实现后 **14:56:49，7 单元 + 29 相关集成全部通过，零失败/错误/跳过，BUILD SUCCESS，01:16、退出码 0**。命令 `./mvnw -B -o -Dtest=ExecutionCoordinatorSpringTest,ExecutionEnvironmentTest -Dit.test=ExecutionSchedulerIT,ExecutionRecoveryIT,ExecutionBuildQueueIT verify`，同一显式 schema 与隔离 JDK。恢复未执行任务后下一队列项实际启动；原未决阻断时排队项不变；目录打不开时不修改旧任务。EX13c 的真实 JVM 异常退出场景尚待完成。
+
+## 2026-10-24 · EX13c 真实 JVM 崩溃与重新启动
+
+EX13b 本地提交 `feddef1`，报告 `.local/ex13b-passed.yfoeszar`。本片只增加测试夹具并扩充恢复集成测试两个主要文件。独立测试 JVM 持有真实数据库/目录租约，使用原领取、阶段日志和产物封存/结算代码，在五个指定节点调用 `Runtime.halt(71)`，确认关闭钩子未运行。随后启动另一个全新 JVM 重新获取租约并执行恢复，最后原测试进程重复恢复核对幂等。恢复进程不会取得原任务或封存产物的内存句柄。
+
+14:57:55 缺失夹具类 RED（8 编译错误）；14:59:10 修正测试异步回调需使用 Callable 承载 IOException 的编译错误。15:00:33 初次真实子 JVM 未到达注入节点（1 失败、4 错误），15:02:37 增加仅输出阶段/异常类名的诊断后确认五项都被执行目录校验拒绝。夹具原把目录放在代码仓库内且位于子进程 cwd 下，违反已有目录排除规则。只把夹具改到仓库外私有临时目录，并使用与执行根平级的进程 cwd；没有放宽生产目录保护。失败目录及固定诊断保留于 `backend/target/execution-crash-*`。
+
+**15:04:21，2 单元 + 14 恢复集成通过，零失败/错误/跳过，BUILD SUCCESS，57.939 秒、退出码 0**，归档 `.local/ex13c-first-pass.5nn7bqbc`。五个真实窗口：
+
+| 窗口 | 测试构建 ID | 恢复结果 |
+|---|---|---|
+| 启动命令前 | `6401d0c4-8c54-43a8-8f6f-958afc801640` | FAILED / EXECUTION_INTERRUPTED |
+| 命令停止、结果尚未记录 | `2917aac3-e013-483f-9b36-7105f8c71da6` | NEEDS_RECONCILIATION，pending 与容量保留 |
+| 阶段完成后 | `5e62c404-5083-41d3-a78d-75239eb8a709` | FAILED / EXECUTION_INTERRUPTED |
+| 产物封存、DB 成功未提交 | `d6163480-8361-4951-812f-4a6b5de824b7` | NEEDS_RECONCILIATION，不发布摘要，文件原样保留 |
+| DB 成功提交、响应未返回 | `5a8e22d2-86ab-4ebd-9b38-16ad8b29aeec` | SUCCEEDED，行、事件、文件均不变 |
+
+证据保留在本机临时目录的 `atoms-ex13-crash-*`，包含窗口、重启状态、verified 构建 ID 以及相关构建/封存文件。测试输入凭据只放 JUnit 私有临时文件，未进入这些证据目录、argv 或日志。结果丢失场景由测试宿主持有真实外部命令停止收据，崩溃 JVM 无法收到该收据；测试核对完后仅凭该原收据结算自身夹具，既有未知记录不变。产物使用受控字节封存夹具验证事务窗口，不将它当作可执行应用；实际 npm/Maven 工程验收仍是 EX11/12 的独立证据。本轮没有新数据库迁移，最终相关回归另记。
+
+最终回归第一次于 15:06:29 停在单元阶段（439 项中 1 错误）：命令未带原验收用 Node 24 PATH，拾取终端默认 Node 20.15.0，旧 `BuildEnvironmentTest` 正确拒绝。错误报告保留于 `.local/ex13-final-tools-failure.xos3y4ur`。只为重跑命令显式指定已安装 Node 24.20.0，不改测试门槛、生产代码或全局配置。
+
+**15:29:52，全部 439 单元 + 121 项相关集成通过，零失败/错误/跳过，BUILD SUCCESS，04:30、退出码 0**。15:25 新鲜度门槛核对 94 份单元、15 份集成 XML，归档 `.local/ex13-final-passed.dfp4qxeh`（0700/0600，含计数摘要）。重跑命令：
+
+```sh
+env JAVA_HOME=/Users/wubingheng/atoms-demo/.local/jdk17-comparison.LlvDQi/jdk-17.0.14.jdk \
+  PATH=/Users/wubingheng/.nvm/versions/node/v24.20.0/bin:$PATH \
+  SPRING_DATASOURCE_URL='jdbc:postgresql://127.0.0.1:5432/atoms_demo_test?currentSchema=atoms_verify_20261021_ex10&connectTimeout=3&socketTimeout=5' \
+  ./mvnw -B -o \
+  -Dit.test=ExecutionRecoveryIT,ExecutionSchedulerIT,ExecutionBuildQueueIT,ExecutionBuildSettlementIT,ExecutionProbeJournalIT,ExecutionFrontendJournalIT,ExecutionJavaJournalIT,ExecutionBuildWorkerIT,ExecutionCancellationIT,ExecutionBuildClaimIT,ExecutionAdmissionIT,ExecutionCoordinatorLeaseIT,AgentCoordinatorLeaseIT,ProjectSourceCoordinatorLeaseIT,BuildCoordinatorLeaseIT,ProjectSourceReadGatewayIT verify
+```
+
+本命令未开启 `project-execution-contract`，列表中的 `ExecutionBuildWorkerIT` 被原有标签规则排除，不计入 121 项；实际通过的是其余 15 个集成类。原生工程构建和离线 CLI 契约没有变更，本轮未重复执行，也不以本次字节夹具替代此前真实 JAR 验收。
+
+收尾只读核对：批准 schema 的新 Agent 未决/pending/活动编辑和构建未决均为 0，执行协调锁持有者为 0；三份历史未决审计 MD5、旧源码失败现场和此前误运行的 15 任务/34 事件不变。自审确认恢复不执行命令、不清理未知文件、不按旧 PID 获取停止证明；参数化 SQL、最多 21 条执行历史、短事务和原租约检查保持有界。私有 env 五个敏感值与本轮差异核对零匹配。EX13 完成，下一项 EX14；没有推送、部署、真实模型调用、SMTP 调用或修改个人工具配置。

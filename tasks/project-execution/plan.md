@@ -1,6 +1,6 @@
 # project-execution · 实施计划
 
-状态：2026-10-24，用户已确认本计划及 EX01–EX30 任务，连续实施；检查点报告证据，不逐小项请求开始。依据[规格](../../SPEC-project-execution.md)，规划基线 `1e3a13a`、计划提交 `ee5096a`，当前分支 `feature/standalone-engineering`。EX01–12 和 C-EX04 已完成：Spring 调度实际构建原始种子，产生 JAR，并验证两个失败版本保留旧产物。14:37:51 全部 **439 单元 + 63 项相关集成通过**，零失败/错误/跳过；见[任务清单](todo.md)与[验收记录](../../docs/project-execution-verification.md#2026-10-24--ex12c2b2b-spring-调度与原生组合验收)。下一项 EX13 崩溃恢复，每片仍最多 5 个主要文件。新模式默认关闭，尚未启动实际 HTTP 服务或接入网页。
+状态：2026-10-24，用户已确认本计划及 EX01–EX30 任务，连续实施；检查点报告证据，不逐小项请求开始。依据[规格](../../SPEC-project-execution.md)，规划基线 `1e3a13a`、计划提交 `ee5096a`，当前分支 `feature/standalone-engineering`。EX01–13 和 C-EX04 已完成：Spring 调度实际构建原始种子，失败版本保留旧产物；启动恢复及五个真实 JVM 崩溃/重新启动窗口通过。15:29:52 全部 **439 单元 + 121 项相关集成通过**，零失败/错误/跳过；见[任务清单](todo.md)与[验收记录](../../docs/project-execution-verification.md#2026-10-24--ex13c-真实-jvm-崩溃与重新启动)。下一项 EX14 依赖准备与编辑互斥，每片仍最多 5 个主要文件。新模式默认关闭，尚未启动实际 HTTP 服务或接入网页。
 
 ## 1. 交付范围与组织
 

@@ -1,10 +1,12 @@
 # 完整源码工程与 Coding Agent · 能力地图
 
-状态：2026-10-24，`project-source` 内部模块与 `project-agent` 的 PA01–PA33 离线能力已验收；`project-execution` 的 EX01–12 和 C-EX04 完成。完整工程已通过 Spring 任务调度实际构建 JAR，并验证失败后续版本保留旧产物。最新全部 **439 单元 + 63 项相关集成通过**；此前 EX11 完整回归 417 + 377 的证据单独保留。沿用获准的隔离 JDK 17.0.14，旧原生枚举问题仍保留监测。下一项 EX13 崩溃恢复；新模块默认关闭，真实模型、应用运行、交付和工作台仍待完成，尚未部署。
+状态：2026-10-24，`project-source` 内部模块与 `project-agent` 的 PA01–PA33 离线能力已验收；`project-execution` 的 EX01–13 和 C-EX04 完成。完整工程已通过 Spring 任务调度实际构建 JAR，失败后续版本保留旧产物；启动恢复及五个真实 JVM 崩溃/重新启动窗口通过。最新全部 **439 单元 + 121 项相关集成通过**；此前原生构建及 EX11 完整回归证据单独保留。沿用获准的隔离 JDK 17.0.14，旧原生枚举问题仍保留监测。下一项 EX14 依赖准备与编辑互斥；新模块默认关闭，真实模型、应用运行、交付和工作台仍待完成，尚未部署。
 
 ## 目标与现状
 
 执行模块现已接通源码就绪检查、私有测试库装配和 Spring 生命周期：队列取消/到期/权限变化原子结算，默认 1、最多 4 个 worker，已领取/待核对任务保留容量等待实际停止。修复了扫描途中容量释放导致后项超车的问题。真实原始种子构建包含 15 项前端、2 项 Java 测试和实际 JAR；前端失败、Java 编译失败的后续版本均保留旧产物，关闭后资源可重新取得，详见[证据](docs/project-execution-verification.md#2026-10-24--ex12c2b2b-spring-调度与原生组合验收)。网页仍使用原有链路，页面按钮和本机应用启动尚待后续接入。
+
+平台重启先核对中断构建：未启动或已有明确停止记录的非封存阶段可以结束并释放名额；结果丢失和封存/提交间隙保留待核对，不自动重跑。成功终态和旧产物不变，恢复未决时不启动新构建。该行为通过独立 JVM 异常退出、另一个全新 JVM 恢复验证，见[恢复证据](docs/project-execution-verification.md#2026-10-24--ex13c-真实-jvm-崩溃与重新启动)。
 
 让用户描述需求后得到可持续修改的完整 Vue + Spring Boot 17 + PostgreSQL 工程，包含实际前端、后端业务接口和数据库迁移。预览运行该工程的构建结果，下载提供对应的同一份源码快照。
 
@@ -16,7 +18,7 @@
 |---|---|---|---|
 | `project-source` | 每项目完整源码 Git 仓库、不可变版本、工作副本、元数据、旧产物显式导入 | 现有项目身份与所有权 | 内部模块已验收、默认关闭；[使用说明](docs/project-source.md)、[测试证据](docs/project-source-verification.md)、[任务清单](tasks/project-source/todo.md) |
 | `project-agent` | Claude Code + DeepSeek 在任务副本中读取及修改 Vue、Java、SQL 等文件，提交可检查的变更 | `project-source` | PA01–PA33 内部离线验收完成，默认 4 并发；最终后端 290 单元 + 272 集成通过，CLI 2.1.302 / 2.1.303 精确适配。见[维护说明](docs/project-agent.md)、[证据](docs/project-agent-verification.md)、[任务清单](tasks/project-agent/todo.md)。真实模型 PA-LIVE 未完成，旧两份测试未决审计保留；不代表实际构建运行或工作台已交付 |
-| `project-execution` | 对固定源码版本测试、构建、启动本机进程；构建失败保留上一可用结果，数据库迁移另行核对 | `project-source` | [规格](SPEC-project-execution.md)、[实施计划](tasks/project-execution/plan.md)与 [EX 任务清单](tasks/project-execution/todo.md)已确认；EX01–11 完成。原始 35 文件种子实际构建通过，前端 15 项与 Java 2 项测试通过，JAR/清单/数据库摘要一致；两个失败版本不覆盖旧成功产物。独立原生契约与随后完整 **417 单元 + 377 集成**回归通过，见[证据](docs/project-execution-verification.md#ex11b--实际-jar-与失败版本验收)。未提高预算或改正式模板，Git 读取的定点中位耗时下降约 55.9%。未知执行保留容量及旧审计；调度、常驻进程、HTTP 业务验收及网页尚未接通 |
+| `project-execution` | 对固定源码版本测试、构建、启动本机进程；构建失败保留上一可用结果，数据库迁移另行核对 | `project-source` | [规格](SPEC-project-execution.md)、[实施计划](tasks/project-execution/plan.md)与 [EX 任务清单](tasks/project-execution/todo.md)已确认；EX01–13 完成。Spring 调度原始种子实际构建 JAR，失败后续版本保留旧产物；重启先恢复、未知执行保留容量及原审计。五个真实 JVM 崩溃/重启窗口及 **439 单元 + 121 相关集成**通过，见[证据](docs/project-execution-verification.md#2026-10-24--ex13c-真实-jvm-崩溃与重新启动)。依赖准备、常驻进程、HTTP 业务验收及网页尚待接通 |
 | `project-delivery` | 实际应用预览、同快照下载、代码版本恢复；明确业务数据边界 | `project-source`、`project-execution` | 待规格评审 |
 | `project-workbench` | 文件树、差异、任务与构建状态、实际进程预览及增量开发入口 | 以上模块 | 待规格评审 |
 
