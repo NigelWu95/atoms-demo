@@ -1378,3 +1378,15 @@ EX14 完成。真实 npm lock-only、停写核对、只接受锁文件变化及�
 把现有只读连接及系统目录查询原样提取到 `ExecutionDatabaseInspection`，两种用途共用实际身份、标记及最小权限检查；没有业务启动凭据接口、DDL/DML 或新配置开关。测试注册表仍只能读 test 文件，旧返回类型和启动句柄不变。
 
 新测试先因缺少 `readBusiness` 编译失败。01:53:25，**9 单元 + 12 既有真实数据库/受控 JVM 契约全部通过**，无跳过，耗时 1:38。命令：`-Dtest=ExecutionBusinessConfigTest,ExecutionTestDatabaseTest -Pproject-execution-contract -Dit.test=ExecutionTestDatabaseIT,ExecutionDatabaseLaunchIT -Dexecution.test-config-directory=<原已批准私有目录> verify`，沿用获准隔离 JDK。只读连接既有四库，测试库身份检查 4 项、环境传递和拒绝 8 项；未启动业务应用或改写库/角色。原红灯及通过日志私有归档。5 个主要文件，持久绑定和运行记录留给 EX17b/c。
+
+## 2026-10-25 · EX17b 项目业务库的持久绑定
+
+追加 V027 `execution_database_bindings`：固定项目、维护者 binding UUID、loopback 数据库端口、实际 DB/角色 OID、数据库/角色名、应用端口和不含凭据的身份摘要。项目、库名、角色名、应用端口、绑定 UUID 和同一数据库端口下的物理 OID 均有唯一约束。唯一的 1–4 槽位限制持久绑定总数；触发器拒绝更新归属、身份、摘要或删除，停止应用没有释放绑定接口。采用 [PG 唯一/非空/检查约束](https://www.postgresql.org/docs/17/ddl-constraints.html)，避免只靠 JVM 内存限额。
+
+内部 `ExecutionDatabaseBinding` 装载最多四项完整业务注册表；拒绝维护者给出的平台/测试库和角色、跨项目目标重复及应用端口与 DB 端口冲突。每次 verify 只读连接核对实际 runtime 标记及权限，返回无凭据的身份快照，快照本身不能获得启动权限。元数据登记要求短事务，按项目锁→专用绑定容量事务锁（718395205）顺序，重复相同身份返回原记录；跨重启变更身份返回 RUN_DB_BINDING_CONFLICT，缩容不驱逐旧绑定。文件与业务库检查仍在元数据事务之外；用户授权、实际启动前重新核验及凭据传递归后续 EX20。
+
+先因缺少仓库类编译失败，02:01:28 初始 9 单元 + 9 集成通过；自审新增缩容、无事务拒绝和真正触发 CHECK 的第五槽测试，02:04:07 **9 单元 + 11 集成全部通过**，无失败/错误/跳过，耗时 1:37。7 项元数据测试全部事务回滚，不伪装为实际业务库；4 项 opt-in 契约实际只读核对此前获准的 A/B 业务库和测试库。完整命令：`-Dtest=ExecutionBusinessConfigTest,ExecutionTestDatabaseTest -Pproject-execution-contract -Dit.test=ExecutionBindingIT,ExecutionBindingContractIT -Dexecution.test-config-directory=<原已批准私有目录> verify`，只在获准 EX16 schema 应用新迁移，不改历史 schema。
+
+契约持久项目 A=`f7a7917c-7b41-4fd6-b224-25aeeaa9e579`、B=`cdcd56cb-98a1-4ef4-aac9-180589576a91`，均属于测试身份 `f0818b24-e2e7-4a67-bf5d-248eae92fa92`。分别绑定原业务库 A/B、18181/18182；原 binding UUID 分别为 `5055d9cb-9203-4235-bea7-d4732f53f0d0`、`514938e1-b354-4f7b-a26a-e47a933876dd`。两连接竞争 A 得到同一记录，新注册表重复核对仍保持原创建时间；这些绑定有意保留供后续运行验收，不在测试收尾删除或换绑。业务 schema relation 数前后一致，没有 DDL/DML、启动端口占用或新资源创建。
+
+运行身份与迁移批准记录尚在 EX17c 实施，不能把业务绑定登记当作应用已启动。退回旧版本须关闭新入口并保留 V027 及绑定记录，不 DROP 表或释放持久归属。
