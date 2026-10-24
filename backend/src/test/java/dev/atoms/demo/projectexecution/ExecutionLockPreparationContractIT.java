@@ -2,14 +2,11 @@ package dev.atoms.demo.projectexecution;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import dev.atoms.demo.execution.OwnedProcess;
 import dev.atoms.demo.project.ProjectService;
 import dev.atoms.demo.source.*;
 import java.nio.file.*;
 import java.nio.file.attribute.PosixFilePermissions;
-import java.time.Duration;
 import java.util.*;
-import java.util.concurrent.TimeUnit;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,7 +15,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import static org.assertj.core.api.Assertions.*;
 
-/** Opt-in real npm/source publication contract; preparation task scheduling/settlement is tested separately. */
+/** Opt-in real npm through durable preparation admission, owned execution and source-result settlement. */
 @Tag("project-execution-contract")
 @org.springframework.test.annotation.DirtiesContext(classMode = org.springframework.test.annotation.DirtiesContext.ClassMode.AFTER_CLASS)
 @ActiveProfiles("test")
@@ -79,55 +76,39 @@ class ExecutionLockPreparationContractIT {
     private SourceAgentFixture.Base prepare(SourceAgentFixture source, ExecutionPaths paths, ExecutionCoordinatorLease coordination,
             ExecutionToolchain.Locations locations, Path policyFile, UUID owner, SourceAgentFixture.Base base, boolean changed,
             List<Path> protectedRoots) throws Exception {
-        var budget = new ExecutionProcess.Deadline(Duration.ofMinutes(5));
-        var snapshot = source.snapshot(owner, base.projectId(), base.versionId());
-        var excluded = new ArrayList<>(protectedRoots); excluded.add(paths.checkedRoot());
-        var policy = ExecutionApprovedPolicy.capture(policyFile, excluded, budget);
-        policy.npm().checkPreparation(snapshot);
-        var tools = ExecutionToolchain.capture(locations, excluded, budget);
-        UUID task = UUID.randomUUID(), execution = UUID.randomUUID();
-        var edit = source.gateway().claimEdit(owner, base.projectId(), base.versionId(), base.revision(), task);
-        boolean pending = false;
-        try {
-            source.gateway().prepareEdit(edit, budget::remaining);
-            Path work = source.gateway().workPath(edit);
-            var home = ExecutionToolHome.create(paths, paths.createBuild(task, budget), budget);
-            var invocation = tools.lockPreparation(home, work);
-            assertThat(source.gateway().readEdit(edit).sha256()).isEqualTo(snapshot.sha256());
-            source.gateway().markExecutionStarted(edit, execution); pending = true;
-            try {
-                var result = new ExecutionProcess().run(invocation, budget, () -> false, task, execution, () -> {
+        var config = new org.springframework.mock.env.MockEnvironment().withProperty("atoms.project-execution.enabled", "true")
+                .withProperty("atoms.project-execution.maintainer-ids", owner.toString())
+                .withProperty("atoms.project-execution.root", paths.checkedRoot().toString())
+                .withProperty("atoms.project-execution.node", locations.node().toString())
+                .withProperty("atoms.project-execution.npm", locations.npm().toString())
+                .withProperty("atoms.project-execution.java", locations.java().toString())
+                .withProperty("atoms.project-execution.maven", locations.maven().toString())
+                .withProperty("atoms.project-execution.policy", policyFile.toString());
+        var settings = new ExecutionSettings(config);
+        var repository = new DependencyPreparationRepository(jdbc);
+        var service = new DependencyPreparationService(settings, repository, projects, source.readGateway(), source.gateway(),
+                source.environment(), config, transactions);
+        var task = service.submit(owner, base.projectId(), new DependencyPreparationService.Input(base.versionId(), base.revision()),
+                "lock-only-" + UUID.randomUUID());
+        // Whole-task contract uses the approved production default, including cold registry resolution.
+        // The earlier 300-second override timed out with an actual stop and was retained as separate evidence.
+        assertThat(jdbc.queryForObject("SELECT task_timeout_seconds FROM dependency_preparations WHERE id=?", Integer.class, task.id())).isEqualTo(1800);
+        var result = new DependencyPreparationWorker(settings, projects, jdbc, transactions, paths, source.readGateway(),
+                source.gateway(), service, protectedRoots).run(owner, base.projectId(), task.id(), () -> false, () -> {
                     if (!coordination.healthy()) throw new java.io.IOException("EXECUTION_STATE_UNAVAILABLE");
-                    assertThat(source.gateway().workPath(edit)).isEqualTo(work);
-                    assertThat(source.gateway().readEdit(edit).sha256()).isEqualTo(snapshot.sha256());
-                    home.verify(budget); tools.verify(budget); policy.verify(budget);
                 });
-                assertThat(result.stopped().matches(task, execution, work)).isTrue();
-                source.gateway().confirmExecutionStopped(edit, result.stopped()); pending = false;
-            } catch (OwnedProcess.Failure error) {
-                if (error.stopped() != null) { source.gateway().confirmExecutionStopped(edit, error.stopped()); pending = false; }
-                throw error;
-            }
-            home.verify(budget); tools.verify(budget); policy.verify(budget);
-            assertThat(work.resolve("node_modules")).doesNotExist();
-            assertThat(work.resolve("frontend/node_modules")).doesNotExist();
-            var accepted = source.gateway().sealAndAccept(edit, "lock-only-" + task, candidate -> {
-                try { assertThat(policy.npm().checkPrepared(snapshot, candidate).changed()).isEqualTo(changed); }
-                catch (java.io.IOException error) { throw new AssertionError(error.getMessage()); }
-            });
-            if (!changed) {
-                assertThat(accepted).isInstanceOf(ProjectSourceEditGateway.NoChanges.class);
-                assertThat(source.gateway().operationFact(edit)).isNull();
-                return base;
-            }
-            var submitted = (ProjectSourceEditGateway.Submitted) accepted;
-            var saved = submitted.completion().get(budget.remaining().toNanos(), TimeUnit.NANOSECONDS);
-            assertThat(saved.status()).isEqualTo("COMMITTED");
-            return new SourceAgentFixture.Base(base.projectId(), saved.resultVersionId(), base.revision() + 1);
-        } finally {
-            var operation = source.gateway().operationFact(edit);
-            if (!pending && (operation == null || operation.terminal())) source.gateway().releaseEdit(edit);
+        assertThat(result.status()).isEqualTo(changed ? "SOURCE_SAVED" : "NO_CHANGES");
+        assertThat(service.handle(task.id())).isNull();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM execution_task_slots WHERE task_id=?", Integer.class, task.id())).isZero();
+        var row = jdbc.queryForMap("SELECT source_operation_id,result_version_id FROM dependency_preparations WHERE id=?", task.id());
+        System.out.printf("lock_preparation_task id=%s status=%s sourceOperation=%s result=%s%n", task.id(), result.status(),
+                row.get("source_operation_id"), row.get("result_version_id"));
+        if (!changed) {
+            assertThat(row).containsEntry("source_operation_id", null).containsEntry("result_version_id", null);
+            return base;
         }
+        assertThat(row.get("source_operation_id")).isNotNull();
+        return new SourceAgentFixture.Base(base.projectId(), (UUID) row.get("result_version_id"), base.revision() + 1);
     }
 
     private static Path required(String key) {

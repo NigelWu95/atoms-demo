@@ -1,6 +1,6 @@
 # Spec: project-execution · 完整工程受控构建与本机进程
 
-状态：2026-10-24，用户已确认本规格及 §10 三项取舍、[实施计划](tasks/project-execution/plan.md)与[任务清单](tasks/project-execution/todo.md)；EX01–14、C-EX04 及 EX15a/b 已完成。实际 npm/Maven 构建、五个 JVM 崩溃/重启窗口和依赖准备准入已验收；真实 npm lock-only 已通过封存候选校验发布新源码版，重复运行无变更不造版本。最新回归与实际契约分别记录于[验收记录](docs/project-execution-verification.md#2026-10-24--ex15b-实际-npm-锁文件与源码发布)。新模式仍默认关闭，下一项 EX15c 接通准备任务 worker；准备调度恢复、应用启动、HTTP 业务验收和网页接入尚未完成。本地完整闭环范围已获准，见 [Agent 规格 §10](SPEC-project-agent.md#10-2026-10-19-完整闭环实施授权)。
+状态：2026-10-24，用户已确认本规格及 §10 三项取舍、[实施计划](tasks/project-execution/plan.md)与[任务清单](tasks/project-execution/todo.md)；EX01–15 及 C-EX05 已完成。实际 npm/Maven 构建、五个 JVM 崩溃/重启窗口及依赖准备完整单次 worker 已验收。22:11:42 真实 npm 经持久任务保存新源码版、第二轮无变更；使用已批准的 1800 秒默认任务预算，之前 300 秒超时证据单独保留，见[验收记录](docs/project-execution-verification.md#2026-10-24--ex15d-真实整轮验收通过)。新模式仍默认关闭，下一项 EX16 接通准备任务调度、取消与恢复；应用启动、HTTP 业务验收和网页接入尚未完成。本地完整闭环范围已获准，见 [Agent 规格 §10](SPEC-project-agent.md#10-2026-10-19-完整闭环实施授权)。
 
 模块 ID 沿用[能力地图](FULL-PROJECT-CAPABILITY-MAP.md)的 `project-execution`，依赖 `project-source`，不反向依赖 Agent、交付或工作台。上游只读门面 PS21 已完成；当前网页仍走旧固定模板链路。
 

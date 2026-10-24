@@ -1,6 +1,6 @@
 # 完整源码工程与 Coding Agent · 能力地图
 
-状态：2026-10-24，`project-source` 内部模块与 `project-agent` 的 PA01–PA33 离线能力已验收；`project-execution` 的 EX01–14 和 C-EX04 完成。完整工程实际构建和启动恢复通过，依赖准备准入已与构建共享容量、原子绑定源码编辑租约。最新全部 **439 单元 + 156 项相关集成通过**；此前原生构建及 EX11 完整回归证据单独保留。沿用获准的隔离 JDK 17.0.14，旧原生枚举问题仍保留监测。下一项 EX15 实际 lock-only 与新源码发布；新模块默认关闭，真实模型、应用运行、交付和工作台仍待完成，尚未部署。
+状态：2026-10-24，`project-source` 内部模块与 `project-agent` 的 PA01–PA33 离线能力已验收；`project-execution` 的 EX01–15 和 C-EX05 完成。完整工程构建/崩溃恢复和依赖准备单次 worker 通过；真实 npm 经持久任务保存新源码版，第二轮无变更。最新[整轮证据](docs/project-execution-verification.md#2026-10-24--ex15d-真实整轮验收通过)使用已批准的 1800 秒任务默认预算；300 秒超时及旧回归另记。沿用获准的隔离 JDK 17.0.14，原生枚举问题仍保留监测。下一项 EX16 准备调度/取消/恢复；新模块默认关闭，真实模型、应用运行、交付和工作台仍待完成，尚未部署。
 
 ## 目标与现状
 
@@ -18,7 +18,7 @@
 |---|---|---|---|
 | `project-source` | 每项目完整源码 Git 仓库、不可变版本、工作副本、元数据、旧产物显式导入 | 现有项目身份与所有权 | 内部模块已验收、默认关闭；[使用说明](docs/project-source.md)、[测试证据](docs/project-source-verification.md)、[任务清单](tasks/project-source/todo.md) |
 | `project-agent` | Claude Code + DeepSeek 在任务副本中读取及修改 Vue、Java、SQL 等文件，提交可检查的变更 | `project-source` | PA01–PA33 内部离线验收完成，默认 4 并发；最终后端 290 单元 + 272 集成通过，CLI 2.1.302 / 2.1.303 精确适配。见[维护说明](docs/project-agent.md)、[证据](docs/project-agent-verification.md)、[任务清单](tasks/project-agent/todo.md)。真实模型 PA-LIVE 未完成，旧两份测试未决审计保留；不代表实际构建运行或工作台已交付 |
-| `project-execution` | 对固定源码版本测试、构建、启动本机进程；构建失败保留上一可用结果，数据库迁移另行核对 | `project-source` | [规格](SPEC-project-execution.md)、[实施计划](tasks/project-execution/plan.md)与 [EX 任务清单](tasks/project-execution/todo.md)已确认；EX01–14 及 EX15a/b 完成。原始种子实际构建、五个 JVM 崩溃/重启窗口、依赖准备准入和真实 lock-only 源码发布通过；重复准备无变更不造版本，构建仍需新锁批准。最新回归见[证据](docs/project-execution-verification.md#2026-10-24--ex15b-实际-npm-锁文件与源码发布)。准备 worker/调度恢复、常驻进程、HTTP 业务验收及网页尚待接通 |
+| `project-execution` | 对固定源码版本测试、构建、启动本机进程；构建失败保留上一可用结果，数据库迁移另行核对 | `project-source` | [规格](SPEC-project-execution.md)、[实施计划](tasks/project-execution/plan.md)与 [EX 任务清单](tasks/project-execution/todo.md)已确认；EX01–15 完成。实际构建、五个 JVM 崩溃窗口和依赖准备单次 worker 通过；真实 npm 保存新源码版，二次无变更，新锁仍需独立构建批准。见[证据](docs/project-execution-verification.md#2026-10-24--ex15d-真实整轮验收通过)。准备调度/取消/恢复、常驻进程、HTTP 业务验收及网页尚待接通 |
 | `project-delivery` | 实际应用预览、同快照下载、代码版本恢复；明确业务数据边界 | `project-source`、`project-execution` | 待规格评审 |
 | `project-workbench` | 文件树、差异、任务与构建状态、实际进程预览及增量开发入口 | 以上模块 | 待规格评审 |
 
