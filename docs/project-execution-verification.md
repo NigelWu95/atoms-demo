@@ -1118,3 +1118,41 @@ EX12c1 本地提交为 `867e559`，随后继续 c2 调度接线。
 14:02:50 缺类 RED（2 编译错误、退出码 1）；14:04:19，19 项相关单元通过。**14:05:20 注册表漂移变异被捕获**：临时移除持有期间的注册表一致性检查，1 项测试失败、无错误/跳过，资源由原 try-with-resources 关闭；归档 `.local/ex12c2b2a-registry-mutation.t8af8m3c`，随后恢复校验。
 
 **14:07:10，23 单元 + 8 源码读取集成通过，零失败/错误/跳过，BUILD SUCCESS，01:36、退出码 0**。沿用隔离 JDK/显式批准 schema，命令为 `./mvnw -B -o -Dtest=ExecutionEnvironmentTest,ExecutionTestDatabaseTest,ExecutionSettingsTest,ProjectSourceReadinessTest -Dit.test=ProjectSourceReadGatewayIT verify`。验证禁用/源码未就绪无副作用、无效/过量/重复注册、真实临时根排他与释放、运行期间配置变化、平台身份及受保护目录拒绝、事务内拒绝和异常脱敏。新工厂的测试没有启动 npm/Maven 或实际测试库连接，不将这些结果记为原生构建验收；该验收由 b2b 完成。未更改私有 env、个人工具配置或历史审计，没有推送/部署。
+
+原生工厂本地提交 `a701aa6`，报告归档 `.local/ex12c2b2a-passed.kbc7nl9q`，0700/0600。
+
+## 2026-10-24 · EX12c2b2b Spring 调度与原生组合验收
+
+增加执行开关条件 bean 和实际源码/原生工厂构造接线，保留内部夹具构造。生命周期先启动源码、后启动执行，关闭顺序相反；不开开关不注册协调器。原生契约改为真实源码协调器 + Spring 执行上下文，通过 `ProjectExecutionService.submit` 入队，等待持久结果，不再直接调用同步 worker。测试启动前要求批准 schema 的源码操作没有未决项，避免新临时根恢复其他测试现场；子上下文不接管外部连接池和源码环境的关闭责任。
+
+14:09:27 装配 RED：两项测试因缺条件注册/原生构造发生依赖错误。实现后，14:11:28 定向回归中 11 单元、18 集成通过，但默认串行场景等待第二任务失败。只读检查失败 owner `3c340fc1-491e-4258-ad9b-6020f1275272` 的记录：第一 `4a884282-4d06-4f00-b6c2-bc048f267fce` 与第三 `1500bf85-fd75-4bdd-9601-26e365ed8f5b` 各有两条 NPM_CI 阶段事件，第二 `10d91ac1-6f17-4a3d-b2f6-fada28e78f67` 没有执行事件，三者最终均由原关闭流程取消、pending=false。确认容量在扫描中途释放导致后项超车，不是增大测试等待即可解决。失败报告 `.local/ex12c2b2b-scheduler-failure.yuu0jj_0` 保留。
+
+修复为一次扫描遇到容量阻塞后不再派发后项，下一轮从最早等待项重试；仍继续对后项结算到期、取消和权限撤销，不让清理因满员停止。保持原 20 秒测试等待、共享任务期限与并发上限，未修改旧审计或测试成功标准。后续恢复结果及实际工程构建证据另记。
+
+**14:16:14，恢复后 2 项 Spring 装配单元 + 10 项调度集成全部通过，零失败/错误/跳过，BUILD SUCCESS，01:13、退出码 0**；归档 `.local/ex12c2b2b-order-fixed.9h2ktz5u`，0700/0600。随后开始全部单元、相关集成及实际原生组合验收。
+
+本轮原生组合命令（同一获准 JDK、工具、schema 和私有测试库；外层 Maven 离线，实际 worker 的依赖安装仍按既有批准策略访问仓库）：
+
+```sh
+env JAVA_HOME=/Users/wubingheng/atoms-demo/.local/jdk17-comparison.LlvDQi/jdk-17.0.14.jdk \
+  PATH=/Users/wubingheng/.nvm/versions/node/v24.20.0/bin:$PATH \
+  SPRING_DATASOURCE_URL='jdbc:postgresql://127.0.0.1:5432/atoms_demo_test?currentSchema=atoms_verify_20261021_ex10&connectTimeout=3&socketTimeout=5' \
+  ./mvnw -B -o -Pproject-execution-contract \
+  -Dexecution.test-config-directory=/Users/wubingheng/atoms-demo/.local/project-execution-acceptance.x5cvui \
+  -Dexecution.contract-directory=/private/tmp/atoms-ex11-contract.APT7Jb \
+  -Dexecution.contract-node=/Users/wubingheng/.nvm/versions/node/v24.20.0/bin/node \
+  -Dexecution.contract-npm=/Users/wubingheng/.nvm/versions/node/v24.20.0/bin/npm \
+  -Dexecution.contract-java=/Users/wubingheng/atoms-demo/.local/jdk17-comparison.LlvDQi/jdk-17.0.14.jdk/bin/java \
+  -Dexecution.contract-maven=/Users/wubingheng/.m2/wrapper/dists/apache-maven-3.9.11/a2d47e15/bin/mvn \
+  -Dit.test=ExecutionSeedBuildContractIT,ExecutionSchedulerIT,ExecutionBuildQueueIT,ExecutionCancellationIT,ExecutionBuildClaimIT,ExecutionAdmissionIT,ExecutionCoordinatorLeaseIT,AgentCoordinatorLeaseIT,ProjectSourceCoordinatorLeaseIT,BuildCoordinatorLeaseIT,ProjectSourceReadGatewayIT verify
+```
+
+首个真实任务 `1d1ca3b5-d0ce-4be9-998f-12d4f75397b3` 已由 Spring 调度构建为 SUCCEEDED，耗时 419,139 ms；来源 `ca9125aa-5dc7-40ac-8b5f-a2fcb42402c3`。前端 15 项、Java 2 项测试通过，JAR 24,023,687 字节，SHA-256 `f90d09b47d7688619cd03a0742305e81a86458c205524f622846fe86410b8bf3` 与清单/数据库一致。实际根为 `/private/tmp/atoms-ex11-contract.APT7Jb/seed-build-15860576047448330585`。后续失败版本、关闭和回归尚在本命令内验证，此处不提前记整体通过。
+
+后续原生契约于 **14:35:44 完整通过**，耗时 997.8 秒：前端失败构建 `a4e3749f-05c9-4356-b654-809f0172b319` 在 UNIT_TEST 失败，188,846 ms；报告实际 16 项测试中 1 项失败。Java 失败构建 `c797a7ce-b8a5-4713-9a7b-5961de84e1ae` 在 MAVEN_PACKAGE 失败，354,021 ms；编译输入清单包含故意引用缺失类型的 `AcceptanceFailure.java`。两个失败任务均无新封存产物，旧成功数据库行与 JAR 摘要保持不变。源码版本/静态首页/Java 类/迁移均与成功产物核对，测试库身份与 relation 数量未变；Spring 上下文关闭后实际重新取得执行根文件租约和独立数据库协调租约。
+
+**14:37:51，全部 439 单元 + 63 项相关集成通过，零失败/错误/跳过，BUILD SUCCESS，20:07、退出码 0**。按 14:17:00 新鲜度门槛仅统计本次 94 份单元、11 份集成 XML；归档 `.local/ex12c2b2b-native-passed.blyztie_`，0700/0600。63 项包含上述真实原生组合、调度/队列/取消/领取/准入、四类协调租约和原源码读取；不是所有集成测试的完整回归，也未重跑无变更的离线 CLI 契约。
+
+自审确认三个主要实现/测试文件内完成原生 Spring 接线和扫描公平性修复，未更改默认开关、工具/任务预算或真实模型预算。EX12 与 C-EX04 已完成；EX13 崩溃恢复、本机常驻应用、HTTP 业务验收及工作台仍待继续，不能把本次构建 JAR 当作网页已切换新链路或应用已部署。
+
+收尾只读审计：当前批准 schema 的新 Agent 未决/pending/活动编辑与构建未决均为 0，执行协调锁持有者为 0；测试角色仍无建 schema 权限。三份旧未决审计的任务/租约 MD5 与原记录一致，旧源码失败现场与 c1 误运行的 15 个任务、34 条事件保持不变。未删除或强行结算未知记录，未读取旧 PID 补发停止证明。

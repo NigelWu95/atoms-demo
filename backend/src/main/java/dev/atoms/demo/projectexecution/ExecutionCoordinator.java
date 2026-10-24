@@ -2,19 +2,25 @@ package dev.atoms.demo.projectexecution;
 
 import dev.atoms.demo.common.ApiException;
 import dev.atoms.demo.execution.OwnedProcess;
+import dev.atoms.demo.source.ProjectSourceReadGateway;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BooleanSupplier;
 import javax.sql.DataSource;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.SmartLifecycle;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.stereotype.Component;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/** One dispatcher, independent workers. Explicit internal wiring until the opt-in native bootstrap is added. */
+/** One opt-in dispatcher with independent workers; source lifecycle starts first and stops last. */
+@Component
+@ConditionalOnProperty(name = "atoms.project-execution.enabled", havingValue = "true")
 final class ExecutionCoordinator implements SmartLifecycle, AutoCloseable {
     interface WorkerResources extends AutoCloseable {
         void check() throws IOException;
@@ -42,6 +48,13 @@ final class ExecutionCoordinator implements SmartLifecycle, AutoCloseable {
     private ExecutionBuildQueue queue;
     private int concurrency;
     private boolean activated, released;
+
+    @Autowired
+    ExecutionCoordinator(ExecutionSettings settings, ExecutionBuildRepository builds, JdbcTemplate jdbc,
+                         PlatformTransactionManager transactions, DataSource database, ProjectSourceReadGateway source,
+                         ExecutionEnvironment environment) {
+        this(settings, builds, jdbc, transactions, database, source::readyForExecution, environment);
+    }
 
     ExecutionCoordinator(ExecutionSettings settings, ExecutionBuildRepository builds, JdbcTemplate jdbc,
                          PlatformTransactionManager transactions, DataSource database, BooleanSupplier sourceReady,
@@ -88,25 +101,29 @@ final class ExecutionCoordinator implements SmartLifecycle, AutoCloseable {
             var owned = Set.copyOf(active.keySet());
             for (var build : builds.inFlight())
                 if (build.status().equals("NEEDS_RECONCILIATION") || !owned.contains(build.id())) throw unavailable();
+            boolean canDispatch = true;
             for (var candidate : queue.waiting()) {
                 if (stopping.get()) return;
                 if (active.containsKey(candidate.id())) continue;
                 var current = queue.beforeDispatch(candidate);
-                if (!current.status().equals("QUEUED")) continue;
+                if (!current.status().equals("QUEUED") || !canDispatch) continue;
                 int limit = Math.min(concurrency, Math.min(settings.load().maxConcurrentBuilds(), builds.workerLimit(current)));
-                dispatch(current, limit);
+                // If a slot frees mid-scan, retry the oldest waiting task on the next poll.
+                // Keep settling expiration/cancellation for the remainder without letting it overtake.
+                canDispatch = dispatch(current, limit);
             }
         } catch (IOException | RuntimeException error) {
             log("execution_dispatcher_stopping", null); requestStop();
         }
     }
 
-    private void dispatch(ExecutionBuild build, int limit) {
+    private boolean dispatch(ExecutionBuild build, int limit) {
         synchronized (admission) {
-            if (stopping.get() || !running.get() || active.size() >= limit || active.containsKey(build.id())) return;
+            if (stopping.get() || !running.get() || active.size() >= limit || active.containsKey(build.id())) return false;
             var job = new Job(build); active.put(build.id(), job);
             try { executor.execute(job); }
             catch (RuntimeException error) { active.remove(build.id(), job); throw error; }
+            return true;
         }
     }
 
