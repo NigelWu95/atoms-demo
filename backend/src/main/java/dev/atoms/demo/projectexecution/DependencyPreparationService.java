@@ -110,6 +110,13 @@ public final class DependencyPreparationService {
         if (projects.lock(owner, project.toString()).archived()) throw ExecutionBuild.conflict("EXECUTION_PROJECT_ARCHIVED");
     }
     ProjectSourceEditGateway.EditHandle handle(UUID task) { return handles.get(task); }
+    void forgetAfterCommit(UUID task, ProjectSourceEditGateway.EditHandle expected) {
+        if (!TransactionSynchronizationManager.isActualTransactionActive())
+            throw new IllegalStateException("Preparation capability release requires a transaction");
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override public void afterCommit() { handles.remove(task, expected); }
+        });
+    }
     static TaskView view(DependencyPreparationRepository.Task task) {
         return new TaskView(task.id(), task.projectId(), task.editLeaseId(), task.baseVersionId(), task.baseRevision(),
                 task.treeSha256(), task.manifestSha256(), task.baseLockSha256(), task.policySha256(), task.status(), task.createdAt(), task.finishedAt());

@@ -210,7 +210,7 @@ U/I/REAL/ALL/COMPAT/DOC 的命令与权限条件见计划 §6。S = 1–2、M = 
   - [x] EX15b：私有工具环境中的 lock-only 命令，使用源码副本作为执行身份，固定版本/参数并保留完整停写证明。17:00:13，10 项受控进程/工具单元通过；17:05:07，实际 npm 生成 250 项依赖的锁文件并发布新源码版，第二轮无变更不新增版本。补齐未批准 yarn.lock 输入的拒绝，17:16:39，16 单元 + 10 集成通过。准备任务 worker 仍由 c 接入。
   - [ ] EX15c：准备任务一次性领取、执行意图及发布结果结算；接入 worker，覆盖失败/无变更/CAS 和异常停写。
     - [x] EX15c1：`DependencyPreparationClaim`、`ProjectSourceEditGateway` 的只读未执行租约检查与 `ExecutionPreparationClaimIT`（3 个主要文件）。短事务一次性领取，复核任务绑定的编辑能力与基线、原始/当前共享容量、取消和数据库排队期限；不启动进程，不跨模块直接查询源码表。17:39:56，16 单元 + 32 相关集成通过，包括 8 项新领取用例。
-    - [ ] EX15c2：持久执行意图、停止证明和源码结果结算，按需补仓库字段及提交服务句柄释放；主要文件为 preparation journal/settlement、repository/service 和集成测试，超过 5 个先拆。
+    - [x] EX15c2：`DependencyPreparationLifecycle`、`DependencyPreparationService`、`ProjectSourceEditGateway` 与 `ExecutionPreparationLifecycleIT`（4 个主要文件）。短事务保存执行意图和停止事实，源码操作事实决定结算；原能力在确认停止/源码操作终结后可以收尾，不因账号切换把已提交源码误报失败，未知执行仍保留占位。17:50:53 初始 16 单元 + 34 相关集成通过；补齐未知结果反例后，17:55:42，16 单元 + 22 相关集成通过（生命周期 10 项、原源码/Agent 12 项）。
     - [ ] EX15c3：单次 preparation worker 组合已验证的工具命令、最终候选校验与上述元数据链路；worker 与受控进程集成测试（预计 2–3 文件），调度/恢复仍归 EX16。
   - [ ] EX15d：实际 npm lock-only 经完整任务发布新源码版本，并核对后续构建仍需新锁批准；记录真实输出及旧版本保留证据。
 - 描述：在源模块持有的任务副本执行批准的固定锁文件准备，再经停写证明发布新版本。

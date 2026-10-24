@@ -223,6 +223,11 @@ public class ProjectSourceEditGateway {
         owned(handle); return leases.operation(handle.lease);
     }
 
+    /** Fact issued by this gateway after candidate validation; a caller-created NoChanges DTO is not evidence. */
+    public boolean noChangesFact(EditHandle handle) {
+        owned(handle); return handle.accepted instanceof NoChanges;
+    }
+
     /** Startup-only, behind the caller's exclusive coordinator lease. Never recreates a writable capability. */
     public RecoveryFact reconcileAbandonedEdit(UUID project, UUID leaseId, UUID task) {
         return transaction.execute(status -> {
@@ -247,6 +252,16 @@ public class ProjectSourceEditGateway {
             repository.lockEvidence(handle.lease.projectId());
             service.authorize(handle.lease.ownerId(), handle.lease.projectId());
             leases.release(handle.lease);
+            forgetAfterCommit(handle.leaseId());
+        });
+    }
+
+    /** Held-capability cleanup after stop/terminal publication, even if account ownership has since changed. */
+    public void releaseSettledEdit(EditHandle handle) {
+        owned(handle);
+        transaction.executeWithoutResult(status -> {
+            repository.lockEvidence(handle.projectId());
+            leases.release(handle.lease); // Rejects pending execution and any unfinished source operation.
             forgetAfterCommit(handle.leaseId());
         });
     }
@@ -284,7 +299,7 @@ public class ProjectSourceEditGateway {
         private volatile Path directory;
         private SourceCandidate candidate;
         private String acceptanceKey;
-        private Acceptance accepted;
+        private volatile Acceptance accepted;
         private SourceExecutionBudget budget;
         private boolean budgetAssigned;
         private EditHandle(SourceEditLeaseRepository.Lease lease, AtomicBoolean slotReleased) {
