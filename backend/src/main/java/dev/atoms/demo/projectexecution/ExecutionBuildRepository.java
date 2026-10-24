@@ -1,6 +1,7 @@
 package dev.atoms.demo.projectexecution;
 
 import dev.atoms.demo.common.ApiException;
+import java.util.List;
 import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
@@ -29,10 +30,15 @@ class ExecutionBuildRepository {
                 .stream().findFirst().orElseThrow(() -> new ApiException(404, "EXECUTION_BUILD_NOT_FOUND", "构建不存在或无权访问。"));
     }
 
+    /** Internal dispatcher only; the caller must hold its database coordinator lease. */
+    List<ExecutionBuild> waiting() {
+        return jdbc.query("SELECT * FROM execution_builds WHERE status='QUEUED' ORDER BY created_at,id LIMIT 8", ROW);
+    }
+
     /** Caller first locks the project; keep the same ordering as claims and stage completion. */
     ExecutionBuild lock(UUID project, UUID build) {
         if (!TransactionSynchronizationManager.isActualTransactionActive())
-            throw new IllegalStateException("Execution cancellation requires a transaction");
+            throw new IllegalStateException("Execution row locking requires a transaction");
         return jdbc.query("SELECT * FROM execution_builds WHERE project_id=? AND id=? FOR UPDATE", ROW, project, build)
                 .stream().findFirst().orElseThrow(() -> new ApiException(404, "EXECUTION_BUILD_NOT_FOUND", "构建不存在或无权访问。"));
     }

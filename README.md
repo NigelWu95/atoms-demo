@@ -238,7 +238,7 @@ npm run dev:fixtures
 | 持久卷 | atoms-demo-postgres-data |
 | JDBC URL | jdbc:postgresql://127.0.0.1:5432/atoms_demo |
 
-postgres 仅用于本地数据库管理；后端使用 `atoms_app` 访问 atoms_demo 的 atoms schema，集成测试使用 `atoms_test` 访问 atoms_demo_test 的 atoms schema。两个账号均不是超级用户，不能创建数据库或角色，不把任何数据库凭据发送给浏览器。
+postgres 仅用于本地数据库管理；后端使用 `atoms_app` 访问 atoms_demo 的 atoms schema。集成测试使用 `atoms_test` 访问 atoms_demo_test，当前测试配置默认指向已获准的 `atoms_verify_20261021_ex10` schema；旧测试 schema 保留故障审计，不再作为日常回归目标。两个账号均不是超级用户，不能创建数据库或角色，不把任何数据库凭据发送给浏览器。显式设置 `SPRING_DATASOURCE_URL` 会覆盖测试默认值，运行前仍须核对目标；旧发布 smoke 脚本的显式地址不受此默认值控制，本轮未执行该脚本。
 
 数据库端口只绑定本机回环地址。密码必须非空并随机生成；.env 权限设为仅当前用户可读写，已加入忽略规则。Docker 控制权限仍属于可信管理边界：能控制本机 Docker 的人可能读取容器配置。
 

@@ -1042,3 +1042,37 @@ env JAVA_HOME=/Users/wubingheng/atoms-demo/.local/jdk17-comparison.LlvDQi/jdk-17
 **11:06:06，428 单元 + 28 相关集成全部通过，0 失败/错误/跳过，BUILD SUCCESS，04:53、退出码 0**。91 份单元报告、6 份集成报告按 11:00:15 新鲜度门槛核对，归档 `.local/ex12b-related-passed.0rjmb02a`（0700/0600）；未将旧完整回归 XML 混入计数。命令沿用上方 JDK/Node/schema 前缀，改为 `./mvnw -B -o -Dit.test=ExecutionCoordinatorLeaseIT,ExecutionCancellationIT,ExecutionBuildClaimIT,AgentCoordinatorLeaseIT,ProjectSourceCoordinatorLeaseIT,BuildCoordinatorLeaseIT verify`。
 
 完成后的只读审计无新增 Agent 未决/pending/活动编辑租约或构建未决；旧失败、未决、源码中断记录保持原样，测试角色无 CREATE 权限。自审确认新类无 Spring 自动启动副作用，固定锁编号和限定查询，不接受请求提供的 SQL/路径/连接目标；异常无驱动 cause/suppressed。真实连接支持现有 Hikari，未知连接池在借出前拒绝；回收回调仅供可信内部接线和模拟测试，不能通过配置/HTTP 指定。没有修改旧协调器、平台依赖、私有 env 或个人配置。EX12c 及 C-EX04 仍未完成，仅本地提交，不推送或部署。
+
+EX12b 本地提交为 `d8dd219`，随后继续 c1 队列处理。
+
+## 2026-10-24 · EX12c1 等待任务处理
+
+主要文件为 `ExecutionBuildQueue`、`ExecutionBuildRepository`、`ExecutionBuildQueueIT`，另因下述测试目标错误修正 `application-test.yml`，共四个。只处理未领取的队列元数据；无调度线程、工具、模型或 Git 调用。固定最多 8 条，按数据库创建时间及 ID 排序；候选须重新取得项目/构建行锁，核对不变身份、最新权限及原排队期限。取消优先于期限，归档/转让/维护者撤销结束等待任务；已领取及待核对任务不能借此释放 worker。
+
+**11:18:50 RED**：缺少 `ExecutionBuildQueue` 的两处编译错误，54.704 秒、退出码 1，未运行测试。随后补实现；租约失效时统一返回不含底层原因的 `EXECUTION_STATE_UNAVAILABLE`，结束前的失锁观察使事务、事件与名额整体回滚，不重试提交结果不明的操作。
+
+### 测试目标操作失误与修正
+
+**11:21:05 的第一次聚焦运行误用了旧 `atoms` schema**：命令漏传 `SPRING_DATASOURCE_URL`，测试 profile 旧默认仍为 `atoms`。该次确为 7 单元 + 8 集成通过、38.225 秒、退出码 0，但不作为指定回归 schema 的通过证据。发现日志后尝试中断时进程已结束；不能表述为已阻止迁移。报告保存在 `.local/ex12c1-wrong-schema.lnsfvx9w`。
+
+此错误实际在旧 `atoms` 应用了既有 V023/V024（从 V022 到 V024），并留下本次 15 条元数据夹具：11 CANCELLED、3 FAILED、1 TIMED_OUT，34 条事件，pending/占用名额均为 0。未启动任何任务进程。没有回退迁移、删除新旧记录或强制释放旧租约。只读核对三份历史未决 Agent 的状态、pending、停止证明缺失及基线，与历史记录一致：`atoms/f7e3d276…`、`pa32/af6755c5…`、`pa32b/2f263256…` 仍为 NEEDS_RECONCILIATION、ACTIVE/pending、缺停止证明、基线未变。当前取得行摘要留供后续比对；本轮没有运行前的三份行摘要，不能称为本轮逐字节前后比较。执行协调锁无剩余持有者，指定新 schema 未新增未决任务。
+
+已将测试 profile 的默认 URL 修正到已批准的 `atoms_verify_20261021_ex10`，不修改私有 env、生产配置或数据库授权；新集成测试同时断言实际数据库与 schema。后续命令仍显式传入准确 URL。README 同步说明覆盖规则；旧发布 smoke 脚本另有显式 `atoms` 地址，本次未运行。该修正防止遗漏覆盖值继续落入旧目标，但不能防止操作者显式给错 URL。
+
+**11:30:28，指定 schema 的聚焦 GREEN：7 单元 + 8 集成全部通过，零失败/错误/跳过，BUILD SUCCESS，01:19、退出码 0**；归档 `.local/ex12c1-focused-passed.cu_nj6js`。Flyway 确认目标已为 V024，无迁移执行。命令（backend）：
+
+```sh
+env JAVA_HOME=/Users/wubingheng/atoms-demo/.local/jdk17-comparison.LlvDQi/jdk-17.0.14.jdk \
+  SPRING_DATASOURCE_URL='jdbc:postgresql://127.0.0.1:5432/atoms_demo_test?currentSchema=atoms_verify_20261021_ex10&connectTimeout=3&socketTimeout=5' \
+  ./mvnw -B -o -Dtest=ExecutionSettingsTest -Dit.test=ExecutionBuildQueueIT verify
+```
+
+覆盖持锁延迟后的数据库时钟、调高配置不能延长旧排队期限、重复取消无新增事件、禁用后仅关闭路径可结束队列、陈旧候选不影响已领取/待核对任务、伪造 owner 被拒绝、更新后失锁整笔回滚，以及拒绝调用者已有事务。夹具不启动外部进程，保留记录，仅结束自身明确未执行的行。
+
+**11:32:22，失锁变异被捕获**：临时移除事务结束前的 `requireLease()`，仅运行对应一个数据库用例，1 失败、0 错误/跳过，01:27、退出码 1。主断言发现该调用错误地成功返回；收尾另附租约关闭的固定异常，因为故意省略的观察使失锁直到关闭才被发现，连接仍经 abort/evict/close 处理。归档 `.local/ex12c1-lease-mutation.a56i6b83`。随后立即恢复检查，再运行全部单元及相关集成；未把故意错误的状态转换用于任何已有任务。
+
+**11:38:38，恢复后的相关回归 GREEN：428 单元 + 39 集成全部通过，零失败/错误/跳过，BUILD SUCCESS，05:35、退出码 0**。按 11:32:40 新鲜度门槛核对 91 份单元和 5 份集成 XML，归档 `.local/ex12c1-related-passed.xf3nlvp_`（0700/0600），未混入历史报告。命令沿用上方准确 JDK/schema，另指定 Node 24.20.0 PATH，执行 `./mvnw -B -o -Dit.test=ExecutionBuildQueueIT,ExecutionCancellationIT,ExecutionBuildClaimIT,ExecutionAdmissionIT,ExecutionCoordinatorLeaseIT verify`。没有重跑未受本片影响的原生构建/CLI 契约，不把相关回归称为全部集成回归。
+
+结束后的只读核对：指定 schema 无新增 Agent 未决、关联 pending/活动编辑租约或构建未决，旧源码失败/中断记录保留；测试角色仍无数据库 CREATE 权限。三份旧未决任务及租约的行摘要与本次误用后首次只读采样相同，误运行的 15 条任务/34 条事件也未再变化。执行协调锁无持有者。过滤进程清单未见残留 Java/Maven 测试进程；现有个人 Claude 进程未操作。
+
+自审确认项目行 → 构建行的顺序与已有领取/取消相同，数据库约束保证 QUEUED 没有执行意图；固定 SQL 无请求拼接，查询最多 8 条。原身份匹配覆盖 owner、来源版本/树、幂等/请求摘要与创建时间；陈旧候选只读取已领取/待核对状态，不释放其容量。测试配置的变更限于 test profile，日常 env、个人配置与远程部署未改。c1 完成，c2 实际调度/线程/关闭、EX13 恢复以及运行/页面仍待实施，EX12/C-EX04 不勾选。
