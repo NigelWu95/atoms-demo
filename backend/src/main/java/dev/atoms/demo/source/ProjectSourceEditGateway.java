@@ -145,7 +145,7 @@ public class ProjectSourceEditGateway {
 
     /** Only a stopped task can freeze files. Replays return the durable operation, not a second Git write. */
     public synchronized Acceptance sealAndAccept(EditHandle handle, String idempotencyKey) {
-        return sealAndAccept(handle, idempotencyKey, tree -> {});
+        return accept(handle, idempotencyKey, null);
     }
 
     /**
@@ -154,7 +154,10 @@ public class ProjectSourceEditGateway {
      */
     public synchronized Acceptance sealAndAccept(EditHandle handle, String idempotencyKey,
                                                  java.util.function.Consumer<SourceTree> validation) {
-        java.util.Objects.requireNonNull(validation);
+        return accept(handle, idempotencyKey, java.util.Objects.requireNonNull(validation));
+    }
+
+    private Acceptance accept(EditHandle handle, String idempotencyKey, java.util.function.Consumer<SourceTree> validation) {
         requireOutsideTransaction(); owned(handle);
         String key = SourceRequest.key(idempotencyKey);
         var lease = handle.lease;
@@ -172,7 +175,7 @@ public class ProjectSourceEditGateway {
         });
         var deadline = deadline(handle);
         if (handle.candidate == null) handle.candidate = candidates.seal(handle.workspace, deadline);
-        validation.accept(candidates.read(lease.ownerId(), lease.projectId(), handle.candidate, deadline));
+        if (validation != null) validation.accept(candidates.read(lease.ownerId(), lease.projectId(), handle.candidate, deadline));
         if (handle.candidate.treeSha256().equals(repository.version(lease.projectId(), lease.baseVersionId()).treeSha256())) {
             handle.acceptanceKey = key;
             handle.accepted = new NoChanges(lease.baseVersionId());
