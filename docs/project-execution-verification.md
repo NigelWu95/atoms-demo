@@ -1356,3 +1356,17 @@ EX14 完成。真实 npm lock-only、停写核对、只接受锁文件变化及�
 八个新场景覆盖：原生 Spring 工厂两轮 SOURCE_SAVED/NO_CHANGES、陈旧基线拒绝；构建→准备→构建的顺序；两构建与两准备共占四名额、第五项等待真实停止；满载时排队期限仍生效；丢失能力的旧队列恢复后派发新队列；协调租约丢失；配置禁用；未决任务阻止启动。Node/JVM、Git/PG 均实际执行，CLI 和构建内容为受控夹具，不替代 EX15 的真实 npm 或 EX11 的真实 Maven 契约。
 
 只读审计：116 条准备记录均终结，pending、活动源码编辑、共享名额、投影差异和协调锁均为 0。自审核对锁顺序、能力交接、合并队列排序、停止前持久取消及终态查询，未发现阻断项。4 个主要文件，无新增依赖或迁移。EX16d 独立 JVM 发布后崩溃及原源码恢复兼容仍待验收，不能据此宣称完整工程网页链路已经完成。
+
+## 2026-10-25 · EX16d 发布后进程崩溃与兼容验收
+
+新增测试专用 `ExecutionPreparationCrashProbe` 和 `ExecutionPreparationCrashIT`，2 个主要文件。独立 JVM 持有真实源码/执行根与数据库协调租约，创建基线、领取准备任务、执行并登记实际 JVM 停止证明，再发布受控锁文件变更。在 source operation 已 COMMITTED、准备任务仍 ACCEPTING 且尚无操作绑定时执行 `Runtime.halt(173)`，绕过 finally 和关闭钩子。父进程只用自己的进程停止证明确认该 JVM 已退出，不拿它代替准备任务的停止事实。
+
+重新装配源码与执行协调器，原编辑能力已丢失；启动恢复仅读取持久事实，绑定原操作及准确结果版本，得到 SOURCE_SAVED，释放原源码租约和共享名额。再次启动结果不变，整个恢复没有派发构建或准备工具，源码保持三版、该编辑租约仅一个 source operation。真实根锁及数据库协调租约必须重新取得；原基线与新版本的差异只含新增锁文件。夹具没有实际 npm 安装，不替代 EX15 的原生依赖准备验收。
+
+01:37:43，`-Dtest=ExecutionCoordinatorSpringTest -Dit.test=ExecutionPreparationCrashIT verify` 的 **2 单元 + 1 崩溃集成通过**，无失败/错误/跳过，耗时 1:54。归档 `.local/ex16d-crash-passed.0t8dgmxu`；现场 `/private/var/folders/51/83lhk1js0698vn8fgmlgtgxc0000gn/T/atoms-ex16-preparation-crash-5847192551075943062`，目录 0700，记录 0600；凭据只在 JUnit 临时私有文件，由测试生命周期清理。项目 `91124533-e287-4f04-b5ca-078a11941144`，任务 `57fa4f3a-de88-4056-831b-f30e8cda3f56`，真实提交操作 `4a49b070-4990-4489-bdae-5a676abf7f7e`、版本 `bb46689e-1f85-4e58-a5f9-0bef7db653a5`。
+
+01:42:24，完整 **446 单元 + 16 源码兼容集成通过**，无失败/错误/跳过，耗时 4:15，归档 `.local/ex16d-compat-passed.ns_y2i5h`。运行 `-Dit.test=ProjectSourceRecoveryIT,ProjectSourceEditAcceptanceIT,ProjectSourceEditCancellationIT,AgentLifecycleIT verify`；实际为源码恢复 8、编辑接受 6、编辑取消 2。最后一个类名误少写 Project 前缀，未执行、不计数；发现后单独执行 `-Dit.test=ProjectAgentLifecycleIT failsafe:integration-test failsafe:verify`，01:43:31 **4 项通过**，43.385 秒，归档 `.local/ex16d-agent-passed.p8_vqs_o`。补跑复用本轮已编译、未改动的代码，不重复完整单元。该回归使用受控子进程，不调用真实模型。
+
+最终只读审计：117 条准备任务全部终结，pending、活动准备编辑、共享名额、投影差异及协调锁均为 0；本次崩溃任务为 SOURCE_SAVED，原源码操作 COMMITTED、租约 RELEASED、停止记录存在。自审确认没有用父进程停止证明冒充子任务事实、恢复不会重新取得编辑能力、没有隐式执行或发布；目录/凭据权限及故障现场保留。旧源码和 Agent 兼容通过，c2 两轮基线竞争已覆盖，EX16 标记完成。
+
+本轮只提交本地代码和记录；既有原生构建/npm 证据不重复运行或计数，默认开关、私有 env、全局配置与服务器未改动。下一项 EX17 持久运行身份和独立业务库绑定；完整工程的常驻应用、HTTP 业务验收与网页接入仍未交付。

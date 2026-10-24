@@ -1,6 +1,6 @@
 # Spec: project-execution · 完整工程受控构建与本机进程
 
-状态：2026-10-25，用户已确认本规格及 §10 三项取舍、[实施计划](tasks/project-execution/plan.md)与[任务清单](tasks/project-execution/todo.md)。EX01–15、C-EX05，以及 EX16a–c 的准备取消、恢复和统一调度已完成。新增 8 项混合调度场景及旧队列/调度回归通过，见[记录](docs/project-execution-verification.md#2026-10-25--ex16c2-统一准备与构建调度)。EX16d 发布后崩溃与兼容验收仍待完成；新模式默认关闭，应用常驻运行、HTTP 业务验收与网页接入未完成。本地闭环范围见 [Agent 规格 §10](SPEC-project-agent.md#10-2026-10-19-完整闭环实施授权)。实际 npm 的既有 1800 秒通过记录及 300 秒超时分别保留。
+状态：2026-10-25，用户已确认本规格及 §10 三项取舍、[实施计划](tasks/project-execution/plan.md)与[任务清单](tasks/project-execution/todo.md)。EX01–16、C-EX05 已完成，包括准备取消、统一调度和源码提交后真实 JVM 崩溃恢复。最新全部 446 单元、16 源码兼容及补充 4 项 Agent 生命周期通过，见[记录](docs/project-execution-verification.md#2026-10-25--ex16d-发布后进程崩溃与兼容验收)。下一项 EX17 业务库绑定；新模式默认关闭，应用常驻运行、HTTP 业务验收与网页接入未完成。本地闭环范围见 [Agent 规格 §10](SPEC-project-agent.md#10-2026-10-19-完整闭环实施授权)。实际 npm 的既有 1800 秒通过记录及 300 秒超时分别保留。
 
 模块 ID 沿用[能力地图](FULL-PROJECT-CAPABILITY-MAP.md)的 `project-execution`，依赖 `project-source`，不反向依赖 Agent、交付或工作台。上游只读门面 PS21 已完成；当前网页仍走旧固定模板链路。
 

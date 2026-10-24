@@ -1,6 +1,6 @@
 # project-execution · 实施计划
 
-状态：2026-10-25，用户已确认本计划及 EX01–EX30 任务，连续实施；检查点报告证据，不逐小项请求开始。依据[规格](../../SPEC-project-execution.md)，规划基线 `1e3a13a`、计划提交 `ee5096a`，分支 `feature/standalone-engineering`。EX01–15、C-EX05 和 EX16a–c 已完成；统一调度的 8 项新场景与旧队列/调度回归通过，见[清单](todo.md)与[记录](../../docs/project-execution-verification.md#2026-10-25--ex16c2-统一准备与构建调度)。下一步 EX16d 独立 JVM 发布后崩溃和兼容验收，每片最多 5 个主要文件。新模式默认关闭，常驻 HTTP 服务与网页尚未接通；此前实际 npm 1800 秒通过、300 秒超时及旧故障证据分别保留。
+状态：2026-10-25，用户已确认本计划及 EX01–EX30 任务，连续实施；检查点报告证据，不逐小项请求开始。依据[规格](../../SPEC-project-execution.md)，规划基线 `1e3a13a`、计划提交 `ee5096a`，分支 `feature/standalone-engineering`。EX01–16、C-EX05 已完成；统一调度与真实 JVM 发布后崩溃通过，最新全部 446 单元、16 源码兼容及补充 4 项 Agent 生命周期通过，见[清单](todo.md)与[记录](../../docs/project-execution-verification.md#2026-10-25--ex16d-发布后进程崩溃与兼容验收)。下一步 EX17 持久运行身份及独立业务库绑定，每片最多 5 个主要文件。新模式默认关闭，常驻 HTTP 服务与网页尚未接通；此前实际 npm 1800 秒通过、300 秒超时及旧故障证据分别保留。
 
 ## 1. 交付范围与组织
 

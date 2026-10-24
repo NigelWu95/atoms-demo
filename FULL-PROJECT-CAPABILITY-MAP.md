@@ -1,6 +1,6 @@
 # 完整源码工程与 Coding Agent · 能力地图
 
-状态：2026-10-25，`project-source` 内部模块及 `project-agent` 的 PA01–PA33 离线能力已验收；`project-execution` 的 EX01–15、C-EX05 和 EX16a–c 已完成。最新[统一调度验收](docs/project-execution-verification.md#2026-10-25--ex16c2-统一准备与构建调度)覆盖 8 项新增场景及旧队列/调度回归；既有真实 npm、构建与崩溃证据分别保留。下一步 EX16d 发布后崩溃与兼容验收；新模式默认关闭，真实模型、应用常驻运行、交付和工作台接入仍待完成，未部署。隔离 JDK 17.0.14 沿用，旧故障记录保留。
+状态：2026-10-25，`project-source` 内部模块及 `project-agent` 的 PA01–PA33 离线能力已验收；`project-execution` 的 EX01–16、C-EX05 已完成。统一准备/构建调度及真实 JVM 发布后恢复通过，最新全部 446 单元、16 源码兼容及补充 4 项 Agent 生命周期通过，见[验收](docs/project-execution-verification.md#2026-10-25--ex16d-发布后进程崩溃与兼容验收)；既有真实 npm、构建与崩溃证据分别保留。下一步 EX17 持久业务库绑定；新模式默认关闭，真实模型、应用常驻运行、交付和工作台接入仍待完成，未部署。隔离 JDK 17.0.14 沿用，旧故障记录保留。
 
 ## 目标与现状
 
@@ -18,7 +18,7 @@
 |---|---|---|---|
 | `project-source` | 每项目完整源码 Git 仓库、不可变版本、工作副本、元数据、旧产物显式导入 | 现有项目身份与所有权 | 内部模块已验收、默认关闭；[使用说明](docs/project-source.md)、[测试证据](docs/project-source-verification.md)、[任务清单](tasks/project-source/todo.md) |
 | `project-agent` | Claude Code + DeepSeek 在任务副本中读取及修改 Vue、Java、SQL 等文件，提交可检查的变更 | `project-source` | PA01–PA33 内部离线验收完成，默认 4 并发；最终后端 290 单元 + 272 集成通过，CLI 2.1.302 / 2.1.303 精确适配。见[维护说明](docs/project-agent.md)、[证据](docs/project-agent-verification.md)、[任务清单](tasks/project-agent/todo.md)。真实模型 PA-LIVE 未完成，旧两份测试未决审计保留；不代表实际构建运行或工作台已交付 |
-| `project-execution` | 对固定源码版本测试、构建、启动本机进程；构建失败保留上一可用结果，数据库迁移另行核对 | `project-source` | [规格](SPEC-project-execution.md)、[实施计划](tasks/project-execution/plan.md)与 [EX 任务清单](tasks/project-execution/todo.md)已确认；EX01–15 和 EX16a–c 完成。实际构建、五个 JVM 崩溃窗口和依赖准备单次 worker 通过；真实 npm 保存新源码版，二次无变更，新锁仍需独立构建批准。统一准备/构建调度、两轮及四并发验收通过，见[证据](docs/project-execution-verification.md#2026-10-25--ex16c2-统一准备与构建调度)。准备发布后崩溃、常驻进程、HTTP 业务验收及网页尚待完成 |
+| `project-execution` | 对固定源码版本测试、构建、启动本机进程；构建失败保留上一可用结果，数据库迁移另行核对 | `project-source` | [规格](SPEC-project-execution.md)、[实施计划](tasks/project-execution/plan.md)与 [EX 任务清单](tasks/project-execution/todo.md)已确认；EX01–16 完成。实际构建、五个 JVM 构建崩溃窗口、真实 npm 两轮及共享四并发通过；新锁仍需独立构建批准。准备任务在源码提交后崩溃可恢复准确版本且不重复执行，见[证据](docs/project-execution-verification.md#2026-10-25--ex16d-发布后进程崩溃与兼容验收)。业务库绑定、常驻进程、HTTP 业务验收及网页尚待完成 |
 | `project-delivery` | 实际应用预览、同快照下载、代码版本恢复；明确业务数据边界 | `project-source`、`project-execution` | 待规格评审 |
 | `project-workbench` | 文件树、差异、任务与构建状态、实际进程预览及增量开发入口 | 以上模块 | 待规格评审 |
 
