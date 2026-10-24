@@ -4,6 +4,8 @@
 
 模块 ID 沿用[能力地图](FULL-PROJECT-CAPABILITY-MAP.md)的 `project-execution`，依赖 `project-source`，不反向依赖 Agent、交付或工作台。上游只读门面 PS21 已完成；当前网页仍走旧固定模板链路。
 
+EX16a 已实现内部准备任务取消和结果查询：排队任务及其源码租约原子释放；运行中只保存取消意图，由原 worker 确认停止；已提交源码结果优先。22:49:09 的 16 单元 + 21 集成通过，准备调度和重启恢复继续实施，详见[记录](docs/project-execution-verification.md#2026-10-24--ex16a-依赖准备取消)。
+
 EX12 最新证据：2026-10-24 14:37:51，全部 **439 单元 + 63 项相关集成通过**，零失败/错误/跳过，包含真实 Spring 原生构建及 10 项 PG/JVM 调度场景，见[验收记录](docs/project-execution-verification.md#2026-10-24--ex12c2b2b-spring-调度与原生组合验收)。本轮修复容量中途释放时的队列超车；源码就绪、私有测试库注册表和启停装配已验证。EX11 的完整 417 单元 + 377 集成与本轮相关回归分别记录。沿用获准的隔离 JDK 17.0.14；旧原生枚举问题仍保留监测，旧 schema 误运行及历史审计保留[原记录](docs/project-execution-verification.md#2026-10-24--ex12c1-等待任务处理)。
 
 ## 1. 目标与边界

@@ -1306,3 +1306,15 @@ EX14 完成。真实 npm lock-only、停写核对、只接受锁文件变化及�
 最终只读审计：累计 115 条准备记录均终结，pending、活动编辑、共享槽、投影不一致与协调锁均为 0；当前 schema 无新 Agent/构建未决执行。三份历史未知执行的任务/租约 MD5、原源码失败现场及旧误运行的 15 任务/34 事件均未改变。没有清理或改写之前的 300 秒超时记录。
 
 自审核对固定命令与环境、共享期限、提交时批准摘要、实际启动 preflight、最终候选、停止证明和源码事实优先的结算；本片仅 1 个主要契约测试文件。五项私有 env 敏感值与本轮差异核对零匹配。EX15 与 C-EX05 完成，下一项 EX16；该结果不是五分钟性能验收，也不代表自动准备调度、新应用常驻运行或网页已交付。未推送、部署、调用模型/SMTP或改动个人配置。
+
+## 2026-10-24 · EX16a 依赖准备取消
+
+内部 `DependencyPreparationService.cancel` 按项目→准备任务→源码证据顺序锁定；复核当前维护者、项目归属和原任务 owner，归档后仍能查询/取消。QUEUED 且持有原能力时，源码取消、释放、任务终态及共享名额在一个事务完成；已领取任务只保存单调取消意图。丢失内存能力时不重建编辑授权，只提交意图等待启动恢复。终态重复操作不修改记录，原 source operation 已 COMMITTED 时不添加晚到取消。查询增加取消、pending、源码操作/结果版本和固定错误码，未新增 HTTP 端点。
+
+首轮 16 单元通过，21 集成中 1 失败、12 错误。真实 Node worker 的 4 项通过；新取消夹具在记录执行意图后先取消，再读取工作目录以执行测试 JVM，正确触发 SOURCE_EDIT_CANCELLED，导致一条夹具意图未结算，并阻断之后依赖共享容量的测试。任务 `6182b45d-d976-49e8-93b5-f11596356ebc`、项目 `49ac525b-d7bd-4e8f-b6f9-b28a8e3df697`、源码租约 `7424130d-1d9b-418a-90c3-b1baef9fe1bd` 保留于原 `atoms_verify_20261021_ex10`；不补造停止证明。报告存 `.local/ex16a-cancel-failed.aj0sf88t`。夹具改为取消前执行并持有真实收据，异常收尾也只能使用本夹具已有收据。
+
+准确目标创建命令经本轮权限审批，已创建 `atoms_demo_test.atoms_verify_20261024_ex16`，归 `atoms_test`、无 PUBLIC 权限，不扩大数据库 CREATE；创建前后包含本次记录在内的四份未决审计摘要一致。复测只在新 schema 进行，环境隔离不冒充业务故障修复。`application-test.yml` 默认值尚未切换，必须显式传 `SPRING_DATASOURCE_URL` 指向上述新 schema。
+
+22:49:09，`ExecutionNpmPolicyTest,ExecutionLockPreparationTest` 的 **16 单元**和 `ExecutionPreparationCancelIT,ExecutionPreparationWorkerIT,ExecutionPreparationLifecycleIT` 的 **21 集成**全部通过，无跳过，耗时 4:08。覆盖取消/领取竞争、归档、转让与权限、外部事务拒绝、事务失败回滚、内存能力丢失、已提交源码结果和真实 Node 父子进程通过持久取消意图停止。私有报告 `.local/ex16a-cancel-passed.xzxjvj3w`。23:01:48 将 QUEUED 判断反向后单用例正确失败（期望 CANCELLED、实际 QUEUED）；立即恢复并逐字比对通过版本，反向日志 `.local/ex16a-cancel-mutation.log`。
+
+最后新 schema 23 条准备记录无未完成/pending、活动源码编辑、共享槽、投影差异或协调锁。EX16a 的主要文件共 5 个，准备队列、恢复和统一调度仍待完成；本片不改变现有网页、服务器或个人配置。

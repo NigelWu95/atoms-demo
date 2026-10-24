@@ -14,7 +14,8 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 class DependencyPreparationRepository {
     record Task(UUID id, UUID projectId, UUID ownerId, UUID editLeaseId, UUID baseVersionId, long baseRevision,
                 String treeSha256, String manifestSha256, String baseLockSha256, String policySha256,
-                String requestSha256, String status, Instant createdAt, Instant finishedAt) {}
+                String requestSha256, String status, boolean cancelRequested, boolean executionPending,
+                UUID sourceOperationId, UUID resultVersionId, String errorCode, Instant createdAt, Instant finishedAt) {}
     record Request(UUID version, long revision, String keyHash, String bodyHash) {
         static Request from(DependencyPreparationService.Input input, String key) {
             if (input == null || input.expectedSourceRevision() < 1 || input.expectedSourceRevision() > 9007199254740991L)
@@ -31,7 +32,9 @@ class DependencyPreparationRepository {
             rs.getObject("project_id", UUID.class), rs.getObject("owner_id", UUID.class), rs.getObject("edit_lease_id", UUID.class),
             rs.getObject("base_version_id", UUID.class), rs.getLong("base_revision"), rs.getString("tree_sha256"),
             rs.getString("manifest_sha256"), rs.getString("base_lock_sha256"), rs.getString("policy_sha256"),
-            rs.getString("request_sha256"), rs.getString("status"), rs.getTimestamp("created_at").toInstant(),
+            rs.getString("request_sha256"), rs.getString("status"), rs.getBoolean("cancel_requested"), rs.getBoolean("execution_pending"),
+            rs.getObject("source_operation_id", UUID.class), rs.getObject("result_version_id", UUID.class), rs.getString("error_code"),
+            rs.getTimestamp("created_at").toInstant(),
             rs.getTimestamp("finished_at") == null ? null : rs.getTimestamp("finished_at").toInstant());
     private final JdbcTemplate jdbc;
     private final ExecutionBuildRepository capacity;
@@ -46,6 +49,29 @@ class DependencyPreparationRepository {
                 .stream().findFirst().orElseThrow(() -> new ApiException(404, "EXECUTION_PREPARATION_NOT_FOUND", "依赖准备任务不存在或无权访问。"));
     }
     void requireIdle(UUID project) { capacity.requireIdle(project); }
+
+    Task lock(UUID project, UUID task) {
+        if (!TransactionSynchronizationManager.isActualTransactionActive()) throw new IllegalStateException("Preparation lock requires a transaction");
+        jdbc.execute("SET LOCAL lock_timeout = '3s'");
+        return jdbc.query("SELECT * FROM dependency_preparations WHERE project_id=? AND id=? FOR UPDATE", ROW, project, task)
+                .stream().findFirst().orElseThrow(() -> new ApiException(404, "EXECUTION_PREPARATION_NOT_FOUND", "依赖准备任务不存在或无权访问。"));
+    }
+
+    /** Caller holds the project and task locks. A cancellation intent is not evidence of stopped execution. */
+    Task requestCancel(Task task) {
+        if (task.finishedAt() == null && !task.cancelRequested())
+            jdbc.update("UPDATE dependency_preparations SET cancel_requested=true WHERE id=?", task.id());
+        return get(task.projectId(), task.id());
+    }
+
+    /** The caller must release the never-claimed source edit in this same transaction. */
+    Task cancelQueued(Task task) {
+        if (jdbc.update("""
+                UPDATE dependency_preparations SET status='CANCELLED',cancel_requested=true,error_code='EXECUTION_CANCELLED',
+                    queue_slot=null,finished_at=clock_timestamp() WHERE id=? AND status='QUEUED'
+                """, task.id()) != 1) throw new IllegalStateException("Preparation is no longer queued");
+        return get(task.projectId(), task.id());
+    }
 
     Task insert(UUID id, UUID owner, UUID project, UUID edit, Request request, String tree,
                 ExecutionNpmPolicy.Preparation approved, ExecutionSettings.Configuration config) {

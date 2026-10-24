@@ -38,7 +38,7 @@ class ExecutionPreparationWorkerIT {
 
     @BeforeEach void fixture() throws Exception {
         assertThat(jdbc.queryForObject("SELECT current_database() || '.' || current_schema()", String.class))
-                .isEqualTo("atoms_demo_test.atoms_verify_20261021_ex10");
+                .isIn("atoms_demo_test.atoms_verify_20261021_ex10", "atoms_demo_test.atoms_verify_20261024_ex16");
         Path root = temporary.toRealPath();
         source = new SourceAgentFixture(jdbc, projects, transactions, root);
         source.start(Objects.requireNonNull(jdbc.getDataSource()));
@@ -114,7 +114,16 @@ class ExecutionPreparationWorkerIT {
         Path marker = temporary.toRealPath().resolve("child-started");
         cli("fs.writeFileSync(" + new ObjectMapper().writeValueAsString(marker.toString()) + ",'yes'); setInterval(()=>{},1000);");
         var task = submit(base());
-        assertThat(run(task, () -> Files.exists(marker)).status()).isEqualTo("CANCELLED");
+        var requested = new java.util.concurrent.atomic.AtomicBoolean();
+        assertThat(run(task, () -> {
+            if (Files.exists(marker) && requested.compareAndSet(false, true)) {
+                var cancelled = service.cancel(owner, task.projectId(), task.id());
+                assertThat(cancelled.status()).isEqualTo("RESOLVING");
+                assertThat(cancelled.executionPending()).isTrue();
+                assertThat(cancelled.cancelRequested()).isTrue();
+            }
+            return false; // The worker must observe the committed intent, not this external signal.
+        }).status()).isEqualTo("CANCELLED");
         assertThat(marker).exists();
         assertThat(jdbc.queryForObject("SELECT stopped_sha256 FROM source_edit_leases WHERE id=?", String.class, task.editLeaseId())).matches("[a-f0-9]{64}");
         assertReleased(task);

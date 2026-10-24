@@ -39,7 +39,7 @@ class ExecutionPreparationLifecycleIT {
 
     @BeforeEach void fixture() throws Exception {
         assertThat(jdbc.queryForObject("SELECT current_database() || '.' || current_schema()", String.class))
-                .isEqualTo("atoms_demo_test.atoms_verify_20261021_ex10");
+                .isIn("atoms_demo_test.atoms_verify_20261021_ex10", "atoms_demo_test.atoms_verify_20261024_ex16");
         source = new SourceAgentFixture(jdbc, projects, transactions, temporary.toRealPath());
         jdbc.update("INSERT INTO guest_users(id) VALUES (?),(?)", owner, stranger);
         config = new MockEnvironment().withProperty("atoms.project-execution.enabled", "true")

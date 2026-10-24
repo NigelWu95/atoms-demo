@@ -12,15 +12,17 @@ import org.springframework.core.env.Environment;
 import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionException;
 import org.springframework.transaction.support.*;
 
-/** Internal admission only. No dependency tools, editable workspaces or source publication occur here. */
+/** Internal admission, query and cancellation. No dependency tools or source publication occur here. */
 @Service
 public final class DependencyPreparationService {
     public record Input(UUID baseSourceVersionId, long expectedSourceRevision) {}
     public record TaskView(UUID id, UUID projectId, UUID editLeaseId, UUID baseVersionId, long baseRevision,
                            String treeSha256, String manifestSha256, String baseLockSha256, String policySha256,
-                           String status, Instant createdAt, Instant finishedAt) {}
+                           String status, boolean cancelRequested, boolean executionPending, UUID sourceOperationId,
+                           UUID resultVersionId, String errorCode, Instant createdAt, Instant finishedAt) {}
     private final ExecutionSettings settings;
     private final DependencyPreparationRepository repository;
     private final ProjectService projects;
@@ -84,10 +86,48 @@ public final class DependencyPreparationService {
     }
 
     public TaskView get(UUID owner, UUID project, UUID task) {
+        authorize(owner);
+        if (project == null || task == null) throw new ApiException(422, "EXECUTION_INVALID_INPUT", "项目或准备任务标识无效。");
         return transaction.execute(status -> {
-            authorize(owner); lock(owner, project); authorize(owner);
+            // Archived projects remain queryable while their existing work is being stopped.
+            projects.lock(owner, project.toString()); authorize(owner);
             return view(repository.get(project, task));
         });
+    }
+
+    /** Commit intent before returning; only a never-claimed task with its original capability can settle here. */
+    public TaskView cancel(UUID owner, UUID project, UUID task) {
+        authorize(owner);
+        if (project == null || task == null) throw new ApiException(422, "EXECUTION_INVALID_INPUT", "项目或准备任务标识无效。");
+        if (TransactionSynchronizationManager.isActualTransactionActive())
+            throw new IllegalStateException("Cancellation must commit independently before worker action");
+        try {
+            return transaction.execute(status -> {
+                projects.lock(owner, project.toString());
+                var current = repository.lock(project, task);
+                authorize(owner);
+                if (!owner.equals(current.ownerId())) throw ExecutionBuild.conflict("EXECUTION_PREPARATION_OWNER_CHANGED");
+                if (current.finishedAt() != null) return view(current);
+                var edit = handle(task);
+                if (edit != null) {
+                    if (!project.equals(edit.projectId()) || !current.editLeaseId().equals(edit.leaseId()) || !task.equals(edit.taskId()))
+                        throw ExecutionBuild.conflict("EXECUTION_PREPARATION_EDIT_UNAVAILABLE");
+                    var source = edits.cancelEdit(owner, edit);
+                    // A durable publication is already successful; its worker/recovery will settle that exact operation.
+                    if (source.operation() != null && source.operation().status().equals("COMMITTED")) return view(current);
+                    if (current.status().equals("QUEUED")) {
+                        edits.releaseSettledEdit(edit);
+                        var result = repository.cancelQueued(current);
+                        forgetAfterCommit(task, edit);
+                        return view(result);
+                    }
+                }
+                // No capability after restart: record intent without reconstructing authority or releasing the lease.
+                return view(repository.requestCancel(current));
+            });
+        } catch (DataAccessException | TransactionException error) {
+            throw new ApiException(503, "EXECUTION_STATE_UNAVAILABLE", "依赖准备状态暂不可用，请查询任务状态。");
+        }
     }
     private DependencyPreparationRepository.Task existing(UUID owner, UUID project, DependencyPreparationRepository.Request request) {
         authorize(owner); lock(owner, project); authorize(owner);
@@ -119,6 +159,8 @@ public final class DependencyPreparationService {
     }
     static TaskView view(DependencyPreparationRepository.Task task) {
         return new TaskView(task.id(), task.projectId(), task.editLeaseId(), task.baseVersionId(), task.baseRevision(),
-                task.treeSha256(), task.manifestSha256(), task.baseLockSha256(), task.policySha256(), task.status(), task.createdAt(), task.finishedAt());
+                task.treeSha256(), task.manifestSha256(), task.baseLockSha256(), task.policySha256(), task.status(),
+                task.cancelRequested(), task.executionPending(), task.sourceOperationId(), task.resultVersionId(), task.errorCode(),
+                task.createdAt(), task.finishedAt());
     }
 }
