@@ -1412,3 +1412,11 @@ V028 追加 `execution_runs` 和 `execution_migration_reviews`。运行身份固
 `ExecutionMigrationPolicy` 只允许已确认空 schema 初始化；已应用历史须是目标的准确前缀，核对顺序、名称、类型、成功标记及校验和。新增迁移需批准；修改、删除、乱序、失败或回退到缺失已应用版本的目标一律不兼容。CRC32 对照当前 Flyway 11.7.2 实现验证，另以 SHA-256 固定原 SQL 字节及目标集合。[官方校验说明](https://documentation.red-gate.com/flyway/reference/commands/validate)、[11.7.2 校验源码](https://github.com/flyway/flyway/blob/flyway-11.7.2/flyway-core/src/main/java/org/flywaydb/core/internal/resolver/ChecksumCalculator.java)。
 
 初次测试编译暴露缺少类型；该次未等待编译结束便启动下一命令，日志还含并发编译造成的其他缺符号错误，因此不把该红灯当作有效的独立回归证据。两命令结束后单独执行验证：02:55:01，`-Dtest=ExecutionMigrationsTest,ExecutionMigrationPolicyTest,ExecutionArtifactTest test`，**12 项通过**，零失败/错误/跳过，48.924 秒。实际 ZIP 字节和封存句柄受测，构建成功记录是显式元数据夹具，不表示运行过生成应用；本片未连接业务库。4 个主要文件，EX18b/c 仍待完成。
+
+## 2026-10-25 · EX18b 业务库迁移历史只读检查
+
+`ExecutionDatabaseBinding.history` 从原私有配置开独立、限时、只读 REPEATABLE READ 连接，复核实际库/角色标记、权限及物理身份；不持平台元数据事务。`ExecutionMigrationHistory` 固定查询 `generated_app`，先验证历史表是当前角色所有的普通表、无继承/RLS、十列类型正确，再读取最多 129 行以拒绝超过 128 的历史；文本在 SQL 端限长，并拒绝超长值，失败只返回固定错误码。历史摘要含表 OID、对象数、顺序、SQL 校验和、结果和安装元数据。函数/独立类型计入非空检测。[PG 17 事务快照](https://www.postgresql.org/docs/17/transaction-iso.html)、[Flyway 11.7.2 历史表定义](https://github.com/flyway/flyway/blob/flyway-11.7.2/flyway-database/flyway-database-postgresql/src/main/java/org/flywaydb/database/postgresql/PostgreSQLDatabase.java)。
+
+测试先独立编译失败（缺少 history 方法/类型），再实现。03:01:27 初次 6 单元 + 8 契约通过；补充查询端文本上界及 RLS 后，03:03:56 **6 单元 + 9 契约全部通过**，零失败/错误/跳过，耗时 1:46。命令 `-Dtest=ExecutionMigrationsTest,ExecutionMigrationPolicyTest -Pproject-execution-contract -Dit.test=ExecutionMigrationHistoryIT,ExecutionBindingContractIT -Dexecution.test-config-directory=<原已批准私有目录> verify`。
+
+两套真实业务库的完整生产入口只读重复检查；异常历史夹具只在原已批准 B 业务验收库的显式回滚事务中创建，直接调用同一历史查询器，没有提交 DDL/DML 或调用 Flyway。夹具每次先确认空 schema，拒绝覆盖已有数据；回滚后再次用完整只读入口确认对象数为 0。五项新历史契约、四项原绑定契约全部通过，未创建新 DB/角色或更改凭据。此项证明历史读取/拒绝，不是应用迁移执行验收；真实升级与失败升级仍由 EX25/后续常驻进程验收承担。3 个主要文件，EX18c 待接批准及启动前复查。

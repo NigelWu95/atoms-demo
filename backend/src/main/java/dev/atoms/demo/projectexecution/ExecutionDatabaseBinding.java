@@ -37,4 +37,10 @@ final class ExecutionDatabaseBinding {
         return new ExecutionBindingRepository.Target(project, config.bindingId(), config.databasePort(), config.database(), config.role(),
                 config.applicationPort(), identity.databaseOid(), identity.roleOid());
     }
+
+    ExecutionMigrationHistory.Snapshot history(UUID project, OwnedProcess.Budget budget) throws IOException {
+        var config = project == null ? null : configurations.get(project);
+        if (config == null) throw new IOException("RUN_DB_BINDING_NOT_FOUND");
+        return ExecutionMigrationHistory.inspect(project, config, budget);
+    }
 }
