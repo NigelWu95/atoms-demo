@@ -35,6 +35,16 @@ class ExecutionBuildRepository {
         return jdbc.query("SELECT * FROM execution_builds WHERE status='QUEUED' ORDER BY created_at,id LIMIT 8", ROW);
     }
 
+    /** At most four worker slots plus eight retained queue slots can be unfinished outside QUEUED. */
+    List<ExecutionBuild> inFlight() {
+        return jdbc.query("SELECT * FROM execution_builds WHERE finished_at IS NULL AND status<>'QUEUED' ORDER BY id LIMIT 12", ROW);
+    }
+
+    int workerLimit(ExecutionBuild build) {
+        return jdbc.queryForObject("SELECT worker_capacity FROM execution_builds WHERE project_id=? AND id=?",
+                Integer.class, build.projectId(), build.id());
+    }
+
     /** Caller first locks the project; keep the same ordering as claims and stage completion. */
     ExecutionBuild lock(UUID project, UUID build) {
         if (!TransactionSynchronizationManager.isActualTransactionActive())

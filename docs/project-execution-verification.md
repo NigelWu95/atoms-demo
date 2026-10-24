@@ -1076,3 +1076,25 @@ env JAVA_HOME=/Users/wubingheng/atoms-demo/.local/jdk17-comparison.LlvDQi/jdk-17
 结束后的只读核对：指定 schema 无新增 Agent 未决、关联 pending/活动编辑租约或构建未决，旧源码失败/中断记录保留；测试角色仍无数据库 CREATE 权限。三份旧未决任务及租约的行摘要与本次误用后首次只读采样相同，误运行的 15 条任务/34 条事件也未再变化。执行协调锁无持有者。过滤进程清单未见残留 Java/Maven 测试进程；现有个人 Claude 进程未操作。
 
 自审确认项目行 → 构建行的顺序与已有领取/取消相同，数据库约束保证 QUEUED 没有执行意图；固定 SQL 无请求拼接，查询最多 8 条。原身份匹配覆盖 owner、来源版本/树、幂等/请求摘要与创建时间；陈旧候选只读取已领取/待核对状态，不释放其容量。测试配置的变更限于 test profile，日常 env、个人配置与远程部署未改。c1 完成，c2 实际调度/线程/关闭、EX13 恢复以及运行/页面仍待实施，EX12/C-EX04 不勾选。
+
+EX12c1 本地提交为 `867e559`，随后继续 c2 调度接线。
+
+## 2026-10-24 · EX12c2a 调度核心与实际子进程取消
+
+四个主要文件：`ExecutionCoordinator`、`ExecutionBuildRepository`、`ExecutionSchedulerIT`、`ExecutionSchedulerFixture`。启动先检查配置和源码就绪，再取得独立数据库协调租约；既有非 QUEUED 未完成任务直接阻断，不按 PID 接管或重新执行。通过可信内部工厂延迟打开执行根及 worker 资源，使用一个轮询线程和默认 1、最多 4 个工作线程。每次派发同时检查启动时容量、当前容量和原任务容量，最终仍由已有原子 claim 分配持久槽位；队列满员时继续处理到期任务。
+
+线程池/有界交接依据 [JDK 17 ThreadPoolExecutor](https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/util/concurrent/ThreadPoolExecutor.html)；生命周期 phase 预留在源码模块之后，依据 [Spring 6.2 SmartLifecycle](https://docs.spring.io/spring-framework/docs/6.2.x/javadoc-api/org/springframework/context/SmartLifecycle.html)。本片尚无 `@Component` 自动装配，工厂不是 HTTP 或生成源码可指定的执行入口；原生 worker/Spring 接线仍属于 c2b。
+
+关闭先停止接收新调度；协调权仍有效时在短事务保存本协调者活动任务的取消标记，再中断并等待拥有者。数据库不可用/失锁不能作为继续运行自己进程的理由，也不能谎称取消意图已保存。线程结束后只取消仍排队的任务，数据库存在未决执行时保留资源；原始停止收据被可靠落库后才能再次完成关闭。轮询线程不等待自己，外部关闭等待工作线程与轮询结束后再释放根及租约；重复关闭不会追加状态事件。
+
+**12:06:11 RED**：新协调类/内部资源契约不存在，8 处编译错误，01:54、退出码 1，未运行测试。随后实现；**13:13:43 聚焦报告为 7 单元 + 10 集成全部通过，零失败/错误/跳过**，归档 `.local/ex12c2a-focused-passed.jaxqnhyg`。该命令的工具会话被用户中断，接续时后台执行已结束，不能恢复原始命令退出码；依据新鲜 XML 与 Failsafe 汇总记录通过，最终成功退出由后续完整单元/相关回归确认。恢复前只读进程清单未见 Java/Maven 测试残留，没有重复运行这一条聚焦命令。
+
+十项集成场景：禁用/源码未就绪无资源打开；默认单并发及持久取消；四个项目并行且第五个等待；提高当前配置不绕过旧任务容量；活动 worker 满员时队列仍按期结束；第二协调者不能接管队列或打开根；启动前已领取/待核对任务原样阻断；释放本测试自己的数据库会话锁后停止实际子进程且不更改未领取任务；禁用/源码停止后收尾；真实子进程已经停止但完成结果未写入时保留资源，只有原 journal 收到原停止收据后才释放。夹具通过平台 `ExecutionProcess` 运行真正的 JVM，记录持久意图和真实停止证据；它不会产生 SUCCEEDED 或伪造 npm/Maven/JAR 验收。
+
+**13:43:44，未决保留变异被捕获**：仅移除最终释放前的未决检查，执行一个已持有真实停止收据的夹具场景，1 失败、0 错误/跳过，01:05、退出码 1；断言发现 close 错误地成功返回。归档 `.local/ex12c2a-retention-mutation.1l9w5mhd`。夹具通过原 journal 记录自身已经持有的停止收据，未遗留活动进程或处理旧审计；随后立即恢复检查，开始全部单元及相关回归。
+
+**13:49:05，428 单元 + 54 相关集成全部通过，零失败/错误/跳过，BUILD SUCCESS，03:29、退出码 0**。按 13:44:45 新鲜度门槛核对 91 份单元和 9 份集成报告，归档 `.local/ex12c2a-related-passed.9po36i_e`（0700/0600）。命令使用既有隔离 JDK、Node 24.20.0 PATH 和显式 `atoms_verify_20261021_ex10` URL，执行 `./mvnw -B -o -Dit.test=ExecutionSchedulerIT,ExecutionBuildQueueIT,ExecutionCancellationIT,ExecutionBuildClaimIT,ExecutionAdmissionIT,ExecutionCoordinatorLeaseIT,AgentCoordinatorLeaseIT,ProjectSourceCoordinatorLeaseIT,BuildCoordinatorLeaseIT verify`。未混入历史报告，也没有将旧模式未决审计清零。
+
+自审：worker 的等待队列有界，持久任务仍是等待来源；内存任务不授予重复 claim 权限。关闭不持有 worker 需要的资源锁等待线程，不在轮询线程中等待自身；元数据提交失败不重试。工厂只为可信内部装配和测试使用，真实进程意图/停止收据仍由原组件管理。没有新增数据库迁移、模型/SMTP 调用或私有配置变更；c2b 原生装配与 EX13 恢复尚未完成，本片不勾选整个 EX12/C-EX04。
+
+回归后的只读核对：当前 schema 的 Agent 未决、关联 pending/活动编辑租约与构建未决均为 0；执行协调锁没有残留持有者。三份旧审计行摘要与 c1 保留采样一致，旧源码失败/中断现场及 c1 误运行记录未改变，测试角色仍无数据库 CREATE 权限。没有删除记录、按 PID 补发证明或操作个人 Claude 进程。
