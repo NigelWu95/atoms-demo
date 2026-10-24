@@ -1,6 +1,6 @@
 # project-execution · 实施计划
 
-状态：2026-10-24，用户已确认本计划及 EX01–EX30 任务，连续实施；检查点报告证据，不逐小项请求开始。依据[规格](../../SPEC-project-execution.md)，规划基线 `1e3a13a`、计划提交 `ee5096a`，当前分支 `feature/standalone-engineering`。EX01–15 和 C-EX05 已完成：构建/崩溃恢复与依赖准备单次 worker 已验收，真实 npm 经持久任务保存新源码版、第二轮无变更；见[任务清单](todo.md)与[验收记录](../../docs/project-execution-verification.md#2026-10-24--ex15d-真实整轮验收通过)。整轮契约使用已确认的 1800 秒任务默认预算，300 秒超时另记，不宣称五分钟性能目标通过。下一项 EX16 接通准备调度、取消与恢复，每片仍最多 5 个主要文件。新模式默认关闭，实际 HTTP 服务和网页尚未接通。
+状态：2026-10-25，用户已确认本计划及 EX01–EX30 任务，连续实施；检查点报告证据，不逐小项请求开始。依据[规格](../../SPEC-project-execution.md)，规划基线 `1e3a13a`、计划提交 `ee5096a`，分支 `feature/standalone-engineering`。EX01–15、C-EX05 和 EX16a/b1/b2 已完成；内部准备取消、恢复及队列策略最新 30 项集成通过，见[清单](todo.md)与[记录](../../docs/project-execution-verification.md#2026-10-25--ex16b2-准备队列策略)。下一步 EX16c 接自动协调器，再做整体故障验收，每片最多 5 个主要文件。新模式默认关闭，常驻 HTTP 服务与网页尚未接通；此前实际 npm 1800 秒通过、300 秒超时及旧故障证据分别保留。
 
 ## 1. 交付范围与组织
 

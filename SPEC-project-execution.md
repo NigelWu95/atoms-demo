@@ -1,10 +1,8 @@
 # Spec: project-execution · 完整工程受控构建与本机进程
 
-状态：2026-10-24，用户已确认本规格及 §10 三项取舍、[实施计划](tasks/project-execution/plan.md)与[任务清单](tasks/project-execution/todo.md)；EX01–15 及 C-EX05 已完成。实际 npm/Maven 构建、五个 JVM 崩溃/重启窗口及依赖准备完整单次 worker 已验收。22:11:42 真实 npm 经持久任务保存新源码版、第二轮无变更；使用已批准的 1800 秒默认任务预算，之前 300 秒超时证据单独保留，见[验收记录](docs/project-execution-verification.md#2026-10-24--ex15d-真实整轮验收通过)。新模式仍默认关闭，下一项 EX16 接通准备任务调度、取消与恢复；应用启动、HTTP 业务验收和网页接入尚未完成。本地完整闭环范围已获准，见 [Agent 规格 §10](SPEC-project-agent.md#10-2026-10-19-完整闭环实施授权)。
+状态：2026-10-25，用户已确认本规格及 §10 三项取舍、[实施计划](tasks/project-execution/plan.md)与[任务清单](tasks/project-execution/todo.md)。EX01–15、C-EX05，以及 EX16a/b1/b2 的准备取消、恢复和队列策略已完成。最新准备队列/取消/恢复 30 项集成通过，见[记录](docs/project-execution-verification.md#2026-10-25--ex16b2-准备队列策略)。EX16c 自动协调器接线和整体故障验收仍待完成；新模式默认关闭，应用常驻运行、HTTP 业务验收与网页接入未完成。本地闭环范围见 [Agent 规格 §10](SPEC-project-agent.md#10-2026-10-19-完整闭环实施授权)。实际 npm 的既有 1800 秒通过记录及 300 秒超时分别保留。
 
 模块 ID 沿用[能力地图](FULL-PROJECT-CAPABILITY-MAP.md)的 `project-execution`，依赖 `project-source`，不反向依赖 Agent、交付或工作台。上游只读门面 PS21 已完成；当前网页仍走旧固定模板链路。
-
-EX16a/b1 已实现内部准备任务取消、结果查询和启动恢复逻辑：排队取消原子释放源码租约，运行中只提交取消意图；恢复关联原源码操作，已提交版本优先，未知执行保留容量。最新 2026-10-25 00:20:40 的 16 单元 + 30 集成通过，详见[恢复记录](docs/project-execution-verification.md#2026-10-25--ex16b1-依赖准备恢复)。准备队列与自动协调器接线仍待完成。
 
 EX12 最新证据：2026-10-24 14:37:51，全部 **439 单元 + 63 项相关集成通过**，零失败/错误/跳过，包含真实 Spring 原生构建及 10 项 PG/JVM 调度场景，见[验收记录](docs/project-execution-verification.md#2026-10-24--ex12c2b2b-spring-调度与原生组合验收)。本轮修复容量中途释放时的队列超车；源码就绪、私有测试库注册表和启停装配已验证。EX11 的完整 417 单元 + 377 集成与本轮相关回归分别记录。沿用获准的隔离 JDK 17.0.14；旧原生枚举问题仍保留监测，旧 schema 误运行及历史审计保留[原记录](docs/project-execution-verification.md#2026-10-24--ex12c1-等待任务处理)。
 

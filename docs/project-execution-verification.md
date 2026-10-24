@@ -1328,3 +1328,13 @@ EX14 完成。真实 npm lock-only、停写核对、只接受锁文件变化及�
 本片 4 个主要文件，源码门面的原 `reconcileAbandonedEdit` 保持原行为，新增只读 inspect；未新增依赖、迁移或启用开关。验证命令继续显式限定 `atoms_demo_test.atoms_verify_20261024_ex16`。取消源码已恢复为 EX16a 通过版本，反向检查修改未保留。
 
 随后完成测试环境接续：`application-test.yml` 和现有准确目标守卫同步至新 schema，历史失败记录不变。00:47:32，`ExecutionPreparationClaimIT,ExecutionBuildQueueIT,ExecutionRecoveryIT` 的 **30 项集成通过**（含五个真实 JVM 崩溃窗口），耗时 3:00，报告 `.local/ex16-schema-core-passed.m3fldvce`。00:49:46，`ExecutionSchedulerIT` 的 **12 项通过**，耗时 1:19。两项原生契约只有目标名守卫变化，已编译核对，未再运行实际 npm/Maven 下载。默认测试目标现已安全接续，无需依赖记忆手动覆盖；命令示例也已更新。
+
+## 2026-10-25 · EX16b2 准备队列策略
+
+`DependencyPreparationQueue` 持有效协调租约读取最多 8 个有序候选，在五秒事务内按项目→任务锁顺序复核。使用任务原本保存的数据库排队期限，当前配置增大不会延长已入队任务。取消优先于超时，归档、转让及维护者撤权分别记固定失败码。关闭时可在执行开关关闭或归属变化后释放从未领取、仍持原能力的排队任务，源码释放、任务终态与共享名额原子提交；不会通过队列处理已领取或待核对任务。
+
+没有原编辑能力时不重建能力，不释放源码或名额；取消只能写入意图，等待能力交接或启动恢复。`dispatchable` 避免在 admission 的 afterCommit 能力尚未交接时派发；返回可派发也不代替 worker 的原子领取和重新授权。写入失败或提交前观察到协调权丢失会整体回滚，包括释放回调。
+
+00:56:59，`ExecutionPreparationQueueIT,ExecutionPreparationCancelIT,ExecutionPreparationRecoveryIT` 的 **30 项集成全部通过**，无跳过，耗时 3:41：队列 12、取消 7、恢复 11。报告 `.local/ex16b2-queue-passed.caspa75v`。队列场景没有启动工具或分配执行身份；另有 EX16a 的真实 Node 取消及 EX15 的实际 npm 证据，不混淆验证层级。本片 3 个主要文件。EX16c 自动协调器、统一公平调度和关闭接线仍待完成，不能将队列策略通过称为整体调度交付。
+
+最终只读核对：新 schema 共 87 条准备记录，未完成、pending、活动准备编辑、共享名额、投影差异和协调租约均为 0。旧 `atoms_verify_20261021_ex10` 保留首轮失败现场：135 条准备记录中 1 条执行意图 pending，另有后续测试领取失败留下的 8 条 QUEUED，合计 9 条未完成/活动编辑/占用；未清理或强制结算，投影仍一致、无协调租约。所有后续验证已显式使用新目标，默认测试配置也已同步。源码、文档本地提交，未推送、部署、调用真实模型或 SMTP，也未改动私有 env 与全局工具配置。

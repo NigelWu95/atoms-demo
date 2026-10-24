@@ -55,6 +55,10 @@ class DependencyPreparationRepository {
         return jdbc.query("SELECT * FROM dependency_preparations WHERE finished_at IS NULL ORDER BY created_at,id LIMIT 12", ROW);
     }
 
+    List<Task> waiting() {
+        return jdbc.query("SELECT * FROM dependency_preparations WHERE status='QUEUED' ORDER BY created_at,id LIMIT 8", ROW);
+    }
+
     static void requireSameTask(Task expected, Task actual) {
         if (!expected.id().equals(actual.id()) || !expected.projectId().equals(actual.projectId())
                 || !expected.ownerId().equals(actual.ownerId()) || !expected.editLeaseId().equals(actual.editLeaseId())
@@ -74,6 +78,7 @@ class DependencyPreparationRepository {
 
     /** Caller holds the project and task locks. A cancellation intent is not evidence of stopped execution. */
     Task requestCancel(Task task) {
+        if (!TransactionSynchronizationManager.isActualTransactionActive()) throw new IllegalStateException("Cancellation requires a transaction");
         if (task.finishedAt() == null && !task.cancelRequested())
             jdbc.update("UPDATE dependency_preparations SET cancel_requested=true WHERE id=?", task.id());
         return get(task.projectId(), task.id());
@@ -81,10 +86,16 @@ class DependencyPreparationRepository {
 
     /** The caller must release the never-claimed source edit in this same transaction. */
     Task cancelQueued(Task task) {
+        return finishQueued(task, "CANCELLED", "EXECUTION_CANCELLED");
+    }
+
+    Task finishQueued(Task task, String status, String code) {
+        if (!TransactionSynchronizationManager.isActualTransactionActive()) throw new IllegalStateException("Queue settlement requires a transaction");
+        if (!Set.of("CANCELLED", "FAILED", "TIMED_OUT").contains(status)) throw new IllegalArgumentException("Invalid queue outcome");
         if (jdbc.update("""
-                UPDATE dependency_preparations SET status='CANCELLED',cancel_requested=true,error_code='EXECUTION_CANCELLED',
+                UPDATE dependency_preparations SET status=?,cancel_requested=cancel_requested OR ?,error_code=?,
                     queue_slot=null,finished_at=clock_timestamp() WHERE id=? AND status='QUEUED'
-                """, task.id()) != 1) throw new IllegalStateException("Preparation is no longer queued");
+                """, status, status.equals("CANCELLED"), code, task.id()) != 1) throw new IllegalStateException("Preparation is no longer queued");
         return get(task.projectId(), task.id());
     }
 
