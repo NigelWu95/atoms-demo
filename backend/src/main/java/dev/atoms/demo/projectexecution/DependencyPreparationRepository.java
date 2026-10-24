@@ -59,6 +59,11 @@ class DependencyPreparationRepository {
         return jdbc.query("SELECT * FROM dependency_preparations WHERE status='QUEUED' ORDER BY created_at,id LIMIT 8", ROW);
     }
 
+    int workerLimit(Task task) {
+        return jdbc.queryForObject("SELECT worker_capacity FROM dependency_preparations WHERE project_id=? AND id=?",
+                Integer.class, task.projectId(), task.id());
+    }
+
     static void requireSameTask(Task expected, Task actual) {
         if (!expected.id().equals(actual.id()) || !expected.projectId().equals(actual.projectId())
                 || !expected.ownerId().equals(actual.ownerId()) || !expected.editLeaseId().equals(actual.editLeaseId())

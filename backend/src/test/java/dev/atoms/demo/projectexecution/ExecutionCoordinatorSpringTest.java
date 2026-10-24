@@ -1,6 +1,7 @@
 package dev.atoms.demo.projectexecution;
 
 import dev.atoms.demo.source.ProjectSourceReadGateway;
+import dev.atoms.demo.source.ProjectSourceEditGateway;
 import java.util.UUID;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.Test;
@@ -42,6 +43,8 @@ class ExecutionCoordinatorSpringTest {
             context.registerBean(PlatformTransactionManager.class, () -> mock(PlatformTransactionManager.class));
             context.registerBean(DataSource.class, () -> database);
             context.registerBean(ProjectSourceReadGateway.class, () -> source);
+            context.registerBean(ProjectSourceEditGateway.class, () -> mock(ProjectSourceEditGateway.class));
+            context.registerBean(DependencyPreparationService.class, () -> mock(DependencyPreparationService.class));
             context.registerBean(ExecutionEnvironment.class, () -> resources);
             context.register(ExecutionCoordinator.class); context.refresh();
             assertThat(context.getBean(ExecutionCoordinator.class).isRunning()).isFalse();

@@ -1344,3 +1344,15 @@ EX14 完成。真实 npm lock-only、停写核对、只接受锁文件变化及�
 原生 `ExecutionEnvironment` 在同一执行根租约下装配已有 `DependencyPreparationWorker`，提供 `runPreparation`；源码未就绪时在读取任务或领取编辑能力之前拒绝。打开工厂不提前领取任务、创建工作副本或启动 npm；旧只构建资源适配器默认拒绝准备调用。原生种子契约的手动 Spring 上下文补齐实际源码编辑门面与准备服务。
 
 01:06:20，`ExecutionEnvironmentTest` 6 项与 `ExecutionCoordinatorSpringTest` 2 项，共 **8 单元通过**，耗时 44.861 秒；所有测试源码含原生契约已编译，未重跑网络安装。命令中误写的 `ExecutionConfigurationTest` 在仓库不存在，不计入验证；实际配置/默认关闭保护由上述两类覆盖。4 个主要文件；自动派发逻辑在 c2 接通，未宣称本片完成统一调度。
+
+## 2026-10-25 · EX16c2 统一准备与构建调度
+
+`ExecutionCoordinator` 启动时在执行根与数据库独占租约下恢复准备任务；仍有未决执行则不派发。把准备和构建按创建时间、UUID 合并排序，共用工作线程和原始/当前较小并发上限；名额满时仍结算后续排队任务的超时或撤权，但不让后项抢占刚释放的名额。原准备能力交接尚未完成时等待，不重建可写句柄。旧只构建测试适配器遇到准备积压会拒绝启动。
+
+关闭先停止准入、保存取消意图，再通知自己的工作线程停止；确认子进程停止、任务及源码结算后才关闭资源。失去协调权不取消其他协调者的新队列。Spring 原生工厂和生命周期已接通准备 worker；默认配置与网页入口未变化。
+
+01:26:37，**8 单元 + 30 集成通过**，无失败/错误/跳过，耗时 8:44。集成为新混合调度 6、准备队列 12、旧构建调度 12。01:35:04，**2 单元 + 2 新增集成通过**，耗时 3:30。两次命令分别为 `-Dtest=ExecutionEnvironmentTest,ExecutionCoordinatorSpringTest -Dit.test=ExecutionPreparationSchedulerIT,ExecutionSchedulerIT,ExecutionPreparationQueueIT verify`，以及 `-Dtest=ExecutionCoordinatorSpringTest -Dit.test=ExecutionPreparationSchedulerIT#disablingExecutionStopsItsRealPreparationAndCancelsItsOwnedQueue+unresolvedPreparationBlocksStartupWithoutDispatchingOrChangingTheFreshQueue verify`；均经私有 runner 使用获准 EX16 schema 和隔离 JDK 17.0.14。归档 `.local/ex16c2-passed.go9d91rt`；第二次仅新增两项，不把它算作重跑八项。
+
+八个新场景覆盖：原生 Spring 工厂两轮 SOURCE_SAVED/NO_CHANGES、陈旧基线拒绝；构建→准备→构建的顺序；两构建与两准备共占四名额、第五项等待真实停止；满载时排队期限仍生效；丢失能力的旧队列恢复后派发新队列；协调租约丢失；配置禁用；未决任务阻止启动。Node/JVM、Git/PG 均实际执行，CLI 和构建内容为受控夹具，不替代 EX15 的真实 npm 或 EX11 的真实 Maven 契约。
+
+只读审计：116 条准备记录均终结，pending、活动源码编辑、共享名额、投影差异和协调锁均为 0。自审核对锁顺序、能力交接、合并队列排序、停止前持久取消及终态查询，未发现阻断项。4 个主要文件，无新增依赖或迁移。EX16d 独立 JVM 发布后崩溃及原源码恢复兼容仍待验收，不能据此宣称完整工程网页链路已经完成。
