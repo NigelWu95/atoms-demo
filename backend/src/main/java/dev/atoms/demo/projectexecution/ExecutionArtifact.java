@@ -77,6 +77,29 @@ final class ExecutionArtifact {
 
     Path jar() throws IOException { return paths.directory(task).resolve("app.jar"); }
     Summary summary() { return summary; }
+
+    /** Expected hashes come from an authorized successful DB build; files alone can never promote a build to success. */
+    static ExecutionArtifact openSuccessful(ExecutionPaths paths, ExecutionBuild build, String jarSha256,
+            String manifestSha256, OwnedProcess.Budget budget) throws IOException {
+        try {
+            check(budget);
+            if (build == null || !"SUCCEEDED".equals(build.status()) || build.finishedAt() == null
+                    || jarSha256 == null || !jarSha256.matches("[a-f0-9]{64}")
+                    || manifestSha256 == null || !manifestSha256.matches("[a-f0-9]{64}")) throw invalid();
+            var task = paths.openArtifact(build.id(), budget); Path directory = paths.directory(task);
+            var jar = scan(directory.resolve("app.jar"), MAX_JAR_BYTES, true, budget);
+            var manifest = scan(directory.resolve("manifest.json"), 16384, true, budget);
+            if (!jar.sha256().equals(jarSha256) || !manifest.sha256().equals(manifestSha256)) throw invalid();
+            byte[] contents;
+            try (var input = Files.newInputStream(directory.resolve("manifest.json"), LinkOption.NOFOLLOW_LINKS)) {
+                contents = input.readNBytes((int) manifest.size() + 1);
+            }
+            if (contents.length != manifest.size() || !hash(contents).equals(manifestSha256)) throw invalid();
+            var evidence = ExecutionArtifactManifest.read(build, contents, jar.size(), jar.sha256());
+            var result = new ExecutionArtifact(paths, task, jar, manifest, build, evidence);
+            result.verify(budget); return result;
+        } catch (IOException | RuntimeException error) { throw sanitized(error); }
+    }
     /** Immutable in-memory binding, not a capability reconstructed from caller-supplied hashes or paths. */
     Evidence evidenceFor(ExecutionBuild expected) throws IOException {
         if (expected == null || !build.id().equals(expected.id()) || !build.projectId().equals(expected.projectId())

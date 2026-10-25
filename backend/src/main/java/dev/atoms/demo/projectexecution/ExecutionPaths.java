@@ -69,6 +69,24 @@ final class ExecutionPaths implements AutoCloseable {
         return create(Area.RUN, id, budget);
     }
 
+    /** Read-only reacquisition of sealed artifact storage; never opens build/run tasks or restores process ownership. */
+    synchronized Task openArtifact(UUID id, dev.atoms.demo.execution.OwnedProcess.Budget budget) throws IOException {
+        Objects.requireNonNull(id); checkCapacity(budget);
+        Path path = root.resolve(Area.ARTIFACT.directory).resolve(id.toString()); Object key = lease.directoryKey(path);
+        String prefix = "atoms-execution-task-v1\nARTIFACT\n" + id + "\n";
+        int length = prefix.length() + 37;
+        Path markerPath = path.resolve(TASK_MARKER); Object markerKey = lease.fileKey(markerPath, length);
+        byte[] marker;
+        try (var input = Files.newInputStream(markerPath, LinkOption.NOFOLLOW_LINKS)) { marker = input.readNBytes(length + 1); }
+        String value = new String(marker, StandardCharsets.UTF_8);
+        if (marker.length != length || !value.startsWith(prefix) || !value.endsWith("\n")) throw ExecutionRootLease.unavailable();
+        String nonce = value.substring(prefix.length(), value.length() - 1);
+        try { if (!UUID.fromString(nonce).toString().equals(nonce)) throw new IllegalArgumentException(); }
+        catch (IllegalArgumentException error) { throw ExecutionRootLease.unavailable(); }
+        var task = new Task(this, Area.ARTIFACT, path, key, null, markerKey, marker);
+        directory(task); checkBudget(budget); return task;
+    }
+
     private Task create(Area area, UUID id) throws IOException {
         return create(area, id, () -> java.time.Duration.ofSeconds(10));
     }

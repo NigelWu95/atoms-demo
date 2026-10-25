@@ -2,12 +2,15 @@ package dev.atoms.demo.projectexecution;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.core.JsonParser;
 import java.io.IOException;
 import java.util.*;
 
 /** Fixed, bounded evidence schema: no caller-supplied paths, messages, versions or environment strings. */
 final class ExecutionArtifactManifest {
-    private static final ObjectMapper JSON = new ObjectMapper().enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS);
+    private static final ObjectMapper JSON = new ObjectMapper().enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS)
+            .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS).enable(JsonParser.Feature.STRICT_DUPLICATE_DETECTION);
     private record Manifest(int format, UUID buildId, UUID projectId, UUID sourceVersionId, String treeSha256,
                             ExecutionArtifact.Evidence evidence, long jarBytes, String jarSha256) {}
 
@@ -38,6 +41,16 @@ final class ExecutionArtifactManifest {
                 build.treeSha256(), evidence, size, digest));
         if (bytes.length > 16384) throw invalid();
         return bytes;
+    }
+
+    /** Require the exact canonical schema emitted at sealing, not merely a parseable file with plausible hashes. */
+    static ExecutionArtifact.Evidence read(ExecutionBuild build, byte[] contents, long size, String digest) throws IOException {
+        try {
+            if (contents == null || contents.length == 0 || contents.length > 16384) throw invalid();
+            var manifest = JSON.readValue(contents, Manifest.class);
+            if (!Arrays.equals(contents, bytes(build, manifest.evidence(), size, digest))) throw invalid();
+            return manifest.evidence();
+        } catch (IOException | RuntimeException error) { throw invalid(); }
     }
     private static void count(long value, long max) throws IOException { if (value <= 0 || value > max) throw invalid(); }
     private static void hash(String value) throws IOException { if (value == null || !value.matches("[a-f0-9]{64}")) throw invalid(); }
