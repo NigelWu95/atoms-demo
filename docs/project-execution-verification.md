@@ -1530,3 +1530,13 @@ ticket 限原服务领取一次；持有的配置、产物、绑定和原单调�
 READY 提交新增显式共享预算参数，在仓库写入前后检查原剩余期限；等待事务锁等期间过期则回滚，返回固定 `RUN_START_TIMEOUT`，不会另开一个启动窗口。边界测试使用可控预算，在写入前耗尽和写入后耗尽均不提交；监控测试将原启动预算置零，仍能查询真实绑定的 READY/STOPPING 元数据，并拒绝错执行及配置撤销。
 
 独立红灯明确缺少监控入口与预算参数；17:32:42，`-Dtest=ExecutionRunAdmissionTest,ExecutionRunJournalTest,ExecutionRunProcessTest -Dit.test=ExecutionRunStateIT,ExecutionRunIT verify`，**24 单元 + 13 项 PG 集成通过**，零失败/错误/跳过，2:41，平台打包成功。4 个主要文件，没有业务迁移或新运行启动；f2 继续完成真实进程组合。
+
+## 2026-10-25 · EX20f2 worker 与真实持久状态组合
+
+内部 `ExecutionRunWorker.run(ticket)` 持有本次运行直至进程结束：检查独占协调权/执行根/准确 Java、最新权限与迁移，组装固定命令与凭据，检查端口后提交执行意图，再调用原进程拥有者。preflight 再检查同一组来源/绑定/授权；HTTP 身份通过且预算仍有效才持久 READY。之后继续排空输出并每秒检查当前授权、协调权与持久停止标记，不以启动期限限制应用寿命。外来端口明确失败，不杀外来进程；端口检查与进程绑定仍不是跨进程原子操作，因此就绪继续要求本次准确身份。
+
+意图提交回执不明不调用 launcher、不伪造未启动结果；已拥有的进程遇到失败由原拥有者停止。缺失停止结果保留未知状态，完成写入在失败捕获之外，不因写入异常再结算一次。worker 不关闭调用者的根/协调租约、不发布 HTTP 接口，也没有提前启用 Spring 调度；EX21–22 接入管理生命周期。
+
+17:36:32 独立红灯缺少 worker 类型；17:39:56，`-Dtest=ExecutionRunJournalTest,ExecutionRunAdmissionTest,ExecutionRunProcessTest -Pproject-execution-contract -Dit.test=ExecutionRunHealthIT -Dexecution.test-config-directory=<原批准目录> -Dexecution.runtime-fixture-root=<固定源码根> -Dexecution.contract-directory=<仓库外父目录> verify`，**24 单元 + 1 项真实组合通过**，零失败/错误/跳过，2:16。真实 PG、独占租约、Git/封存/私有配置/业务历史与状态服务全部参与；最后 launcher 是明确的受控 HTTP JVM，工具/JAR 为命令验证夹具，不把此项当作原生 Spring 应用/SQL 执行验收。夹具进程不接收业务凭据，也不执行样本 SQL。
+
+独立连接在 `Process.start` 前已能读到准确执行意图；健康握手后 READY、重复 ticket 拒绝；测试生产持久停止标记（正式停止 API 仍属 EX21），原拥有者实际停止并将匹配摘要写入 STOPPED。随后外来监听占用原端口，新请求以 `RUN_PORT_IN_USE` 在发出执行意图前失败，外来 socket 保持打开，launcher 总计只执行一次。原业务历史前后相同，审计记录保留。2 个主要文件；f3 继续异常矩阵和收尾回归。
