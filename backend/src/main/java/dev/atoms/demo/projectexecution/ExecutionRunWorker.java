@@ -162,6 +162,8 @@ final class ExecutionRunWorker {
         String code = error instanceof ApiException api ? api.code() : Objects.toString(error.getMessage(), "");
         if (Set.of("RUN_PORT_IN_USE", "RUN_HEALTH_INVALID", "RUN_START_TIMEOUT", "RUN_CANCELLED", "RUN_CONFIGURATION_CHANGED",
                 "RUN_COORDINATOR_UNAVAILABLE").contains(code)) return code;
+        if (Set.of("EXECUTION_COORDINATOR_UNAVAILABLE", "EXECUTION_ENVIRONMENT_UNAVAILABLE").contains(code))
+            return "RUN_COORDINATOR_UNAVAILABLE";
         if (code.equals("EXECUTION_TIMEOUT")) return "RUN_START_TIMEOUT";
         if (code.equals("EXECUTION_CANCELLED")) return "RUN_CANCELLED";
         if (code.equals("EXECUTION_DISABLED") || code.equals("EXECUTION_CONFIGURATION_INVALID")) return "RUN_CONFIGURATION_CHANGED";

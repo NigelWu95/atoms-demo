@@ -3,16 +3,18 @@ package dev.atoms.demo.projectexecution;
 import dev.atoms.demo.common.ApiException;
 import dev.atoms.demo.project.ProjectService;
 import dev.atoms.demo.source.*;
+import com.zaxxer.hikari.HikariDataSource;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BooleanSupplier;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -31,9 +33,10 @@ class ExecutionRuntimeSchedulerIT {
     @Autowired PlatformTransactionManager transactions;
     @Autowired DataSource database;
     static final UUID OWNER = ExecutionBindingContractIT.OWNER, PROJECT = ExecutionBindingContractIT.A;
+    enum Scenario { SWITCH, CLOSE, LOSE_LEASE }
 
-    @ParameterizedTest @ValueSource(booleans = {false, true})
-    void coordinatorOwnsAdmissionResidenceAndShutdownWhileBuildWorkersRemainAvailable(boolean closeActive) throws Exception {
+    @ParameterizedTest @EnumSource(Scenario.class)
+    void coordinatorOwnsAdmissionResidenceAndShutdownWhileBuildWorkersRemainAvailable(Scenario scenario) throws Exception {
         assertThat(jdbc.queryForObject("SELECT current_database() || '.' || current_schema()", String.class))
                 .isEqualTo("atoms_demo_test.atoms_verify_20261024_ex16");
         var runs = new ExecutionRunRepository(jdbc); assertThat(runs.unfinished()).isEmpty();
@@ -57,7 +60,8 @@ class ExecutionRuntimeSchedulerIT {
             var fixture = new ExecutionRuntimeFixture(settings, projects, jdbc, transactions, source.readGateway(), tools, registry, target);
             var first = fixture.seal(base, tree); var second = fixture.seal(base, tree);
             var builds = new ExecutionBuildRepository(jdbc);
-            var coordinator = new ExecutionCoordinator(settings, builds, jdbc, transactions, database, source.readGateway()::readyForExecution, () -> fixture);
+            var connection = new AtomicReference<java.sql.Connection>(); var leaseDatabase = leasePool(connection);
+            var coordinator = new ExecutionCoordinator(settings, builds, jdbc, transactions, leaseDatabase, source.readGateway()::readyForExecution, () -> fixture);
             try {
                 coordinator.start(); assertThat(coordinator.isRunning()).isTrue();
                 String key = "managed-" + UUID.randomUUID();
@@ -67,7 +71,7 @@ class ExecutionRuntimeSchedulerIT {
                 assertThat(coordinator.isRunning()).isTrue(); assertThat(fixture.launches).hasValue(1);
                 assertThat(fixture.process.get().isServing()).isTrue();
                 assertThat(coordinator.startApplication(OWNER, PROJECT, first.id(), target.id(), null, key).toCompletableFuture().get().id()).isEqualTo(admitted.id());
-                if (!closeActive) {
+                if (scenario == Scenario.SWITCH) {
                     var buildService = new ProjectExecutionService(settings, builds, projects, source.readGateway(), transactions);
                     var work = buildService.submit(OWNER, PROJECT, base.versionId(), "while-serving-" + UUID.randomUUID());
                     Path marker = executionRoot.resolve("builds/" + work.id() + "/project/frontend/started");
@@ -88,6 +92,17 @@ class ExecutionRuntimeSchedulerIT {
                     coordinator.stopApplication(OWNER, PROJECT, replacement.id()); await(() -> runs.get(PROJECT, replacement.id()).finishedAt() != null);
                     assertThat(runs.get(PROJECT, replacement.id()).status()).isEqualTo("STOPPED");
                 }
+                if (scenario == Scenario.LOSE_LEASE) {
+                    // Revoke only this fixture's exact dedicated session lock; never terminate a foreign backend.
+                    try (var statement = connection.get().createStatement(); var row = statement.executeQuery("SELECT pg_advisory_unlock(718395204)")) {
+                        assertThat(row.next()).isTrue(); assertThat(row.getBoolean(1)).isTrue();
+                    }
+                    await(() -> !coordinator.isRunning() && fixture.builds.closed);
+                    var ended = runs.get(PROJECT, admitted.id());
+                    assertThat(ended.status()).isEqualTo("FAILED");
+                    assertThat(ended.errorCode()).isIn("RUN_COORDINATOR_UNAVAILABLE", "RUN_CANCELLED", "RUN_STOPPED");
+                    assertThat(fixture.launches).hasValue(1);
+                }
                 coordinator.close();
                 assertThat(fixture.builds.closed).isTrue(); assertThat(fixture.process.get().isAlive()).isFalse();
                 assertThat(runs.unfinished()).isEmpty();
@@ -98,7 +113,7 @@ class ExecutionRuntimeSchedulerIT {
                 try (var reopened = new ExecutionPaths(executionRoot, List.of(root)); var lease = new ExecutionCoordinatorLease(database)) {
                     reopened.checkedRoot(); assertThat(lease.healthy()).isTrue();
                 }
-            } finally { coordinator.close(); }
+            } finally { try { coordinator.close(); } finally { leaseDatabase.close(); } }
         }
         assertThat(registry.history(PROJECT, budget())).isEqualTo(history);
     }
@@ -128,4 +143,15 @@ class ExecutionRuntimeSchedulerIT {
         Path path = Path.of(value); assertThat(path.isAbsolute()).isTrue(); ExecutionRootLease.noLinks(path); return path.toRealPath();
     }
     private ExecutionProcess.Deadline budget() { return new ExecutionProcess.Deadline(Duration.ofSeconds(30)); }
+    private HikariDataSource leasePool(AtomicReference<java.sql.Connection> connection) throws Exception {
+        var original = database.unwrap(HikariDataSource.class);
+        var pool = new HikariDataSource() {
+            @Override public java.sql.Connection getConnection() throws java.sql.SQLException {
+                var acquired = super.getConnection(); connection.set(acquired); return acquired;
+            }
+        };
+        pool.setJdbcUrl(original.getJdbcUrl()); pool.setUsername(original.getUsername()); pool.setPassword(original.getPassword());
+        pool.setMaximumPoolSize(1); pool.setMinimumIdle(0); pool.setConnectionTimeout(3000);
+        pool.setPoolName("runtime-lease-fixture"); return pool;
+    }
 }

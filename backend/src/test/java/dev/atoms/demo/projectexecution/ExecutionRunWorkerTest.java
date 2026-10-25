@@ -37,7 +37,7 @@ class ExecutionRunWorkerTest {
     private int launches, readyWrites, finishWrites, noLaunchWrites, toolCaptures;
     private boolean failToolCapture;
     private boolean loseBeginCommit, loseReadyCommit, loseFinishCommit, failCompletion, loseCoordination, loseAuthorization, unknownProcess;
-    private String mode = "wrong", recordedFailure;
+    private String mode = "wrong", recordedFailure, coordinationCode = "RUN_COORDINATOR_UNAVAILABLE";
 
     @BeforeEach void setup() throws Exception {
         Path root = temporary.toRealPath();
@@ -115,7 +115,11 @@ class ExecutionRunWorkerTest {
             if (failToolCapture) throw new IOException("EXECUTION_TIMEOUT");
             return tools;
         }, databases, () -> {
-            if (loseCoordination && readyWrites > 0) throw new IOException("RUN_COORDINATOR_UNAVAILABLE");
+            if (loseCoordination && readyWrites > 0) {
+                if (coordinationCode.startsWith("EXECUTION_"))
+                    throw new dev.atoms.demo.common.ApiException(503, coordinationCode, "private-coordination-details");
+                throw new IOException(coordinationCode);
+            }
         }, (prepared, run, exec, budget, preflight) -> {
             outside(); assertThat(current.executionPending()).isTrue(); assertThat(current.executionId()).isEqualTo(exec);
             launches++; directory = prepared.directory().toPath();
@@ -230,6 +234,15 @@ class ExecutionRunWorkerTest {
         worker.run(ticket());
         assertThat(readyWrites).isEqualTo(1); assertThat(recordedFailure).isEqualTo("RUN_COORDINATOR_UNAVAILABLE");
         assertThat(finishWrites).isEqualTo(1); assertStopped();
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"EXECUTION_COORDINATOR_UNAVAILABLE", "EXECUTION_ENVIRONMENT_UNAVAILABLE"})
+    void nativeCoordinationFailuresAreNotReportedAsApplicationStartupFailures(String code) throws Exception {
+        mode = "valid"; loseCoordination = true; coordinationCode = code;
+        worker.run(ticket());
+        assertThat(readyWrites).isEqualTo(1); assertThat(recordedFailure).isEqualTo("RUN_COORDINATOR_UNAVAILABLE");
+        assertThat(finishWrites).isEqualTo(1); assertStopped(); assertThat(worker.hasHeldProcesses()).isFalse();
     }
 
     @Test void ownershipLostAfterReadyStillAllowsTheOriginalWorkerToStopAndSettle() throws Exception {
