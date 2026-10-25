@@ -1,7 +1,7 @@
 spring:
   datasource:
     # Approved execution regression schema; old schemas retain unresolved audit evidence.
-    url: jdbc:postgresql://127.0.0.1:5432/atoms_demo_test?currentSchema=atoms_verify_20261024_ex16&connectTimeout=3&socketTimeout=5
+    url: jdbc:postgresql://127.0.0.1:5432/atoms_demo_test?currentSchema=atoms_verify_20261025_ex22&connectTimeout=3&socketTimeout=5
     username: atoms_test
     password: ${TEST_DB_PASSWORD}
 server:

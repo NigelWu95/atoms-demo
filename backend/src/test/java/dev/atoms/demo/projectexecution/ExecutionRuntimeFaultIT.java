@@ -30,7 +30,7 @@ class ExecutionRuntimeFaultIT {
     @ParameterizedTest @EnumSource(ExecutionRuntimeFaultProbe.Fault.class)
     void unavailableMetadataAndLostCompletionReceiptsRetainCapabilitiesWithoutReplaying(ExecutionRuntimeFaultProbe.Fault fault) throws Exception {
         assertThat(jdbc.queryForObject("SELECT current_database() || '.' || current_schema()", String.class))
-                .isEqualTo("atoms_demo_test.atoms_verify_20261024_ex16");
+                .isEqualTo(ExecutionTestTarget.DATABASE_SCHEMA);
         Path parent = required("execution.contract-directory"), source = required("execution.runtime-fixture-root"), configuration = required("execution.test-config-directory");
         var runs = new ExecutionRunRepository(jdbc); assertThat(runs.unfinished()).isEmpty();
         var registry = ExecutionDatabaseBinding.load(Map.of(PROJECT, configuration.resolve(ExecutionBindingContractIT.A_DB + ".properties")),

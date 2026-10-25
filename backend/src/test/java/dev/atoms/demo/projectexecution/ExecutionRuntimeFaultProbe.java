@@ -55,7 +55,7 @@ public final class ExecutionRuntimeFaultProbe {
         var database = pool(input, "fault-coordinator"); var jdbc = jdbc(database);
         var transactions = new DataSourceTransactionManager(database);
         assertThat(jdbc.queryForObject("SELECT current_database() || '.' || current_schema()", String.class))
-                .isEqualTo("atoms_demo_test.atoms_verify_20261024_ex16");
+                .isEqualTo(ExecutionTestTarget.DATABASE_SCHEMA);
         var runs = new ExecutionRunRepository(jdbc); assertThat(runs.unfinished()).isEmpty();
         var projects = new ProjectService(jdbc);
         stage = "source";

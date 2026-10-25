@@ -31,7 +31,7 @@ class ExecutionBindingContractIT {
 
     @BeforeEach void approvedEnvironment() throws Exception {
         assertThat(jdbc.queryForObject("SELECT current_database() || '.' || current_schema()", String.class))
-                .isEqualTo("atoms_demo_test.atoms_verify_20261024_ex16");
+                .isEqualTo(ExecutionTestTarget.DATABASE_SCHEMA);
         String configured = System.getProperty("execution.test-config-directory");
         assertThat(configured).as("Explicit approved private database directory is required").isNotBlank();
         configuration = Path.of(configured); ExecutionRootLease.noLinks(configuration);
