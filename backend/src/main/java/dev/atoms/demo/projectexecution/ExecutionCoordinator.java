@@ -31,6 +31,8 @@ final class ExecutionCoordinator implements SmartLifecycle, AutoCloseable {
                 BooleanSupplier cancelled, OwnedProcess.Preflight coordination) throws IOException {
             throw new IOException("EXECUTION_PREPARATION_UNAVAILABLE");
         }
+        /** Optional runtime resources; attachment alone never starts a task or claims an old run. */
+        default ExecutionRuntimeResources runtime(OwnedProcess.Preflight coordination) throws IOException { return null; }
         @Override void close() throws IOException;
     }
     /** Trusted resource assembly only; never supplied by a request or generated source. */
