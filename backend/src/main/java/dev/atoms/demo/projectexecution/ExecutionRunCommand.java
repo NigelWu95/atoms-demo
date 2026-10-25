@@ -16,6 +16,8 @@ final class ExecutionRunCommand {
     private final ExecutionPaths.Task task;
     private final ExecutionArtifact artifact;
     private final ExecutionToolchain tools;
+    private final UUID run, execution;
+    private final ExecutionBindingRepository.Target binding;
     private final Path directory, config;
     private final Map<Path, Object> directories;
     private final Object configKey;
@@ -24,8 +26,9 @@ final class ExecutionRunCommand {
     private final Map<String, String> environment;
 
     private ExecutionRunCommand(ExecutionPaths paths, ExecutionPaths.Task task, ExecutionArtifact artifact,
-            ExecutionToolchain tools, byte[] contents) throws IOException {
+            ExecutionToolchain tools, byte[] contents, UUID run, UUID execution, ExecutionBindingRepository.Target binding) throws IOException {
         this.paths = paths; this.task = task; this.artifact = artifact; this.tools = tools; this.contents = contents.clone();
+        this.run = run; this.execution = execution; this.binding = binding;
         directory = paths.directory(task); config = directory.resolve("config/application.properties");
         Path home = directory.resolve("home"), temporary = directory.resolve("tmp"), javaHome = tools.javaHome();
         for (Path path : List.of(directory, artifact.jar(), javaHome)) requirePath(path);
@@ -61,7 +64,7 @@ final class ExecutionRunCommand {
                 while (buffer.hasRemaining()) { check(budget); file.write(buffer); }
                 file.force(true);
             }
-            var result = new ExecutionRunCommand(paths, task, artifact, tools, contents);
+            var result = new ExecutionRunCommand(paths, task, artifact, tools, contents, run, execution, binding);
             result.verify(budget); return result;
         } catch (FileAlreadyExistsException exists) { throw new IOException("RUN_WORKSPACE_NOT_CLEAN"); }
         catch (IOException | RuntimeException error) { throw sanitized(error); }
@@ -70,6 +73,10 @@ final class ExecutionRunCommand {
     ProcessBuilder builder() {
         var result = new ProcessBuilder(new ArrayList<>(command)).directory(directory.toFile());
         result.environment().clear(); result.environment().putAll(environment); return result;
+    }
+
+    boolean matches(UUID run, UUID execution, ExecutionBindingRepository.Target binding) {
+        return this.run.equals(run) && this.execution.equals(execution) && this.binding.equals(binding);
     }
 
     void verify(OwnedProcess.Budget budget) throws IOException {

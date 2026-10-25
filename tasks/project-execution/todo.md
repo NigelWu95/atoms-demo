@@ -283,7 +283,7 @@ U/I/REAL/ALL/COMPAT/DOC 的命令与权限条件见计划 §6。S = 1–2、M = 
 - [ ] 完成 EX20。依赖：EX17–19。原 5 文件估计未覆盖成功产物重新读取、业务凭据发放及运行结算；实施前拆片，每片最多 5 个主要文件。
   - [x] EX20a：固定 loopback 健康请求、有界响应、运行身份及活进程核验（Health、HealthTest，2 文件）。16:30:30，12 项进程/HTTP 组合通过；增加事务边界后 16:32:33，5 项 HTTP 测试通过。持久 READY 尚待 d–f 接线。
   - [x] EX20b：成功构建的封存产物重新读取，核对 DB 摘要及原清单/源码身份；不恢复进程或停止凭据（Artifact、ArtifactManifest、Paths、ArtifactReopenTest，4 文件）。16:38:08，20 项相关测试通过。
-  - [ ] EX20c：业务注册表签发本次执行专用的凭据装配能力，启动前重新核对物理绑定；同时绑定固定运行命令（DatabaseBinding、PrivateConfig、RunCommand 及相关测试，最多 5 文件）。
+  - [x] EX20c：业务注册表签发本次执行专用的凭据装配能力，启动前重新核对物理绑定；同时绑定固定运行命令（DatabaseBinding、PrivateConfig、RunCommand、RuntimeLaunchContractIT，4 文件）。16:49:03，5 单元 + 7 项真实绑定/只读凭据契约通过并打包；未启动业务应用。
   - [ ] EX20d：幂等领取、执行意图、健康就绪与真实停止/未知结果的持久状态流转（RunRepository、RunJournal 及相关测试，最多 4 文件）。
   - [ ] EX20e：启动准入重新核对当前权限、归档、来源、产物、绑定与迁移批准（RunService、RunAdmissionIT 及必要接线，最多 5 文件）。
   - [ ] EX20f：串联真实进程、HTTP 健康与失败收尾，验证单次启动和提交/退出竞争（RunWorker、RunHealthIT 及必要契约，最多 5 文件）。运行调度的 Spring 生命周期、恢复与关闭在 EX21–22 接入。

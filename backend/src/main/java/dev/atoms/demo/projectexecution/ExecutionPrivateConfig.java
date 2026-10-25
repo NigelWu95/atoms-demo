@@ -104,10 +104,21 @@ final class ExecutionPrivateConfig {
         // Spring Boot 3.5 placeholders resolve environment values; Surefire inherits the Maven environment.
         // https://docs.spring.io/spring-boot/3.5/reference/features/external-config.html
         // https://maven.apache.org/surefire-archives/surefire-3.5.6/maven-surefire-plugin/test-mojo.html#excludedEnvironmentVariables
+        applyDatabaseEnvironment(builder);
+        builder.environment().put("APP_PORT", "0");
+    }
+
+    void applyRuntimeEnvironment(ProcessBuilder builder) throws IOException {
+        verify();
+        if (!values.getProperty("purpose").equals("runtime")) throw invalid();
+        applyDatabaseEnvironment(builder);
+        builder.environment().put("APP_PORT", Integer.toString(applicationPort()));
+    }
+
+    private void applyDatabaseEnvironment(ProcessBuilder builder) {
         builder.environment().put("APP_DB_URL", values.getProperty("jdbcUrl"));
         builder.environment().put("APP_DB_USERNAME", role());
         builder.environment().put("APP_DB_PASSWORD", values.getProperty("password"));
-        builder.environment().put("APP_PORT", "0");
     }
 
     /** Fresh explicit properties only; the URL cannot override these with operator-supplied parameters. */
