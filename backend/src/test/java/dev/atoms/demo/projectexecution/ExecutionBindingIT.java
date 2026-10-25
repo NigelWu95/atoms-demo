@@ -22,7 +22,7 @@ class ExecutionBindingIT {
 
     @BeforeEach void target() {
         assertThat(jdbc.queryForObject("SELECT current_database() || '.' || current_schema()", String.class))
-                .isEqualTo("atoms_demo_test.atoms_verify_20261024_ex16");
+                .isEqualTo(ExecutionTestTarget.DATABASE_SCHEMA);
         repository = new ExecutionBindingRepository(jdbc);
     }
 

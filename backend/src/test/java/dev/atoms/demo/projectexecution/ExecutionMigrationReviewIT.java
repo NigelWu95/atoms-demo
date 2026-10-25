@@ -25,7 +25,7 @@ class ExecutionMigrationReviewIT {
     final ExecutionMigrations.Migration second=new ExecutionMigrations.Migration(2,"V002__next.sql","next",43,JAR);
 
     @BeforeEach void fixture() {
-        assertThat(jdbc.queryForObject("SELECT current_database()||'.'||current_schema()",String.class)).isEqualTo("atoms_demo_test.atoms_verify_20261024_ex16");
+        assertThat(jdbc.queryForObject("SELECT current_database()||'.'||current_schema()",String.class)).isEqualTo(ExecutionTestTarget.DATABASE_SCHEMA);
         jdbc.update("INSERT INTO guest_users(id) VALUES (?)",owner);
         jdbc.update("INSERT INTO projects(id,owner_id,name) VALUES (?,?,'migration-review-metadata')",project,owner);
         jdbc.update("INSERT INTO project_sources(project_id) VALUES (?)",project);

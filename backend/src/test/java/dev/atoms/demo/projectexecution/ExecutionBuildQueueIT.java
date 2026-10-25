@@ -36,7 +36,7 @@ class ExecutionBuildQueueIT {
 
     @BeforeEach void setup() throws Exception {
         assertThat(jdbc.queryForObject("SELECT current_database()", String.class)).isEqualTo("atoms_demo_test");
-        assertThat(jdbc.queryForObject("SELECT current_schema()", String.class)).isEqualTo("atoms_verify_20261024_ex16");
+        assertThat(jdbc.queryForObject("SELECT current_schema()", String.class)).isEqualTo(ExecutionTestTarget.SCHEMA);
         jdbc.update("INSERT INTO guest_users(id) VALUES (?),(?)", owner, stranger);
         config = new MockEnvironment().withProperty("atoms.project-execution.enabled", "true")
                 .withProperty("atoms.project-execution.maintainer-ids", owner.toString());
