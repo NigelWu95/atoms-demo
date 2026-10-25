@@ -1,6 +1,6 @@
 # 完整源码工程与 Coding Agent · 能力地图
 
-状态：2026-10-25，`project-source` 内部模块及 `project-agent` 的 PA01–PA33 离线能力已验收；`project-execution` 的 EX01–21、C-EX07 和 EX22a/b 已完成，内部常驻调度、停止、换版及启动恢复已接通。EX22c 的故障组合收尾留下 1 条待核对运行；停止等待中断修复后 552 单元和打包通过，数据库组合尚未复验，详见[记录](docs/project-execution-verification.md#2026-10-25--ex22c2-收尾失败与停止等待修复)。EX22 整项仍未完成，不提前进入交付接线。新模式默认关闭，真实模型、完整业务应用验收、交付和工作台接入仍待完成，未部署；旧故障现场全部保留。
+状态：2026-10-26，`project-source` 内部模块及 `project-agent` 的 PA01–PA33 离线能力已验收；`project-execution` 的 EX01–22、C-EX07 已完成，内部常驻调度、停止、换版、启动恢复及故障收尾已接通。停止等待修复在用户批准的新 schema 完成复验，552 单元 + 95 项相关集成通过，详见[记录](docs/project-execution-verification.md#2026-10-26--ex22-整项收尾)；五份旧未决审计全部保留。下一项 EX23 交付身份契约。新模式默认关闭，真实模型、完整业务应用验收、交付和工作台接入仍待完成，未部署。
 
 ## 目标与现状
 
@@ -18,7 +18,7 @@
 |---|---|---|---|
 | `project-source` | 每项目完整源码 Git 仓库、不可变版本、工作副本、元数据、旧产物显式导入 | 现有项目身份与所有权 | 内部模块已验收、默认关闭；[使用说明](docs/project-source.md)、[测试证据](docs/project-source-verification.md)、[任务清单](tasks/project-source/todo.md) |
 | `project-agent` | Claude Code + DeepSeek 在任务副本中读取及修改 Vue、Java、SQL 等文件，提交可检查的变更 | `project-source` | PA01–PA33 内部离线验收完成，默认 4 并发；最终后端 290 单元 + 272 集成通过，CLI 2.1.302 / 2.1.303 精确适配。见[维护说明](docs/project-agent.md)、[证据](docs/project-agent-verification.md)、[任务清单](tasks/project-agent/todo.md)。真实模型 PA-LIVE 未完成，旧两份测试未决审计保留；不代表实际构建运行或工作台已交付 |
-| `project-execution` | 对固定源码版本测试、构建、启动本机进程；构建失败保留上一可用结果，数据库迁移另行核对 | `project-source` | [规格](SPEC-project-execution.md)、[实施计划](tasks/project-execution/plan.md)与 [EX 任务清单](tasks/project-execution/todo.md)已确认；EX01–21 和 EX22a/b 完成。真实种子构建、npm 准备、业务库绑定、内部常驻启动/健康/停止/换版与恢复已接通；EX22c 收尾失败，补充停止等待修复后需数据库组合复验，见[证据](docs/project-execution-verification.md#2026-10-25--ex22c2-收尾失败与停止等待修复)。完整业务应用、交付及网页尚待完成 |
+| `project-execution` | 对固定源码版本测试、构建、启动本机进程；构建失败保留上一可用结果，数据库迁移另行核对 | `project-source` | [规格](SPEC-project-execution.md)、[实施计划](tasks/project-execution/plan.md)与 [EX 任务清单](tasks/project-execution/todo.md)已确认；EX01–22 完成。真实种子构建、npm 准备、业务库绑定、内部常驻启动/健康/停止/换版、恢复与故障收尾已验收，见[证据](docs/project-execution-verification.md#2026-10-26--ex22-整项收尾)。完整业务应用、交付身份/查询及网页尚待完成 |
 | `project-delivery` | 实际应用预览、同快照下载、代码版本恢复；明确业务数据边界 | `project-source`、`project-execution` | 待规格评审 |
 | `project-workbench` | 文件树、差异、任务与构建状态、实际进程预览及增量开发入口 | 以上模块 | 待规格评审 |
 

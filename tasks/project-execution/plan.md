@@ -1,6 +1,6 @@
 # project-execution · 实施计划
 
-状态：2026-10-25，用户已确认本计划及 EX01–EX30 任务，连续实施；检查点报告证据，不逐小项请求开始。依据[规格](../../SPEC-project-execution.md)，规划基线 `1e3a13a`、计划提交 `ee5096a`，分支 `feature/standalone-engineering`。EX01–21、C-EX07 及 EX22a/b 已完成，统一协调者已接运行调度与重启核对。EX22c2a/b 定向通过，但收尾集成出现 1 条待核对运行；停止等待中断修复后 552 单元与打包通过，实际数据库组合仍待复验，见[清单](todo.md)与[记录](../../docs/project-execution-verification.md#2026-10-25--ex22c2-收尾失败与停止等待修复)。EX22c/d 保持未完成，暂不进入 EX23；每片最多 5 个主要文件。新模式默认关闭，真实业务验收和网页尚未接通，所有旧故障证据保留。
+状态：2026-10-26，用户已确认本计划及 EX01–EX30 任务，连续实施；检查点报告证据，不逐小项请求开始。依据[规格](../../SPEC-project-execution.md)，规划基线 `1e3a13a`、计划提交 `ee5096a`，分支 `feature/standalone-engineering`。EX01–22、C-EX07 已完成，统一协调者已接运行调度、重启核对与故障收尾。停止等待修复在用户批准的新 schema 完成原场景和相关兼容复验，552 单元 + 95 集成通过，见[清单](todo.md)与[记录](../../docs/project-execution-verification.md#2026-10-26--ex22-整项收尾)。下一项 EX23 交付身份契约，每片最多 5 个主要文件。新模式默认关闭，真实业务验收和网页尚未接通，所有旧故障证据保留。
 
 ## 1. 交付范围与组织
 
@@ -174,7 +174,7 @@ env PATH=/Users/wubingheng/.nvm/versions/node/v24.20.0/bin:$PATH \
   ./mvnw -B -Dtest=ExecutionSettingsTest test
 
 env PATH=/Users/wubingheng/.nvm/versions/node/v24.20.0/bin:$PATH \
-  SPRING_DATASOURCE_URL='jdbc:postgresql://127.0.0.1:5432/atoms_demo_test?currentSchema=atoms_verify_20261024_ex16&connectTimeout=3&socketTimeout=5' \
+  SPRING_DATASOURCE_URL='jdbc:postgresql://127.0.0.1:5432/atoms_demo_test?currentSchema=atoms_verify_20261025_ex22&connectTimeout=3&socketTimeout=5' \
   ./mvnw -B -Dit.test=ExecutionAdmissionIT verify
 ```
 
@@ -194,7 +194,7 @@ EX11 定向命令（私有契约目录先由维护者创建在平台仓库之外
 ```sh
 env JAVA_HOME=/Users/wubingheng/atoms-demo/.local/jdk17-comparison.LlvDQi/jdk-17.0.14.jdk \
   PATH=/Users/wubingheng/.nvm/versions/node/v24.20.0/bin:$PATH \
-  SPRING_DATASOURCE_URL='jdbc:postgresql://127.0.0.1:5432/atoms_demo_test?currentSchema=atoms_verify_20261024_ex16&connectTimeout=3&socketTimeout=5' \
+  SPRING_DATASOURCE_URL='jdbc:postgresql://127.0.0.1:5432/atoms_demo_test?currentSchema=atoms_verify_20261025_ex22&connectTimeout=3&socketTimeout=5' \
   ./mvnw -B -Pproject-execution-contract \
   -Dexecution.test-config-directory=/Users/wubingheng/atoms-demo/.local/project-execution-acceptance.x5cvui \
   -Dexecution.contract-directory=/private/tmp/atoms-ex11-contract.APT7Jb \
