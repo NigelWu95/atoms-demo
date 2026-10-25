@@ -104,9 +104,16 @@ final class ExecutionRunWorker {
             if (attempted && !committed) throw new IOException("RUN_STATE_UNAVAILABLE");
             if (failure != null && process != null) {
                 process.requestStop();
-                try { outcome = process.await(Duration.ofSeconds(12)); }
-                catch (InterruptedException error) { interrupted = true; outcome = unknown(process.output()); }
-                catch (TimeoutException error) { outcome = unknown(process.output()); }
+                long deadline = System.nanoTime() + Duration.ofSeconds(12).toNanos();
+                // Shutdown may interrupt after the original failure. Keep awaiting the same owner's receipt,
+                // without extending the cleanup budget or retrying the completion transaction below.
+                while (outcome == null) {
+                    long remaining = deadline - System.nanoTime();
+                    if (remaining <= 0) { outcome = unknown(process.output()); break; }
+                    try { outcome = process.await(Duration.ofNanos(remaining)); }
+                    catch (InterruptedException error) { interrupted = true; }
+                    catch (TimeoutException error) { outcome = unknown(process.output()); }
+                }
             }
             if (!attempted) return journal.notStarted(failure == null ? "RUN_START_FAILED" : failure);
             if (outcome == null) outcome = unknown(new ExecutionRunProcess.Output(0, 0));

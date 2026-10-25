@@ -36,6 +36,7 @@ class ExecutionRunWorkerTest {
     private Path directory;
     private int launches, readyWrites, finishWrites, noLaunchWrites, toolCaptures;
     private boolean failToolCapture;
+    private int cleanupInterrupts, cleanupAwaits;
     private boolean loseBeginCommit, loseReadyCommit, loseFinishCommit, failCompletion, loseCoordination, loseAuthorization, unknownProcess;
     private String mode = "wrong", recordedFailure, coordinationCode = "RUN_COORDINATOR_UNAVAILABLE";
 
@@ -132,6 +133,20 @@ class ExecutionRunWorkerTest {
                         mode.equals("exit") ? ExitChild.class.getName() : ExecutionHealthTest.Child.class.getName(),
                         Integer.toString(target.port()), run.toString(), exec.toString(), mode).directory(prepared.directory());
                 command.environment().clear(); process = ExecutionRunProcess.start(command, run, exec, budget, preflight);
+                if (cleanupInterrupts > 0) {
+                    var original = process;
+                    process = mock(ExecutionRunProcess.class, org.mockito.AdditionalAnswers.delegatesTo(original));
+                    try {
+                        doAnswer(call -> {
+                            Duration wait = call.getArgument(0);
+                            if (wait.compareTo(Duration.ofMillis(250)) > 0) {
+                                cleanupAwaits++;
+                                if (cleanupAwaits <= cleanupInterrupts) throw new InterruptedException("controlled-stop-wait-interruption");
+                            }
+                            return original.await(wait);
+                        }).when(process).await(any());
+                    } catch (InterruptedException | java.util.concurrent.TimeoutException impossible) { throw new AssertionError(impossible); }
+                }
             }
             return process;
         });
@@ -251,6 +266,19 @@ class ExecutionRunWorkerTest {
         assertThat(readyWrites).isEqualTo(1); assertThat(recordedFailure).isEqualTo("RUN_AUTHORIZATION_CHANGED");
         assertThat(finishWrites).isEqualTo(1); assertStopped();
         assertThat(worker.ownedProcess(initial.id())).isNull();
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(ints = {1, 3})
+    void interruptedCleanupStillAwaitsTheOriginalStopReceiptBeforeItsSingleCompletion(int interruptions) throws Exception {
+        mode = "valid"; loseCoordination = true; cleanupInterrupts = interruptions;
+        try {
+            worker.run(ticket());
+            assertThat(Thread.currentThread().isInterrupted()).isTrue();
+            assertThat(cleanupAwaits).isEqualTo(interruptions + 1);
+            assertThat(finishWrites).isEqualTo(1); assertStopped();
+            assertThat(worker.hasHeldProcesses()).isFalse();
+        } finally { Thread.interrupted(); cleanupInterrupts = 0; }
     }
 
     @Test void absentStopReceiptRetainsOwnershipAndNeverFallsBackToNoLaunch() throws Exception {
