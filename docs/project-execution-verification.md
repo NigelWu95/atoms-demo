@@ -1454,3 +1454,11 @@ EX18 与 C-EX06 完成，下一项 EX19 真实常驻进程与健康身份。当�
 新增测试先因缺少实现编译失败；15:03:10，16 项通过。15:05:15 临时反转运行 UUID 检查，定向测试准确失败（错误 UUID 被接受）；随后逐字恢复并核对 SHA-256。15:10:43 回归暴露真实竞态：就绪后主动停止若落在 cancellation 检查和下一次 budget 检查之间，会重新读取已过期的启动期限，误报 `RUN_START_TIMEOUT`。15:12:29 新增受控时序单例稳定复现该错误，没有放宽断言。
 
 修复让 STOP_REQUESTED 沿用有限轮询间隔，由下次 cancellation 检查进入原固定收尾，不重新启用启动期限；已经观察到的启动超时仍不被晚到停止覆盖。15:14:38，`-Dtest=ExecutionRunProcessTest,OwnedProcessLifetimeTest,ExecutionProcessTest test`，**18 项通过**，零失败/错误/跳过，1:27。其中常驻进程 8 项验证无健康轮询时主动超时、就绪后的持续运行、停止竞态、重复停止同一凭据、18 MiB/路输出洪泛、退出/启动失败及未知子进程；全部使用真实受控 JVM，未运行生成应用或接入数据库。主要文件 2 个，尚不发布持久 READY，也未暴露网页启动入口。
+
+## 2026-10-25 · EX19c 固定本机启动命令
+
+`ExecutionRunCommand` 复核成功构建与原封存身份、项目绑定及构建时的 Java 工具摘要，分配新的 0700 运行目录和 home/tmp/config，写入 0600 外置配置。目录分配、工具/JAR 扫描与文件写入共用原启动预算；已存在的目录、失败半成品不覆盖或清理。命令只使用已固定 Java、封存 JAR classpath 和 Spring Boot `JarLauncher`，不运行工程启动脚本或 Shell。私有配置指定 loopback/绑定端口、运行/执行 UUID、固定迁移目录及 schema，禁用 baseline/out-of-order/clean/SQL init；数据库连接仅保留占位符，业务凭据发放和 EX18 复核仍待 EX20 接线。
+
+环境从空白白名单构造，包含私有 JVM home/tmp，不继承平台环境。调用方取得的 builder 是独立副本；preflight 重新检查目录/配置 inode、权限、成员、内容，以及封存 JAR 和 Java 文件；失败只返回固定码。显式 `spring.config.location` 替换默认配置查找，因此这一受控启动模式不自动加载工程内任意应用 YAML；也不限制应用 Java 代码自行读取其他配置，不宣称同 UID 安全隔离。[Spring Boot 3.5 外部配置](https://docs.spring.io/spring-boot/3.5/reference/features/external-config.html)、[JarLauncher 契约](https://docs.spring.io/spring-boot/3.5/specification/executable-jar/launching.html)。
+
+新增测试先独立编译失败（缺少命令类型）；15:20:49，`-Dtest=ExecutionRunCommandTest,ExecutionToolchainTest,ExecutionPathsTest,ExecutionArtifactTest test`，**20 项通过**，零失败/错误/跳过，1:15。包含新命令 3 项（多个篡改向量）、原目录 8、工具 3、封存 6；验证固定 argv/环境、权限、重复分配、错项目/失败构建、期限及事务边界。这里的工具和 JAR 是明确的文件夹具，未启动这些文件，也不计作真实应用运行验收。4 个主要文件，无新依赖或数据库变更。

@@ -85,12 +85,14 @@ final class ExecutionToolchain {
     }
 
     void verify(OwnedProcess.Budget budget) throws IOException {
+        for (Kind kind : Kind.values()) verify(kind, budget);
+    }
+    void verifyJava(OwnedProcess.Budget budget) throws IOException { verify(Kind.JAVA, budget); }
+    private void verify(Kind kind, OwnedProcess.Budget budget) throws IOException {
         requireBudget(budget);
         try {
-            for (Kind kind : Kind.values()) {
-                if (!resolved.get(kind).equals(configured.get(kind).toRealPath())) throw unsupported();
-                identities.get(kind).verify(budget);
-            }
+            if (!resolved.get(kind).equals(configured.get(kind).toRealPath())) throw unsupported();
+            identities.get(kind).verify(budget);
         } catch (IOException | RuntimeException error) {
             throw new IOException("EXECUTION_TIMEOUT".equals(error.getMessage()) ? "EXECUTION_TIMEOUT" : "EXECUTION_TOOL_CHANGED");
         }

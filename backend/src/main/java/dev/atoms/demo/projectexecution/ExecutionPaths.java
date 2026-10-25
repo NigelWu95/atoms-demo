@@ -65,6 +65,9 @@ final class ExecutionPaths implements AutoCloseable {
         return create(Area.ARTIFACT, id, budget);
     }
     synchronized Task createRun(UUID id) throws IOException { return create(Area.RUN, id); }
+    synchronized Task createRun(UUID id, dev.atoms.demo.execution.OwnedProcess.Budget budget) throws IOException {
+        return create(Area.RUN, id, budget);
+    }
 
     private Task create(Area area, UUID id) throws IOException {
         return create(area, id, () -> java.time.Duration.ofSeconds(10));
