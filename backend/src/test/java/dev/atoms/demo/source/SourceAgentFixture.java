@@ -58,6 +58,20 @@ public final class SourceAgentFixture implements AutoCloseable {
         return new Base(project, result.resultVersionId(), 1);
     }
     public ProjectSourceEditGateway gateway() { return gateway; }
+    /** Retained, explicitly selected contract project: reuse only an identical, genuinely readable snapshot. */
+    public Base initializeExisting(UUID owner, UUID project, SourceTree tree) {
+        source.authorize(owner, project);
+        var state = repository.state(project);
+        if (state != null && state.versionId() != null) {
+            assertThat(state.status()).isEqualTo("READY");
+            assertThat(snapshot(owner, project, state.versionId()).sha256()).isEqualTo(tree.sha256());
+            return new Base(project, state.versionId(), state.revision());
+        }
+        var result = new SourceWorker(source, repository, environment).execute(
+                new SourceInitializer(source).request(owner, project, tree, "retained-contract-initial"), tree);
+        assertThat(result.status()).isEqualTo("COMMITTED");
+        return new Base(project, result.resultVersionId(), 1);
+    }
     public ProjectSourceReadGateway readGateway() {
         return new ProjectSourceReadGateway(source, repository, environment,
                 (java.util.function.Supplier<SourceCoordinator>) () -> coordinator);

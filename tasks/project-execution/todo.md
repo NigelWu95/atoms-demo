@@ -285,10 +285,13 @@ U/I/REAL/ALL/COMPAT/DOC 的命令与权限条件见计划 §6。S = 1–2、M = 
   - [x] EX20b：成功构建的封存产物重新读取，核对 DB 摘要及原清单/源码身份；不恢复进程或停止凭据（Artifact、ArtifactManifest、Paths、ArtifactReopenTest，4 文件）。16:38:08，20 项相关测试通过。
   - [x] EX20c：业务注册表签发本次执行专用的凭据装配能力，启动前重新核对物理绑定；同时绑定固定运行命令（DatabaseBinding、PrivateConfig、RunCommand、RuntimeLaunchContractIT，4 文件）。16:49:03，5 单元 + 7 项真实绑定/只读凭据契约通过并打包；未启动业务应用。
   - [x] EX20d：幂等领取、执行意图、健康就绪与真实停止/未知结果的持久状态流转（RunRepository、RunJournal、RunStateIT、RunJournalTest，4 文件）。16:59:47，20 单元 + 25 项相关 PG 集成通过，停止身份变异被拦住；提交结果不明不重试，未就绪应用即使停止也保留数据待核对。
-  - [ ] EX20e：启动准入重新核对当前权限、归档、来源、产物、绑定与迁移批准（RunService、RunAdmissionTest、RunAdmissionIT 及必要接线，最多 5 文件）。
+  - [x] EX20e：启动准入重新核对当前权限、归档、来源、产物、绑定与迁移批准（RunService、RunAdmissionTest、RunAdmissionIT 及必要接线，最多 5 文件）。
     - [x] e1 内部准入和单次领取能力，原启动预算贯穿预检与启动前重查。17:09:39，23 单元 + 18 项现有 PG 集成通过（新增 7 项准入组件测试，真实文件/事务边界，元数据与迁移依赖为受控替身）。2 个主要文件。
-    - [ ] e2 真实 PG 的并发准入/提交与启动组合验收；不能把 e1 的竞争替身当作双连接实测，也不能以 d 的回滚夹具代替独立提交后的外部启动。
+    - [x] e2 真实 PG 的双连接并发准入/提交：17:26:04，7 单元 + 1 项显式契约通过，两个实际 backend PID、一个提交记录和一张 ticket，含真实 Git/封存/业务历史及权限反例。2 个主要测试文件；外部进程启动组合仍由 f 验收，不以本项替代。
   - [ ] EX20f：串联真实进程、HTTP 健康与失败收尾，验证单次启动和提交/退出竞争（RunWorker、RunHealthIT 及必要契约，最多 5 文件）。运行调度的 Spring 生命周期、恢复与关闭在 EX21–22 接入。
+    - [ ] f1 常驻期间当前授权/停止状态检查与 READY 提交的剩余启动期限（RunService、RunJournal 及对应两项测试文件）。
+    - [ ] f2 worker 串联及真实 PG/受控 HTTP 子进程组合；成功、端口冲突和退出时序。
+    - [ ] f3 启动/健康/提交失败与未知进程反例，完整相关回归。各片至多 5 个主要文件。
 - 描述：从封存 buildId 创建一次运行意图，健康检查成功才发布 READY。
 - 验收：每次启动重新授权/校验产物、绑定、迁移批准，意图先于 launch 持久化；同键只启动一次，端口冲突及来源不匹配明确失败；持有本进程事实及预期健康身份，120 秒超时不伪造就绪。
 - 验证：I(ExecutionRunAdmissionIT,ExecutionRunHealthIT)，跨所有者、归档、改 JAR、外来端口/重定向/假健康、启动中崩溃及退出竞争。

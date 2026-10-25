@@ -1514,3 +1514,11 @@ ticket 限原服务领取一次；持有的配置、产物、绑定和原单调�
 17:04:46，新测试独立红灯缺少服务类型。17:06:53 首轮失败发生在 Mockito 重设 `when` 时触发旧 answer 的事务断言（3 项），没有删除/放宽断言；改用 `doReturn` / `doAnswer` 重设。17:09:39，`-Dtest=ExecutionRunAdmissionTest,ExecutionRunJournalTest,ExecutionArtifactReopenTest,ExecutionMigrationReviewTest -Dit.test=ExecutionRunStateIT,ExecutionRunIT,ExecutionMigrationReviewIT verify`，**23 单元 + 18 项相关集成通过**，零失败/错误/跳过，1:35，平台打包通过。7 项新组件测试覆盖单次领取、原预算复用、重放、最终锁竞争替身、改 JAR/错库/迁移失败、权限漂移及提交回执失败；封存文件真实，元数据/业务库/迁移依赖为明确受控替身，不宣称真实双连接准入或生成应用启动验收。e2 与 f 仍待完成，EX20 不勾选整体完成。
 
 本轮收尾只读核对原批准 schema：V027/V028 成功，2 项目/2 端口的原业务绑定不变；运行、未结束运行、批准、共享占位和绑定锁均为 0。未清理其他旧故障现场。8 个实际私有值与本轮公开差异及平台包内 classes/resources 核对，零匹配。15 份 EX20 日志（包含红灯、失败和变异）已归档到忽略目录 `.local/ex20-progress-evidence-q5leastt`，目录 0700、文件 0600。已本地提交，未推送、部署、改私有 env、调用模型或 SMTP；默认旧网页流程不变。接下来完成 e2 真实并发准入及 f 启动 worker，再验收 EX20 整体。
+
+## 2026-10-25 · EX20e2 双连接真实准入
+
+新增显式 `project-execution-contract` 契约，复用已批准 A 项目、所有者和原业务绑定，不新增数据库/角色/绑定。`SourceAgentFixture.initializeExisting` 通过真实源码初始化保存一份 SQL 样本，之后仅在原快照可读且摘要完全相同的情况下复用。源码及 Git 保存在指定私有根，测试保留审计和文件，不删除既有记录。构建成功元数据与只含 SQL 的 ZIP 是明确测试夹具，没有声称实际 npm/Maven 构建或业务应用启动通过。
+
+实际 `ExecutionRunService` / PG 仓库 / 源码读取 / 封存校验 / 物理库检查 / 迁移复核组合运行。两条事务连接通过真实 `pg_backend_pid()` 证明不同，在首次项目锁前同步，并在事务外完成迁移复查后再次同步：两请求只提交一个运行 UUID，只有一个取得 ticket。重放、同键异体、活动项目、非所有者、归档、篡改 JAR 和重复领取均校验；未发出执行意图的本次测试记录通过正式 `notStarted` 入口终结，不清理已执行或未知状态。业务历史前后完全相同。
+
+17:19:21 红灯明确缺少跨模块测试适配。17:22:54 首轮在创建执行根前失败，原因是测试把执行根放进平台仓库；已有保护正确拒绝，未改保护规则。源码快照保留，执行根改为显式仓库外目录。17:26:04，`-Dtest=ExecutionRunAdmissionTest -Pproject-execution-contract -Dit.test=ExecutionRunAdmissionIT -Dexecution.test-config-directory=<原配置目录> -Dexecution.runtime-fixture-root=<固定源码夹具根> -Dexecution.contract-directory=<仓库外执行父目录> verify`，**7 单元 + 1 项真实契约通过**，零失败/错误/跳过，2:02。两个主要测试文件；生产逻辑未修改。EX20e 完成，真正的进程启动及提交/退出组合由 f 继续验收。
