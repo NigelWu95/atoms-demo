@@ -35,7 +35,7 @@ class ExecutionPreparationCrashIT {
 
     @Test void actualHaltAfterSourceCommitRecoversItsVersionWithoutRunningToolsAgain() throws Exception {
         assertThat(jdbc.queryForObject("SELECT current_database() || '.' || current_schema()", String.class))
-                .isEqualTo("atoms_demo_test.atoms_verify_20261024_ex16");
+                .isEqualTo(ExecutionTestTarget.DATABASE_SCHEMA);
         UUID owner = UUID.randomUUID(); jdbc.update("INSERT INTO guest_users(id) VALUES (?)", owner);
         // Evidence survives a failed test, while the credential file is owned by JUnit's temporary directory.
         Path evidence = Files.createTempDirectory(Path.of(System.getProperty("java.io.tmpdir")).toRealPath(), "atoms-ex16-preparation-crash-",

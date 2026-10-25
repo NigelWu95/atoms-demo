@@ -44,7 +44,7 @@ public final class ExecutionPreparationCrashProbe {
             var jdbc = new JdbcTemplate(database); jdbc.setQueryTimeout(3);
             phase = "database";
             assertThat(jdbc.queryForObject("SELECT current_database() || '.' || current_schema()", String.class))
-                    .isEqualTo("atoms_demo_test.atoms_verify_20261024_ex16");
+                    .isEqualTo(ExecutionTestTarget.DATABASE_SCHEMA);
             var transactions = new DataSourceTransactionManager(database);
             var projects = new ProjectService(jdbc);
             var config = configuration(evidence, UUID.fromString(input.getProperty("owner")));
