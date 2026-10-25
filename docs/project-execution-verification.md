@@ -1504,3 +1504,11 @@ EX19 完成，C-EX07 仍等待 EX20/21。下一项 EX20 接入当前授权、业
 `ExecutionRunJournal` 用独立五秒事务封装领取/就绪/完成，拒绝外层事务；领取和就绪在操作前后核对维护者配置。清理不因配置撤销而被阻断。数据库/提交异常仅返回固定错误，无 cause/suppressed，不重试不明提交。该接口仍是内部组合，不能单独代表协调租约、当前源码/迁移检查或真正调用启动器；e–f 继续接线。
 
 状态测试红灯明确缺少仓库方法；16:54:50，2 单元 + 24 集成通过。16:56:21 将停止凭据身份条件反转，定向测试准确失败（错误执行的停止凭据被接受）；随后恢复原文件并核对 SHA-256 一致。事务编排测试独立红灯缺少类型；增加终态写入故障后，16:59:47，`-Dtest=ExecutionRunJournalTest,ExecutionHealthTest,ExecutionRunProcessTest -Dit.test=ExecutionRunStateIT,ExecutionRunIT,ExecutionBindingIT,ExecutionMigrationReviewIT verify` **20 单元 + 25 集成通过**，零失败/错误/跳过，1:20。新状态集成 7 项使用可回滚元数据夹具和真实受控 HTTP 子进程，进程操作时挂起测试事务；新增事务单测 7 项注入配置漂移/数据库失败/提交回执丢失，不能据此宣称真实提交丢失已发生。所有生成业务数据库仍未迁移，没有新表迁移、依赖、模型调用或网页接口。4 个主要文件，本地提交。
+
+## 2026-10-25 · EX20e1 内部启动准入与一次领取
+
+`ExecutionRunService` 在短项目事务内检查当前维护者及已有幂等记录；重放不重新打开文件、连接业务库或签发启动能力。新请求取得成功构建身份，在事务外重新读取封存 JAR、核对完整物理绑定并调用 EX18 的源码/迁移复核。最终项目锁内再检查当前身份、幂等竞争、配置与预算，只有新插入运行记录的请求取得不可自行构造的内存 `Ticket`。提交回执丢失不返回 ticket、不重试写入；重放也不从已有 STARTING 行重建 ticket。这个能力尚未实际启动进程。
+
+ticket 限原服务领取一次；持有的配置、产物、绑定和原单调启动预算随 claim 传递。`recheck` 在实际命令准备前（尚无执行编号）、及之后的进程 preflight（准确执行编号）重新核对当前元数据、固定版本/产物、物理绑定、迁移批准和权限，拒绝改版、停止、完成或配置变化。该组合还没有 Spring 调度或 HTTP 入口，持有执行根不等于已经取得数据库协调租约；后续 worker 必须接入当前独占协调权。
+
+17:04:46，新测试独立红灯缺少服务类型。17:06:53 首轮失败发生在 Mockito 重设 `when` 时触发旧 answer 的事务断言（3 项），没有删除/放宽断言；改用 `doReturn` / `doAnswer` 重设。17:09:39，`-Dtest=ExecutionRunAdmissionTest,ExecutionRunJournalTest,ExecutionArtifactReopenTest,ExecutionMigrationReviewTest -Dit.test=ExecutionRunStateIT,ExecutionRunIT,ExecutionMigrationReviewIT verify`，**23 单元 + 18 项相关集成通过**，零失败/错误/跳过，1:35，平台打包通过。7 项新组件测试覆盖单次领取、原预算复用、重放、最终锁竞争替身、改 JAR/错库/迁移失败、权限漂移及提交回执失败；封存文件真实，元数据/业务库/迁移依赖为明确受控替身，不宣称真实双连接准入或生成应用启动验收。e2 与 f 仍待完成，EX20 不勾选整体完成。
