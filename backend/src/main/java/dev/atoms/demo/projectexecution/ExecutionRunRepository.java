@@ -26,6 +26,26 @@ final class ExecutionRunRepository {
                 .orElseThrow(() -> ExecutionRun.error(404, "RUN_NOT_FOUND"));
     }
 
+    /** At most four bound projects can have an unfinished run; include one overflow row to fail closed. */
+    List<ExecutionRun> unfinished() {
+        return jdbc.query("SELECT * FROM execution_runs WHERE finished_at IS NULL ORDER BY created_at,id LIMIT 5", ROW);
+    }
+
+    /** Startup metadata only. Caller must hold exclusive coordination/root leases and check authority around this transaction. */
+    ExecutionRun recover(ExecutionRun expected) {
+        var row = locked(expected, false);
+        if (row.finishedAt() != null || row.status().equals("NEEDS_RECONCILIATION")) return row;
+        if (row.status().equals("STARTING") && row.executionId() == null && !row.executionPending()) {
+            // No intent was ever issued: an abandoned in-memory ticket cannot be replayed after restart.
+            jdbc.update("UPDATE execution_runs SET status=?,error_code=?,finished_at=clock_timestamp() WHERE id=?",
+                    row.stopRequested() ? "CANCELLED" : "FAILED", row.stopRequested() ? "RUN_CANCELLED" : "RUN_INTERRUPTED", row.id());
+        } else {
+            // Even a durable stop digest does not prove the outcome of a partial startup migration.
+            jdbc.update("UPDATE execution_runs SET status='NEEDS_RECONCILIATION',error_code='RUN_RECOVERY_UNCERTAIN' WHERE id=?", row.id());
+        }
+        return get(row.projectId(), row.id());
+    }
+
     /** Durable intent only: even an unclaimed ticket is settled by its worker, never by a caller's stop request. */
     ExecutionRun stop(UUID owner, UUID project, UUID id) {
         if (project == null || id == null) throw ExecutionRun.error(422, "RUN_INVALID_INPUT");

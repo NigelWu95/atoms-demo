@@ -70,6 +70,67 @@ class ExecutionRunStateIT {
         assertThat(repository.admit(owner, project, request("one"))).isEqualTo(claimed);
     }
 
+    @Test void recoveryFinishesOnlyNeverIssuedIntentsAndDoesNotReplayTickets() {
+        assertThat(repository.unfinished()).contains(run);
+        var interrupted = repository.recover(run);
+        assertThat(interrupted.status()).isEqualTo("FAILED");
+        assertThat(interrupted.errorCode()).isEqualTo("RUN_INTERRUPTED");
+        assertThat(interrupted.executionId()).isNull(); assertThat(interrupted.stoppedSha256()).isNull();
+        assertThat(interrupted.finishedAt()).isNotNull();
+        assertThat(repository.recover(run)).isEqualTo(interrupted);
+        assertThat(repository.unfinished()).noneMatch(row -> row.id().equals(run.id()));
+        var next = repository.admit(owner, project, request("cancelled-before-claim"));
+        repository.stop(owner, project, next.id());
+        var cancelled = repository.recover(next);
+        assertThat(cancelled.status()).isEqualTo("CANCELLED");
+        assertThat(cancelled.errorCode()).isEqualTo("RUN_CANCELLED");
+        assertThat(cancelled.executionId()).isNull();
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"STARTING", "READY", "STOPPING"})
+    void recoveryNeverAdoptsAnIssuedExecutionOrTurnsStopIntentIntoStopEvidence(String state) {
+        repository.begin(run, execution);
+        if (!state.equals("STARTING")) repository.ready(run, execution, target, health(execution));
+        if (state.equals("STOPPING")) repository.stop(owner, project, run.id());
+        var before = repository.get(project, run.id());
+        var recovered = repository.recover(run);
+        assertThat(recovered.status()).isEqualTo("NEEDS_RECONCILIATION");
+        assertThat(recovered.errorCode()).isEqualTo("RUN_RECOVERY_UNCERTAIN");
+        assertThat(recovered.executionId()).isEqualTo(execution); assertThat(recovered.executionPending()).isTrue();
+        assertThat(recovered.readyAt()).isEqualTo(before.readyAt());
+        assertThat(recovered.stopRequested()).isEqualTo(before.stopRequested());
+        assertThat(recovered.stoppedSha256()).isNull(); assertThat(recovered.finishedAt()).isNull();
+        assertThat(new ExecutionBindingRepository(jdbc).get(project).target()).isEqualTo(target);
+        assertThat(repository.recover(run)).isEqualTo(recovered);
+        rejected(() -> repository.admit(owner, project, request("cannot-restart")));
+        if (process != null) {
+            assertThat(process.isAlive()).isTrue(); // Metadata reconciliation neither adopts nor kills the real child.
+            assertThat(repository.finish(run, execution, temporary, stop(), null)).isEqualTo(recovered);
+        }
+    }
+
+    @Test void recoveryPreservesKnownStopWithUncertainMigrationInsteadOfReleasingTheProject() {
+        repository.begin(run, execution); health(execution);
+        var unknown = repository.finish(run, execution, temporary, stop(), "RUN_HEALTH_INVALID");
+        assertThat(unknown.executionPending()).isFalse(); assertThat(unknown.stoppedSha256()).isNotNull();
+        assertThat(repository.recover(run)).isEqualTo(unknown);
+        assertThat(repository.unfinished()).contains(unknown);
+        rejected(() -> repository.admit(owner, project, request("cannot-clear-data-uncertainty")));
+    }
+
+    @Test void recoveryChecksImmutableIdentityButCanReconcileAfterOwnerOrArchiveChanges() {
+        var forged = new ExecutionRun(run.id(), project, UUID.randomUUID(), build, source, target.id(), null,
+                run.treeSha256(), run.jarSha256(), run.manifestSha256(), run.bindingIdentitySha256(), run.keySha256(),
+                run.requestSha256(), run.status(), false, null, false, null, null, run.createdAt(), null, null);
+        rejected(() -> repository.recover(forged));
+        assertThat(repository.get(project, run.id())).isEqualTo(run);
+        UUID nextOwner = UUID.randomUUID(); jdbc.update("INSERT INTO guest_users(id) VALUES (?)", nextOwner);
+        jdbc.update("UPDATE projects SET owner_id=?,archived=true WHERE id=?", nextOwner, project);
+        assertThat(repository.recover(run).status()).isEqualTo("FAILED");
+        assertThat(new ExecutionBindingRepository(jdbc).get(project).target()).isEqualTo(target);
+    }
+
     @Test void stopBeforeLaunchIsMonotonicAndOnlyTheWorkerCanFinishCancellation() {
         var requested = repository.stop(owner, project, run.id());
         assertThat(requested.stopRequested()).isTrue(); assertThat(requested.status()).isEqualTo("STARTING");

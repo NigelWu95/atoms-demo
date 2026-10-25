@@ -1588,3 +1588,11 @@ b1 独立红灯缺少换版请求/服务方法。首次组合 29 单元、16 项
 最终只读核对原 schema：V027/V028 成功，A/B 两组绑定 UUID、项目、端口和物理 OID 保持不变；20 条运行全部终结，未结束运行、共享占位、绑定锁和迁移批准均为 0。包括首次端口误判在内的失败记录均保留，没有重写它们或强制清除 pending。9 个实际私有值与本轮公开差异及最终包 classes/resources 核对，零匹配；9 份日志与全部本轮 XML 归档在忽略目录 `.local/ex21-final-evidence-pgfchjam`（目录 0700、文件 0600）。
 
 据此完成 EX21 与 C-EX07。控制入口仍为内部服务，等待停止阶段由调用者继续观察/重试；没有新增公开 HTTP、工作台按钮、自动恢复或 Spring 运行调度。EX22 负责管理生命周期、关闭和重启核对，原生生成应用/真实业务升级仍按 EX25–27 验收。未推送、部署、改变私有 env 或调用真实模型/SMTP。
+
+## 2026-10-25 · EX22a1 遗留运行的持久状态核对
+
+新增内部恢复持久操作，复用项目/运行行锁与完整不可变身份核对。STARTING 且从未发出执行 UUID 的遗留任务结算为 FAILED/RUN_INTERRUPTED；已有停止请求则为 CANCELLED/RUN_CANCELLED，不伪造停止凭据。其余未终结、非既有待核对运行转为 NEEDS_RECONCILIATION/RUN_RECOVERY_UNCERTAIN，保留执行 pending、原健康时间、停止意图、绑定和全部身份。既有待核对及终态逐字保持；实际进程停止但启动迁移结果未知，也不自动解除项目阻断。
+
+先缺方法编译红灯，再于 18:50:10 通过 **33 单元 + 23 PG 集成**，零失败/错误/跳过，平台打包成功（`ExecutionRunJournalTest,ExecutionRunAdmissionTest,ExecutionRunWorkerTest` 与 `ExecutionRunStateIT,ExecutionRunIT`）。新增 6 个恢复用例，READY/STOPPING 场景使用真实受控 HTTP JVM；恢复只更新元数据，原进程仍存活且只能由测试原拥有句柄停止。元数据全事务回滚，不留下永久绑定或不明运行；这不是真实协调者崩溃或生成应用业务迁移验收。
+
+18:51:19，移除“既有 NEEDS_RECONCILIATION 原样保留”条件的变异，使 RUN_HEALTH_INVALID 被错误覆盖为 RUN_RECOVERY_UNCERTAIN，定向用例准确失败。随后源码恢复并核对字节一致。日志为忽略目录中的 `ex16-ex22a1-{red,green,mutation}.log`。本片 2 个主要文件；独占协调权包装与 Spring 启动接线仍待后续小片，不据此勾选 EX22 整项。

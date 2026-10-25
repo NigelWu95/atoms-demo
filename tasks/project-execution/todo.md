@@ -316,11 +316,16 @@ U/I/REAL/ALL/COMPAT/DOC 的命令与权限条件见计划 §6。S = 1–2、M = 
 
 ## EX22 · 运行恢复及数据未知状态
 
-- [ ] 完成 EX22。依赖：EX13、EX18、EX21。规模：M（4 文件）。
+- [ ] 完成 EX22。依赖：EX13、EX18、EX21。原 4 文件估计未包含运行资源装配与常驻调度，实施前拆为以下顺序小片，每片最多 5 个主要实现/测试文件。
+  - [x] EX22a1：短事务核对遗留运行；只终结从未发出执行意图的任务，旧 READY/已领取任务转待核对，保留绑定、执行与数据证据（RunRepository、RunStateIT，2 个主要文件）。18:50:10，33 单元 + 23 PG 集成通过；18:51:19 移除既有待核对保护的变异被拦截，源码逐字恢复。尚待 a2 的独占协调权包装及 b 的启动接线。
+  - [ ] EX22a2：独占协调权、配置/源码可用性及事务前后复核；拒绝嵌套事务，数据库故障和授权变化不部分写入（RunRecovery、RunRecoveryTest 及必要 PG 契约）。
+  - [ ] EX22b：运行资源装配、统一协调者管理常驻任务及停机收尾；常驻进程不占构建线程，仍共用原排他协调权和执行根。按资源接线、调度、关闭测试分别提交，不扩大单片文件数。
+  - [ ] EX22c：实际测试 JVM 崩溃、重新取得租约、未知状态阻断和不重放验收；只用原拥有证据处置本轮进程，不清除未知旧审计。
+  - [ ] EX22d：相关故障与兼容回归、变异和私有证据归档，再更新完成状态。
 - 描述：重启协调者时核对运行与迁移证据，不收养未知进程或自动恢复服务。
 - 验收：旧 READY 不能未经确认继续展示；启动/迁移中崩溃保留 NEEDS_RECONCILIATION 和绑定；不按 PID/端口猜测死亡，不重放未知 start，不抹掉数据状态待核对记录。
 - 验证：I(ExecutionRunRecoveryIT)，真实测试 JVM 崩溃、租约丢失及 DB 不可用；旧进程处置只凭仍持有的拥有证据。
-- 主要文件：`E/ExecutionRecovery.java`、`E/ExecutionCoordinator.java`、`ET/ExecutionRunRecoveryIT.java`、`ET/ExecutionCrashProbe.java`。
+- 主要文件：a1/a2 如上；b 为 `E/ExecutionEnvironment.java`、`E/ExecutionCoordinator.java`、独立的内部运行调度助手及对应测试，实施前按依赖进一步拆片；c 使用独立运行崩溃夹具及 `ET/ExecutionRunRecoveryIT.java`，不把运行恢复规则混入已有构建恢复类。
 
 ## EX23 · 给交付模块的构建/运行身份
 
