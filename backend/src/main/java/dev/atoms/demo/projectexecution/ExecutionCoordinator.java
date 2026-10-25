@@ -39,6 +39,7 @@ final class ExecutionCoordinator implements SmartLifecycle, AutoCloseable {
     private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(ExecutionCoordinator.class);
     private final ExecutionSettings settings;
     private final ExecutionBuildRepository builds;
+    private final ExecutionRunRepository runs;
     private final JdbcTemplate jdbc;
     private final PlatformTransactionManager transactions;
     private final DataSource database;
@@ -77,7 +78,7 @@ final class ExecutionCoordinator implements SmartLifecycle, AutoCloseable {
                          PlatformTransactionManager transactions, DataSource database, BooleanSupplier sourceReady,
                          Factory factory, DependencyPreparationService preparationService, ProjectSourceEditGateway edits) {
         if ((preparationService == null) != (edits == null)) throw new IllegalArgumentException("Incomplete preparation wiring");
-        this.settings = settings; this.builds = builds; this.jdbc = jdbc; this.transactions = transactions;
+        this.settings = settings; this.builds = builds; this.runs = new ExecutionRunRepository(jdbc); this.jdbc = jdbc; this.transactions = transactions;
         this.database = database; this.sourceReady = sourceReady; this.factory = factory;
         this.preparations = new DependencyPreparationRepository(jdbc); this.preparationService = preparationService; this.edits = edits;
     }
@@ -95,6 +96,12 @@ final class ExecutionCoordinator implements SmartLifecycle, AutoCloseable {
                 resources = Objects.requireNonNull(factory.open());
                 resources.check(); requireLease();
                 if (!sourceReady.getAsBoolean() || !initial.equals(settings.load())) throw unavailable();
+                var runRecovery = new ExecutionRunRecovery(settings, runs, transactions, lease, sourceReady);
+                var abandonedRuns = runs.unfinished();
+                if (abandonedRuns.size() > 4) throw unavailable();
+                for (var abandoned : abandonedRuns) {
+                    resources.check(); runRecovery.reconcile(abandoned);
+                }
                 var recovery = new ExecutionRecovery(settings, builds, jdbc, transactions, lease, sourceReady);
                 for (var abandoned : builds.inFlight()) {
                     // Filesystem checks remain outside the recovery transaction; no worker exists yet.
@@ -110,7 +117,8 @@ final class ExecutionCoordinator implements SmartLifecycle, AutoCloseable {
                     preparationQueue = new DependencyPreparationQueue(settings, preparations, preparationService, edits, jdbc, transactions, lease);
                 } else if (!preparations.unfinished().isEmpty()) throw unavailable();
                 resources.check(); requireLease();
-                if (!sourceReady.getAsBoolean() || !initial.equals(settings.load()) || !builds.inFlight().isEmpty() || unresolvedPreparations())
+                if (!sourceReady.getAsBoolean() || !initial.equals(settings.load()) || !builds.inFlight().isEmpty()
+                        || unresolvedPreparations() || !runs.unfinished().isEmpty())
                     throw unavailable();
                 queue = new ExecutionBuildQueue(settings, builds, jdbc, transactions, lease);
                 // Bound both live workers and handoffs. The durable queue remains the source of waiting work.
@@ -132,6 +140,8 @@ final class ExecutionCoordinator implements SmartLifecycle, AutoCloseable {
         if (stopping.get()) { finishWhenTerminated(); return; }
         try {
             checkAuthority();
+            // No runtime tickets are handed to this dispatcher yet. Unowned intent must stop dispatch, never be adopted.
+            if (!runs.unfinished().isEmpty()) throw unavailable();
             // Snapshot ownership BEFORE the query: a worker may finish and remove itself during the read.
             var owned = Set.copyOf(active.keySet());
             for (var build : builds.inFlight())
@@ -232,7 +242,7 @@ final class ExecutionCoordinator implements SmartLifecycle, AutoCloseable {
                         if (preparationQueue != null)
                             for (var task : preparationQueue.waiting()) preparationQueue.cancelWaiting(task);
                     }
-                    if (!builds.inFlight().isEmpty() || unresolvedPreparations()) throw unavailable();
+                    if (!builds.inFlight().isEmpty() || unresolvedPreparations() || !runs.unfinished().isEmpty()) throw unavailable();
                 }
                 if (resources != null) { resources.close(); resources = null; }
                 if (lease != null) { lease.close(); lease = null; }
