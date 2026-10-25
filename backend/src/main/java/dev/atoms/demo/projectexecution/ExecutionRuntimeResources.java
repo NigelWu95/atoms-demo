@@ -14,6 +14,12 @@ final class ExecutionRuntimeResources {
     private final ExecutionRunWorker worker;
     private final OwnedProcess.Preflight control;
 
+    /** Trusted package-only composition seam for actual worker/PG lifecycle tests; never accepted from an API. */
+    ExecutionRuntimeResources(ExecutionRunService service, ExecutionRunWorker worker, OwnedProcess.Preflight control) {
+        this.service = Objects.requireNonNull(service); this.worker = Objects.requireNonNull(worker);
+        this.control = Objects.requireNonNull(control);
+    }
+
     ExecutionRuntimeResources(ExecutionSettings settings, JdbcTemplate jdbc, PlatformTransactionManager transactions,
             ProjectSourceReadGateway source, ExecutionPaths paths, ExecutionDatabaseBinding databases,
             List<Path> protectedRoots, OwnedProcess.Preflight control) {

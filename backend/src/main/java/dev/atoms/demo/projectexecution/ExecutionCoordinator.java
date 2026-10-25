@@ -5,6 +5,7 @@ import dev.atoms.demo.execution.OwnedProcess;
 import dev.atoms.demo.source.ProjectSourceReadGateway;
 import dev.atoms.demo.source.ProjectSourceEditGateway;
 import java.io.IOException;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.*;
@@ -57,6 +58,7 @@ final class ExecutionCoordinator implements SmartLifecycle, AutoCloseable {
     private volatile ScheduledExecutorService monitor;
     private volatile ExecutionCoordinatorLease lease;
     private volatile WorkerResources resources;
+    private volatile ExecutionRuntimeDispatcher runtime;
     private ExecutionBuildQueue queue;
     private DependencyPreparationQueue preparationQueue;
     private int concurrency;
@@ -123,6 +125,9 @@ final class ExecutionCoordinator implements SmartLifecycle, AutoCloseable {
                         || unresolvedPreparations() || !runs.unfinished().isEmpty())
                     throw unavailable();
                 queue = new ExecutionBuildQueue(settings, builds, jdbc, transactions, lease);
+                var residentResources = resources.runtime(this::checkAuthority);
+                if (residentResources != null) runtime = new ExecutionRuntimeDispatcher(settings, residentResources, runs,
+                        this::checkAuthority, this::requestStop);
                 // Bound both live workers and handoffs. The durable queue remains the source of waiting work.
                 // https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/util/concurrent/ThreadPoolExecutor.html
                 executor = new ThreadPoolExecutor(concurrency, concurrency, 0, TimeUnit.MILLISECONDS,
@@ -142,8 +147,8 @@ final class ExecutionCoordinator implements SmartLifecycle, AutoCloseable {
         if (stopping.get()) { finishWhenTerminated(); return; }
         try {
             checkAuthority();
-            // No runtime tickets are handed to this dispatcher yet. Unowned intent must stop dispatch, never be adopted.
-            if (!runs.unfinished().isEmpty()) throw unavailable();
+            if (runtime != null) runtime.checkOwnedRuns();
+            else if (!runs.unfinished().isEmpty()) throw unavailable();
             // Snapshot ownership BEFORE the query: a worker may finish and remove itself during the read.
             var owned = Set.copyOf(active.keySet());
             for (var build : builds.inFlight())
@@ -191,6 +196,22 @@ final class ExecutionCoordinator implements SmartLifecycle, AutoCloseable {
         if (lease == null || !lease.healthy()) throw unavailable();
     }
 
+    CompletionStage<ExecutionRun> startApplication(UUID owner, UUID project, UUID build, UUID binding, UUID review, String key) throws IOException {
+        return runtime().submit(owner, project, ExecutionRun.request(build, binding, review, key));
+    }
+    CompletionStage<ExecutionRun> replaceApplication(UUID owner, UUID project, UUID predecessor, UUID build, UUID binding, UUID review, String key) throws IOException {
+        return runtime().submit(owner, project, ExecutionRun.replacement(build, binding, review, predecessor, key));
+    }
+    ExecutionRun stopApplication(UUID owner, UUID project, UUID run) throws IOException {
+        return runtime().stop(owner, project, run);
+    }
+    private ExecutionRuntimeDispatcher runtime() {
+        outsideTransaction();
+        var resident = runtime;
+        if (!isRunning() || resident == null) throw unavailable();
+        return resident;
+    }
+
     /** Stop admission first. When still authorized, commit cancellation before signalling owned workers. */
     private void requestStop() {
         if (!stopping.compareAndSet(false, true)) return;
@@ -215,9 +236,13 @@ final class ExecutionCoordinator implements SmartLifecycle, AutoCloseable {
             log("execution_shutdown_intent_unavailable", null);
         } finally {
             running.set(false);
-            var workers = executor;
-            if (workers != null) for (var queued : workers.shutdownNow())
-                if (queued instanceof Job job) active.remove(job.id, job);
+            try { if (runtime != null) runtime.requestStop(); }
+            catch (RuntimeException error) { log("execution_runtime_stop_unavailable", null); }
+            finally {
+                var workers = executor;
+                if (workers != null) for (var queued : workers.shutdownNow())
+                    if (queued instanceof Job job) active.remove(job.id, job);
+            }
             if (interrupted) Thread.currentThread().interrupt();
         }
     }
@@ -226,6 +251,7 @@ final class ExecutionCoordinator implements SmartLifecycle, AutoCloseable {
     private void finishWhenTerminated() {
         var workers = executor;
         if (workers != null && !workers.isTerminated()) return;
+        if (runtime != null && !runtime.isTerminated()) return;
         var dispatcher = monitor;
         if (dispatcher != null) dispatcher.shutdown();
         try { finish(); }
@@ -236,6 +262,7 @@ final class ExecutionCoordinator implements SmartLifecycle, AutoCloseable {
         synchronized (finishing) {
             if (released) return;
             if (executor != null && !executor.isTerminated()) throw unavailable();
+            if (runtime != null && !runtime.isTerminated()) throw unavailable();
             try {
                 if (activated) {
                     // Lost authority never grants permission to cancel another dispatcher's new queue.
@@ -254,12 +281,15 @@ final class ExecutionCoordinator implements SmartLifecycle, AutoCloseable {
     }
 
     @Override public void close() {
-        outsideTransaction(); requestStop();
-        boolean interrupted = Thread.interrupted();
+        outsideTransaction();
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
+        requestStop();
+        boolean interrupted = Thread.interrupted();
         try {
             var workers = executor;
             if (workers != null && !workers.awaitTermination(remaining(deadline), TimeUnit.NANOSECONDS)) throw unavailable();
+            var resident = runtime;
+            if (resident != null && !resident.awaitTermination(Duration.ofNanos(remaining(deadline)))) throw unavailable();
             var dispatcher = monitor;
             if (dispatcher != null) {
                 dispatcher.shutdown();
