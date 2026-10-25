@@ -1462,3 +1462,15 @@ EX18 与 C-EX06 完成，下一项 EX19 真实常驻进程与健康身份。当�
 环境从空白白名单构造，包含私有 JVM home/tmp，不继承平台环境。调用方取得的 builder 是独立副本；preflight 重新检查目录/配置 inode、权限、成员、内容，以及封存 JAR 和 Java 文件；失败只返回固定码。显式 `spring.config.location` 替换默认配置查找，因此这一受控启动模式不自动加载工程内任意应用 YAML；也不限制应用 Java 代码自行读取其他配置，不宣称同 UID 安全隔离。[Spring Boot 3.5 外部配置](https://docs.spring.io/spring-boot/3.5/reference/features/external-config.html)、[JarLauncher 契约](https://docs.spring.io/spring-boot/3.5/specification/executable-jar/launching.html)。
 
 新增测试先独立编译失败（缺少命令类型）；15:20:49，`-Dtest=ExecutionRunCommandTest,ExecutionToolchainTest,ExecutionPathsTest,ExecutionArtifactTest test`，**20 项通过**，零失败/错误/跳过，1:15。包含新命令 3 项（多个篡改向量）、原目录 8、工具 3、封存 6；验证固定 argv/环境、权限、重复分配、错项目/失败构建、期限及事务边界。这里的工具和 JAR 是明确的文件夹具，未启动这些文件，也不计作真实应用运行验收。4 个主要文件，无新依赖或数据库变更。
+
+## 2026-10-25 · EX19d 模板健康身份与收尾
+
+新种子健康响应增加 `runId` / `executionId`，由固定外部属性提供；完整规范 UUID 对才接受，错误消息不回显配置。独立启动两项均未提供时保留 HTTP 存活/INITIALIZED，并返回空身份；平台不能把这种响应作为托管运行成功。该响应不是用户业务或数据库健康检查，也没有改写历史源码快照。
+
+按正式 35 文件清单复制到新的私有临时目录，15:22:36 原生 Maven 红灯明确缺少带身份的构造器；实现后 15:23:02，`./mvnw -B -o test` **4 项原生 MVC 测试通过**，零失败/错误/跳过，9.568 秒。验证 Spring 属性注入及 JSON 身份回显、默认独立启动兼容、无效/缺项身份拒绝和未知接口 404。使用已批准的私有 JDK 与本地缓存，无依赖下载、监听端口、业务数据库访问或真实应用启动；模板构建目录仅在忽略的 `.local` 下。两个模板主要文件。
+
+15:26:09，`-Dit.test=ExecutionRunIT,ExecutionBindingIT,ExecutionMigrationReviewIT,ProjectAgentLifecycleIT,ProjectAgentInitializationIT,ProjectSourceTemplateInitializationIT verify`，**全部 473 单元 + 30 项相关集成通过**，零失败/错误/跳过，BUILD SUCCESS，2:23，平台本地打包完成。只统计本次日志创建之后的 102 份 Surefire / 6 份 Failsafe XML；相关集成为运行元数据 6、绑定 7、迁移批准 5、Agent 生命周期 4、Agent 初始化 4、模板初始化 4。模板 4 项是上面单独的原生运行，不混入平台计数；此次未重跑无变化的实际 npm 构建或真实业务迁移验收。
+
+最后固定只读核对已授权的 `atoms_demo_test.atoms_verify_20261024_ex16`：V027/V028 成功，原 2 项目/端口/物理库角色绑定不变，运行、未结束运行、迁移批准、共享占位和绑定锁均为 0。未访问其他旧故障 schema 或清理历史记录。9 个实际私有值与公开差异及平台包内容核对零匹配；日志、红灯/变异证据及新鲜报告归档于忽略目录 `.local/ex19-evidence-ba15irlb`，目录 0700、文件 0600。
+
+EX19 完成，C-EX07 仍等待 EX20/21。下一项 EX20 接入当前授权、业务凭据发放、EX18 迁移复核、持久执行意图和实际 HTTP 身份握手；后续仍有停止换版、重启恢复及真实业务验收。当前实现的是内部进程及命令能力，不表示生成应用已经从网页启动；新模式保持关闭。本轮本地提交，未推送、部署、调用模型/SMTP或改变日常配置。自审覆盖身份绑定、预算/停止竞态、环境与输出边界、文件复验及兼容性；没有引入新依赖、公共接口或数据库迁移。

@@ -1,6 +1,6 @@
 # project-execution · 开发任务
 
-状态：2026-10-25，规格及 EX01–EX30 计划已获确认，EX01–18、C-EX06 已完成。迁移源码/JAR 对照、只读业务历史和批准流程已验收；本轮全部 460 单元 + 36 项相关集成通过，补充空 schema 修正后 12 单元 + 37 项相关集成通过，见[证据](../../docs/project-execution-verification.md#2026-10-25--ex18b2-空-schema-判定修正与收尾)。下一项 EX19 常驻应用进程与健康身份。常驻应用与网页接入未完成，新模式保持默认关闭。当前回归使用本轮获准的新 schema，旧失败现场和真实 npm 的既有通过/超时记录全部保留。唯一依据为[规格](../../SPEC-project-execution.md)与[计划](plan.md)，不复用旧工程导出的 PE 编号；勾选须附真实证据。
+状态：2026-10-25，规格及 EX01–EX30 计划已获确认，EX01–19、C-EX06 已完成。常驻进程拥有者、固定私有启动命令与模板健康身份已验收；本轮全部 473 单元 + 30 项相关集成及 4 项原生模板测试通过，见[证据](../../docs/project-execution-verification.md#2026-10-25--ex19d-模板健康身份与收尾)。下一项 EX20 持久启动与真实 HTTP 健康检查。生成应用常驻服务和网页接入未完成，新模式保持默认关闭。当前回归使用已获准的隔离 schema，旧失败现场和真实 npm 的既有通过/超时记录全部保留。唯一依据为[规格](../../SPEC-project-execution.md)与[计划](plan.md)，不复用旧工程导出的 PE 编号；勾选须附真实证据。
 
 执行环境沿用已获准的项目隔离 Liberica 17.0.14+10，仅命令级指定；原 Oracle 17.0.5、全局默认、私有 env、服务器和旧审计均不变。原生枚举故障未捕获原 errno，不能宣布根因完全证实，保留监测。EX11 原生构建、完整回归和变异证据见[验证记录](../../docs/project-execution-verification.md#ex11b--实际-jar-与失败版本验收)。
 
@@ -267,11 +267,11 @@ U/I/REAL/ALL/COMPAT/DOC 的命令与权限条件见计划 §6。S = 1–2、M = 
 
 ## EX19 · 持有常驻应用进程
 
-- [ ] 完成 EX19。依赖：EX03、EX10、EX17、EX18。原 5 文件未涵盖共享进程的活动身份及固定启动参数，实施前拆片，每片最多 5 个主要文件。
+- [x] 完成 EX19。依赖：EX03、EX10、EX17、EX18。原 5 文件未涵盖共享进程的活动身份及固定启动参数，实施前拆片，每片最多 5 个主要文件。
   - [x] EX19a：共享拥有者签发只读活动身份，保留原停止证明和旧 Agent/构建行为（OwnedProcess、OwnedProcessLifetimeTest，2 文件）。04:17:58，34 项真实进程及原 Agent/构建回归通过，见验收记录。
   - [x] EX19b：常驻进程句柄、启动期限/运行寿命分离、持续排空、幂等停止与未知结果（RunProcess、RunProcessTest，2 文件）。15:14:38，修复停止时重开启动期限的竞态后，18 项通过；错身份变异及竞态红灯保留。
   - [x] EX19c：固定 Java/classpath/私有配置/loopback 启动命令及文件复验；复用原工具身份并让运行目录分配沿用启动预算（RunCommand、RunCommandTest、Toolchain、Paths，4 文件）。15:20:49，20 项通过；业务凭据装配及 EX18 启动前复核由 EX20 接线。
-  - [ ] EX19d：模板健康响应回显运行/执行标识，完成模板原生测试与兼容回归（HealthController、HealthControllerTest 及必要契约，最多 3 文件）。
+  - [x] EX19d：模板健康响应回显运行/执行标识（HealthController、HealthControllerTest，2 文件）；4 项原生 MVC 测试通过，15:26:09 全部 473 单元 + 30 项相关集成通过并打包。新模式仍关闭，EX20 负责真实 HTTP 健康与持久启动接线。
 - 描述：后台拥有 Java 进程直到退出；给受控种子健康响应加入运行身份契约。
 - 验收：明确 classpath/私有配置/loopback，源码脚本不负责平台启动；启动窗口与运行寿命分开，READY 后仍排空流及观察退出；健康响应回显本次运行标识，缺此契约不退化为任意 HTTP 200。
 - 验证：U(ExecutionRunProcessTest)，受控常驻子进程与重复停止、输出洪泛；种子 HealthControllerTest 及原生模板测试回归。

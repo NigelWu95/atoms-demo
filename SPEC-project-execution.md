@@ -1,6 +1,6 @@
 # Spec: project-execution · 完整工程受控构建与本机进程
 
-状态：2026-10-25，用户已确认本规格及 §10 三项取舍、[实施计划](tasks/project-execution/plan.md)与[任务清单](tasks/project-execution/todo.md)。EX01–18、C-EX06 已完成，新增源码/JAR 迁移一致性、业务历史只读检查及准确批准流程。本轮全部 460 单元 + 36 项相关集成通过；补充非表对象修正后，12 单元 + 37 项相关集成通过，见[记录](docs/project-execution-verification.md#2026-10-25--ex18b2-空-schema-判定修正与收尾)。下一项 EX19 常驻应用进程与健康身份；新模式默认关闭，应用常驻运行、真实迁移/HTTP 业务验收与网页接入未完成。本地闭环范围见 [Agent 规格 §10](SPEC-project-agent.md#10-2026-10-19-完整闭环实施授权)。实际 npm 的既有 1800 秒通过记录及 300 秒超时分别保留。
+状态：2026-10-25，用户已确认本规格及 §10 三项取舍、[实施计划](tasks/project-execution/plan.md)与[任务清单](tasks/project-execution/todo.md)。EX01–19、C-EX06 已完成；新增常驻进程拥有者、固定私有启动命令和模板健康身份。本轮全部 473 单元 + 30 项相关集成及 4 项原生模板测试通过，见[记录](docs/project-execution-verification.md#2026-10-25--ex19d-模板健康身份与收尾)。下一项 EX20 持久启动与真实 HTTP 健康检查；新模式默认关闭，生成应用常驻运行、真实迁移/业务验收与网页接入尚未完成。本地闭环范围见 [Agent 规格 §10](SPEC-project-agent.md#10-2026-10-19-完整闭环实施授权)。此前实际 npm 的通过/超时及故障证据分别保留。
 
 模块 ID 沿用[能力地图](FULL-PROJECT-CAPABILITY-MAP.md)的 `project-execution`，依赖 `project-source`，不反向依赖 Agent、交付或工作台。上游只读门面 PS21 已完成；当前网页仍走旧固定模板链路。
 
@@ -122,9 +122,15 @@ EX18 按迁移集合、历史读取、批准流程分片。首版支持固定 `d
 
 首期每项目最多一个运行进程。切换版本前保留旧构建身份，明确停止旧进程再启动新进程；允许短暂停机，不承诺零停机。停止失败时不再启动第二个同项目写入者。新进程失败不覆盖上一成功构建记录；若涉及数据迁移，恢复旧运行也需要重新核对兼容性。
 
+EX19 增加内部常驻进程句柄，复用原 `OwnedProcess` 的进程/输出流所有权与固定收尾。启动期间沿用原剩余预算；实际根进程仍存活且本次运行/执行身份匹配后，可由可信调用者确认就绪，之后持续运行、观察和排空输出，不再套用启动期限。停止幂等，等候超时不签发停止凭据；未知子进程/输出收尾不明保留未知结果。停止已就绪进程时不重新开启启动期限，相关竞态已用固定时序的真实 JVM 测试覆盖。该内部确认方法不解析 HTTP，不代替 EX20 的固定目标健康检查与持久 READY。
+
+运行命令固定已封存 JAR 的 classpath 与 Spring Boot `JarLauncher`，使用构建证据匹配的维护者 Java。每次运行新建 0700 的 home/tmp/config，配置文件 0600，绑定 loopback/应用端口及规范 UUID；启动前复验目录、配置、JAR 和 Java 身份。环境从空白白名单构造，数据库仅留占位符，由 EX20 的真实业务注册表发放启动凭据；不读取个人模型或邮箱环境。显式 `spring.config.location` 替换默认查找，不自动加载工程内任意配置，也不作为对生成 Java 代码的安全认证。[Spring Boot 外部配置](https://docs.spring.io/spring-boot/3.5/reference/features/external-config.html)、[启动器说明](https://docs.spring.io/spring-boot/3.5/specification/executable-jar/launching.html)。
+
+新种子 `/api/health` 保留 `status=UP` / `stage=INITIALIZED`，增加 `runId` 与 `executionId`。平台通过 `atoms.runtime.run-id` / `atoms.runtime.execution-id` 提供完整规范 UUID 对；缺一项、非规范值或无效值直接拒绝启动。两项均未配置的独立工程可启动并返回空身份，不能被平台认作本次托管运行。标识不是秘密或业务安全认证；既有不可变源码快照不随模板变化而重写，旧快照缺身份契约时不能退化接受任意 HTTP 200。
+
 ## 6. 状态、幂等与恢复
 
-V023–V026 已有持久构建、阶段事件及依赖准备；V027 增加业务绑定，V028 增加运行身份与迁移批准元数据。运行准入只接受成功构建并固定其源码/树/JAR/清单和数据库身份摘要，同幂等键同输入复用原记录，每项目只允许一个未终结运行。STARTING 不等于进程已启动；READY 必须具有执行意图，活动进程未确认停止不得结算终态，待核对记录继续占用项目。持有真实进程、实际健康握手、启停和重启恢复在 EX19–22 实现。迁移只追加，不改现有源码/Agent 或旧构建表的含义；字段不保存完整源码、原始输出、密码或可直接操作的 PID。
+V023–V026 已有持久构建、阶段事件及依赖准备；V027 增加业务绑定，V028 增加运行身份与迁移批准元数据。运行准入只接受成功构建并固定其源码/树/JAR/清单和数据库身份摘要，同幂等键同输入复用原记录，每项目只允许一个未终结运行。STARTING 不等于进程已启动；READY 必须具有执行意图，活动进程未确认停止不得结算终态，待核对记录继续占用项目。EX19 已实现真实进程拥有者；实际健康握手、持久启停和重启恢复仍由 EX20–22 接线。迁移只追加，不改现有源码/Agent 或旧构建表的含义；字段不保存完整源码、原始输出、密码或可直接操作的 PID。
 
 ```text
 构建：QUEUED → PREPARING → INSTALLING → CHECKING → PACKAGING → SUCCEEDED
