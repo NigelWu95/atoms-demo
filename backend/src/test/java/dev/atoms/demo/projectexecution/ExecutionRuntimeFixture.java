@@ -27,6 +27,7 @@ final class ExecutionRuntimeFixture implements ExecutionCoordinator.WorkerResour
     final ExecutionBindingRepository.Target target;
     final ExecutionRunRepository runs;
     final ExecutionRunService service;
+    final Path childClasses;
     final AtomicReference<ExecutionRunProcess> process = new AtomicReference<>();
     final AtomicInteger launches = new AtomicInteger();
     ExecutionRuntimeResources runtime;
@@ -36,6 +37,7 @@ final class ExecutionRuntimeFixture implements ExecutionCoordinator.WorkerResour
             ExecutionDatabaseBinding databases, ExecutionBindingRepository.Target target) throws Exception {
         this.settings = settings; this.jdbc = jdbc; this.transactions = transactions; this.tools = tools;
         this.databases = databases; this.target = target;
+        childClasses = Path.of(ExecutionHealthTest.Child.class.getProtectionDomain().getCodeSource().getLocation().toURI()).toRealPath();
         builds = new ExecutionSchedulerFixture(settings.load().root(), settings, projects, jdbc, transactions);
         runs = new ExecutionRunRepository(jdbc); var identities = new ExecutionMigrationReviewRepository(jdbc);
         service = new ExecutionRunService(settings, runs, identities, transactions, builds.paths, databases,
@@ -52,7 +54,7 @@ final class ExecutionRuntimeFixture implements ExecutionCoordinator.WorkerResour
                     assertThat(row.executionPending()).isTrue(); assertThat(row.executionId()).isEqualTo(execution);
                     launches.incrementAndGet();
                     var command = new ProcessBuilder(Path.of(System.getProperty("java.home"), "bin/java").toString(),
-                            "--add-modules", "jdk.httpserver", "-cp", Path.of("target/test-classes").toAbsolutePath().toString(),
+                            "--add-modules", "jdk.httpserver", "-cp", childClasses.toString(),
                             ExecutionHealthTest.Child.class.getName(), Integer.toString(target.port()), run.toString(), execution.toString(), "valid")
                             .directory(prepared.directory());
                     command.environment().clear(); // No business credentials or SQL are passed to the HTTP fixture.
