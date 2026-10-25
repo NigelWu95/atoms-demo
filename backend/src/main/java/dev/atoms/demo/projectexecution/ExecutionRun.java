@@ -12,19 +12,28 @@ record ExecutionRun(UUID id, UUID projectId, UUID ownerId, UUID buildId, UUID so
         String treeSha256, String jarSha256, String manifestSha256, String bindingIdentitySha256, String keySha256, String requestSha256,
         String status, boolean stopRequested, UUID executionId, boolean executionPending, String stoppedSha256, String errorCode,
         Instant createdAt, Instant readyAt, Instant finishedAt) {
-    record Request(UUID build, UUID binding, UUID review, String keyHash, String bodyHash) {}
+    record Request(UUID build, UUID binding, UUID review, UUID predecessor, String keyHash, String bodyHash) {}
 
     static Request request(UUID build, UUID binding, UUID review, String key) {
         if (build == null || binding == null || key == null || key.isBlank() || key.length() > 128
                 || key.codePoints().anyMatch(c -> Character.isISOControl(c) || c >= 0xd800 && c <= 0xdfff))
             throw error(422, "RUN_INVALID_INPUT");
-        return new Request(build, binding, review, hash(key), bodyHash(build, binding, review));
+        return new Request(build, binding, review, null, hash(key), bodyHash(build, binding, review, null));
+    }
+    static Request replacement(UUID build, UUID binding, UUID review, UUID predecessor, String key) {
+        var ordinary = request(build, binding, review, key);
+        if (predecessor == null) throw error(422, "RUN_INVALID_INPUT");
+        return new Request(build, binding, review, predecessor, ordinary.keyHash(), bodyHash(build, binding, review, predecessor));
     }
     static boolean valid(Request request) {
         return request != null && request.build() != null && request.binding() != null && request.keyHash() != null
-                && request.keyHash().matches("[a-f0-9]{64}") && bodyHash(request.build(), request.binding(), request.review()).equals(request.bodyHash());
+                && request.keyHash().matches("[a-f0-9]{64}") && bodyHash(request.build(), request.binding(), request.review(), request.predecessor()).equals(request.bodyHash());
     }
-    private static String bodyHash(UUID build, UUID binding, UUID review) { return hash("project-execution-run-v1\n" + build + "\n" + binding + "\n" + review); }
+    private static String bodyHash(UUID build, UUID binding, UUID review, UUID predecessor) {
+        // Ordinary start keeps its persisted v1 hash; replacement binds the exact old run as well as the target.
+        return hash((predecessor == null ? "project-execution-run-v1\n" : "project-execution-replace-v1\n" + predecessor + "\n")
+                + build + "\n" + binding + "\n" + review);
+    }
     private static String hash(String value) {
         try { return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8))); }
         catch (java.security.NoSuchAlgorithmException impossible) { throw new IllegalStateException(impossible); }

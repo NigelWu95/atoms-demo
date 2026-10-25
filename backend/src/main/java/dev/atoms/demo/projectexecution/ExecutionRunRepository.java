@@ -45,6 +45,11 @@ final class ExecutionRunRepository {
             if (previous != null) return previous;
             if (Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT FROM execution_runs WHERE project_id=? AND finished_at IS NULL)", Boolean.class, project)))
                 throw ExecutionRun.error(409, "RUN_PROJECT_BUSY");
+            if (request.predecessor() != null) {
+                var old = get(project, request.predecessor());
+                if (!old.ownerId().equals(owner) || !old.bindingId().equals(request.binding())) throw ExecutionRun.error(404, "RUN_NOT_FOUND");
+                if (old.finishedAt() == null || old.executionPending()) throw ExecutionRun.error(409, "RUN_STOP_PENDING");
+            }
             var builds = jdbc.queryForList("SELECT * FROM execution_builds WHERE project_id=? AND id=? AND status='SUCCEEDED'", project, request.build());
             if (builds.isEmpty()) throw ExecutionRun.error(409, "RUN_BUILD_NOT_READY");
             var build = builds.get(0); var binding = new ExecutionBindingRepository(jdbc).get(project);

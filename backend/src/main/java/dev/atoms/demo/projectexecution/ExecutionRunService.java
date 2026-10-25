@@ -28,6 +28,8 @@ final class ExecutionRunService {
     }
 
     record Admission(ExecutionRun run, Ticket ticket) {}
+    /** Exactly one side is present: keep observing the old stop, or hand the new admission to the coordinator. */
+    record Replacement(ExecutionRun stopping, Admission admission) {}
     private record Initial(ExecutionRun previous, ExecutionMigrationReviewRepository.Identity identity) {}
 
     ExecutionRun stop(UUID owner, UUID project, UUID id) throws IOException {
@@ -38,6 +40,29 @@ final class ExecutionRunService {
             var row = runs.stop(owner, project, id);
             sameConfiguration(owner, configuration); return row;
         });
+    }
+
+    /** Two-phase, retryable command. No transaction/thread waits for another process and no unknown start is replayed. */
+    Replacement replace(UUID owner, UUID project, UUID predecessor, UUID build, UUID binding, UUID review, String key) throws IOException {
+        outsideTransaction(); var configuration = authorize(owner);
+        if (project == null) throw ExecutionRun.error(422, "RUN_INVALID_INPUT");
+        var request = ExecutionRun.replacement(build, binding, review, predecessor, key);
+        var result = tx(() -> {
+            sameConfiguration(owner, configuration);
+            var existing = runs.find(owner, project, request);
+            Replacement step;
+            if (existing != null) step = new Replacement(null, new Admission(existing, null));
+            else {
+                // Reject a missing/failed target before stopping a currently serving version.
+                var identity = identities.identity(owner, project, build);
+                if (!identity.binding().id().equals(binding)) throw ExecutionRun.error(409, "RUN_DB_BINDING_CONFLICT");
+                step = new Replacement(runs.stop(owner, project, predecessor), null);
+            }
+            sameConfiguration(owner, configuration); return step;
+        });
+        if (result.admission() != null || result.stopping().finishedAt() == null || result.stopping().executionPending()) return result;
+        // Full artifact/physical DB/migration validation happens only after the old run is durably settled.
+        return new Replacement(null, submit(owner, project, request));
     }
     /** Created only for the request that inserted a row. No reconstruction from a persisted run ID. */
     static final class Ticket {
@@ -60,10 +85,13 @@ final class ExecutionRunService {
     }
 
     Admission submit(UUID owner, UUID project, UUID build, UUID binding, UUID review, String key) throws IOException {
+        return submit(owner, project, ExecutionRun.request(build, binding, review, key));
+    }
+    private Admission submit(UUID owner, UUID project, ExecutionRun.Request request) throws IOException {
         outsideTransaction();
         var configuration = authorize(owner);
         if (project == null) throw ExecutionRun.error(422, "RUN_INVALID_INPUT");
-        var request = ExecutionRun.request(build, binding, review, key);
+        UUID build = request.build(), binding = request.binding(), review = request.review();
         var budget = new ExecutionProcess.Deadline(configuration.startTimeout());
         var initial = tx(() -> {
             sameConfiguration(owner, configuration); remaining(budget);

@@ -162,6 +162,46 @@ class ExecutionRunAdmissionTest {
         assertThat(transactions.rollbacks).isPositive();
     }
 
+    @Test void replacementBindsItsPredecessorAndWaitsWithoutReadingArtifactsOrIssuingATicket() throws Exception {
+        UUID predecessor = UUID.randomUUID();
+        var replacement = ExecutionRun.replacement(buildId, bindingId, null, predecessor, "once");
+        assertThat(ExecutionRun.valid(replacement)).isTrue();
+        assertThat(replacement.keyHash()).isEqualTo(request.keyHash());
+        assertThat(replacement.bodyHash()).isNotEqualTo(request.bodyHash());
+        assertThat(ExecutionRun.replacement(buildId, bindingId, null, UUID.randomUUID(), "once").bodyHash()).isNotEqualTo(replacement.bodyHash());
+        when(runs.stop(owner, project, predecessor)).thenAnswer(call -> { inside(); return run; });
+        Files.writeString(artifact.jar(), "unreadable-until-stopped");
+        var waiting = service.replace(owner, project, predecessor, buildId, bindingId, null, "once");
+        assertThat(waiting.stopping()).isEqualTo(run); assertThat(waiting.admission()).isNull();
+        verifyNoInteractions(databases, migrations); verify(runs, never()).admit(any(), any(), any());
+        doReturn(run).when(runs).find(owner, project, replacement);
+        var replay = service.replace(owner, project, predecessor, buildId, bindingId, null, "once");
+        assertThat(replay.stopping()).isNull(); assertThat(replay.admission().run()).isEqualTo(run); assertThat(replay.admission().ticket()).isNull();
+        verify(runs, times(1)).stop(owner, project, predecessor);
+    }
+
+    @Test void replacementRechecksMigrationAfterStopAndFailedStopCommitNeverAdmits() throws Exception {
+        UUID predecessor = UUID.randomUUID();
+        var replacement = ExecutionRun.replacement(buildId, bindingId, null, predecessor, "once");
+        var stopped = new ExecutionRun(predecessor, project, owner, buildId, run.sourceVersionId(), bindingId, null,
+                run.treeSha256(), run.jarSha256(), run.manifestSha256(), run.bindingIdentitySha256(), run.keySha256(), run.requestSha256(),
+                "STOPPED", true, UUID.randomUUID(), false, "a".repeat(64), null, run.createdAt(), Instant.now(), Instant.now());
+        when(runs.stop(owner, project, predecessor)).thenAnswer(call -> { inside(); return stopped; });
+        when(runs.admit(owner, project, replacement)).thenAnswer(call -> { inside(); return run; });
+        transactions.failCommitAt = 1;
+        assertThatThrownBy(() -> service.replace(owner, project, predecessor, buildId, bindingId, null, "once"))
+                .isInstanceOfSatisfying(dev.atoms.demo.common.ApiException.class, e -> assertThat(e.code()).isEqualTo("RUN_STATE_UNAVAILABLE"));
+        verify(runs, never()).admit(any(), any(), any()); verifyNoInteractions(databases, migrations);
+        var next = service.replace(owner, project, predecessor, buildId, bindingId, null, "once");
+        assertThat(next.stopping()).isNull(); assertThat(next.admission().ticket()).isNotNull();
+        verify(migrations, times(1)).requireCompatible(eq(owner), eq(project), eq(buildId), isNull(), any(), any());
+        when(migrations.requireCompatible(eq(owner), eq(project), eq(buildId), isNull(), any(), any()))
+                .thenThrow(new IOException("RUN_MIGRATION_INCOMPATIBLE"));
+        assertThatThrownBy(() -> service.replace(owner, project, predecessor, buildId, bindingId, null, "once"))
+                .hasMessage("RUN_MIGRATION_INCOMPATIBLE");
+        verify(runs, times(1)).admit(owner, project, replacement);
+    }
+
     @Test void residentMonitoringChecksCurrentIdentityAndStopButNeverRestartsTheStartupDeadline() throws Exception {
         try (var deadlines = mockConstruction(ExecutionProcess.Deadline.class,
                 (deadline, context) -> when(deadline.remaining()).thenReturn(Duration.ofSeconds(120)))) {
