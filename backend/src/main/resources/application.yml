@@ -34,6 +34,7 @@ atoms:
     policy: ${PROJECT_EXECUTION_POLICY:}
     maintainer-ids: ${PROJECT_EXECUTION_MAINTAINER_IDS:}
     test-databases: ${PROJECT_EXECUTION_TEST_DATABASES:}
+    runtime-databases: ${PROJECT_EXECUTION_RUNTIME_DATABASES:}
     max-concurrent-builds: ${PROJECT_EXECUTION_MAX_CONCURRENT_BUILDS:1}
     queue-capacity: ${PROJECT_EXECUTION_QUEUE_CAPACITY:8}
     max-running-projects: ${PROJECT_EXECUTION_MAX_RUNNING_PROJECTS:4}

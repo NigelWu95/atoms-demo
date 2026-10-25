@@ -90,6 +90,10 @@ Java 阶段 `ExecutionJava` 固定执行 `MAVEN_PACKAGE` 的 `verify` 命令，�
 
 运行配置保存在源码/构建副本之外的私有文件，只传给对应应用。使用明确的 Spring 配置位置，不把平台 env 整份复制给应用；Spring 的 `spring.config.location` 替换默认查找位置，但生成代码仍可能主动读文件，不能据此宣称隔离。[Spring Boot 3.5 配置说明](https://docs.spring.io/spring-boot/3.5/reference/features/external-config.html)
 
+资源工厂通过可选的 `PROJECT_EXECUTION_RUNTIME_DATABASES`（`atoms.project-execution.runtime-databases`）读取“规范项目 UUID → 私有业务 `.properties` 绝对路径”JSON；空白表示仅装配原构建/准备资源，显式对象仍要求 1–4 项及既有 JSON/路径限制。项目须属于测试注册表，业务文件使用 purpose=runtime 并指定 port；排除平台数据库/角色及测试注册表的数据库、角色、绑定 UUID、数据库监听端口。凭据继续只在原 0600 文件中，注册表及文件身份变化必须停止继续使用。没有自动建库/建角色或改写私有 env。
+
+原生运行资源只装配同一准入服务与 worker，使用协调者原根并单次附接协调检查；装配不捕获工具、创建线程或启动应用。每次执行在领取准确 ticket 后，用原启动剩余预算核对工具；停止信号不能丢弃未确认持久化的原拥有能力。关闭根前还须由管理器等待准入及工作线程终止，常驻调度、交接竞争和完整关闭接线仍由 EX22b2 完成。
+
 数据库采用维护者预置的专用绑定：每项目独立数据库及最小权限角色，另有测试数据库。禁止平台日常库、系统库、超级用户和跨项目复用；运行服务不持有建库/建角色的管理员密码。创建这些环境需要单独明确目标，不能由网页提交连接字符串。
 
 测试库检查器读取维护者提供的完整、不可变项目注册表（最多 4 项），不按网页请求临时登记连接。每份文件仅允许 `database/user/password/purpose/bindingId/jdbcUrl/schema` 七个键，拒绝重复键、环境占位符和任意 JDBC 参数；仅支持明确的 `127.0.0.1` TCP、`purpose=test` 与 `generated_app` schema。文件须为本机非 root 用户拥有的 0600 普通文件，父目录 0700，拒绝链接、硬链接、源码/构建等受保护根内位置，读取后固定身份及内容并在每次检查前后复验。配置最大 8 KiB；不读取个人或平台 env。
