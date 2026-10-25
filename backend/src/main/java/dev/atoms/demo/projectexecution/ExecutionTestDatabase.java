@@ -12,6 +12,13 @@ final class ExecutionTestDatabase {
 
     private ExecutionTestDatabase(Map<UUID, ExecutionPrivateConfig> bindings) { this.bindings = Map.copyOf(bindings); }
 
+    /** Registry identity comparison only; never shares credentials or opens a connection. */
+    boolean overlapsRuntime(ExecutionPrivateConfig runtime) {
+        return bindings.values().stream().anyMatch(test -> test.database().equals(runtime.database())
+                || test.role().equals(runtime.role()) || test.bindingId().equals(runtime.bindingId())
+                || test.databasePort() == runtime.applicationPort());
+    }
+
     static ExecutionTestDatabase load(Map<UUID, Path> files, List<Path> protectedRoots,
                                       Set<String> forbiddenDatabases, Set<String> forbiddenRoles) throws IOException {
         if (files == null || files.isEmpty() || files.size() > 4 || files.keySet().stream().anyMatch(Objects::isNull)

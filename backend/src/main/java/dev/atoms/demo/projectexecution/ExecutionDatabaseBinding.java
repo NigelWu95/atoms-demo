@@ -11,6 +11,18 @@ final class ExecutionDatabaseBinding {
     private final Map<UUID, ExecutionPrivateConfig> configurations;
     private ExecutionDatabaseBinding(Map<UUID, ExecutionPrivateConfig> configurations) { this.configurations = Map.copyOf(configurations); }
 
+    void requireSeparateFrom(ExecutionTestDatabase tests) throws IOException {
+        if (tests == null) throw ExecutionPrivateConfig.invalid();
+        for (var runtime : configurations.values())
+            if (tests.overlapsRuntime(runtime)) throw new IOException("RUN_DB_BINDING_CONFLICT");
+    }
+
+    /** Read-only file identity check used by the resident lifecycle; no business queries or migrations. */
+    void verifyConfiguration() throws IOException {
+        outsideTransaction();
+        for (var config : configurations.values()) config.verify();
+    }
+
     static ExecutionDatabaseBinding load(Map<UUID, Path> files, List<Path> protectedRoots,
             Set<String> forbiddenDatabases, Set<String> forbiddenRoles) throws IOException {
         if (files == null || files.isEmpty() || files.size() > 4 || files.keySet().stream().anyMatch(Objects::isNull)

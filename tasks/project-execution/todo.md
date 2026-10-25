@@ -324,7 +324,7 @@ U/I/REAL/ALL/COMPAT/DOC 的命令与权限条件见计划 §6。S = 1–2、M = 
     - [ ] EX22b1：运行资源工厂装配业务配置、准入与常驻 worker；复用原执行根，默认关闭不访问运行配置（Environment、独立运行资源类及对应测试，实施前明确不超过 5 文件）。
       - [x] b1a：worker 在原单次启动预算内惰性核对工具，保留原进程能力并提供自有停止/持有状态给生命周期管理（RunWorker、RunWorkerTest，2 文件）。19:21:13，43 单元 + 18 集成通过；错误在停止信号后丢弃未确认句柄的变异被拦截，源码逐字恢复。
       - [ ] b1b：可选业务配置注册表与运行资源接线，复用根和已有准入/迁移/worker；配置为空保持原构建能力。
-        - [ ] b1b1：业务/测试数据库、角色、绑定及监听端口不能交叉使用，私有业务配置漂移检测（TestDatabase、DatabaseBinding、RuntimeRegistryTest，3 文件）。
+        - [x] b1b1：业务/测试数据库、角色、绑定及监听端口不能交叉使用，私有业务配置漂移检测（TestDatabase、DatabaseBinding、RuntimeRegistryTest，3 文件）。19:27:11，25 单元 + 7 真实绑定集成通过；移除端口交叉检查的变异被拦截，源码逐字恢复。
         - [ ] b1b2：资源工厂连接准入与常驻 worker，单次附接协调权，关闭时不得丢弃未确认拥有能力（Environment、Coordinator 的资源接口、RuntimeResources、EnvironmentTest，4 文件）。
       - [ ] b1c：配置项、资源工厂真实契约及隔离校验；按测试/业务库边界补充独立小片，不在私有 env 自动启用。
     - [ ] EX22b2：同一协调者下的常驻任务管理及停止收尾；使用单独有界运行线程，原构建/准备共享容量不被常驻线程占用（调度助手、Coordinator 及对应测试，实施前按依赖拆片）。
