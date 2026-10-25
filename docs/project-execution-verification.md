@@ -1556,3 +1556,9 @@ worker 增加内部拥有句柄表，保留原 launcher 返回的同一个 `Exec
 收尾只读核对 `atoms_demo_test.atoms_verify_20261024_ex16`：V027/V028 成功，原 A/B 两项目绑定、端口和物理 DB/role OID 不变；6 条运行均终结，未结束运行、共享占位、绑定锁与迁移批准均为 0。真实业务库历史检查和可回滚历史夹具通过，没有把样本 SQL 交给生成应用执行。9 个实际私有值与本轮公开差异、新测试及最终平台包内 classes/resources 核对，零匹配。27 份 EX20 日志及本轮全部 XML 已归档到忽略目录 `.local/ex20-final-evidence-bscns6t3`，目录 0700、文件 0600；旧审计和失败日志保留。
 
 据此完成 EX20。这里验证的是内部 worker 与真实 PG/受控 HTTP JVM，不替代生成 Spring 应用的业务验收。EX21 接正式停止/换版，EX22 接运行恢复与管理生命周期，网页入口及原生完整工程验收仍按后续计划推进；新模式保持默认关闭。本轮只做本地提交，不推送、部署、修改私有 env、调用真实模型或 SMTP。
+
+## 2026-10-25 · EX21a 正式持久停止入口
+
+`ExecutionRunService.stop` 在独立短事务中核对当前维护者配置、项目所有者和原运行 owner，提交单调的停止标记。允许原所有者停止归档项目；其他用户、换主后的旧任务和跨项目运行均拒绝。READY 转 STOPPING，尚未启动的 STARTING 与 NEEDS_RECONCILIATION 保持原状态；不清 pending、不签发停止凭据、不开放新运行容量。重复停止和终态重放不产生额外变更。实际停止仍由原拥有 worker 执行；启动前观察到已提交的停止请求时，返回明确取消原因。
+
+独立红灯明确缺少服务及仓库 stop 方法。18:13:45，`-Dtest=ExecutionRunAdmissionTest,ExecutionRunWorkerTest,ExecutionRunJournalTest -Dit.test=ExecutionRunStateIT,ExecutionRunIT verify`，**27 单元 + 16 项 PG 集成通过**，零失败/错误/跳过，1:29，平台打包成功。新场景包括重复停止、归档时停止、真实停止凭据前阻止下一运行、未知状态保留、所有者变化、禁用/配置变化/事务嵌套和提交回执失败；最后一类采用受控事务故障，不宣称真实网络故障。4 个主要文件，EX21b 继续接换版与完整进程组合。

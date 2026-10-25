@@ -26,6 +26,17 @@ final class ExecutionRunRepository {
                 .orElseThrow(() -> ExecutionRun.error(404, "RUN_NOT_FOUND"));
     }
 
+    /** Durable intent only: even an unclaimed ticket is settled by its worker, never by a caller's stop request. */
+    ExecutionRun stop(UUID owner, UUID project, UUID id) {
+        if (project == null || id == null) throw ExecutionRun.error(422, "RUN_INVALID_INPUT");
+        lockProject(owner, project, true, true);
+        var row = get(project, id);
+        if (!row.ownerId().equals(owner)) throw ExecutionRun.error(404, "RUN_NOT_FOUND");
+        if (row.finishedAt() != null || row.stopRequested()) return row;
+        jdbc.update("UPDATE execution_runs SET stop_requested=true,status=CASE WHEN status='READY' THEN 'STOPPING' ELSE status END WHERE id=?", id);
+        return get(project, id);
+    }
+
     ExecutionRun admit(UUID owner, UUID project, ExecutionRun.Request request) {
         if (!TransactionSynchronizationManager.isActualTransactionActive()) throw new IllegalStateException("Run admission requires a transaction");
         if (!ExecutionRun.valid(request)) throw ExecutionRun.error(422, "RUN_INVALID_INPUT");
@@ -153,12 +164,15 @@ final class ExecutionRunRepository {
     }
 
     private void lockProject(UUID owner, UUID project, boolean authorize) {
+        lockProject(owner, project, authorize, false);
+    }
+    private void lockProject(UUID owner, UUID project, boolean authorize, boolean allowArchived) {
         if (!TransactionSynchronizationManager.isActualTransactionActive()) throw new IllegalStateException("Run persistence requires a transaction");
         jdbc.execute("SET LOCAL lock_timeout = '3s'");
         var projects = jdbc.queryForList("SELECT owner_id,archived FROM projects WHERE id=? FOR UPDATE", project);
         if (projects.isEmpty() || authorize && (owner == null || !owner.equals(projects.get(0).get("owner_id"))))
             throw ExecutionRun.error(404, "PROJECT_NOT_FOUND");
-        if (authorize && Boolean.TRUE.equals(projects.get(0).get("archived"))) throw ExecutionRun.error(409, "RUN_PROJECT_ARCHIVED");
+        if (authorize && !allowArchived && Boolean.TRUE.equals(projects.get(0).get("archived"))) throw ExecutionRun.error(409, "RUN_PROJECT_ARCHIVED");
     }
     private static final Set<String> OUTCOMES = Set.of("RUN_EXITED", "RUN_STOPPED", "RUN_START_TIMEOUT", "RUN_START_FAILED",
             "RUN_PROCESS_FAILED", "RUN_CHILD_PROCESS_REMAINS", "RUN_PROCESS_UNSETTLED", "RUN_PREFLIGHT_FAILED", "RUN_EXECUTION_FAILED");

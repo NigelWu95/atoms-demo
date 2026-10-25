@@ -29,6 +29,16 @@ final class ExecutionRunService {
 
     record Admission(ExecutionRun run, Ticket ticket) {}
     private record Initial(ExecutionRun previous, ExecutionMigrationReviewRepository.Identity identity) {}
+
+    ExecutionRun stop(UUID owner, UUID project, UUID id) throws IOException {
+        outsideTransaction();
+        var configuration = authorize(owner);
+        return tx(() -> {
+            sameConfiguration(owner, configuration);
+            var row = runs.stop(owner, project, id);
+            sameConfiguration(owner, configuration); return row;
+        });
+    }
     /** Created only for the request that inserted a row. No reconstruction from a persisted run ID. */
     static final class Ticket {
         private final Claim claim;
@@ -103,7 +113,8 @@ final class ExecutionRunService {
         tx(() -> {
             remaining(claim.budget);
             var row = boundRun(claim, execution);
-            if (!row.status().equals("STARTING") || row.stopRequested()) throw ExecutionRun.error(409, "RUN_STATE_CONFLICT");
+            if (row.stopRequested()) throw ExecutionRun.error(409, "RUN_CANCELLED");
+            if (!row.status().equals("STARTING")) throw ExecutionRun.error(409, "RUN_STATE_CONFLICT");
             remaining(claim.budget); return row;
         });
     }

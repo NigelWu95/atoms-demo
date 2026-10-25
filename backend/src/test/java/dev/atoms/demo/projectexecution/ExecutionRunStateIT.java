@@ -70,6 +70,50 @@ class ExecutionRunStateIT {
         assertThat(repository.admit(owner, project, request("one"))).isEqualTo(claimed);
     }
 
+    @Test void stopBeforeLaunchIsMonotonicAndOnlyTheWorkerCanFinishCancellation() {
+        var requested = repository.stop(owner, project, run.id());
+        assertThat(requested.stopRequested()).isTrue(); assertThat(requested.status()).isEqualTo("STARTING");
+        assertThat(requested.executionId()).isNull(); assertThat(requested.finishedAt()).isNull();
+        assertThat(repository.stop(owner, project, run.id())).isEqualTo(requested);
+        rejected(() -> repository.begin(run, execution));
+        rejected(() -> repository.admit(owner, project, request("second")));
+        var cancelled = repository.notStarted(run, "RUN_CANCELLED");
+        assertThat(cancelled.status()).isEqualTo("CANCELLED");
+        assertThat(repository.stop(owner, project, run.id())).isEqualTo(cancelled);
+    }
+
+    @Test void stopOfReadyArchivedProjectNeedsActualExitBeforeAnotherRunCanStart() {
+        repository.begin(run, execution); repository.ready(run, execution, target, health(execution));
+        jdbc.update("UPDATE projects SET archived=true WHERE id=?", project);
+        var stopping = repository.stop(owner, project, run.id());
+        assertThat(stopping.status()).isEqualTo("STOPPING"); assertThat(stopping.executionPending()).isTrue();
+        assertThat(stopping.stoppedSha256()).isNull(); assertThat(stopping.finishedAt()).isNull();
+        assertThat(repository.stop(owner, project, run.id())).isEqualTo(stopping);
+        jdbc.update("UPDATE projects SET archived=false WHERE id=?", project);
+        rejected(() -> repository.admit(owner, project, request("second")));
+        var stopped = repository.finish(run, execution, temporary, stop(), null);
+        assertThat(stopped.status()).isEqualTo("STOPPED");
+        assertThat(repository.stop(owner, project, run.id())).isEqualTo(stopped);
+        assertThat(repository.admit(owner, project, request("second")).id()).isNotEqualTo(run.id());
+    }
+
+    @Test void stopCannotClearUnknownExecutionOrOperateAcrossOwnership() {
+        rejected(() -> repository.stop(UUID.randomUUID(), project, run.id()));
+        rejected(() -> repository.stop(owner, UUID.randomUUID(), run.id()));
+        rejected(() -> repository.stop(owner, project, UUID.randomUUID()));
+        repository.begin(run, execution);
+        var unknown = repository.finish(run, execution, temporary,
+                new ExecutionRunProcess.Outcome("RUN_PROCESS_UNSETTLED", new ExecutionRunProcess.Output(0, 0), null), null);
+        var requested = repository.stop(owner, project, run.id());
+        assertThat(requested.status()).isEqualTo("NEEDS_RECONCILIATION"); assertThat(requested.executionPending()).isTrue();
+        assertThat(requested.errorCode()).isEqualTo(unknown.errorCode()); assertThat(requested.stoppedSha256()).isNull();
+        rejected(() -> repository.admit(owner, project, request("second")));
+        UUID nextOwner = UUID.randomUUID(); jdbc.update("INSERT INTO guest_users(id) VALUES (?)", nextOwner);
+        jdbc.update("UPDATE projects SET owner_id=? WHERE id=?", nextOwner, project);
+        rejected(() -> repository.stop(owner, project, run.id()));
+        rejected(() -> repository.stop(nextOwner, project, run.id()));
+    }
+
     @Test void onlyLiveHealthProofCanPublishReadyAndActualExitSettlesTheOriginalIntent() {
         repository.begin(run, execution);
         rejected(() -> repository.ready(run, execution, target, null));

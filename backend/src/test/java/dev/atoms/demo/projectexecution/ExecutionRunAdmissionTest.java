@@ -136,6 +136,32 @@ class ExecutionRunAdmissionTest {
         verify(runs, times(1)).admit(owner, project, request);
     }
 
+    @Test void stopIsAShortAuthorizedTransactionWithoutArtifactOrBusinessDatabaseIo() throws Exception {
+        when(runs.stop(owner, project, run.id())).thenAnswer(call -> { inside(); return run; });
+        assertThat(service.stop(owner, project, run.id())).isEqualTo(run);
+        verifyNoInteractions(identities, databases, migrations);
+        transactions.failCommitAt = transactions.commits + 1;
+        assertThatThrownBy(() -> service.stop(owner, project, run.id()))
+                .isInstanceOfSatisfying(dev.atoms.demo.common.ApiException.class, e -> assertThat(e.code()).isEqualTo("RUN_STATE_UNAVAILABLE"))
+                .hasNoCause().hasNoSuppressedExceptions();
+        verify(runs, times(2)).stop(owner, project, run.id());
+    }
+
+    @Test void stopRejectsUnauthorizedDisabledNestedTransactionsAndConfigurationDrift() throws Exception {
+        assertThatThrownBy(() -> service.stop(UUID.randomUUID(), project, run.id())).isInstanceOf(dev.atoms.demo.common.ApiException.class);
+        environment.withProperty("atoms.project-execution.enabled", "false");
+        assertThatThrownBy(() -> service.stop(owner, project, run.id())).isInstanceOf(dev.atoms.demo.common.ApiException.class);
+        environment.withProperty("atoms.project-execution.enabled", "true");
+        new TransactionTemplate(transactions).executeWithoutResult(tx ->
+                assertThatThrownBy(() -> service.stop(owner, project, run.id())).hasMessage("EXECUTION_TRANSACTION_ACTIVE"));
+        verifyNoInteractions(runs, identities, databases, migrations);
+        when(runs.stop(owner, project, run.id())).thenAnswer(call -> {
+            environment.withProperty("atoms.project-execution.start-timeout-seconds", "119"); return run;
+        });
+        assertThatThrownBy(() -> service.stop(owner, project, run.id())).isInstanceOf(dev.atoms.demo.common.ApiException.class);
+        assertThat(transactions.rollbacks).isPositive();
+    }
+
     @Test void residentMonitoringChecksCurrentIdentityAndStopButNeverRestartsTheStartupDeadline() throws Exception {
         try (var deadlines = mockConstruction(ExecutionProcess.Deadline.class,
                 (deadline, context) -> when(deadline.remaining()).thenReturn(Duration.ofSeconds(120)))) {
