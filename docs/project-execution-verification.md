@@ -1540,3 +1540,19 @@ READY 提交新增显式共享预算参数，在仓库写入前后检查原剩�
 17:36:32 独立红灯缺少 worker 类型；17:39:56，`-Dtest=ExecutionRunJournalTest,ExecutionRunAdmissionTest,ExecutionRunProcessTest -Pproject-execution-contract -Dit.test=ExecutionRunHealthIT -Dexecution.test-config-directory=<原批准目录> -Dexecution.runtime-fixture-root=<固定源码根> -Dexecution.contract-directory=<仓库外父目录> verify`，**24 单元 + 1 项真实组合通过**，零失败/错误/跳过，2:16。真实 PG、独占租约、Git/封存/私有配置/业务历史与状态服务全部参与；最后 launcher 是明确的受控 HTTP JVM，工具/JAR 为命令验证夹具，不把此项当作原生 Spring 应用/SQL 执行验收。夹具进程不接收业务凭据，也不执行样本 SQL。
 
 独立连接在 `Process.start` 前已能读到准确执行意图；健康握手后 READY、重复 ticket 拒绝；测试生产持久停止标记（正式停止 API 仍属 EX21），原拥有者实际停止并将匹配摘要写入 STOPPED。随后外来监听占用原端口，新请求以 `RUN_PORT_IN_USE` 在发出执行意图前失败，外来 socket 保持打开，launcher 总计只执行一次。原业务历史前后相同，审计记录保留。2 个主要文件；f3 继续异常矩阵和收尾回归。
+
+## 2026-10-25 · EX20f3 异常收尾与拥有句柄保留
+
+worker 增加内部拥有句柄表，保留原 launcher 返回的同一个 `ExecutionRunProcess`。完成写入获得成功回执、pending 已清除且持久停止摘要匹配本次真实凭据后才释放句柄；停止结果不明、完成写入失败或提交回执不明均保留，供后续协调者使用原拥有能力清理。不根据数据库行、PID 或端口重建进程拥有权，不重试不明完成操作。尚未 READY 的数据待核对状态仍由原数据库规则保留，进程已停止并不等于可再次运行。
+
+新增 9 项 worker 组件验收：真实 HTTP 错身份、提前退出、执行意图提交回执丢失、READY 提交回执丢失、完成 SQL 失败、完成提交回执丢失、启动前配置撤销、READY 后协调权丢失，以及缺失停止凭据。实际子进程和停止收据由原进程拥有者产生；只有最后一项使用无 OS 进程的未知结果替身，明确不伪造停止证明。元数据/物理库边界与提交故障为受控替身，真实 PG 的状态/事务约束由 `ExecutionRunStateIT` 另行核对，不宣称实际数据库发生过网络丢包。
+
+17:48:53，独立红灯缺少拥有句柄查询方法。17:51:01 首轮编译指出测试 launcher 内声明受检异常的位置不正确；将未知结果替身准备移到测试 setup，未放宽断言。17:54:30，`-Dtest=ExecutionRunWorkerTest,ExecutionRunJournalTest,ExecutionRunAdmissionTest,ExecutionRunProcessTest,ExecutionHealthTest -Dit.test=ExecutionRunStateIT,ExecutionRunIT verify`，**38 单元 + 13 项 PG 集成通过**，零失败/错误/跳过，2:33，平台打包成功。2 个主要实现/测试文件；后续完整回归及变异结果在下方续记。
+
+17:56:47，将完成后的句柄释放条件改为“无条件释放”，定向未知结果测试准确失败：预期原拥有对象，实际得到 null。随后恢复原条件，源码 SHA-256 与变异前完全一致，继续全部单元及相关集成回归；没有保留变异代码或放宽测试。
+
+18:03:49，完整单元与相关集成回归 **506 单元 + 61 集成通过**，零失败/错误/跳过，6:10，平台打包成功。命令为 `-Pproject-execution-contract -Dit.test=ExecutionRunAdmissionIT,ExecutionRunHealthIT,ExecutionRunStateIT,ExecutionRunIT,ExecutionBindingIT,ExecutionMigrationReviewIT,ExecutionRuntimeLaunchContractIT,ExecutionBindingContractIT,ExecutionMigrationHistoryIT,ExecutionAdmissionIT,ProjectAgentLifecycleIT,ProjectAgentInitializationIT,ProjectSourceTemplateInitializationIT`，继续传入上文三个准确私有夹具目录并执行 `verify`；未指定 `-Dtest`，全部后端单元均运行。按本轮开始时间筛选实际 XML，107 个单元类、13 个集成类与日志计数一致，没有拿旧报告补数。
+
+收尾只读核对 `atoms_demo_test.atoms_verify_20261024_ex16`：V027/V028 成功，原 A/B 两项目绑定、端口和物理 DB/role OID 不变；6 条运行均终结，未结束运行、共享占位、绑定锁与迁移批准均为 0。真实业务库历史检查和可回滚历史夹具通过，没有把样本 SQL 交给生成应用执行。9 个实际私有值与本轮公开差异、新测试及最终平台包内 classes/resources 核对，零匹配。27 份 EX20 日志及本轮全部 XML 已归档到忽略目录 `.local/ex20-final-evidence-bscns6t3`，目录 0700、文件 0600；旧审计和失败日志保留。
+
+据此完成 EX20。这里验证的是内部 worker 与真实 PG/受控 HTTP JVM，不替代生成 Spring 应用的业务验收。EX21 接正式停止/换版，EX22 接运行恢复与管理生命周期，网页入口及原生完整工程验收仍按后续计划推进；新模式保持默认关闭。本轮只做本地提交，不推送、部署、修改私有 env、调用真实模型或 SMTP。

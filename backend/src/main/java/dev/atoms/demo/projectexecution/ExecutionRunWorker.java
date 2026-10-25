@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.net.*;
 import java.time.Duration;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeoutException;
 import org.springframework.transaction.PlatformTransactionManager;
 
@@ -23,12 +24,16 @@ final class ExecutionRunWorker {
     private final ExecutionDatabaseBinding databases;
     private final OwnedProcess.Preflight coordination;
     private final Launcher launcher;
+    private final Map<UUID, ExecutionRunProcess> owned = new ConcurrentHashMap<>();
 
     ExecutionRunWorker(ExecutionSettings settings, ExecutionRunService service, ExecutionRunRepository runs,
             PlatformTransactionManager transactions, ExecutionPaths paths, ExecutionToolchain tools,
             ExecutionDatabaseBinding databases, OwnedProcess.Preflight coordination) {
         this(settings, service, runs, transactions, paths, tools, databases, coordination, ExecutionRunProcess::start);
     }
+
+    /** Retains the original capability for coordinator cleanup; never reconstruct it from persistent IDs or ports. */
+    ExecutionRunProcess ownedProcess(UUID run) { return owned.get(run); }
     /** Package-private fixture seam. No executable, path, launcher or control callback is accepted from a user request. */
     ExecutionRunWorker(ExecutionSettings settings, ExecutionRunService service, ExecutionRunRepository runs,
             PlatformTransactionManager transactions, ExecutionPaths paths, ExecutionToolchain tools,
@@ -60,6 +65,7 @@ final class ExecutionRunWorker {
                 coordination.check(); verifyResources(claim); service.recheck(claim, execution);
                 grant.verify(claim.budget); portAvailable(claim.identity.binding().port());
             });
+            owned.put(run.id(), process);
             outcome = serve(claim, execution, process, command, journal);
         } catch (InterruptedException error) {
             interrupted = true; failure = "RUN_CANCELLED";
@@ -77,7 +83,10 @@ final class ExecutionRunWorker {
             }
             if (!attempted) return journal.notStarted(failure == null ? "RUN_START_FAILED" : failure);
             if (outcome == null) outcome = unknown(new ExecutionRunProcess.Output(0, 0));
-            return journal.finish(execution, outcome, failure);
+            var settled = journal.finish(execution, outcome, failure);
+            if (process != null && outcome.stopped() != null && !settled.executionPending()
+                    && outcome.stopped().digest().equals(settled.stoppedSha256())) owned.remove(run.id(), process);
+            return settled;
         } finally { if (interrupted) Thread.currentThread().interrupt(); }
     }
 
