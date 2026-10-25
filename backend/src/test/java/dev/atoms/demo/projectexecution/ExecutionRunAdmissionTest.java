@@ -202,6 +202,20 @@ class ExecutionRunAdmissionTest {
         verify(runs, times(1)).admit(owner, project, replacement);
     }
 
+    @Test void unknownPredecessorRemainsBlockedAndInvalidTargetDoesNotStopTheCurrentRun() throws Exception {
+        var unknown = resident(UUID.randomUUID(), "NEEDS_RECONCILIATION", true);
+        when(runs.stop(owner, project, run.id())).thenAnswer(call -> { inside(); return unknown; });
+        var blocked = service.replace(owner, project, run.id(), buildId, bindingId, null, "replace");
+        assertThat(blocked.stopping()).isEqualTo(unknown); assertThat(blocked.admission()).isNull();
+        verifyNoInteractions(databases, migrations); verify(runs, never()).admit(any(), any(), any());
+        doThrow(ExecutionRun.error(409, "RUN_BUILD_NOT_READY")).when(identities).identity(owner, project, buildId);
+        assertThatThrownBy(() -> service.replace(owner, project, run.id(), buildId, bindingId, null, "invalid"))
+                .isInstanceOf(dev.atoms.demo.common.ApiException.class);
+        verify(runs, times(1)).stop(owner, project, run.id());
+        assertThatThrownBy(() -> ExecutionRun.replacement(buildId, bindingId, null, null, "invalid"))
+                .isInstanceOf(dev.atoms.demo.common.ApiException.class);
+    }
+
     @Test void residentMonitoringChecksCurrentIdentityAndStopButNeverRestartsTheStartupDeadline() throws Exception {
         try (var deadlines = mockConstruction(ExecutionProcess.Deadline.class,
                 (deadline, context) -> when(deadline.remaining()).thenReturn(Duration.ofSeconds(120)))) {

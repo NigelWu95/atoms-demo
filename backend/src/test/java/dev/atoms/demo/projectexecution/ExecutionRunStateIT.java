@@ -114,6 +114,22 @@ class ExecutionRunStateIT {
         rejected(() -> repository.stop(nextOwner, project, run.id()));
     }
 
+    @Test void replacementRequiresTheExactSettledPredecessorAndKeepsOrdinaryKeysCompatible() {
+        var request = ExecutionRun.replacement(build, target.id(), null, run.id(), "replacement");
+        rejected(() -> repository.admit(owner, project, request));
+        var cancelled = repository.notStarted(run, "RUN_CANCELLED");
+        assertThat(repository.find(owner, project, request("one"))).isEqualTo(cancelled);
+        rejected(() -> repository.admit(owner, project, ExecutionRun.replacement(build, target.id(), null, UUID.randomUUID(), "missing")));
+        rejected(() -> repository.admit(owner, project, ExecutionRun.replacement(build, target.id(), null, run.id(), "one")));
+        var next = repository.admit(owner, project, request);
+        assertThat(next.requestSha256()).isEqualTo(request.bodyHash());
+        assertThat(repository.admit(owner, project, request)).isEqualTo(next);
+        assertThatThrownBy(() -> repository.admit(owner, project,
+                ExecutionRun.replacement(build, target.id(), null, UUID.randomUUID(), "replacement")))
+                .isInstanceOfSatisfying(dev.atoms.demo.common.ApiException.class, e -> assertThat(e.code()).isEqualTo("RUN_IDEMPOTENCY_CONFLICT"));
+        assertThat(repository.get(project, run.id())).isEqualTo(cancelled);
+    }
+
     @Test void onlyLiveHealthProofCanPublishReadyAndActualExitSettlesTheOriginalIntent() {
         repository.begin(run, execution);
         rejected(() -> repository.ready(run, execution, target, null));

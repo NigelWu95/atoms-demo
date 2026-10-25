@@ -35,7 +35,7 @@ class ExecutionRunWorkerTest {
     private UUID execution;
     private Path directory;
     private int launches, readyWrites, finishWrites, noLaunchWrites;
-    private boolean loseBeginCommit, loseReadyCommit, loseFinishCommit, failCompletion, loseCoordination, unknownProcess;
+    private boolean loseBeginCommit, loseReadyCommit, loseFinishCommit, failCompletion, loseCoordination, loseAuthorization, unknownProcess;
     private String mode = "wrong", recordedFailure;
 
     @BeforeEach void setup() throws Exception {
@@ -68,7 +68,9 @@ class ExecutionRunWorkerTest {
                 .withProperty("atoms.project-execution.root", paths.checkedRoot().toString())
                 .withProperty("atoms.project-execution.java", tools.javaHome().resolve("bin/java").toString());
         for (String key : List.of("node", "npm", "maven", "policy")) environment.withProperty("atoms.project-execution." + key, root.resolve(key).toString());
-        when(identities.identity(owner, project, buildId)).thenAnswer(call -> { inside(); return identity; });
+        when(identities.identity(owner, project, buildId)).thenAnswer(call -> {
+            inside(); if (loseAuthorization && readyWrites > 0) throw ExecutionRun.error(404, "PROJECT_NOT_FOUND"); return identity;
+        });
         when(runs.find(owner, project, request)).thenAnswer(call -> { inside(); return null; });
         when(runs.admit(owner, project, request)).thenAnswer(call -> { inside(); return initial; });
         when(runs.get(project, initial.id())).thenAnswer(call -> { inside(); return current; });
@@ -201,6 +203,14 @@ class ExecutionRunWorkerTest {
         worker.run(ticket());
         assertThat(readyWrites).isEqualTo(1); assertThat(recordedFailure).isEqualTo("RUN_COORDINATOR_UNAVAILABLE");
         assertThat(finishWrites).isEqualTo(1); assertStopped();
+    }
+
+    @Test void ownershipLostAfterReadyStillAllowsTheOriginalWorkerToStopAndSettle() throws Exception {
+        mode = "valid"; loseAuthorization = true;
+        worker.run(ticket());
+        assertThat(readyWrites).isEqualTo(1); assertThat(recordedFailure).isEqualTo("RUN_AUTHORIZATION_CHANGED");
+        assertThat(finishWrites).isEqualTo(1); assertStopped();
+        assertThat(worker.ownedProcess(initial.id())).isNull();
     }
 
     @Test void absentStopReceiptRetainsOwnershipAndNeverFallsBackToNoLaunch() throws Exception {

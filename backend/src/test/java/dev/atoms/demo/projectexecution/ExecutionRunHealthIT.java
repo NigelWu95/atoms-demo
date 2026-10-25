@@ -102,7 +102,7 @@ class ExecutionRunHealthIT {
                 assertThat(receipt.matches(stopped.id(), stopped.executionId(), executionRoot.resolve("runs/" + stopped.id()))).isTrue();
                 assertThat(stopped.stoppedSha256()).isEqualTo(receipt.digest());
                 assertThat(service.submit(OWNER, PROJECT, build.id(), target.id(), null, key).run()).isEqualTo(stopped);
-                var replacement = service.replace(OWNER, PROJECT, stopped.id(), nextBuild.id(), target.id(), null, replacementKey);
+                var replacement = concurrentReplacement(service, stopped.id(), nextBuild.id(), target.id(), replacementKey);
                 assertThat(replacement.stopping()).isNull(); assertThat(replacement.admission().ticket()).isNotNull();
                 future = threads.submit(() -> worker.run(replacement.admission().ticket()));
                 var nextReady = awaitReady(runs, replacement.admission().run().id(), future);
@@ -127,6 +127,11 @@ class ExecutionRunHealthIT {
                     assertThat(runs.get(PROJECT, nextStopped.id())).isEqualTo(nextStopped);
                     assertThat(new ExecutionBuildRepository(jdbc).get(PROJECT, nextBuild.id()).status()).isEqualTo("SUCCEEDED");
                 }
+                var cancelledAdmission = service.submit(OWNER, PROJECT, build.id(), target.id(), null, key + "-cancel-before-launch");
+                assertThat(service.stop(OWNER, PROJECT, cancelledAdmission.run().id()).executionId()).isNull();
+                var cancelled = worker.run(cancelledAdmission.ticket());
+                assertThat(cancelled.status()).isEqualTo("CANCELLED"); assertThat(cancelled.executionId()).isNull();
+                assertThat(launches).hasValue(2);
             } finally {
                 boolean settled = owned.get() == null;
                 if (owned.get() != null) {
@@ -139,6 +144,20 @@ class ExecutionRunHealthIT {
             }
         }
         assertThat(registry.history(PROJECT, budget())).isEqualTo(history);
+    }
+
+    private ExecutionRunService.Replacement concurrentReplacement(ExecutionRunService service, UUID previous, UUID build, UUID binding, String key) throws Exception {
+        var racers = Executors.newFixedThreadPool(2); var gate = new CyclicBarrier(2);
+        try {
+            Callable<ExecutionRunService.Replacement> request = () -> {
+                gate.await(5, TimeUnit.SECONDS); return service.replace(OWNER, PROJECT, previous, build, binding, null, key);
+            };
+            var first = racers.submit(request); var second = racers.submit(request);
+            var results = List.of(first.get(30, TimeUnit.SECONDS), second.get(30, TimeUnit.SECONDS));
+            assertThat(results.stream().map(value -> value.admission().run().id()).distinct().count()).isEqualTo(1);
+            var winners = results.stream().filter(value -> value.admission().ticket() != null).toList();
+            assertThat(winners).hasSize(1); return winners.get(0);
+        } finally { racers.shutdownNow(); assertThat(racers.awaitTermination(10, TimeUnit.SECONDS)).isTrue(); }
     }
 
     private ExecutionRun awaitReady(ExecutionRunRepository runs, UUID id, Future<ExecutionRun> future) throws Exception {
