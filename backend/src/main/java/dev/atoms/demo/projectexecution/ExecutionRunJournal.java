@@ -30,8 +30,13 @@ final class ExecutionRunJournal {
     ExecutionRun begin(UUID execution) throws IOException {
         return transact(() -> repository.begin(run, execution), true);
     }
-    ExecutionRun ready(UUID execution, ExecutionBindingRepository.Target target, ExecutionHealth.Confirmed proof) throws IOException {
-        return transact(() -> repository.ready(run, execution, target, proof), true);
+    ExecutionRun ready(UUID execution, ExecutionBindingRepository.Target target, ExecutionHealth.Confirmed proof,
+            dev.atoms.demo.execution.OwnedProcess.Budget budget) throws IOException {
+        return transact(() -> {
+            remaining(budget);
+            var result = repository.ready(run, execution, target, proof);
+            remaining(budget); return result;
+        }, true);
     }
     ExecutionRun notStarted(String failure) throws IOException {
         return transact(() -> repository.notStarted(run, failure), false);
@@ -51,6 +56,8 @@ final class ExecutionRunJournal {
             });
         } catch (RuntimeException error) {
             // Commit outcome may be unknown. Never retry here or expose driver/configuration details.
+            if (error instanceof dev.atoms.demo.common.ApiException api && api.code().equals("RUN_START_TIMEOUT"))
+                throw new IOException("RUN_START_TIMEOUT");
             throw new IOException("RUN_STATE_UNAVAILABLE");
         }
     }
@@ -58,5 +65,11 @@ final class ExecutionRunJournal {
         var current = settings.load();
         if (!current.equals(configuration) || !current.maintainerIds().contains(run.ownerId()))
             throw ExecutionRun.error(409, "RUN_CONFIGURATION_CHANGED");
+    }
+    private static void remaining(dev.atoms.demo.execution.OwnedProcess.Budget budget) {
+        try {
+            var left = budget.remaining();
+            if (Thread.currentThread().isInterrupted() || left == null || left.isNegative() || left.isZero()) throw new IOException();
+        } catch (IOException | RuntimeException error) { throw ExecutionRun.error(409, "RUN_START_TIMEOUT"); }
     }
 }

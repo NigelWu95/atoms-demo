@@ -101,19 +101,37 @@ final class ExecutionRunService {
 
     private void current(Claim claim, UUID execution) {
         tx(() -> {
-            var expected = claim.run;
-            sameConfiguration(expected.ownerId(), claim.configuration); remaining(claim.budget);
-            if (!identities.identity(expected.ownerId(), expected.projectId(), expected.buildId()).equals(claim.identity))
-                throw ExecutionRun.error(409, "RUN_MIGRATION_INPUT_CHANGED");
-            var row = runs.get(expected.projectId(), expected.id());
-            if (!row.ownerId().equals(expected.ownerId()) || !row.requestSha256().equals(expected.requestSha256())
-                    || !row.buildId().equals(expected.buildId()) || !row.sourceVersionId().equals(expected.sourceVersionId())
-                    || !row.jarSha256().equals(expected.jarSha256()) || !row.manifestSha256().equals(expected.manifestSha256())
-                    || !row.bindingIdentitySha256().equals(expected.bindingIdentitySha256()) || !row.status().equals("STARTING")
-                    || row.stopRequested() || row.finishedAt() != null || !Objects.equals(row.executionId(), execution)
-                    || row.executionPending() != (execution != null)) throw ExecutionRun.error(409, "RUN_STATE_CONFLICT");
-            sameConfiguration(expected.ownerId(), claim.configuration); remaining(claim.budget); return row;
+            remaining(claim.budget);
+            var row = boundRun(claim, execution);
+            if (!row.status().equals("STARTING") || row.stopRequested()) throw ExecutionRun.error(409, "RUN_STATE_CONFLICT");
+            remaining(claim.budget); return row;
         });
+    }
+
+    /** Resident monitoring checks current authorization and durable stop intent, never the expired startup clock or migration history. */
+    boolean stopRequested(Claim claim, UUID execution) throws IOException {
+        outsideTransaction();
+        if (claim == null || claim.issuer != this || execution == null) throw new IOException("RUN_INVOCATION_REJECTED");
+        return tx(() -> {
+            var row = boundRun(claim, execution);
+            if (!Set.of("STARTING", "READY", "STOPPING").contains(row.status())) throw ExecutionRun.error(409, "RUN_STATE_CONFLICT");
+            return row.stopRequested();
+        });
+    }
+
+    private ExecutionRun boundRun(Claim claim, UUID execution) {
+        var expected = claim.run;
+        sameConfiguration(expected.ownerId(), claim.configuration);
+        if (!identities.identity(expected.ownerId(), expected.projectId(), expected.buildId()).equals(claim.identity))
+            throw ExecutionRun.error(409, "RUN_MIGRATION_INPUT_CHANGED");
+        var row = runs.get(expected.projectId(), expected.id());
+        if (!row.ownerId().equals(expected.ownerId()) || !row.requestSha256().equals(expected.requestSha256())
+                || !row.buildId().equals(expected.buildId()) || !row.sourceVersionId().equals(expected.sourceVersionId())
+                || !row.jarSha256().equals(expected.jarSha256()) || !row.manifestSha256().equals(expected.manifestSha256())
+                || !row.bindingIdentitySha256().equals(expected.bindingIdentitySha256()) || row.finishedAt() != null
+                || !Objects.equals(row.executionId(), execution) || row.executionPending() != (execution != null))
+            throw ExecutionRun.error(409, "RUN_STATE_CONFLICT");
+        sameConfiguration(expected.ownerId(), claim.configuration); return row;
     }
 
     private void checkInputs(UUID owner, UUID project, UUID build, UUID review, ExecutionSettings.Configuration configuration,

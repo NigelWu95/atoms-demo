@@ -1522,3 +1522,11 @@ ticket 限原服务领取一次；持有的配置、产物、绑定和原单调�
 实际 `ExecutionRunService` / PG 仓库 / 源码读取 / 封存校验 / 物理库检查 / 迁移复核组合运行。两条事务连接通过真实 `pg_backend_pid()` 证明不同，在首次项目锁前同步，并在事务外完成迁移复查后再次同步：两请求只提交一个运行 UUID，只有一个取得 ticket。重放、同键异体、活动项目、非所有者、归档、篡改 JAR 和重复领取均校验；未发出执行意图的本次测试记录通过正式 `notStarted` 入口终结，不清理已执行或未知状态。业务历史前后完全相同。
 
 17:19:21 红灯明确缺少跨模块测试适配。17:22:54 首轮在创建执行根前失败，原因是测试把执行根放进平台仓库；已有保护正确拒绝，未改保护规则。源码快照保留，执行根改为显式仓库外目录。17:26:04，`-Dtest=ExecutionRunAdmissionTest -Pproject-execution-contract -Dit.test=ExecutionRunAdmissionIT -Dexecution.test-config-directory=<原配置目录> -Dexecution.runtime-fixture-root=<固定源码夹具根> -Dexecution.contract-directory=<仓库外执行父目录> verify`，**7 单元 + 1 项真实契约通过**，零失败/错误/跳过，2:02。两个主要测试文件；生产逻辑未修改。EX20e 完成，真正的进程启动及提交/退出组合由 f 继续验收。
+
+## 2026-10-25 · EX20f1 常驻状态监控与就绪提交期限
+
+内部 `stopRequested` 在短项目事务中复核原服务 claim、当前维护者、所有权/归档、封存构建与永久绑定、准确执行编号及活动状态，然后读取持久停止标记。READY 后不再读取原启动预算，也不反复执行迁移批准检查；迁移后的业务历史已经变化，不能用启动前的批准摘要误杀正常常驻应用。调用者已有事务时仍拒绝，外部停止与原进程收尾由 worker 接线。
+
+READY 提交新增显式共享预算参数，在仓库写入前后检查原剩余期限；等待事务锁等期间过期则回滚，返回固定 `RUN_START_TIMEOUT`，不会另开一个启动窗口。边界测试使用可控预算，在写入前耗尽和写入后耗尽均不提交；监控测试将原启动预算置零，仍能查询真实绑定的 READY/STOPPING 元数据，并拒绝错执行及配置撤销。
+
+独立红灯明确缺少监控入口与预算参数；17:32:42，`-Dtest=ExecutionRunAdmissionTest,ExecutionRunJournalTest,ExecutionRunProcessTest -Dit.test=ExecutionRunStateIT,ExecutionRunIT verify`，**24 单元 + 13 项 PG 集成通过**，零失败/错误/跳过，2:41，平台打包成功。4 个主要文件，没有业务迁移或新运行启动；f2 继续完成真实进程组合。

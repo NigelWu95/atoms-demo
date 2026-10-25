@@ -92,6 +92,18 @@ class ExecutionRunJournalTest {
         verifyNoInteractions(repository);
     }
 
+    @Test void readyCommitCannotOutliveTheOriginalStartupBudget() {
+        assertThatThrownBy(() -> journal.ready(execution, null, null, () -> java.time.Duration.ZERO))
+                .hasMessage("RUN_START_TIMEOUT");
+        verifyNoInteractions(repository);
+        var checks = new java.util.concurrent.atomic.AtomicInteger();
+        when(repository.ready(run, execution, null, null)).thenReturn(run);
+        assertThatThrownBy(() -> journal.ready(execution, null, null,
+                () -> checks.incrementAndGet() == 1 ? java.time.Duration.ofSeconds(1) : java.time.Duration.ZERO))
+                .hasMessage("RUN_START_TIMEOUT");
+        assertThat(transactions.commits).isZero(); assertThat(transactions.rollbacks).isEqualTo(2);
+    }
+
     private void unavailable(org.assertj.core.api.ThrowableAssert.ThrowingCallable action) {
         assertThatThrownBy(action).isInstanceOf(java.io.IOException.class).hasMessage("RUN_STATE_UNAVAILABLE")
                 .hasNoCause().hasNoSuppressedExceptions();

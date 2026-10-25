@@ -136,6 +136,30 @@ class ExecutionRunAdmissionTest {
         verify(runs, times(1)).admit(owner, project, request);
     }
 
+    @Test void residentMonitoringChecksCurrentIdentityAndStopButNeverRestartsTheStartupDeadline() throws Exception {
+        try (var deadlines = mockConstruction(ExecutionProcess.Deadline.class,
+                (deadline, context) -> when(deadline.remaining()).thenReturn(Duration.ofSeconds(120)))) {
+            var claim = service.take(submit().ticket()); UUID execution = UUID.randomUUID();
+            var ready = resident(execution, "READY", false);
+            doReturn(ready).when(runs).get(project, run.id());
+            when(deadlines.constructed().get(0).remaining()).thenReturn(Duration.ZERO);
+            assertThat(service.stopRequested(claim, execution)).isFalse();
+            assertThatThrownBy(() -> service.stopRequested(claim, UUID.randomUUID())).isInstanceOf(dev.atoms.demo.common.ApiException.class);
+            doReturn(resident(execution, "STOPPING", true)).when(runs).get(project, run.id());
+            assertThat(service.stopRequested(claim, execution)).isTrue();
+            environment.withProperty("atoms.project-execution.enabled", "false");
+            assertThatThrownBy(() -> service.stopRequested(claim, execution)).isInstanceOf(dev.atoms.demo.common.ApiException.class);
+            // The only business DB/migration check was admission; polling must not re-run a migration or its old approval.
+            verify(databases, times(1)).verify(eq(project), any());
+            verify(migrations, times(1)).requireCompatible(eq(owner), eq(project), eq(buildId), isNull(), any(), any());
+        }
+    }
+    private ExecutionRun resident(UUID execution, String status, boolean stopping) {
+        return new ExecutionRun(run.id(), project, owner, buildId, run.sourceVersionId(), bindingId, null,
+                run.treeSha256(), run.jarSha256(), run.manifestSha256(), run.bindingIdentitySha256(), run.keySha256(), run.requestSha256(),
+                status, stopping, execution, true, null, null, run.createdAt(), Instant.now(), null);
+    }
+
     private ExecutionRunService.Admission submit() throws IOException { return service.submit(owner, project, buildId, bindingId, null, "once"); }
     private void inside() { assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isTrue(); }
     private void outside() { assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse(); }
