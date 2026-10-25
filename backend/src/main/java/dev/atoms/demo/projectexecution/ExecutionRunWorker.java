@@ -4,6 +4,7 @@ import dev.atoms.demo.common.ApiException;
 import dev.atoms.demo.execution.OwnedProcess;
 import java.io.IOException;
 import java.net.*;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -12,6 +13,9 @@ import org.springframework.transaction.PlatformTransactionManager;
 
 /** Holds one runtime for its entire lifetime. A future coordinator supplies its exclusive lease and bounded executor. */
 final class ExecutionRunWorker {
+    @FunctionalInterface interface ToolCapture {
+        ExecutionToolchain load(ExecutionRunService.Claim claim) throws IOException;
+    }
     @FunctionalInterface interface Launcher {
         ExecutionRunProcess start(ProcessBuilder command, UUID run, UUID execution, OwnedProcess.Budget budget, OwnedProcess.Preflight preflight) throws IOException;
     }
@@ -20,7 +24,7 @@ final class ExecutionRunWorker {
     private final ExecutionRunRepository runs;
     private final PlatformTransactionManager transactions;
     private final ExecutionPaths paths;
-    private final ExecutionToolchain tools;
+    private final ToolCapture toolCapture;
     private final ExecutionDatabaseBinding databases;
     private final OwnedProcess.Preflight coordination;
     private final Launcher launcher;
@@ -34,12 +38,33 @@ final class ExecutionRunWorker {
 
     /** Retains the original capability for coordinator cleanup; never reconstruct it from persistent IDs or ports. */
     ExecutionRunProcess ownedProcess(UUID run) { return owned.get(run); }
+    boolean hasHeldProcesses() { return !owned.isEmpty(); }
+    void requestStopOwned() { owned.values().forEach(ExecutionRunProcess::requestStop); }
+
+    /** Capture tools after taking the original claim, using its remaining startup budget, never during application boot. */
+    static ExecutionRunWorker nativeWorker(ExecutionSettings settings, ExecutionRunService service, ExecutionRunRepository runs,
+            PlatformTransactionManager transactions, ExecutionPaths paths, List<Path> protectedRoots,
+            ExecutionDatabaseBinding databases, OwnedProcess.Preflight coordination) {
+        var roots = List.copyOf(protectedRoots);
+        return new ExecutionRunWorker(settings, service, runs, transactions, paths, claim -> {
+            var config = claim.configuration;
+            var excluded = new ArrayList<>(roots); excluded.add(config.root());
+            return ExecutionToolchain.capture(new ExecutionToolchain.Locations(config.node(), config.npm(), config.java(), config.maven()),
+                    excluded, claim.budget);
+        }, databases, coordination, ExecutionRunProcess::start);
+    }
     /** Package-private fixture seam. No executable, path, launcher or control callback is accepted from a user request. */
     ExecutionRunWorker(ExecutionSettings settings, ExecutionRunService service, ExecutionRunRepository runs,
             PlatformTransactionManager transactions, ExecutionPaths paths, ExecutionToolchain tools,
             ExecutionDatabaseBinding databases, OwnedProcess.Preflight coordination, Launcher launcher) {
+        this(settings, service, runs, transactions, paths, claim -> tools, databases, coordination, launcher);
+    }
+
+    ExecutionRunWorker(ExecutionSettings settings, ExecutionRunService service, ExecutionRunRepository runs,
+            PlatformTransactionManager transactions, ExecutionPaths paths, ToolCapture toolCapture,
+            ExecutionDatabaseBinding databases, OwnedProcess.Preflight coordination, Launcher launcher) {
         this.settings = settings; this.service = service; this.runs = runs; this.transactions = transactions;
-        this.paths = paths; this.tools = tools; this.databases = databases;
+        this.paths = paths; this.toolCapture = Objects.requireNonNull(toolCapture); this.databases = databases;
         this.coordination = Objects.requireNonNull(coordination); this.launcher = Objects.requireNonNull(launcher);
     }
 
@@ -52,7 +77,9 @@ final class ExecutionRunWorker {
         boolean attempted = false, committed = false, interrupted = false;
         String failure = null;
         try {
-            coordination.check(); verifyResources(claim); service.recheck(claim, null);
+            coordination.check(); remaining(claim.budget);
+            var tools = toolCapture.load(claim);
+            remaining(claim.budget); verifyResources(claim, tools); service.recheck(claim, null);
             var command = ExecutionRunCommand.prepare(paths, run.id(), execution, tools, claim.artifact,
                     claim.identity.build(), claim.identity.binding(), claim.budget);
             var grant = databases.authorizeLaunch(run.projectId(), run.id(), execution, command, claim.budget);
@@ -62,7 +89,7 @@ final class ExecutionRunWorker {
             journal.begin(execution); // Commit acknowledgement is required before calling even the launcher adapter.
             committed = true;
             process = launcher.start(builder, run.id(), execution, claim.budget, () -> {
-                coordination.check(); verifyResources(claim); service.recheck(claim, execution);
+                coordination.check(); verifyResources(claim, tools); service.recheck(claim, execution);
                 grant.verify(claim.budget); portAvailable(claim.identity.binding().port());
             });
             owned.put(run.id(), process);
@@ -111,7 +138,7 @@ final class ExecutionRunWorker {
             }
         }
     }
-    private void verifyResources(ExecutionRunService.Claim claim) throws IOException {
+    private void verifyResources(ExecutionRunService.Claim claim, ExecutionToolchain tools) throws IOException {
         if (!paths.checkedRoot().equals(claim.configuration.root())
                 || !claim.configuration.java().toRealPath().equals(tools.javaHome().resolve("bin/java")))
             throw new IOException("RUN_CONFIGURATION_CHANGED");

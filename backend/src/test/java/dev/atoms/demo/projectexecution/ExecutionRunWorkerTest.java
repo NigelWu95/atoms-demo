@@ -34,7 +34,8 @@ class ExecutionRunWorkerTest {
     private ExecutionRunProcess.Outcome completed;
     private UUID execution;
     private Path directory;
-    private int launches, readyWrites, finishWrites, noLaunchWrites;
+    private int launches, readyWrites, finishWrites, noLaunchWrites, toolCaptures;
+    private boolean failToolCapture;
     private boolean loseBeginCommit, loseReadyCommit, loseFinishCommit, failCompletion, loseCoordination, loseAuthorization, unknownProcess;
     private String mode = "wrong", recordedFailure;
 
@@ -107,7 +108,13 @@ class ExecutionRunWorkerTest {
         service = new ExecutionRunService(settings, runs, identities, transactions, paths, databases, mock(ExecutionMigrationReview.class));
         var unsettled = mock(ExecutionRunProcess.class);
         when(unsettled.await(any())).thenReturn(new ExecutionRunProcess.Outcome("RUN_PROCESS_UNSETTLED", new ExecutionRunProcess.Output(1, 1), null));
-        worker = new ExecutionRunWorker(settings, service, runs, transactions, paths, tools, databases, () -> {
+        worker = new ExecutionRunWorker(settings, service, runs, transactions, paths, claim -> {
+            outside(); toolCaptures++;
+            assertThat(claim.run).isEqualTo(initial);
+            assertThat(claim.budget.remaining()).isPositive().isLessThanOrEqualTo(claim.configuration.startTimeout());
+            if (failToolCapture) throw new IOException("EXECUTION_TIMEOUT");
+            return tools;
+        }, databases, () -> {
             if (loseCoordination && readyWrites > 0) throw new IOException("RUN_COORDINATOR_UNAVAILABLE");
         }, (prepared, run, exec, budget, preflight) -> {
             outside(); assertThat(current.executionPending()).isTrue(); assertThat(current.executionId()).isEqualTo(exec);
@@ -126,6 +133,24 @@ class ExecutionRunWorkerTest {
         });
     }
 
+    @Test void toolChecksAreLazyAndUseTheAdmittedStartupDeadlineBeforeAnyIntent() throws Exception {
+        assertThat(toolCaptures).isZero();
+        var ticket = ticket(); assertThat(toolCaptures).isZero(); failToolCapture = true;
+        worker.run(ticket);
+        assertThat(toolCaptures).isEqualTo(1); assertThat(recordedFailure).isEqualTo("RUN_START_TIMEOUT");
+        assertThat(noLaunchWrites).isEqualTo(1); assertThat(launches).isZero(); assertThat(execution).isNull();
+        assertThat(worker.hasHeldProcesses()).isFalse(); worker.requestStopOwned();
+    }
+
+    @Test void nativeWorkerCapturesConfiguredToolsOnlyAfterTakingAFreshTicket() throws Exception {
+        var nativeWorker = ExecutionRunWorker.nativeWorker(new ExecutionSettings(environment), service, runs, transactions,
+                paths, List.of(temporary.resolve("source")), databases, () -> {});
+        assertThat(noLaunchWrites).isZero(); assertThat(nativeWorker.hasHeldProcesses()).isFalse();
+        nativeWorker.run(ticket()); // This fixture deliberately has no configured native node/npm/Maven files.
+        assertThat(recordedFailure).isEqualTo("RUN_START_FAILED"); assertThat(noLaunchWrites).isEqualTo(1);
+        assertThat(execution).isNull(); assertThat(launches).isZero(); assertThat(nativeWorker.hasHeldProcesses()).isFalse();
+    }
+
     @org.junit.jupiter.params.ParameterizedTest
     @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
     void failedCompletionRetainsTheOriginalOwnerAndNeverRetriesTheWrite(boolean commitAcknowledgement) throws Exception {
@@ -133,6 +158,8 @@ class ExecutionRunWorkerTest {
         assertThatThrownBy(() -> worker.run(ticket())).hasMessage("RUN_STATE_UNAVAILABLE").hasNoCause().hasNoSuppressedExceptions();
         assertThat(finishWrites).isEqualTo(1); assertThat(noLaunchWrites).isZero();
         assertStopped(); assertThat(worker.ownedProcess(initial.id())).isSameAs(process);
+        assertThat(worker.hasHeldProcesses()).isTrue(); worker.requestStopOwned();
+        assertThat(worker.hasHeldProcesses()).isTrue(); // A stop signal cannot discard an unacknowledged completion.
     }
 
     @Test void wrongHealthStopsTheActualChildWithoutPublishingReady() throws Exception {
