@@ -84,6 +84,40 @@ class ExecutionRunAdmissionTest {
         verifyNoInteractions(identities, databases, migrations); verify(runs, never()).admit(any(), any(), any());
     }
 
+    @Test void authorizedLookupDoesNotAdmitOrInspectArtifactsAndRechecksConfiguration() throws Exception {
+        Files.writeString(artifact.jar(), "not-needed-for-replay");
+        assertThat(service.existing(owner, project, request)).isNull();
+        doReturn(run).when(runs).find(owner, project, request);
+        assertThat(service.existing(owner, project, request)).isEqualTo(run);
+        verifyNoInteractions(identities, databases, migrations);
+        verify(runs, never()).admit(any(), any(), any());
+        assertThatThrownBy(() -> service.existing(UUID.randomUUID(), project, request)).isInstanceOf(dev.atoms.demo.common.ApiException.class);
+        new TransactionTemplate(transactions).executeWithoutResult(tx ->
+                assertThatThrownBy(() -> service.existing(owner, project, request)).hasMessage("EXECUTION_TRANSACTION_ACTIVE"));
+        when(runs.find(owner, project, request)).thenAnswer(call -> {
+            inside(); environment.withProperty("atoms.project-execution.start-timeout-seconds", "119"); return run;
+        });
+        assertThatThrownBy(() -> service.existing(owner, project, request)).isInstanceOfSatisfying(dev.atoms.demo.common.ApiException.class,
+                e -> assertThat(e.code()).isEqualTo("RUN_CONFIGURATION_CHANGED"));
+    }
+
+    @Test void replacementPreparationCannotAdmitEvenWhenThePredecessorHasAlreadyStopped() throws Exception {
+        var stopped = new ExecutionRun(run.id(), project, owner, buildId, run.sourceVersionId(), bindingId, null,
+                run.treeSha256(), run.jarSha256(), run.manifestSha256(), run.bindingIdentitySha256(), run.keySha256(), run.requestSha256(),
+                "STOPPED", true, UUID.randomUUID(), false, "a".repeat(64), null, run.createdAt(), Instant.now(), Instant.now());
+        var replacement = ExecutionRun.replacement(buildId, bindingId, null, run.id(), "replace");
+        when(runs.stop(owner, project, run.id())).thenAnswer(call -> { inside(); return stopped; });
+        Files.writeString(artifact.jar(), "must-not-be-opened-before-reserving-capacity");
+        var step = service.prepareReplacement(owner, project, replacement);
+        assertThat(step.stopping()).isEqualTo(stopped); assertThat(step.admission()).isNull();
+        verifyNoInteractions(databases, migrations); verify(runs, never()).admit(any(), any(), any());
+        doReturn(run).when(runs).find(owner, project, replacement);
+        var replay = service.prepareReplacement(owner, project, replacement);
+        assertThat(replay.admission().run()).isEqualTo(run); assertThat(replay.admission().ticket()).isNull();
+        verify(runs, times(1)).stop(owner, project, run.id());
+        assertThatThrownBy(() -> service.prepareReplacement(owner, project, request)).isInstanceOf(dev.atoms.demo.common.ApiException.class);
+    }
+
     @Test void winnerAtFinalProjectLockTurnsTheSecondRequestIntoReplay() throws Exception {
         doReturn(null, run).when(runs).find(owner, project, request);
         var replay = submit(); assertThat(replay.run()).isEqualTo(run); assertThat(replay.ticket()).isNull();

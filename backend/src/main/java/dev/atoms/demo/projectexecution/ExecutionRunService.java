@@ -44,25 +44,41 @@ final class ExecutionRunService {
 
     /** Two-phase, retryable command. No transaction/thread waits for another process and no unknown start is replayed. */
     Replacement replace(UUID owner, UUID project, UUID predecessor, UUID build, UUID binding, UUID review, String key) throws IOException {
-        outsideTransaction(); var configuration = authorize(owner);
-        if (project == null) throw ExecutionRun.error(422, "RUN_INVALID_INPUT");
         var request = ExecutionRun.replacement(build, binding, review, predecessor, key);
-        var result = tx(() -> {
+        var result = prepareReplacement(owner, project, request);
+        if (result.admission() != null || result.stopping().finishedAt() == null || result.stopping().executionPending()) return result;
+        return new Replacement(null, submit(owner, project, request));
+    }
+
+    /** Short authorized lookup for replay even when the resident pool is full. Never creates a ticket. */
+    ExecutionRun existing(UUID owner, UUID project, ExecutionRun.Request request) throws IOException {
+        outsideTransaction(); var configuration = authorize(owner);
+        if (project == null || !ExecutionRun.valid(request)) throw ExecutionRun.error(422, "RUN_INVALID_INPUT");
+        return tx(() -> {
+            sameConfiguration(owner, configuration);
+            var row = runs.find(owner, project, request);
+            sameConfiguration(owner, configuration); return row;
+        });
+    }
+
+    /** Stop phase only: a dispatcher must reserve capacity before asking submit to validate/start the replacement. */
+    Replacement prepareReplacement(UUID owner, UUID project, ExecutionRun.Request request) throws IOException {
+        outsideTransaction(); var configuration = authorize(owner);
+        if (project == null || !ExecutionRun.valid(request) || request.predecessor() == null)
+            throw ExecutionRun.error(422, "RUN_INVALID_INPUT");
+        return tx(() -> {
             sameConfiguration(owner, configuration);
             var existing = runs.find(owner, project, request);
             Replacement step;
             if (existing != null) step = new Replacement(null, new Admission(existing, null));
             else {
                 // Reject a missing/failed target before stopping a currently serving version.
-                var identity = identities.identity(owner, project, build);
-                if (!identity.binding().id().equals(binding)) throw ExecutionRun.error(409, "RUN_DB_BINDING_CONFLICT");
-                step = new Replacement(runs.stop(owner, project, predecessor), null);
+                var identity = identities.identity(owner, project, request.build());
+                if (!identity.binding().id().equals(request.binding())) throw ExecutionRun.error(409, "RUN_DB_BINDING_CONFLICT");
+                step = new Replacement(runs.stop(owner, project, request.predecessor()), null);
             }
             sameConfiguration(owner, configuration); return step;
         });
-        if (result.admission() != null || result.stopping().finishedAt() == null || result.stopping().executionPending()) return result;
-        // Full artifact/physical DB/migration validation happens only after the old run is durably settled.
-        return new Replacement(null, submit(owner, project, request));
     }
     /** Created only for the request that inserted a row. No reconstruction from a persisted run ID. */
     static final class Ticket {
@@ -87,10 +103,10 @@ final class ExecutionRunService {
     Admission submit(UUID owner, UUID project, UUID build, UUID binding, UUID review, String key) throws IOException {
         return submit(owner, project, ExecutionRun.request(build, binding, review, key));
     }
-    private Admission submit(UUID owner, UUID project, ExecutionRun.Request request) throws IOException {
+    Admission submit(UUID owner, UUID project, ExecutionRun.Request request) throws IOException {
         outsideTransaction();
         var configuration = authorize(owner);
-        if (project == null) throw ExecutionRun.error(422, "RUN_INVALID_INPUT");
+        if (project == null || !ExecutionRun.valid(request)) throw ExecutionRun.error(422, "RUN_INVALID_INPUT");
         UUID build = request.build(), binding = request.binding(), review = request.review();
         var budget = new ExecutionProcess.Deadline(configuration.startTimeout());
         var initial = tx(() -> {

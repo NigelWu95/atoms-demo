@@ -28,6 +28,15 @@ final class ExecutionRuntimeResources {
     ExecutionRunService.Admission submit(UUID owner, UUID project, UUID build, UUID binding, UUID review, String key) throws IOException {
         control.check(); return service.submit(owner, project, build, binding, review, key);
     }
+    ExecutionRun existing(UUID owner, UUID project, ExecutionRun.Request request) throws IOException {
+        control.check(); return service.existing(owner, project, request);
+    }
+    ExecutionRunService.Replacement prepareReplacement(UUID owner, UUID project, ExecutionRun.Request request) throws IOException {
+        control.check(); return service.prepareReplacement(owner, project, request);
+    }
+    ExecutionRunService.Admission submit(UUID owner, UUID project, ExecutionRun.Request request) throws IOException {
+        control.check(); return service.submit(owner, project, request);
+    }
     ExecutionRunService.Replacement replace(UUID owner, UUID project, UUID predecessor, UUID build, UUID binding, UUID review, String key) throws IOException {
         control.check(); return service.replace(owner, project, predecessor, build, binding, review, key);
     }
