@@ -26,7 +26,7 @@ public final class ExecutionRunCrashProbe {
             database.setPassword(input.getProperty("password")); database.setMaximumPoolSize(3);
             database.setMinimumIdle(0); database.setConnectionTimeout(3000);
             var jdbc = new JdbcTemplate(database); jdbc.setQueryTimeout(3);
-            if (!"atoms_demo_test.atoms_verify_20261024_ex16".equals(
+            if (!ExecutionTestTarget.DATABASE_SCHEMA.equals(
                     jdbc.queryForObject("SELECT current_database() || '.' || current_schema()", String.class)))
                 throw new IllegalStateException();
             var lease = new ExecutionCoordinatorLease(database);

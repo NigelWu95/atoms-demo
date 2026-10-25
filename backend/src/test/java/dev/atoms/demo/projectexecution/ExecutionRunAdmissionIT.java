@@ -36,7 +36,7 @@ class ExecutionRunAdmissionIT {
 
     @Test void twoConnectionsProduceOneDurableRunAndOneTicketWithRealInputRechecks() throws Exception {
         assertThat(jdbc.queryForObject("SELECT current_database() || '.' || current_schema()", String.class))
-                .isEqualTo("atoms_demo_test.atoms_verify_20261024_ex16");
+                .isEqualTo(ExecutionTestTarget.DATABASE_SCHEMA);
         Path root = required("execution.runtime-fixture-root"), configuration = required("execution.test-config-directory");
         Path executionParent = required("execution.contract-directory");
         assertThat(jdbc.queryForMap("SELECT owner_id,archived FROM projects WHERE id=?", PROJECT))

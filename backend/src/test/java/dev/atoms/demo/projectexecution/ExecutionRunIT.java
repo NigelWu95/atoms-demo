@@ -23,7 +23,7 @@ class ExecutionRunIT {
 
     @BeforeEach void metadata() {
         assertThat(jdbc.queryForObject("SELECT current_database() || '.' || current_schema()", String.class))
-                .isEqualTo("atoms_demo_test.atoms_verify_20261024_ex16");
+                .isEqualTo(ExecutionTestTarget.DATABASE_SCHEMA);
         repository = new ExecutionRunRepository(jdbc);
         jdbc.update("INSERT INTO guest_users(id) VALUES (?)", owner);
         jdbc.update("INSERT INTO projects(id,owner_id,name) VALUES (?,?,'run-metadata-fixture')", project, owner);

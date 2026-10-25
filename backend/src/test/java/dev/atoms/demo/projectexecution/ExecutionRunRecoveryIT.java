@@ -38,7 +38,7 @@ class ExecutionRunRecoveryIT {
     @ParameterizedTest @EnumSource(ExecutionRunCrashProbe.Window.class)
     void actualCoordinatorCrashNeverReplaysOrAdoptsThePreviousApplication(ExecutionRunCrashProbe.Window window) throws Exception {
         assertThat(jdbc.queryForObject("SELECT current_database() || '.' || current_schema()", String.class))
-                .isEqualTo("atoms_demo_test.atoms_verify_20261024_ex16");
+                .isEqualTo(ExecutionTestTarget.DATABASE_SCHEMA);
         Path parent = required("execution.contract-directory"), configuration = required("execution.test-config-directory");
         var registry = ExecutionDatabaseBinding.load(Map.of(PROJECT, configuration.resolve(ExecutionBindingContractIT.A_DB + ".properties")),
                 List.of(parent), Set.of("atoms_demo", "atoms_demo_test"), Set.of("postgres", "atoms_test"));

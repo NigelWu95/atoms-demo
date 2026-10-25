@@ -36,7 +36,7 @@ class ExecutionRunHealthIT {
 
     @Test void committedIntentPrecedesOneActualLaunchAndStopEvidenceSettlesItWhileForeignPortsRemainUntouched() throws Exception {
         assertThat(jdbc.queryForObject("SELECT current_database() || '.' || current_schema()", String.class))
-                .isEqualTo("atoms_demo_test.atoms_verify_20261024_ex16");
+                .isEqualTo(ExecutionTestTarget.DATABASE_SCHEMA);
         Path root = required("execution.runtime-fixture-root"), parent = required("execution.contract-directory");
         Path configuration = required("execution.test-config-directory");
         assertThat(jdbc.queryForObject("SELECT count(*) FROM execution_runs WHERE project_id=? AND finished_at IS NULL", Integer.class, PROJECT)).isZero();
