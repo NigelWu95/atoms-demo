@@ -34,7 +34,7 @@ class ExecutionRunStateIT {
 
     @BeforeEach void metadata() throws Exception {
         assertThat(jdbc.queryForObject("SELECT current_database() || '.' || current_schema()", String.class))
-                .isEqualTo("atoms_demo_test.atoms_verify_20261024_ex16");
+                .isEqualTo(ExecutionTestTarget.DATABASE_SCHEMA);
         int port;
         try (var socket = new ServerSocket()) { socket.bind(new InetSocketAddress("127.0.0.1", 0)); port = socket.getLocalPort(); }
         repository = new ExecutionRunRepository(jdbc);
