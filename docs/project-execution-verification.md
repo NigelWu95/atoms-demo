@@ -1512,3 +1512,5 @@ EX19 完成，C-EX07 仍等待 EX20/21。下一项 EX20 接入当前授权、业
 ticket 限原服务领取一次；持有的配置、产物、绑定和原单调启动预算随 claim 传递。`recheck` 在实际命令准备前（尚无执行编号）、及之后的进程 preflight（准确执行编号）重新核对当前元数据、固定版本/产物、物理绑定、迁移批准和权限，拒绝改版、停止、完成或配置变化。该组合还没有 Spring 调度或 HTTP 入口，持有执行根不等于已经取得数据库协调租约；后续 worker 必须接入当前独占协调权。
 
 17:04:46，新测试独立红灯缺少服务类型。17:06:53 首轮失败发生在 Mockito 重设 `when` 时触发旧 answer 的事务断言（3 项），没有删除/放宽断言；改用 `doReturn` / `doAnswer` 重设。17:09:39，`-Dtest=ExecutionRunAdmissionTest,ExecutionRunJournalTest,ExecutionArtifactReopenTest,ExecutionMigrationReviewTest -Dit.test=ExecutionRunStateIT,ExecutionRunIT,ExecutionMigrationReviewIT verify`，**23 单元 + 18 项相关集成通过**，零失败/错误/跳过，1:35，平台打包通过。7 项新组件测试覆盖单次领取、原预算复用、重放、最终锁竞争替身、改 JAR/错库/迁移失败、权限漂移及提交回执失败；封存文件真实，元数据/业务库/迁移依赖为明确受控替身，不宣称真实双连接准入或生成应用启动验收。e2 与 f 仍待完成，EX20 不勾选整体完成。
+
+本轮收尾只读核对原批准 schema：V027/V028 成功，2 项目/2 端口的原业务绑定不变；运行、未结束运行、批准、共享占位和绑定锁均为 0。未清理其他旧故障现场。8 个实际私有值与本轮公开差异及平台包内 classes/resources 核对，零匹配。15 份 EX20 日志（包含红灯、失败和变异）已归档到忽略目录 `.local/ex20-progress-evidence-q5leastt`，目录 0700、文件 0600。已本地提交，未推送、部署、改私有 env、调用模型或 SMTP；默认旧网页流程不变。接下来完成 e2 真实并发准入及 f 启动 worker，再验收 EX20 整体。
