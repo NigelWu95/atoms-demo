@@ -62,6 +62,21 @@ public final class OwnedProcess {
     @FunctionalInterface public interface Decoder<T> { T read(InputStream stream) throws IOException; }
     @FunctionalInterface public interface Preflight { void check() throws IOException; }
     public record Result<T>(T summary, Stopped stopped) {}
+    /** Read-only identity of the actual root process; liveness is not health or stop evidence. */
+    public static final class Running {
+        private final Process process;
+        private final java.util.UUID task, execution;
+        private final java.nio.file.Path directory;
+        private Running(Process process, java.util.UUID task, java.util.UUID execution, java.nio.file.Path directory) {
+            this.process = process; this.task = task; this.execution = execution;
+            this.directory = directory.toAbsolutePath().normalize();
+        }
+        public boolean matches(java.util.UUID task, java.util.UUID execution, java.nio.file.Path directory) {
+            return this.task.equals(task) && this.execution.equals(execution)
+                    && directory != null && this.directory.equals(directory.toAbsolutePath().normalize());
+        }
+        public boolean isAlive() { return process.isAlive(); }
+    }
     /** Issued only after this owner's processes and I/O have settled; never reconstructed from a PID. */
     public static final class Stopped {
         private final java.util.UUID task, execution;
@@ -95,22 +110,31 @@ public final class OwnedProcess {
     public <T> Result<T> run(ProcessBuilder builder, String prompt, Budget deadline, BooleanSupplier cancelled,
                              java.util.UUID task, java.util.UUID execution, Decoder<T> decoder, Preflight preflight) throws IOException {
         return run(builder, prompt, deadline, cancelled, task, execution, decoder,
-                stream -> { discard(stream); return null; }, preflight, Policy.AGENT);
+                stream -> { discard(stream); return null; }, preflight, ignored -> {}, Policy.AGENT);
     }
 
     /** Trusted in-process caller only. It owns argv/environment and bounded decoders; no shell or HTTP API. */
     public <T> Result<T> runCommand(ProcessBuilder builder, Budget deadline, BooleanSupplier cancelled,
                                     java.util.UUID task, java.util.UUID execution, Decoder<T> stdout,
                                     Decoder<Void> stderr, Preflight preflight) throws IOException {
-        return run(builder, "", deadline, cancelled, task, execution, stdout, stderr, preflight, Policy.EXECUTION);
+        return runObservedCommand(builder, deadline, cancelled, task, execution, stdout, stderr, preflight, ignored -> {});
+    }
+
+    /** Callback runs once after launch and I/O ownership; callback failure still settles owned processes. */
+    public <T> Result<T> runObservedCommand(ProcessBuilder builder, Budget deadline, BooleanSupplier cancelled,
+                                    java.util.UUID task, java.util.UUID execution, Decoder<T> stdout,
+                                    Decoder<Void> stderr, Preflight preflight,
+                                    java.util.function.Consumer<Running> started) throws IOException {
+        return run(builder, "", deadline, cancelled, task, execution, stdout, stderr, preflight, started, Policy.EXECUTION);
     }
 
     private <T> Result<T> run(ProcessBuilder builder, String prompt, Budget deadline, BooleanSupplier cancelled,
                               java.util.UUID task, java.util.UUID execution, Decoder<T> decoder,
-                              Decoder<Void> errorDecoder, Preflight preflight, Policy policy) throws IOException {
+                              Decoder<Void> errorDecoder, Preflight preflight,
+                              java.util.function.Consumer<Running> started, Policy policy) throws IOException {
         java.util.Objects.requireNonNull(task); java.util.Objects.requireNonNull(execution);
         java.util.Objects.requireNonNull(decoder); java.util.Objects.requireNonNull(errorDecoder);
-        java.util.Objects.requireNonNull(preflight);
+        java.util.Objects.requireNonNull(preflight); java.util.Objects.requireNonNull(started);
         byte[] input = prompt.getBytes(StandardCharsets.UTF_8);
         if (input.length > (1 << 20) || prompt.indexOf('\0') >= 0
                 || builder.directory() == null || !builder.directory().isAbsolute()
@@ -149,6 +173,7 @@ public final class OwnedProcess {
                 try (var stream = process.getOutputStream()) { stream.write(input); }
                 return null;
             });
+            started.accept(new Running(process, task, execution, builder.directory().toPath()));
             while (true) {
                 check(deadline, cancelled, policy); owner.observe();
                 if (owner.uncertain) throw new IOException(policy.code("PROCESS_UNSETTLED"));

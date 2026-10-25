@@ -267,7 +267,11 @@ U/I/REAL/ALL/COMPAT/DOC 的命令与权限条件见计划 §6。S = 1–2、M = 
 
 ## EX19 · 持有常驻应用进程
 
-- [ ] 完成 EX19。依赖：EX03、EX10、EX17、EX18。规模：M（5 文件）。
+- [ ] 完成 EX19。依赖：EX03、EX10、EX17、EX18。原 5 文件未涵盖共享进程的活动身份及固定启动参数，实施前拆片，每片最多 5 个主要文件。
+  - [x] EX19a：共享拥有者签发只读活动身份，保留原停止证明和旧 Agent/构建行为（OwnedProcess、OwnedProcessLifetimeTest，2 文件）。04:17:58，34 项真实进程及原 Agent/构建回归通过，见验收记录。
+  - [ ] EX19b：常驻进程句柄、启动期限/运行寿命分离、持续排空、幂等停止与未知结果（RunProcess、RunProcessTest，2 文件）。
+  - [ ] EX19c：固定 Java/classpath/私有配置/loopback 启动命令及文件复验（RunCommand、RunCommandTest，2 文件）。业务凭据装配及 EX18 启动前复核由 EX20 接线。
+  - [ ] EX19d：模板健康响应回显运行/执行标识，完成模板原生测试与兼容回归（HealthController、HealthControllerTest 及必要契约，最多 3 文件）。
 - 描述：后台拥有 Java 进程直到退出；给受控种子健康响应加入运行身份契约。
 - 验收：明确 classpath/私有配置/loopback，源码脚本不负责平台启动；启动窗口与运行寿命分开，READY 后仍排空流及观察退出；健康响应回显本次运行标识，缺此契约不退化为任意 HTTP 200。
 - 验证：U(ExecutionRunProcessTest)，受控常驻子进程与重复停止、输出洪泛；种子 HealthControllerTest 及原生模板测试回归。
