@@ -118,7 +118,9 @@ final class ExecutionRunWorker {
     }
     private static void portAvailable(int port) throws IOException {
         try (var socket = new ServerSocket()) {
-            socket.setReuseAddress(false); socket.bind(new InetSocketAddress("127.0.0.1", port));
+            // Ignore closed TCP connections in TIME_WAIT; this does not enable SO_REUSEPORT or identify a live owner.
+            // https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/net/ServerSocket.html#setReuseAddress(boolean)
+            socket.setReuseAddress(true); socket.bind(new InetSocketAddress("127.0.0.1", port));
         } catch (IOException error) { throw new IOException("RUN_PORT_IN_USE"); }
     }
     private static void remaining(OwnedProcess.Budget budget) throws IOException {

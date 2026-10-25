@@ -69,6 +69,9 @@ class ExecutionRunHealthIT {
                         () -> { if (!lease.healthy()) throw new IOException("RUN_COORDINATOR_UNAVAILABLE"); },
                         (prepared, run, execution, startup, preflight) -> {
                             assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse();
+                            if (owned.get() != null) {
+                                assertThat(owned.get().isAlive()).as("Previous process must exit before the next launch").isFalse();
+                            }
                             // A separate transaction/connection can already see the committed intent before Process.start.
                             var committed = runs.get(PROJECT, run);
                             assertThat(committed.executionPending()).isTrue(); assertThat(committed.executionId()).isEqualTo(execution);
@@ -89,20 +92,40 @@ class ExecutionRunHealthIT {
                 assertThat(service.submit(OWNER, PROJECT, build.id(), target.id(), null, key).ticket()).isNull();
                 assertThatThrownBy(() -> worker.run(admission.ticket())).hasMessage("RUN_LAUNCH_ALREADY_CLAIMED");
                 assertThat(launches).hasValue(1);
-                // Test producer for the durable stop operation; the public/internal stop API is EX21.
-                assertThat(jdbc.update("UPDATE execution_runs SET status='STOPPING',stop_requested=true WHERE id=? AND status='READY'", ready.id())).isEqualTo(1);
+                var nextBuild = sealedMetadataFixture(paths, tools, base, tree);
+                String replacementKey = key + "-replace";
+                var switching = service.replace(OWNER, PROJECT, ready.id(), nextBuild.id(), target.id(), null, replacementKey);
+                assertThat(switching.stopping().status()).isEqualTo("STOPPING"); assertThat(switching.admission()).isNull();
                 var stopped = future.get(20, TimeUnit.SECONDS);
                 assertThat(stopped.status()).isEqualTo("STOPPED"); assertThat(stopped.executionPending()).isFalse();
                 var receipt = owned.get().await(Duration.ofSeconds(1)).stopped();
                 assertThat(receipt.matches(stopped.id(), stopped.executionId(), executionRoot.resolve("runs/" + stopped.id()))).isTrue();
                 assertThat(stopped.stoppedSha256()).isEqualTo(receipt.digest());
                 assertThat(service.submit(OWNER, PROJECT, build.id(), target.id(), null, key).run()).isEqualTo(stopped);
+                var replacement = service.replace(OWNER, PROJECT, stopped.id(), nextBuild.id(), target.id(), null, replacementKey);
+                assertThat(replacement.stopping()).isNull(); assertThat(replacement.admission().ticket()).isNotNull();
+                future = threads.submit(() -> worker.run(replacement.admission().ticket()));
+                var nextReady = awaitReady(runs, replacement.admission().run().id(), future);
+                assertThat(nextReady.buildId()).isEqualTo(nextBuild.id()); assertThat(launches).hasValue(2);
+                assertThat(runs.get(PROJECT, stopped.id())).isEqualTo(stopped);
+                var replay = service.replace(OWNER, PROJECT, stopped.id(), nextBuild.id(), target.id(), null, replacementKey);
+                assertThat(replay.admission().ticket()).isNull(); assertThat(replay.admission().run()).isEqualTo(nextReady);
+                assertThat(runs.get(PROJECT, nextReady.id()).stopRequested()).isFalse();
+                assertThatThrownBy(() -> service.replace(OWNER, PROJECT, nextReady.id(), nextBuild.id(), target.id(), null, replacementKey))
+                        .isInstanceOfSatisfying(dev.atoms.demo.common.ApiException.class, error -> assertThat(error.code()).isEqualTo("RUN_IDEMPOTENCY_CONFLICT"));
+                assertThat(service.stop(OWNER, PROJECT, nextReady.id()).status()).isEqualTo("STOPPING");
+                var nextStopped = future.get(20, TimeUnit.SECONDS);
+                assertThat(nextStopped.status()).isEqualTo("STOPPED");
+                assertThat(service.stop(OWNER, PROJECT, nextReady.id())).isEqualTo(nextStopped);
                 try (var foreign = new ServerSocket()) {
+                    foreign.setReuseAddress(true);
                     foreign.bind(new InetSocketAddress("127.0.0.1", target.port()));
-                    var next = service.submit(OWNER, PROJECT, build.id(), target.id(), null, key + "-occupied");
+                    var next = service.replace(OWNER, PROJECT, nextStopped.id(), build.id(), target.id(), null, key + "-occupied").admission();
                     var rejected = worker.run(next.ticket());
                     assertThat(rejected.status()).isEqualTo("FAILED"); assertThat(rejected.errorCode()).isEqualTo("RUN_PORT_IN_USE");
-                    assertThat(rejected.executionId()).isNull(); assertThat(foreign.isClosed()).isFalse(); assertThat(launches).hasValue(1);
+                    assertThat(rejected.executionId()).isNull(); assertThat(foreign.isClosed()).isFalse(); assertThat(launches).hasValue(2);
+                    assertThat(runs.get(PROJECT, nextStopped.id())).isEqualTo(nextStopped);
+                    assertThat(new ExecutionBuildRepository(jdbc).get(PROJECT, nextBuild.id()).status()).isEqualTo("SUCCEEDED");
                 }
             } finally {
                 boolean settled = owned.get() == null;

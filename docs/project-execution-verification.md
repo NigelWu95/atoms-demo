@@ -1570,3 +1570,7 @@ worker 增加内部拥有句柄表，保留原 launcher 返回的同一个 `Exec
 目标构建的所有权、成功状态和绑定在停止前检查；完整文件/物理库/迁移复核在旧运行结算后进行。新准入在同一项目锁中核对前一运行已终结、同 owner/绑定及全项目无未结束运行，因此不能绕过“先停后启”。换版后新启动失败不会改写旧成功构建、旧运行或业务绑定，也不承诺自动回滚数据库。
 
 b1 独立红灯缺少换版请求/服务方法。首次组合 29 单元、16 项原 PG 测试通过，新增真实换版于 18:18:27 失败：旧运行已真实停止，新运行在 launcher 前报 `RUN_PORT_IN_USE`。随后只读核对当时 8 条运行均终结、原绑定不变、共享槽位/绑定锁为 0，保留失败记录。因需新增端口修复及回归，拆为 b1（4 个主要文件）与 b2（3 个主要文件），完成组合验收后再分别提交。
+
+18:21:51，真实 TCP 定向测试复现：服务端主动关闭已接受连接并关闭监听后，旧预检仍阻止启动；活跃外来监听测试正常拒绝。原预检显式关闭 `SO_REUSEADDR`，把关闭连接的 TIME_WAIT 当成监听占用；[JDK 17 官方说明](https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/net/ServerSocket.html#setReuseAddress(boolean))明确该选项用于绑定时避开关闭连接的等待状态。改为绑定前开启地址复用，不开启 SO_REUSEPORT；原有独占运行/真实停止/健康身份要求保持。外来监听即使开启地址复用仍被拒绝；没有抢占或终止外来 socket。
+
+18:24:10，`-Dtest=ExecutionRunAdmissionTest,ExecutionRunWorkerTest,ExecutionRunJournalTest -Pproject-execution-contract -Dit.test=ExecutionRunHealthIT,ExecutionRunStateIT,ExecutionRunIT` 加原三个准确私有目录并 `verify`，**31 单元 + 17 集成通过**，零失败/错误/跳过，1:53，平台打包成功。真实 PG + 受控 HTTP JVM 证明：旧版 READY → 正式换版返回 STOPPING → 真实停止凭据持久化 → 新构建一次启动至 READY；启动新版前原进程已不存活。重复换版不停止新运行，修改前一运行产生冲突；下一次端口占用失败保留前版的成功构建及停止记录。业务历史未改变；两个构建沿用同一真实源码/迁移快照，未将此测试冒称原生生成应用或业务升级验收。

@@ -29,6 +29,7 @@ class ExecutionRunWorkerTest {
     private ExecutionRunService service;
     private ExecutionRunWorker worker;
     private ExecutionRun initial, current;
+    private ExecutionBindingRepository.Target target;
     private ExecutionRunProcess process;
     private ExecutionRunProcess.Outcome completed;
     private UUID execution;
@@ -55,7 +56,7 @@ class ExecutionRunWorkerTest {
                 new ExecutionProcess.Deadline(Duration.ofSeconds(30)), () -> {});
         int port;
         try (var socket = new ServerSocket()) { socket.bind(new InetSocketAddress("127.0.0.1", 0)); port = socket.getLocalPort(); }
-        var target = new ExecutionBindingRepository.Target(project, bindingId, 5432, "worker_app", "worker_role", port, 1000, 1001);
+        target = new ExecutionBindingRepository.Target(project, bindingId, 5432, "worker_app", "worker_role", port, 1000, 1001);
         var identity = new ExecutionMigrationReviewRepository.Identity(build, artifact.summary().jarSha256(), artifact.summary().manifestSha256(), target);
         var request = ExecutionRun.request(buildId, bindingId, null, "once");
         initial = new ExecutionRun(UUID.randomUUID(), project, owner, buildId, build.sourceVersionId(), bindingId, null,
@@ -138,6 +139,30 @@ class ExecutionRunWorkerTest {
         assertThat(result.executionPending()).isFalse(); assertThat(result.finishedAt()).isNull();
         assertStopped(); assertThat(finishWrites).isEqualTo(1); assertThat(noLaunchWrites).isZero();
         assertThat(worker.ownedProcess(initial.id())).isNull();
+    }
+
+    @Test void closedServerConnectionsDoNotLookLikeAnActivePortOwnerDuringImmediateRestart() throws Exception {
+        try (var previous = new ServerSocket()) {
+            previous.setReuseAddress(true); previous.bind(new InetSocketAddress("127.0.0.1", target.port()));
+            previous.setSoTimeout(2000);
+            try (var client = new Socket("127.0.0.1", target.port())) {
+                client.setSoTimeout(2000);
+                try (var accepted = previous.accept()) { accepted.shutdownOutput(); }
+                assertThat(client.getInputStream().read()).isEqualTo(-1);
+            }
+        }
+        worker.run(ticket());
+        assertThat(launches).isEqualTo(1); assertThat(recordedFailure).isEqualTo("RUN_HEALTH_INVALID");
+        assertStopped();
+    }
+
+    @Test void listeningForeignServerStillBlocksLaunchEvenWhenItAllowsAddressReuse() throws Exception {
+        try (var foreign = new ServerSocket()) {
+            foreign.setReuseAddress(true); foreign.bind(new InetSocketAddress("127.0.0.1", target.port()));
+            worker.run(ticket());
+            assertThat(launches).isZero(); assertThat(recordedFailure).isEqualTo("RUN_PORT_IN_USE");
+            assertThat(foreign.isClosed()).isFalse(); assertThat(noLaunchWrites).isEqualTo(1);
+        }
     }
 
     @Test void earlyExitUsesTheRealReceiptAndDoesNotInventReadiness() throws Exception {
