@@ -38,7 +38,7 @@ class ExecutionPreparationWorkerIT {
 
     @BeforeEach void fixture() throws Exception {
         assertThat(jdbc.queryForObject("SELECT current_database() || '.' || current_schema()", String.class))
-                .isIn("atoms_demo_test.atoms_verify_20261021_ex10", "atoms_demo_test.atoms_verify_20261024_ex16");
+                .isEqualTo(ExecutionTestTarget.DATABASE_SCHEMA);
         Path root = temporary.toRealPath();
         source = new SourceAgentFixture(jdbc, projects, transactions, root);
         source.start(Objects.requireNonNull(jdbc.getDataSource()));

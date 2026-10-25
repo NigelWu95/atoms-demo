@@ -61,7 +61,7 @@ class ExecutionPreparationSchedulerIT {
 
     @BeforeEach void fixture() throws Exception {
         assertThat(jdbc.queryForObject("SELECT current_database() || '.' || current_schema()", String.class))
-                .isEqualTo("atoms_demo_test.atoms_verify_20261024_ex16");
+                .isEqualTo(ExecutionTestTarget.DATABASE_SCHEMA);
         temporary = temporary.toRealPath();
         source = new SourceAgentFixture(jdbc, projects, transactions, temporary);
         source.start(database); edits = spy(source.gateway());
