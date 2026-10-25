@@ -1596,3 +1596,11 @@ b1 独立红灯缺少换版请求/服务方法。首次组合 29 单元、16 项
 先缺方法编译红灯，再于 18:50:10 通过 **33 单元 + 23 PG 集成**，零失败/错误/跳过，平台打包成功（`ExecutionRunJournalTest,ExecutionRunAdmissionTest,ExecutionRunWorkerTest` 与 `ExecutionRunStateIT,ExecutionRunIT`）。新增 6 个恢复用例，READY/STOPPING 场景使用真实受控 HTTP JVM；恢复只更新元数据，原进程仍存活且只能由测试原拥有句柄停止。元数据全事务回滚，不留下永久绑定或不明运行；这不是真实协调者崩溃或生成应用业务迁移验收。
 
 18:51:19，移除“既有 NEEDS_RECONCILIATION 原样保留”条件的变异，使 RUN_HEALTH_INVALID 被错误覆盖为 RUN_RECOVERY_UNCERTAIN，定向用例准确失败。随后源码恢复并核对字节一致。日志为忽略目录中的 `ex16-ex22a1-{red,green,mutation}.log`。本片 2 个主要文件；独占协调权包装与 Spring 启动接线仍待后续小片，不据此勾选 EX22 整项。
+
+## 2026-10-25 · EX22a2 独占恢复与事务边界
+
+`ExecutionRunRecovery` 在事务外、事务开始后和写入后三次检查原数据库协调租约、源码就绪状态及完整配置快照；独立事务上限 5 秒，拒绝调用方事务。执行根由调用者持有并在事务外检查，恢复器不访问文件、业务库或进程。底层故障仅返回 RUN_RECOVERY_UNAVAILABLE，无驱动消息、路径、cause 或自动重试；提交回执不明不被当作已回滚。
+
+新增 9 个组件测试覆盖失锁、配置变化、源码不可用、嵌套事务、数据库故障及提交回执丢失。扩展原双连接准入契约：持有真实文件根/数据库租约，在真实 UPDATE 后故意改变配置，PG 完整回滚且原运行逐字段保持；正常恢复同一未发出意图的任务后，旧键重放不再发 ticket。关闭实际协调租约后恢复拒绝，业务历史保持不变。此契约仍沿用原有元数据/ZIP 夹具，不声称执行了原生应用。
+
+18:54:59，**42 单元 + 24 PG 集成**通过，零失败/错误/跳过，平台打包成功；命令为 a1 三项单元加 `ExecutionRunRecoveryTest`，集成增加 `ExecutionRunAdmissionIT`，显式使用原契约 profile 与三个批准目录。删除写后 authority 检查的变异被对应失锁测试拦住，源码逐字恢复。日志 `ex16-ex22a2-{red,green,mutation}.log`。3 个主要文件；下一片接 Spring 启动恢复和实际 JVM 崩溃，EX22 整项仍未完成。

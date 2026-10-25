@@ -109,6 +109,8 @@ class ExecutionRunAdmissionIT {
                     assertThat(service.submit(OWNER, PROJECT, build.id(), target.id(), null, key).ticket()).isNull();
                     assertThatThrownBy(() -> service.submit(OWNER, PROJECT, build.id(), target.id(), null, key + "-changed"))
                             .hasMessage("EXECUTION_ARTIFACT_INVALID");
+                    verifyRecovery(settings, runs, environment, original);
+                    assertThat(service.submit(OWNER, PROJECT, build.id(), target.id(), null, key).ticket()).isNull();
                 } finally {
                     concurrent.set(false); threads.shutdownNow(); assertThat(threads.awaitTermination(15, TimeUnit.SECONDS)).isTrue();
                     // Only this fixture's never-launched rows may finish. Never clear an issued execution or unknown process.
@@ -121,6 +123,33 @@ class ExecutionRunAdmissionIT {
             }
         }
         assertThat(registry.history(PROJECT, budget())).isEqualTo(historyBefore);
+    }
+
+    private void verifyRecovery(ExecutionSettings settings, ExecutionRunRepository runs, MockEnvironment environment,
+                                ExecutionRun original) throws Exception {
+        // The outer fixture still holds the real execution-root lease; recovery does no artifact or business DB I/O.
+        try (var lease = new ExecutionCoordinatorLease(database)) {
+            var recovery = new ExecutionRunRecovery(settings, runs, transactions, lease, () -> true);
+            doAnswer(call -> {
+                var result = call.callRealMethod();
+                environment.withProperty("atoms.project-execution.max-running-projects", "3");
+                return result;
+            }).when(runs).recover(original);
+            try {
+                assertThatThrownBy(() -> recovery.reconcile(original)).hasMessage("RUN_RECOVERY_UNAVAILABLE").hasNoCause();
+                assertThat(runs.get(PROJECT, original.id())).isEqualTo(original); // Real UPDATE rolled back in PG.
+            } finally {
+                environment.withProperty("atoms.project-execution.max-running-projects", "4");
+                doCallRealMethod().when(runs).recover(original);
+            }
+            var recovered = recovery.reconcile(original);
+            assertThat(recovered.status()).isEqualTo("FAILED"); assertThat(recovered.errorCode()).isEqualTo("RUN_INTERRUPTED");
+            assertThat(recovered.executionId()).isNull(); assertThat(recovered.stoppedSha256()).isNull();
+            assertThat(recovery.reconcile(original)).isEqualTo(recovered);
+            lease.close();
+            assertThatThrownBy(() -> recovery.reconcile(original)).hasMessage("RUN_RECOVERY_UNAVAILABLE").hasNoCause();
+            assertThat(runs.get(PROJECT, original.id())).isEqualTo(recovered);
+        }
     }
 
     /** A named metadata/ZIP fixture, not a successful native Maven build. Actual native execution remains EX25–27. */
