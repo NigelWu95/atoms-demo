@@ -1,6 +1,6 @@
 # project-execution · 实施计划
 
-状态：2026-10-26，用户已确认本计划及 EX01–EX30 任务，连续实施；检查点报告证据，不逐小项请求开始。依据[规格](../../SPEC-project-execution.md)，分支 `feature/standalone-engineering`。EX01–27 与 C-EX09 已完成：两项目 V1/V2 实际构建、HTTP、独立业务数据、迁移批准与重启，以及真实失败迁移的明确确认和兼容重启均通过，见[清单](todo.md)与[记录](../../docs/project-execution-verification.md)。当前继续 EX28 的组合故障/并发/秘密反例，再做 EX29–30；按清单 a–d 拆片，每片最多 5 主要文件，优先复用既有真实进程夹具。新模式默认关闭，网页交付尚未完成，旧故障证据全部保留。
+状态：2026-10-26，用户已确认本计划及 EX01–EX30 任务，连续实施；检查点报告证据，不逐小项请求开始。依据[规格](../../SPEC-project-execution.md)，分支 `feature/standalone-engineering`。EX01–27 与 C-EX09 已完成：两项目 V1/V2 实际构建、HTTP、独立业务数据、迁移批准与重启，以及真实失败迁移的明确确认和兼容重启均通过，见[清单](todo.md)与[记录](../../docs/project-execution-verification.md)。EX28 的组合故障/并发/秘密反例与三个隔离变异也已完成，当前进入 EX29 全部兼容回归及 EX30 文档收尾；每片最多 5 主要文件，优先复用既有真实进程夹具。新模式默认关闭，网页交付尚未完成，旧故障证据全部保留。
 
 ## 1. 交付范围与组织
 

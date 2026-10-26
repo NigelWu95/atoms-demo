@@ -1977,3 +1977,12 @@ EX27 和 C-EX09 完成。EX28–30 的组合故障验证、全量兼容回归及
 秘密边界的 3 个单元和 1 个组合集成使用合成 canary。实际子进程 stdout/stderr 的成功和失败只返回计数/固定错误；原始前端/Java 报告确实含 canary，而解析计数、持久事件、任务/事件 JSON、Git 源码、封存清单和受控产物不含 canary，平台捕获日志也不含。逐字段污染事件只得到白名单 DTO 或固定不可用诊断。此项证明当前内部边界，未实现或验证自动模型修复请求，也不把受控工具产物称作原生 JAR。
 
 该批次还复验 2 个并发场景和原 worker 的 8 项取消/期限/失权/提交回执故障。生产执行代码不变，后续 EX28d 仍须通过隔离变异和资源核对，EX29 的全部旧链路回归尚未完成。
+
+
+## 2026-10-26 · EX28d 变异与资源核对
+
+新增等长源码字节变化反例，避免只检查文件长度。临时移除 `ExecutionSnapshot` 的字节比较、`ExecutionBuildRepository` 的 QUEUED 立即取消分支和 `ExecutionMigrationReviewRepository` 的缺批准阻断，在批准 schema 中只运行对应 3 个测试方法。21:08:14 恰有 **3 个预期断言失败，零错误/跳过**：等长篡改未被拒绝、取消仍为 QUEUED、缺批准未抛异常。副本/摘要/补丁及失败 XML 已保存，随后生产文件全部逐字节恢复；未调用真实模型或运行实际业务迁移。
+
+21:11:39，`sh .local/run-ex22-checks.sh ex22-ex28d-restored.log -Dtest=ExecutionSettingsTest,ExecutionRuntimeDispatcherTest,ExecutionRunReconciliationTest -Dit.test=ExecutionSnapshotIT,ExecutionCancellationIT,ExecutionMigrationReviewIT,ExecutionQueryIT verify` 的 **35 单元 + 29 集成**通过，零失败/错误/跳过，1:18。只读审计仍为 110 条运行全部终结、容量占位/协调锁为零，3 条迁移批准和 1 条核对审计保留，原 A/B 绑定与五份旧未决审计未改。9 项真实私有值对本轮后端差异、日志及平台 JAR classes 扫描零匹配。证据 `.local/ex28d-evidence-1a7z_td1`，0700/0600。
+
+EX28 完成，只新增测试并复用测试夹具，生产代码未变。EX29 前端类型/lint/format、372 单测、build 及 Python 11 项先通过；默认浏览器命令随后暴露未启动测试后端且端口不匹配的前置配置问题，22 项失败报告保留 `.local/ex29-browser-precondition-failure`。该问题由 EX29a 修正测试服务器配置后复验，不计为已通过浏览器验收。完整后端、离线 CLI 与最终维护文档仍待 EX29–30。

@@ -91,12 +91,13 @@ class ExecutionSnapshotIT {
     }
 
     @Test void changedBytesModesHardlinksSymlinksAndUnexpectedFilesFailRevalidation() throws Exception {
-        for (String kind : List.of("bytes", "mode", "hardlink", "symlink", "extra", "large")) {
+        for (String kind : List.of("bytes", "same-size", "mode", "hardlink", "symlink", "extra", "large")) {
             var task = paths.createBuild(UUID.randomUUID());
             var copy = snapshots.materialize(owner, first.projectId(), first.versionId(), task, budget());
             Path directory = paths.project(task), target = directory.resolve("README.md");
             switch (kind) {
                 case "bytes" -> Files.writeString(target, "changed");
+                case "same-size" -> Files.writeString(target, "changed!!");
                 case "mode" -> Files.setPosixFilePermissions(target, PosixFilePermissions.fromString("rwxr-xr-x"));
                 case "hardlink" -> Files.createLink(temporary.resolve("alias"), target);
                 case "symlink" -> {
