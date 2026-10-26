@@ -24,15 +24,16 @@
   - 默认关闭、启用时严格校验明确 origin、常量容量/期限；禁用不启动执行资源。
   - 文件：DeliverySettings、测试、application.yml、配置说明；验证 J：禁用、非法 origin、无 Host 派生。
   - `.local/ex22-delivery-pd04-green.log` 新旧设置共 12 项通过；不包含任何预览 HTTP 路由或执行资源启动。
-- [ ] **PD05：受限 HTTP 请求及有界响应**（PD04；至多 5 文件）
+- [x] **PD05：受限 HTTP 请求及有界响应**（PD04；拆为 PD05a/b）
   - 限根/静态/api 路径、方法、JSON、头及大小；固定 loopback、无代理/凭据/跳转、有界读取和取消。
   - 文件：执行 HTTP 请求策略、transport、单测/故障夹具；验证 J：规范化、超量/慢响应、3xx、MIME、预期 JSON 409。
   - 拆为 PD05a 请求对象与策略、PD05b 有界上游传输；分别验证提交，合并后才标记 PD05 完成。
   - [x] PD05a：`.local/ex22-delivery-pd05a-green.log` 五项策略测试通过，涵盖多组路径/查询/头注入、UTF-8 JSON、大小及不可变性；尚未建立任何应用连接。
-  - [ ] PD05b：有界上游传输及实际 loopback 故障测试。
+  - [x] PD05b：`.local/ex22-delivery-pd05b-green.log` 11 项请求/loopback 传输测试通过；新增静态大文件和派发前超时验证后，`ex22-delivery-pd05b-bounds.log` 7 项传输测试通过。覆盖业务 409、模块字节、恶意头、跳转、MIME、超大/慢正文、写入不确定及 HEAD/204；这是故障夹具，不是实际 Vue 应用验收。
 - [ ] **PD06：原运行句柄 HTTP 交换**（PD05；至多 5 文件）
   - 在执行模块内部获取原 owner 的目标，校验前后共享总预算；替换/失权/产物漂移失败，写入不确定结果明确。
   - 文件：ProjectExecutionAccess、ExecutionCoordinator、交换 DTO、执行集成测试；验证 J：旧句柄不复用新运行、总期限、未派发与已派发写故障。
+  - 分为 PD06a 将健康验证过的固定目标保存在原 process owner，PD06b 句柄交换/共享预算。复用原 process 引用，避免将端口逐层暴露到协调器或交付 API。
 
 **C2：** 受限 transport 可验证准确运行响应，尚不声称浏览器可用。
 
