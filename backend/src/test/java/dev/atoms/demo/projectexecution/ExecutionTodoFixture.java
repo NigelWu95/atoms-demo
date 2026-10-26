@@ -90,6 +90,7 @@ final class ExecutionTodoFixture implements AutoCloseable {
     Path businessReport(ExecutionBuild build) {
         return root.resolve("execution/builds/" + build.id() + "/project/backend/target/surefire-reports/TEST-dev.atoms.generated.TodoControllerTest.xml");
     }
+    Path frontendDistribution(ExecutionBuild build) { return root.resolve("execution/builds/" + build.id() + "/project/frontend/dist"); }
     void assertTestDatabaseUnchanged() throws Exception {
         assertThat(testDatabase.verify(base.projectId(), new ExecutionProcess.Deadline(Duration.ofSeconds(15)))).isEqualTo(originalDatabase);
     }
@@ -164,6 +165,19 @@ final class ExecutionTodoFixture implements AutoCloseable {
         files.add(file(JAVA, controller)); files.add(file(TEST, tests)); files.add(file(SQL + "V002__todos.sql", resource("V002__todos.sql")));
         return new ProjectSourcePolicy().validate(files);
     }
+    static SourceTree application(int version) throws Exception {
+        var files = new ArrayList<>(backend(version).files());
+        int originalSize = files.size();
+        files.removeIf(file -> Set.of("frontend/src/App.vue", "frontend/src/App.spec.ts").contains(file.path()));
+        assertThat(originalSize - files.size()).isEqualTo(2);
+        for (String name : List.of("App.vue", "App.spec.ts", "useTodos.ts")) {
+            String content = resource(name);
+            if (version == 2 && !name.equals("useTodos.ts")) content = replace(content, "const withPriority = false", "const withPriority = true");
+            files.add(file("frontend/src/" + name, content));
+        }
+        return new ProjectSourcePolicy().validate(files);
+    }
+
     static SourceTree staleWriteMutation() throws Exception {
         var files = new ArrayList<SourceTree.File>();
         for (var file : backend(1).files()) files.add(file.path().equals(JAVA)

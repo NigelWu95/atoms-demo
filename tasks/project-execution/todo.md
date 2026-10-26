@@ -1,6 +1,6 @@
 # project-execution · 开发任务
 
-状态：2026-10-26，规格及 EX01–EX30 计划已获确认，EX01–25、C-EX08 已完成。EX24 的 557 单元 + 180 相关集成基线保留；EX25 新增真实待办 Java/SQL 样本，两版均构建为 JAR，分别通过 10/11 项 Java 测试，去掉冲突保护的反例准确失败；58 项相关单元兼容通过，见[证据](../../docs/project-execution-verification.md#2026-10-26--ex25-真实待办后端样本)。当前测试环境 59 条运行全部终结，五份旧未决审计和原运行/绑定保持不变，未删除失败证据。下一项 EX26 为对应 Vue 业务页面，EX27 常驻 HTTP 与业务数据升级/重启验收仍未完成。新模式默认关闭，网页接入仍待后续。唯一依据为[规格](../../SPEC-project-execution.md)与[计划](plan.md)，不复用旧工程导出的 PE 编号；勾选须附真实证据。
+状态：2026-10-26，规格及 EX01–EX30 计划已获确认，EX01–26、C-EX08 已完成。EX24 的 557 单元 + 180 相关集成基线保留；EX26 的 Vue 待办/优先级两版均通过原生构建，各 22 项前端测试、10/11 项 Java 测试及 59 项相关单元通过，浏览器验证过的静态资源与对应 JAR 逐字节一致，见[证据](../../docs/project-execution-verification.md#2026-10-26--ex26-vue-业务页面)。当前测试环境 59 条运行全部终结，五份旧未决审计和原运行/绑定保持不变，未删除失败证据。下一项 EX27 为常驻 HTTP 与业务数据升级/重启验收，C-EX09 尚未完成。新模式默认关闭，网页接入仍待后续。唯一依据为[规格](../../SPEC-project-execution.md)与[计划](plan.md)，不复用旧工程导出的 PE 编号；勾选须附真实证据。
 
 执行环境沿用已获准的项目隔离 Liberica 17.0.14+10，仅命令级指定；原 Oracle 17.0.5、全局默认、私有 env、服务器和旧审计均不变。原生枚举故障未捕获原 errno，不能宣布根因完全证实，保留监测。EX11 原生构建、完整回归和变异证据见[验证记录](../../docs/project-execution-verification.md#ex11b--实际-jar-与失败版本验收)。
 
@@ -383,9 +383,9 @@ U/I/REAL/ALL/COMPAT/DOC 的命令与权限条件见计划 §6。S = 1–2、M = 
 
 ## EX26 · 对应 Vue 业务页面样本
 
-- [ ] 完成 EX26。依赖：EX09、EX25。将请求/状态逻辑放入独立 composable，主要文件由 4 个调整为 5 个，分片验证。
+- [x] 完成 EX26。依赖：EX09、EX25。将请求/状态逻辑放入独立 composable，主要文件由 4 个调整为 5 个，分片验证。
   - [x] EX26a：`App.vue`、`useTodos.ts`、`App.spec.ts`；两版各 22 项前端测试、类型/lint/构建通过。真实 Chrome 临时上下文通过键盘、冲突、四档宽度与 axe 检查，已查看桌面/手机截图。浏览器的可控 API 响应仅用于 UI 验收，不当作真实 Java/PG 联调。
-  - [ ] EX26b：`ExecutionTodoFixture`、`ExecutionTodoBackendContractIT` 接入两版 Vue 源码；真实构建/测试，并核对 JAR 内静态资源和编译版本。
+  - [x] EX26b：`ExecutionTodoFixture`、`ExecutionTodoBackendContractIT` 接入两版 Vue 源码。缺方法 RED 后，11:05:41 的 59 单元 + 1 原生契约通过，两版各 22 前端及 10/11 Java 测试；JAR 内静态资源与实际 dist、浏览器验收资源逐字节一致且两版不同。证据 `.local/ex26-evidence-dpxn7yly`，原 A/B 绑定和旧审计不变。
 - 描述：为真实待办 API 提供 Vue 页面与交互测试，第二版增加可辨识的业务字段/行为。
 - 验收：页面调用样本 Java API，处理提交/失败/查询，不走原 HTML/SDK 外壳；V1/V2 有明确文件差异且旧功能仍测；不增加未批准依赖或把样本放入所有新用户工程。
 - 验证：REAL(ExecutionTodoBackendContractIT) 增补前端类型/lint/单测/build；检查 Vue 编译资源进入 JAR 的清单。

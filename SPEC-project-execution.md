@@ -1,6 +1,6 @@
 # Spec: project-execution · 完整工程受控构建与本机进程
 
-状态：2026-10-26，用户已确认本规格及 §10 三项取舍、[实施计划](tasks/project-execution/plan.md)与[任务清单](tasks/project-execution/todo.md)。EX01–25、C-EX08 已完成：内部构建/运行交付身份、有界查询与安全诊断已验证，真实待办 Java/SQL 样本的两版工程均通过 npm/Maven 构建，冲突保护退化的业务反例被实际测试拒绝，见[记录](docs/project-execution-verification.md#2026-10-26--ex25-真实待办后端样本)。五份旧未决审计保留。下一项 EX26 为对应 Vue 业务页面；EX27 的常驻 HTTP、业务迁移和重启持久化尚未验收。新模式默认关闭，网页交付仍未接入。本地闭环范围见 [Agent 规格 §10](SPEC-project-agent.md#10-2026-10-19-完整闭环实施授权)。此前实际 npm 的通过/超时及故障证据分别保留。
+状态：2026-10-26，用户已确认本规格及 §10 三项取舍、[实施计划](tasks/project-execution/plan.md)与[任务清单](tasks/project-execution/todo.md)。EX01–26、C-EX08 已完成：内部交付身份、有界查询与安全诊断已验证；真实待办/优先级的 Vue + Java + SQL 两版工程通过 npm/Maven 构建，各 22 前端及 10/11 Java 测试通过，浏览器验证过的静态资源与实际 JAR 一致，见[记录](docs/project-execution-verification.md#2026-10-26--ex26-vue-业务页面)。五份旧未决审计保留。下一项 EX27 为常驻 HTTP、业务迁移和重启持久化验收。新模式默认关闭，网页交付仍未接入。本地闭环范围见 [Agent 规格 §10](SPEC-project-agent.md#10-2026-10-19-完整闭环实施授权)。此前实际 npm 的通过/超时及故障证据分别保留。
 
 模块 ID 沿用[能力地图](FULL-PROJECT-CAPABILITY-MAP.md)的 `project-execution`，依赖 `project-source`，不反向依赖 Agent、交付或工作台。上游只读门面 PS21 已完成；当前网页仍走旧固定模板链路。
 
