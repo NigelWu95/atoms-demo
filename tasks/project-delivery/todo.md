@@ -56,11 +56,15 @@
     - HTTP 验证发现 Tomcat 不以 `setHeader(name, null)` 移除已有 XFO；改为 `SAMEORIGIN` 后备，现代浏览器由明确 CSP frame-ancestors 约束。`ex22-delivery-pd08a-http-fixed.log` 中该项已通过，整组因并发测试自身入场竞争未通过，保留失败证据并另行修正测试同步。
   - [x] PD08a2：`ex22-delivery-pd08a-http-admission.log` 15 项单测与 14 项真实 HTTP/PG 集成通过；严格过滤链、JSON 409、无凭据转发、30 秒慢上传、断开释放、管理 CSRF、不续期、firewall 错误不回显令牌。并发测试等待四个实际入场完成，避免探测请求抢占名额。
   - `ex22-delivery-pd08a-lifecycle.log` 5 项单测通过；客户端已超时但 worker 忽略中断未返回时仍占名额，实际返回后才释放，迟到结果不覆盖超时。此阶段执行响应为受控夹具，真实应用和 Chrome 留在 PD08b。
-- [ ] **PD08b：真实 Vue 页面预览**（PD08a、PD03；至多 5 文件）
+- [x] **PD08b：真实 Vue 页面预览**（PD08a、PD03；至多 5 文件）
   - 原生样本+Chrome 完成模块加载、CRUD/409，检查 cookie/存储/外部请求限制及换版旧授权失效。
   - 文件：原生应用契约、浏览器测试入口/脚本及最小夹具；验证 A + B；页面不纳入正式工作台。
+  - 拆为 PD08b1 实际验收暴露的只读校验性能修复、PD08b2 Chrome 业务与隔离验收，分开提交。
+  - 失败证据：`ex22-delivery-pd08b-timing.log`，单次校验约 5 秒，其中两次产物检查各约 2 秒；真实 Chrome 文档/静态资源等待约 11–19 秒，API 在 10 秒由客户端取消。原因是产物完整性校验同时反复扫描全执行根容量。修复区分目标完整性与全根容量，保留所有字节、文件身份、源码、权限和运行前后检查；修正后 `ex22-delivery-pd08b-readonly.log` 的 17 项单测与 4 项实际集成通过。
 
-**C3：** 实际 Vue/Java 应用经路径预览可用；假上游结果单独标注，保持沙箱不放宽。
+  - 实际 Chrome 的新增 201、修改 200、跨页旧数据写入 409、刷新、opaque origin、cookie/storage/外部连接/顶层导航限制通过；截图和去令牌请求耗时保存在 `delivery-browser-14882716247113117923`。新增约 1.8 秒、修改约 2.1 秒；原 5 条业务数据不变，新增数据重启保留，旧授权在停止及重启后均拒绝，A/B 测试 schema 未改变。
+
+**C3 已通过：** 实际 Vue/Java 应用经路径预览可用；原生表单事件兼容性修正已写入规格，仍禁止 same-origin、平台凭据和额外网络目标。
 
 - [x] **PD09：确定性完整源码 ZIP**（无依赖；至多 4 文件）
   - 固定顺序/时间/STORED/Unix mode，project 文件不变，delivery 元数据独立；严格大小、路径和取消检查。

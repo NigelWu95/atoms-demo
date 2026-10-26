@@ -81,7 +81,7 @@ final class DeliveryHttpPolicy {
         // Servlet containers need not remove a header on setHeader(name, null). Keep a valid fallback;
         // modern browsers enforce the narrower configured CSP frame-ancestors policy.
         response.setHeader("X-Frame-Options", "SAMEORIGIN");
-        response.setHeader("Content-Security-Policy", "sandbox allow-scripts; default-src 'none'; script-src " + assets
+        response.setHeader("Content-Security-Policy", "sandbox allow-scripts allow-forms; default-src 'none'; script-src " + assets
                 + "; style-src 'unsafe-inline' " + assets + "; font-src " + assets + "; img-src data: " + assets
                 + "; connect-src " + base + "api/; base-uri 'none'; object-src 'none'; worker-src 'none'; frame-src 'none'"
                 + "; form-action 'none'; frame-ancestors " + origin);

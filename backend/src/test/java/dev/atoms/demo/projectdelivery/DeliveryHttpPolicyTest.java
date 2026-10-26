@@ -15,7 +15,7 @@ class DeliveryHttpPolicyTest {
         request.addHeader("Host", "attacker.example"); request.addHeader("X-Forwarded-Host", "attacker.example");
         var response = new MockHttpServletResponse(); DeliveryHttpPolicy.closed(response);
         DeliveryHttpPolicy.authorized(request, response, DeliveryHttpPolicy.route(request), "https://platform.example");
-        assertThat(response.getHeader("Content-Security-Policy")).contains("sandbox allow-scripts;", "frame-ancestors https://platform.example",
+        assertThat(response.getHeader("Content-Security-Policy")).contains("sandbox allow-scripts allow-forms;", "form-action 'none'", "frame-ancestors https://platform.example",
                 "script-src https://platform.example" + prefix + "assets/", "connect-src https://platform.example" + prefix + "api/")
                 .doesNotContain("allow-same-origin", "unsafe-eval", "attacker.example");
         assertThat(response.getHeader("X-Frame-Options")).isEqualTo("SAMEORIGIN");

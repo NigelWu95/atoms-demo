@@ -59,9 +59,14 @@
 
 ZIP writer 按 [PKWARE 6.3.10 的本地头、中央目录及 Unix 属性约定](https://pkware.cachefly.net/webdocs/casestudies/APPNOTE.TXT)写有界 classic ZIP。标准 unzip 只在验证中使用，生产代码不调用外部 zip/unzip。没有下载 API、鉴权或独立业务工程验收的完成声明。
 
-## 真实应用预览（进行中）
+## 真实应用预览（已通过）
 
 - `ex22-delivery-pd08b-native.log` 首次编译发现测试夹具用了不可访问的 JdbcSession 实现类型，已改用公开 Session 接口；未进入应用构建。
 - `ex22-delivery-pd08b-native-session.log` 原生构建成功：构建 `79815b82-d390-46b6-acbe-832932118b16`，源码 `a3d2b3eb-65cc-4c5f-9ea2-1f899b90ac7c`，树 `29013c47de04b8a3f645291511a8178cce1646598d45ea3d1fb7d28e84625193`，JAR `7cc015cfaf29f07bedd0e913791a05a79fa8ca8274b9ea07daf20e1fd0e1b507`。实际 22 项前端与 15 项 Java 测试通过，原 owned 进程启动成功。
 - 首次 Chrome 失败于添加待办：HTML/JS/CSS/初始 API 均为 200、没有 pageerror，但没有 POST。`.local/delivery-form-probe.mjs` 在独立 Chrome 比较证明：只有 allow-scripts 时 submit 事件不触发；增加 allow-forms 后 JS 可处理，保留 form-action none 时原生 POST 计数为 0。已将这一兼容性修正写入规格，仍禁止同源及平台凭据。原失败证据保留在 `/private/tmp/atoms-ex11-contract.APT7Jb/todo-applications-y6dt7dkp/delivery-browser-1247067733290532586`。
 - 复用构建时 `ex22-delivery-pd08b-browser-forms.log` 暴露验收夹具仅登记旧整树摘要，拒绝本轮正常产生的新源码；新增两个精确的可移植配置样本摘要，保留旧摘要与拒绝未知源码的断言。`ex22-delivery-pd08b-browser-reviewed.log` 的四项夹具单测已通过；真实浏览器结果另记，不以夹具修复冒充浏览器成功。
+
+- `ex22-delivery-pd08b-browser-diagnostic.log` 保留 POST 已派发但浏览器十秒取消的失败；`ex22-delivery-pd08b-timing.log` 分段计时定位全执行根容量扫描，单次检查约五秒，页面/静态请求约 11–19 秒。只读访问改为完整目标文件/字节核验，不再重复扫描其他构建；创建/封存/运行准入容量规则不变，无摘要缓存，无修改旧源码/JAR。
+- `ex22-delivery-pd08b-readonly.log`：**17 单元 + 4 实际集成，零失败/错误/跳过**。包括文件篡改、准确版本/权限、真实 Chrome 的模块加载、新增/编辑/查询、跨页 409 及恢复刷新、浏览器隔离、桌面与移动布局。原生 owned 应用确实停止；重新启动同一构建后旧授权仍拒绝、刚写入的数据保留、原五条记录和 A/B 测试库不变。
+- 浏览器证据：`/private/tmp/atoms-ex11-contract.APT7Jb/todo-applications-y6dt7dkp/delivery-browser-14882716247113117923` 的 `result.json`、`desktop.png`、`mobile.png`。逐请求耗时无令牌；文档约 1.7 秒、新增约 1.8 秒、修改约 2.1 秒。私有 `preview.json` 含短期能力地址，不提交、不打印。
+- 成功运行 `6650fb44-930d-49e4-b23f-4a6a16db07a1` 和重启运行 `c862d3f5-5fd9-4ee2-902b-b3f08b5575ef` 均有原 owner 的停止证明。此结果完成 PD08b；下载 API、恢复 API、ZIP 独立构建运行及全量兼容性回归仍待后续，模块尚未整体完成。

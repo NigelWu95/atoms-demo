@@ -79,7 +79,9 @@ public record PreviewView(UUID id, Instant expiresAt, String iframeUrl,
 
 ### 5.2 不透明来源与跨域资源
 
-管理页面必须用 `sandbox="allow-scripts"`、`referrerpolicy="no-referrer"` 挂载；所有预览响应另附服务端 CSP sandbox，防止直接打开文档时绕过 iframe 属性。**不加入 allow-same-origin**，不向应用转交平台 Cookie、CSRF、Authorization、邮箱或账号信息。[浏览器 sandbox 语义](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Content-Security-Policy/sandbox)指出，这种文档来源为不透明来源，Origin 为 `null`，不能访问 document.cookie/localStorage。
+管理页面必须用 `sandbox="allow-scripts allow-forms"`、`referrerpolicy="no-referrer"` 挂载；所有已授权预览响应另附相同服务端 CSP sandbox，防止直接打开文档时绕过 iframe 属性。**不加入 allow-same-origin**，不向应用转交平台 Cookie、CSRF、Authorization、邮箱或账号信息。[浏览器 sandbox 语义](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Content-Security-Policy/sandbox)指出，这种文档来源为不透明来源，Origin 为 `null`，不能访问 document.cookie/localStorage。
+
+2026-10-27 实际 Chrome 兼容性修正：仅 allow-scripts 会同时阻止 Vue `@submit.prevent` 的 submit 事件，真实页面无法添加待办。增加 allow-forms 使 JS 能处理表单事件，但服务端继续设置 `form-action 'none'` 禁止原生表单请求/导航；JSON 写入仍限原有 token/api 路径。独立 Chrome 反例已确认事件由不触发变为触发，原生 POST 计数仍为零。此调整不引入 same-origin、平台凭据或额外网络目标；真实应用复验结果单独记录。
 
 由此带来的模块脚本和 API CORS 仅在有效令牌的精确预览路径处理：允许 Origin `null`，不返回 Allow-Credentials，也不将 `null` 本身作为认证。管理 API 不增加此 CORS 许可。新路径仍位于现有 `/api` 转发范围，复用 Vite/部署代理规则；服务端仅为精确预览路径配置无会话写入的过滤链，不全局 permitAll 或关闭 CSRF。OPTIONS 不转发给业务进程，只在授权有效、路径/方法/请求头受支持时返回短期预检结果。复用 [CORS 的无凭据模式](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/CORS)，不依赖第三方 Cookie。
 
@@ -95,6 +97,7 @@ public record PreviewView(UUID id, Instant expiresAt, String iframeUrl,
 - 连接上限 2 秒；整个授权/传输/复核上限 30 秒；JSON 请求/响应各最多 1 MiB，静态响应最多 4 MiB；全局最多 16 个在途交换、每授权最多 4 个，无无界排队。HEAD 及 204/304 按无正文语义处理。
 - 使用 JDK [HttpClient](https://docs.oracle.com/en/java/javase/17/docs/api/java.net.http/java/net/http/HttpClient.html)，显式禁用代理、认证、CookieHandler 和重定向，指定 HTTP/1.1；不读代理环境或平台请求凭据。增量计数限制响应字节，超限/期限到达/取消时中断读取并释放容量，不先收完整正文再检查。
 - 正文完成并复核准确运行后才返回字节；只保留受支持的 Content-Type 和受限 ETag，长度由实际字节计算，no-store。只支持明确的 HTML/CSS/JS/JSON 和少量图片/字体 MIME；不将未知类型猜成 HTML，不执行任意内容嗅探，不转发内容编码或下载响应。3xx 一律拒绝，不跟随也不改写 Location。
+- 逐请求校验目标封存目录、文件身份/权限和完整 JAR/清单字节，同时读取原不可变源码；不在只读访问中反复遍历其他构建的依赖和输出目录。全执行根的容量检查保留在资源创建、产物打开/封存、构建和运行准入路径。此区分不使用摘要缓存，也不省略返回前的身份复核。
 - 应用返回的预期 JSON 4xx（例如 409）保留状态和业务正文；基础设施故障使用平台固定错误码。请求已发出后写结果不确定时返回 DELIVERY_WRITE_UNCERTAIN，明确要求查询确认，不自动重试。前后复核不能撤销已经发生的业务写入。
 
 ## 6. 同快照 ZIP 与恢复后的含义
