@@ -28,6 +28,8 @@
   - 限根/静态/api 路径、方法、JSON、头及大小；固定 loopback、无代理/凭据/跳转、有界读取和取消。
   - 文件：执行 HTTP 请求策略、transport、单测/故障夹具；验证 J：规范化、超量/慢响应、3xx、MIME、预期 JSON 409。
   - 拆为 PD05a 请求对象与策略、PD05b 有界上游传输；分别验证提交，合并后才标记 PD05 完成。
+  - [x] PD05a：`.local/ex22-delivery-pd05a-green.log` 五项策略测试通过，涵盖多组路径/查询/头注入、UTF-8 JSON、大小及不可变性；尚未建立任何应用连接。
+  - [ ] PD05b：有界上游传输及实际 loopback 故障测试。
 - [ ] **PD06：原运行句柄 HTTP 交换**（PD05；至多 5 文件）
   - 在执行模块内部获取原 owner 的目标，校验前后共享总预算；替换/失权/产物漂移失败，写入不确定结果明确。
   - 文件：ProjectExecutionAccess、ExecutionCoordinator、交换 DTO、执行集成测试；验证 J：旧句柄不复用新运行、总期限、未派发与已派发写故障。
