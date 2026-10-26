@@ -95,6 +95,29 @@ final class ExecutionRuntimeDispatcher {
         resources.requestStopOwned();
     }
 
+    /** Metadata checks only: never reconstructs a process receipt or adopts a persisted row. */
+    void checkStoppedFailure(ExecutionRun failed) throws IOException {
+        synchronized (lock) {
+            var job = failed == null ? null : jobs.get(failed.projectId());
+            if (!stopping || !executor.isTerminated() || operations != 0 || resources.hasHeldProcesses()
+                    || job == null || job.stoppedFailure == null || !job.stoppedFailure.equals(failed)) throw unavailable();
+        }
+    }
+
+    void acceptStoppedFailure(ExecutionRun failed, ExecutionRunReconciliationRepository.Audit audit) throws IOException {
+        outsideTransaction();
+        synchronized (lock) {
+            if (failed == null || audit == null) throw unavailable();
+            var job = jobs.get(failed.projectId());
+            if (job == null) return; // Already released or never ours. Never adopt it for a replay.
+            checkStoppedFailure(failed);
+            if (!audit.runId().equals(failed.id()) || !audit.projectId().equals(failed.projectId())
+                    || !audit.approvedBy().equals(failed.ownerId()) || !audit.executionId().equals(failed.executionId())
+                    || !audit.stoppedSha256().equals(failed.stoppedSha256())) throw unavailable();
+            jobs.remove(failed.projectId(), job); lock.notifyAll();
+        }
+    }
+
     boolean isTerminated() {
         synchronized (lock) {
             return executor.isTerminated() && operations == 0 && jobs.isEmpty() && !resources.hasHeldProcesses();
@@ -127,7 +150,7 @@ final class ExecutionRuntimeDispatcher {
         final UUID owner, project;
         final ExecutionRun.Request request;
         final CompletableFuture<ExecutionRun> result = new CompletableFuture<>();
-        ExecutionRun admitted;
+        ExecutionRun admitted, stoppedFailure;
         Job(UUID owner, UUID project, ExecutionRun.Request request) { this.owner = owner; this.project = project; this.request = request; }
         boolean matches(ExecutionRun row) {
             return owner.equals(row.ownerId()) && project.equals(row.projectId()) && request.build().equals(row.buildId())
@@ -135,6 +158,15 @@ final class ExecutionRuntimeDispatcher {
                     && request.keyHash().equals(row.keySha256()) && request.bodyHash().equals(row.requestSha256())
                     && (admitted != null ? admitted.id().equals(row.id())
                         : row.status().equals("STARTING") && row.executionId() == null && !row.executionPending());
+        }
+        private boolean knownStoppedFailure(ExecutionRun ended) {
+            return matches(ended) && admitted.sourceVersionId().equals(ended.sourceVersionId())
+                    && admitted.treeSha256().equals(ended.treeSha256()) && admitted.jarSha256().equals(ended.jarSha256())
+                    && admitted.manifestSha256().equals(ended.manifestSha256())
+                    && admitted.bindingIdentitySha256().equals(ended.bindingIdentitySha256()) && admitted.createdAt().equals(ended.createdAt())
+                    && ended.status().equals("NEEDS_RECONCILIATION") && !ended.executionPending() && ended.executionId() != null
+                    && ended.stoppedSha256() != null && ended.stoppedSha256().matches("[a-f0-9]{64}")
+                    && ended.errorCode() != null && ended.readyAt() == null && ended.finishedAt() == null;
         }
         @Override public void run() {
             boolean uncertain = false, hasTicket = false;
@@ -147,6 +179,7 @@ final class ExecutionRuntimeDispatcher {
                 if (hasTicket) {
                     // Even shutdown after the commit must hand the original ticket to the worker for notStarted/stop settlement.
                     var ended = resources.execute(admission.ticket());
+                    synchronized (lock) { if (knownStoppedFailure(ended)) stoppedFailure = ended; }
                     uncertain = !ended.id().equals(admission.run().id()) || ended.finishedAt() == null || ended.executionPending();
                 }
             } catch (Throwable error) {
@@ -159,7 +192,7 @@ final class ExecutionRuntimeDispatcher {
                         try {
                             var rows = runs.unfinished();
                             if (rows.size() > 4 || rows.stream().anyMatch(row -> row.projectId().equals(project))) uncertain = true;
-                            else jobs.remove(project, this);
+                            else if (!uncertain) jobs.remove(project, this);
                         } catch (RuntimeException unreadable) { uncertain = true; }
                         lock.notifyAll();
                     }

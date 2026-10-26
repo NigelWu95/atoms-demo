@@ -24,7 +24,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 /** One opt-in dispatcher with independent workers; source lifecycle starts first and stops last. */
 @Component
 @ConditionalOnProperty(name = "atoms.project-execution.enabled", havingValue = "true")
-final class ExecutionCoordinator implements SmartLifecycle, AutoCloseable {
+final class ExecutionCoordinator implements SmartLifecycle, AutoCloseable, ExecutionRunReconciliation.Owner {
     interface WorkerResources extends AutoCloseable {
         void check() throws IOException;
         ExecutionBuild run(ExecutionBuild build, BooleanSupplier cancelled, OwnedProcess.Preflight coordination) throws IOException;
@@ -65,7 +65,7 @@ final class ExecutionCoordinator implements SmartLifecycle, AutoCloseable {
     private volatile ExecutionRuntimeDispatcher runtime;
     private ExecutionBuildQueue queue;
     private DependencyPreparationQueue preparationQueue;
-    private int concurrency;
+    private int concurrency, maintenance;
     private boolean activated, released;
 
     @Autowired
@@ -224,6 +224,67 @@ final class ExecutionCoordinator implements SmartLifecycle, AutoCloseable {
         }
     }
 
+    /** Maintenance on this stopped original coordinator only. The scope pins its existing root and lease. */
+    @Override public ExecutionRunReconciliation.Scope open(ExecutionRun failed) throws IOException {
+        outsideTransaction();
+        ReconciliationScope scope;
+        synchronized (finishing) {
+            scope = new ReconciliationScope(failed, resources, runtime, settings.load());
+            scope.checkAuthority(); maintenance++;
+        }
+        try { scope.original.check(); scope.checkAuthority(); return scope; }
+        catch (IOException | RuntimeException error) { scope.close(); throw error; }
+    }
+
+    @Override public void accepted(ExecutionRun failed, ExecutionRunReconciliationRepository.Audit audit) throws IOException {
+        outsideTransaction();
+        synchronized (finishing) {
+            if (!activated || released || !stopping.get()) return; // A replay cannot adopt an old job into a new coordinator.
+            maintenanceAuthority(failed, resources, runtime);
+            resources.check();
+            runtime.acceptStoppedFailure(failed, audit);
+        }
+        finishWhenTerminated();
+    }
+
+    private void maintenanceAuthority(ExecutionRun failed, WorkerResources original, ExecutionRuntimeDispatcher resident) {
+        if (!activated || released || !stopping.get() || running.get() || failed == null || original == null || original != resources
+                || resident == null || resident != runtime || !sourceReady.getAsBoolean()
+                || !settings.load().maintainerIds().contains(failed.ownerId()) || executor == null || !executor.isTerminated()) throw unavailable();
+        requireLease();
+    }
+
+    private final class ReconciliationScope implements ExecutionRunReconciliation.Scope {
+        private final ExecutionRun failed;
+        private final WorkerResources original;
+        private final ExecutionRuntimeDispatcher resident;
+        private final ExecutionSettings.Configuration configuration;
+        private boolean closed;
+        private ReconciliationScope(ExecutionRun failed, WorkerResources original, ExecutionRuntimeDispatcher resident,
+                ExecutionSettings.Configuration configuration) {
+            this.failed = failed; this.original = original; this.resident = resident; this.configuration = configuration;
+        }
+        @Override public void checkAuthority() throws IOException {
+            synchronized (finishing) {
+                if (closed || !configuration.equals(settings.load())) throw unavailable();
+                maintenanceAuthority(failed, original, resident);
+                resident.checkStoppedFailure(failed);
+            }
+        }
+        @Override public ExecutionArtifact artifact(ExecutionBuild build, String jar, String manifest, OwnedProcess.Budget budget) throws IOException {
+            outsideTransaction(); checkAuthority(); original.check();
+            var result = original.artifact(build, jar, manifest, budget);
+            original.check(); checkAuthority(); return result;
+        }
+        @Override public void close() {
+            synchronized (finishing) {
+                if (closed) return;
+                closed = true; maintenance--;
+            }
+            finishWhenTerminated();
+        }
+    }
+
     CompletionStage<ExecutionRun> startApplication(UUID owner, UUID project, UUID build, UUID binding, UUID review, String key) throws IOException {
         return runtime().submit(owner, project, ExecutionRun.request(build, binding, review, key));
     }
@@ -289,6 +350,7 @@ final class ExecutionCoordinator implements SmartLifecycle, AutoCloseable {
     private void finish() {
         synchronized (finishing) {
             if (released) return;
+            if (maintenance != 0) throw unavailable();
             if (executor != null && !executor.isTerminated()) throw unavailable();
             if (runtime != null && !runtime.isTerminated()) throw unavailable();
             try {

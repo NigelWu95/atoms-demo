@@ -174,6 +174,99 @@ class ExecutionRuntimeDispatcherTest {
         verifyNoInteractions(resources, runs);
     }
 
+    @Test void onlyTheOriginalReturnedStoppedFailureCanBeReleasedAfterExactAcceptance() throws Exception {
+        var failed = stoppedFailure();
+        doAnswer(call -> {
+            executing.countDown(); await(finish, true); unfinished.set(List.of(failed)); return failed;
+        }).when(resources).execute(ticket);
+        admitted.countDown(); dispatcher.submit(owner, project, request).toCompletableFuture().get(5, TimeUnit.SECONDS);
+        await(executing, false);
+        assertThatThrownBy(() -> dispatcher.checkStoppedFailure(failed)).hasMessage("RUN_DISPATCH_UNAVAILABLE");
+        finish.countDown(); awaitFailure();
+        assertThat(dispatcher.awaitTermination(Duration.ofSeconds(5))).isFalse();
+        dispatcher.checkStoppedFailure(failed);
+        when(resources.hasHeldProcesses()).thenReturn(true);
+        assertThatThrownBy(() -> dispatcher.checkStoppedFailure(failed)).hasMessage("RUN_DISPATCH_UNAVAILABLE");
+        when(resources.hasHeldProcesses()).thenReturn(false);
+        var audit = audit(failed, failed.executionId());
+        assertThatThrownBy(() -> dispatcher.acceptStoppedFailure(failed, audit(failed, UUID.randomUUID())))
+                .hasMessage("RUN_DISPATCH_UNAVAILABLE");
+        assertThat(dispatcher.isTerminated()).isFalse();
+        // Only the service can supply this trusted committed audit; no OS stop capability is constructed here.
+        unfinished.set(List.of()); dispatcher.acceptStoppedFailure(failed, audit);
+        assertThat(dispatcher.isTerminated()).isTrue();
+        dispatcher.acceptStoppedFailure(failed, audit); // A pure repeat cannot resurrect or re-adopt a job.
+        verify(resources, times(1)).execute(ticket);
+    }
+
+    @Test void matchingPersistedFailureCannotReplaceALostWorkerReturn() throws Exception {
+        expectRetained = true; var failed = stoppedFailure();
+        doAnswer(call -> {
+            unfinished.set(List.of(failed)); throw new IOException("RUN_STATE_UNAVAILABLE");
+        }).when(resources).execute(ticket);
+        admitted.countDown(); dispatcher.submit(owner, project, request).toCompletableFuture().get(5, TimeUnit.SECONDS);
+        awaitFailure(); assertThat(dispatcher.awaitTermination(Duration.ofSeconds(5))).isFalse();
+        assertThatThrownBy(() -> dispatcher.checkStoppedFailure(failed)).hasMessage("RUN_DISPATCH_UNAVAILABLE");
+        assertThatThrownBy(() -> dispatcher.acceptStoppedFailure(failed, audit(failed, failed.executionId())))
+                .hasMessage("RUN_DISPATCH_UNAVAILABLE");
+    }
+
+    @Test void anotherDispatcherCannotAdoptTheSamePersistedStoppedFailure() throws Exception {
+        var failed = stoppedFailure(); unfinished.set(List.of(failed));
+        dispatcher.requestStop();
+        assertThatThrownBy(() -> dispatcher.checkStoppedFailure(failed)).hasMessage("RUN_DISPATCH_UNAVAILABLE");
+        dispatcher.acceptStoppedFailure(failed, audit(failed, failed.executionId()));
+        assertThat(dispatcher.isTerminated()).isTrue();
+        assertThat(unfinished.get()).containsExactly(failed);
+        verify(resources, never()).execute(any());
+    }
+
+    @Test void lostWorkerReturnStillRetainsOwnershipWhenDatabaseLooksTerminal() throws Exception {
+        expectRetained = true;
+        doAnswer(call -> { unfinished.set(List.of()); throw new IOException("RUN_STATE_UNAVAILABLE"); }).when(resources).execute(ticket);
+        admitted.countDown(); dispatcher.submit(owner, project, request).toCompletableFuture().get(5, TimeUnit.SECONDS);
+        awaitFailure(); assertThat(dispatcher.awaitTermination(Duration.ofSeconds(5))).isFalse();
+        assertThat(unfinished.get()).isEmpty();
+        assertThatThrownBy(() -> dispatcher.checkStoppedFailure(stoppedFailure())).hasMessage("RUN_DISPATCH_UNAVAILABLE");
+    }
+
+    @Test void acceptingOneFailureDoesNotClearAnotherProjectsUnconfirmedJob() throws Exception {
+        dispatcher.requestStop(); assertThat(dispatcher.awaitTermination(Duration.ofSeconds(5))).isTrue();
+        environment.withProperty("atoms.project-execution.max-running-projects", "2");
+        dispatcher = new ExecutionRuntimeDispatcher(new ExecutionSettings(environment), resources, runs, () -> {}, failures::incrementAndGet);
+        var second = row(UUID.randomUUID(), request, "STARTING", null);
+        var firstFailure = stoppedFailure(row); var secondFailure = stoppedFailure(second);
+        var both = new CountDownLatch(2); var secondTicket = mock(ExecutionRunService.Ticket.class);
+        doReturn(new ExecutionRunService.Admission(row, ticket)).when(resources).submit(owner, project, request);
+        doReturn(new ExecutionRunService.Admission(second, secondTicket)).when(resources).submit(owner, second.projectId(), request);
+        doAnswer(call -> {
+            both.countDown(); await(finish, true);
+            return call.getArgument(0) == ticket ? firstFailure : secondFailure;
+        }).when(resources).execute(any());
+        dispatcher.submit(owner, project, request).toCompletableFuture().get(5, TimeUnit.SECONDS);
+        dispatcher.submit(owner, second.projectId(), request).toCompletableFuture().get(5, TimeUnit.SECONDS);
+        await(both, false); unfinished.set(List.of(firstFailure, secondFailure)); finish.countDown();
+        long until = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        while (failures.get() < 2 && System.nanoTime() < until) Thread.sleep(10);
+        assertThat(failures).hasValue(2); assertThat(dispatcher.awaitTermination(Duration.ofSeconds(5))).isFalse();
+        dispatcher.checkStoppedFailure(firstFailure); dispatcher.checkStoppedFailure(secondFailure);
+        unfinished.set(List.of(secondFailure)); dispatcher.acceptStoppedFailure(firstFailure, audit(firstFailure, firstFailure.executionId()));
+        assertThat(dispatcher.isTerminated()).isFalse(); dispatcher.checkStoppedFailure(secondFailure);
+        unfinished.set(List.of()); dispatcher.acceptStoppedFailure(secondFailure, audit(secondFailure, secondFailure.executionId()));
+        assertThat(dispatcher.isTerminated()).isTrue();
+    }
+
+    private ExecutionRun stoppedFailure() { return stoppedFailure(row); }
+    private ExecutionRun stoppedFailure(ExecutionRun original) {
+        return new ExecutionRun(original.id(), original.projectId(), owner, build, original.sourceVersionId(), binding, null,
+                original.treeSha256(), original.jarSha256(), original.manifestSha256(), original.bindingIdentitySha256(), original.keySha256(), original.requestSha256(),
+                "NEEDS_RECONCILIATION", false, UUID.randomUUID(), false, "e".repeat(64), "RUN_HEALTH_INVALID", original.createdAt(), null, null);
+    }
+    private ExecutionRunReconciliationRepository.Audit audit(ExecutionRun failed, UUID execution) {
+        return new ExecutionRunReconciliationRepository.Audit(UUID.randomUUID(), failed.id(), failed.projectId(), owner, execution,
+                failed.stoppedSha256(), "f".repeat(64), "a".repeat(64), "b".repeat(64), Instant.now());
+    }
+
     private ExecutionRun row(UUID target, ExecutionRun.Request req, String status, Instant finished) {
         return new ExecutionRun(UUID.randomUUID(), target, owner, req.build(), UUID.randomUUID(), req.binding(), req.review(),
                 "a".repeat(64), "b".repeat(64), "c".repeat(64), "d".repeat(64), req.keyHash(), req.bodyHash(), status,
