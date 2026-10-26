@@ -42,3 +42,4 @@
 - `ex22-delivery-pd07a-green.log`：9 项注册表/设置测试通过，验证授权期限和容量、撤销后仍在执行的请求不提前释放名额。
 - `ex22-delivery-pd07b-project-green.log`：4 项注册表单测、3 项实际 owner/PG 集成通过；管理操作可核验项目权限，无需重新取得活跃进程。
 - `ex22-delivery-pd07b-session-green.log`：14 项会话服务/注册表/设置单测通过，原会话失效或配置变化后旧令牌不可恢复，原运行句柄不会换成新进程，写响应后的失权明确返回不确定且不重试。这里模拟 SessionAccess/执行门面；真实登录会话、CSRF 及浏览器验证仍待后续记录。
+- `ex22-delivery-pd07c-http.log`：14 项定向单测、7 项真实 HTTP/PG 会话检查通过。创建/撤销沿用现有 CSRF 链，匿名和跨 owner 被拒绝，不接受 URL/query 或非规范 UUID，重复撤销成功，实际退出使旧授权失效；管理 OPTIONS 没有 Origin null CORS 许可。本组仅模拟执行门面，不启动应用。

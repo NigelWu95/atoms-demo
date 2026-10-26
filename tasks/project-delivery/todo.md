@@ -40,14 +40,14 @@
 
 **C2 已通过：** 受限 transport 已接到准确运行，包含返回前重新校验；尚不声称浏览器可用。
 
-- [ ] **PD07：短期会话预览授权**（PD04、PD06；至多 5 文件）
+- [x] **PD07：短期会话预览授权**（PD04、PD06；至多 5 文件）
   - 256-bit token，仅存摘要；十分钟、不续期、32/8 容量；创建/撤销检查归属、CSRF，逐请求核验原会话及准确运行。
   - 文件：授权 registry、service、管理 controller、单测/集成测试；验证 J：串用/登出/过期/容量/重启/归档拒绝。
   - [x] PD07a：授权内存注册表及并发名额；`ex22-delivery-pd07a-green.log` 9 项注册表/设置检查通过，覆盖 256-bit 随机令牌、单调过期、跨项目/重启失效、32/8 与 16/4 容量、撤销后实际完成才释放名额。
   - [x] PD07b：执行模块的轻量项目授权入口；会话/准确句柄服务层分别提交验证。
     - 项目授权入口已完成：`ex22-delivery-pd07b-project-green.log` 4 项授权注册表单测、3 项实际 owner/PG 集成通过。管理撤销无需重新取得已停止运行的句柄，仍检查维护者、归属、归档和期限。
     - `ex22-delivery-pd07b-session-green.log` 14 项会话服务/注册表/设置单测通过；原会话撤销、配置变化和原句柄失效会撤销授权，响应后写入状态不确定不重试。HTTP 会话与 CSRF 留在 PD07c 验证。
-  - [ ] PD07c：创建/撤销管理 API 与真实会话/CSRF HTTP 集成。
+  - [x] PD07c：创建/撤销管理 API 与真实会话/CSRF HTTP 集成。`ex22-delivery-pd07c-http.log` 14 项定向单测、7 项真实 HTTP/PG 会话集成通过；覆盖缺少 CSRF、匿名、跨 owner、非法目标/ID、撤销幂等、实际退出后授权永久失效。执行门面在此 HTTP 测试中模拟，实际进程证据见 PD06。
 - [ ] **PD08a：预览 HTTP 与浏览器策略**（PD07；至多 5 文件）
   - 精确 stateless 过滤链、CSP sandbox、Origin null CORS/OPTIONS；16/4 交换容量；不转发平台或上游敏感头，错误不回显令牌。
   - 文件：preview controller、security configuration、header policy、边界测试；验证 J：管理 CSRF/CORS 不被放宽，取消释放容量。
