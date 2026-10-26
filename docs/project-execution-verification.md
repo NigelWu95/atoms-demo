@@ -1966,3 +1966,14 @@ EX27 和 C-EX09 完成。EX28–30 的组合故障验证、全量兼容回归及
 辅助入口不可访问的编译 RED 保留于 `.local/ex22-ex28a-red.log`；20:43:47 首个组合用例通过。20:53:48，`sh .local/run-ex22-checks.sh ex22-ex28a-final.log -Dtest=ExecutionSettingsTest -Dit.test=ExecutionConcurrencyIT,ExecutionPreparationSchedulerIT -Pproject-execution-contract verify` 的 **7 单元 + 10 集成**全部通过，零失败/错误/跳过。随后增强源码头/版本数断言，EX28abc 批次中的两个组合用例也已通过；该批次整体结果另记，不将尚在执行的其他类提前算通过。原调度 8 项报告、更新后的组合 2 项报告及前序日志归档 `.local/ex28a-evidence-gtgqj3r6`，0700/0600。
 
 仅测试代码及计划/证据文档变更，不改变执行权限、环境或业务绑定。受控工具不代表再次运行原生 npm/Maven；原生证据仍见 EX27。未推送、部署或调用模型/SMTP，EX28b–d 尚待完成。
+
+
+## 2026-10-26 · EX28b–c 故障与秘密组合
+
+21:05:52，**19 单元 + 15 集成**全部通过，零失败/错误/跳过，耗时 7:42。命令为 `sh .local/run-ex22-checks.sh ex22-ex28abc-final.log -Dtest=ExecutionSecretBoundaryTest,ExecutionDiagnosticsTest,ExecutionPathsTest,ExecutionArtifactReopenTest -Dit.test=ExecutionConcurrencyIT,ExecutionFailureMatrixIT,ExecutionSecretBoundaryIT,ExecutionBuildWorkerIT -Dexecution.test-config-directory=/Users/wubingheng/atoms-demo/.local/project-execution-acceptance.x5cvui -Pproject-execution-contract verify`。实际仍用批准的项目隔离 JDK、EX22 schema、A 专用测试库配置，没有新建 DB/角色/绑定。报告与前序失败归档 `.local/ex28abc-evidence-_8o4y53i`，0700/0600。
+
+故障矩阵复用真实 PG/Git/JVM worker 夹具，只新增一次实际探测返回后的测试回调及少量包内入口。源码、锁、工具或批准文件变化后，新构建失败且无安装/封存，实际停止记录保留，上一成功产物可复验。执行根替换在领取前拒绝且不写任务；恢复测试根原 inode 后正常取消。模拟磁盘保留空间不足不启动工具、不建产物，也不删除先前产物。修改第二项封存 JAR 会撤销该产物的访问，成功元数据保留、第一项仍可复验。首轮错误摘要用例期待进入 worker，但实际 DB 的 `guard_execution_build` 已在 INSERT 拒绝；保留失败报告后改为验证准入拒绝、无任务/名额/进程，没有放宽 DB 约束。
+
+秘密边界的 3 个单元和 1 个组合集成使用合成 canary。实际子进程 stdout/stderr 的成功和失败只返回计数/固定错误；原始前端/Java 报告确实含 canary，而解析计数、持久事件、任务/事件 JSON、Git 源码、封存清单和受控产物不含 canary，平台捕获日志也不含。逐字段污染事件只得到白名单 DTO 或固定不可用诊断。此项证明当前内部边界，未实现或验证自动模型修复请求，也不把受控工具产物称作原生 JAR。
+
+该批次还复验 2 个并发场景和原 worker 的 8 项取消/期限/失权/提交回执故障。生产执行代码不变，后续 EX28d 仍须通过隔离变异和资源核对，EX29 的全部旧链路回归尚未完成。

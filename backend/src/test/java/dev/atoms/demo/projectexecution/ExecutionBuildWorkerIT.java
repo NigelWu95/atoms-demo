@@ -48,6 +48,7 @@ class ExecutionBuildWorkerIT {
     Path root, policy;
     String mode = "success";
     ExecutionProcess.Deadline shared;
+    OwnedProcess.Preflight afterFirstProbe = () -> {};
 
     @BeforeEach void setup() throws Exception {
         root = temporary.toRealPath();
@@ -214,14 +215,16 @@ class ExecutionBuildWorkerIT {
         assertThat(row(build).get("finished_at")).isNull();
     }
 
-    private ExecutionBuild queued() {
+    ExecutionBuild queued() {
+        return queued(source.snapshot(owner, base.projectId(), base.versionId()).sha256());
+    }
+    ExecutionBuild queued(String hash) {
         var repository = new ExecutionBuildRepository(jdbc);
-        String hash = source.snapshot(owner, base.projectId(), base.versionId()).sha256();
         var build = new TransactionTemplate(transactions).execute(tx -> repository.insert(owner, base.projectId(),
                 ExecutionBuild.request(base.versionId(), UUID.randomUUID().toString()), hash, new ExecutionSettings(config).load()));
         builds.add(build); return build;
     }
-    private ExecutionBuild run(ExecutionBuild build, JdbcTemplate database) throws IOException {
+    ExecutionBuild run(ExecutionBuild build, JdbcTemplate database) throws IOException {
         return new ExecutionBuildWorker(new ExecutionSettings(config), projects, database, transactions, paths,
                 source.readGateway(), databases, protectedRoots(), new ControlledTools(), clock::get)
                 .run(owner, base.projectId(), build.id(), cancel::get, () -> {
@@ -229,7 +232,7 @@ class ExecutionBuildWorkerIT {
                 });
     }
     private List<Path> protectedRoots() { return List.of(root.resolve("source"), root.resolve("work")); }
-    private Map<String, Object> row(ExecutionBuild build) { return jdbc.queryForMap("SELECT * FROM execution_builds WHERE id=?", build.id()); }
+    Map<String, Object> row(ExecutionBuild build) { return jdbc.queryForMap("SELECT * FROM execution_builds WHERE id=?", build.id()); }
     private ExecutionProcess.Deadline deadline() { return new ExecutionProcess.Deadline(Duration.ofSeconds(30)); }
 
     private final class ControlledTools implements ExecutionBuildWorker.Tools {
@@ -238,6 +241,7 @@ class ExecutionBuildWorkerIT {
                 UUID build, UUID execution, OwnedProcess.Preflight preflight) throws IOException {
             assertPending(build, execution); sameDeadline(deadline); executed.add(kind.name());
             var result = child("noop", home.home(), home.home(), home.temporary(), deadline, cancelled, build, execution, preflight, null);
+            if (kind == ExecutionToolchain.Kind.NODE) afterFirstProbe.check();
             if (mode.equals("configuration-drift"))
                 config.withProperty("atoms.project-execution.max-concurrent-builds", "2");
             if (kind == ExecutionToolchain.Kind.MAVEN) {
