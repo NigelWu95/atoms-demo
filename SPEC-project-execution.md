@@ -260,6 +260,8 @@ finish 仅接受匹配构建 UUID、执行 UUID、tool-home cwd 的真实停止�
 
 EX23 的 `ProjectExecutionAccess` 只提供内部 `build` / `running` 句柄签发、身份读取和来源快照读取，不增加 HTTP 路由。句柄私有构造且绑定签发者、owner/project、当前协调者资源及固定构建身份；每次读取在短事务中重新授权，再在事务外校验原封存文件及指定源码版本，返回前再核对权限与协调权。成功构建 V1 不随项目最新 V2 改变。运行句柄还必须匹配原 worker 持有的同一个存活进程和执行 ID，停止后不可复用。协调者关闭或失权会撤销本次资源范围；访问不新开执行根租约，也不返回磁盘路径、端口、凭据或可序列化的访问授权。
 
+访问使用同一 30 秒文件/源码预算和最长 5 秒元数据事务，拒绝调用者已有事务；Git 与文件校验均不占项目行锁。`identity` 也复验原快照和产物，因此用于交付前核对，不作为每个静态资源请求的廉价缓存。返回快照只是当次观察的数据，不保证返回之后权限或进程永久不变；下次交付操作必须重新调用门面。原句柄识别同字节文件替换；新句柄仍可在完整重新授权及摘要/清单验证后读取正确产物。错误只返回白名单稳定码和固定说明，底层配置、路径及 cause 不外传。此边界未实现 HTTP 代理、ZIP 打包或网页按钮。
+
 实现位于 `backend/src/main/java/dev/atoms/demo/projectexecution/`，对应测试位于 `backend/src/test/java/dev/atoms/demo/projectexecution/`，受控样本位于 `backend/src/test/resources/projectexecution/`；追加数据库迁移，维护说明/验证记录放入 `docs/`。现有 `execution/OwnedProcess` 有 Agent 专用错误码，由 `ExecutionProcess` 明确适配，不能直接把其结果当新构建证据。旧 `workspace`/`instances` 固定模板代码不改成混杂的双模式执行器。
 
 `ExecutionTestDatabase.load` 只装载上述内部注册表，不连接数据库；`verify(projectId, budget)` 才创建并关闭一个有界只读连接。未登记项目、无效/漂移配置、重复绑定、实际目标不符、连接不可用和预算耗尽分别返回 `EXECUTION_DB_BINDING_NOT_FOUND`、`EXECUTION_DB_CONFIGURATION_INVALID`、`EXECUTION_DB_BINDING_CONFLICT`、`EXECUTION_DB_TARGET_REJECTED`、`EXECUTION_DB_UNAVAILABLE`、`EXECUTION_TIMEOUT`。异常不携带底层 cause/suppressed 连接详情。连接/读超时和语句期限从剩余整秒预算取值且最多 3/5/5 秒，不把 0 传给 JDBC 表示无限等待；不足 1 秒直接拒绝。该内部类不是自动启动的 Spring 组件，后续协调者须先按现有开关和权限准入。
