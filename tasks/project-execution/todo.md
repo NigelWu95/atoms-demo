@@ -360,7 +360,7 @@ U/I/REAL/ALL/COMPAT/DOC 的命令与权限条件见计划 §6。S = 1–2、M = 
 
 - [ ] 完成 EX24。依赖：EX07、EX14、EX17、EX23。原 4 文件估计遗漏准备/运行尚无事件表，按每片最多 5 个主要文件拆分。
   - [x] EX24a：诊断字段、枚举和错误码白名单，恶意/异常报告仅返回固定降级结果（ExecutionDiagnostics、ExecutionDiagnosticsTest）。缺方法 RED 后，08:37:27 诊断及报告/前端兼容 14 项通过。
-  - [ ] EX24b：追加 V029，为准备/运行记录状态事件，与状态提交同事务；三类事件的连续序号、1000 条/64 KiB 配额及不可变性验证（迁移、ExecutionEventSchemaIT）。不伪造旧任务历史，不修改旧迁移。
+  - [x] EX24b：追加 V029，为准备/运行记录状态事件，与状态提交同事务；三类事件的连续序号、1000 条/64 KiB 配额及不可变性验证（迁移、ExecutionEventSchemaIT）。RED 为 2 失败/6 缺表错误；08:41:31 GREEN 5 单元 + 38 集成。仅迁移已批准测试 schema，不伪造旧任务历史，不修改旧迁移。
   - [ ] EX24c：三类任务和事件查询、绑定 owner/project/kind/task 的游标、每页 1–100、权限复核与诊断 DTO（ExecutionQuery、ExecutionQueryIT）。
   - [ ] EX24d：有效变异、相关回归、只读审计与文档收尾；无 HTTP 接口、模型调用或部署。
 - 描述：补齐构建/准备/运行的稳定分页查询，统一此前阶段事件的可消费 DTO。
