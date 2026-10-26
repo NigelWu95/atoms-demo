@@ -40,7 +40,34 @@ class ProjectSourceGitStoreTest {
                 .isInstanceOf(IOException.class).hasMessage("SOURCE_STORAGE_UNAVAILABLE");
     }
 
-    @Test void readsEachObjectOnceWithoutLosingEmptyFilesUtf8OrTrailingNewlines() throws Exception {
+    @Test void multipleObjectsKeepExactFramingAndRejectDamageAfterAValidFirstObject() throws Exception {
+        String empty = "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391", hello = "ce013625030ba8dba906f756967f9e9ca394464a";
+        String first = empty + " blob 0\n\n", second = hello + " blob 6\nhello\n\n";
+        var decoded = SourceGitStore.decodeObjects("blob", List.of(empty, hello), 6, (first + second).getBytes(StandardCharsets.UTF_8));
+        assertThat(decoded).hasSize(2); assertThat(decoded.get(empty)).isEmpty();
+        assertThat(decoded.get(hello)).isEqualTo("hello\n".getBytes(StandardCharsets.UTF_8));
+        for (String invalid : List.of(second + first, first + second + "extra", first + second.substring(0, second.length() - 1),
+                first + second.replace("hello", "jello"), first + hello + " missing\n", first + second.replace("blob 6", "blob 2147483647")))
+            assertThatThrownBy(() -> SourceGitStore.decodeObjects("blob", List.of(empty, hello), 6, invalid.getBytes(StandardCharsets.UTF_8)))
+                    .isInstanceOf(IOException.class).hasMessage("SOURCE_STORAGE_UNAVAILABLE");
+        assertThatThrownBy(() -> SourceGitStore.decodeObjects("blob", List.of(empty, empty), 6, (first + first).getBytes(StandardCharsets.UTF_8)))
+                .isInstanceOf(IOException.class).hasMessage("SOURCE_STORAGE_UNAVAILABLE");
+    }
+
+    @Test void batchedObjectsCannotBypassTheCombinedContentBudget() throws Exception {
+        var output = new java.io.ByteArrayOutputStream(); var ids = new ArrayList<String>();
+        for (int i = 0; i < 9; i++) {
+            byte[] content = ("" + (char) ('a' + i)).repeat(2 << 20).getBytes(StandardCharsets.US_ASCII);
+            var digest = java.security.MessageDigest.getInstance("SHA-1");
+            digest.update(("blob " + content.length + "\0").getBytes(StandardCharsets.US_ASCII));
+            String id = java.util.HexFormat.of().formatHex(digest.digest(content)); ids.add(id);
+            output.write((id + " blob " + content.length + "\n").getBytes(StandardCharsets.US_ASCII)); output.write(content); output.write('\n');
+        }
+        assertThatThrownBy(() -> SourceGitStore.decodeObjects("blob", ids, 2 << 20, output.toByteArray()))
+                .isInstanceOf(IOException.class).hasMessage("SOURCE_STORAGE_UNAVAILABLE");
+    }
+
+    @Test void readsObjectsInBoundedBatchesWithoutLosingEmptyFilesUtf8OrTrailingNewlines() throws Exception {
         Path parent = temporary.toRealPath();
         UUID project = UUID.randomUUID(), version = UUID.randomUUID();
         var count = new java.util.concurrent.atomic.AtomicInteger();
@@ -53,7 +80,21 @@ class ProjectSourceGitStoreTest {
             store.save(project, version, null, input);
             count.set(0);
             assertTree(input, store.read(project, version));
-            // One reference lookup, one commit, one root tree and two blobs. No per-object size probe.
+            // One reference lookup, one commit, one root tree and one blob batch.
+            assertThat(count.get()).isEqualTo(4);
+        }
+    }
+
+    @Test void readingManyFilesUsesProcessesPerTreeLevelInsteadOfPerFile() throws Exception {
+        Path parent = temporary.toRealPath(); UUID project = UUID.randomUUID(), version = UUID.randomUUID();
+        var count = new java.util.concurrent.atomic.AtomicInteger();
+        var measured = new SourceGitProcess(Path.of("/usr/bin/git"), java.time.Duration.ofSeconds(60), handle -> count.incrementAndGet());
+        var files = new ArrayList<SourceTree.File>();
+        for (int i = 0; i < 40; i++) files.add(file((i % 2 == 0 ? "src" : "other") + "/part" + i + ".txt", "内容 " + (i / 2) + "\n\n"));
+        var input = policy.validate(files);
+        try (var paths = new ProjectSourcePaths(parent.resolve("source"), parent.resolve("work"))) {
+            var store = new SourceGitStore(paths, measured, policy); store.initialize(project); store.save(project, version, null, input);
+            count.set(0); assertTree(input, store.read(project, version));
             assertThat(count.get()).isEqualTo(5);
         }
     }

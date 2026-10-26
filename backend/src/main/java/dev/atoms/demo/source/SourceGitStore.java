@@ -16,6 +16,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.UUID;
@@ -85,9 +86,7 @@ final class SourceGitStore {
     synchronized SourceTree read(UUID projectId, UUID versionId) throws IOException {
         Path repo = repository(projectId);
         Stored version = inspect(repo, versionId, requiredReference(repo, versionId));
-        var files = new ArrayList<SourceTree.File>();
-        long[] total = {0};
-        readTree(repo, version.treeId(), "", 0, files, total);
+        var files = readTree(repo, version.treeId());
         final SourceTree tree;
         try { tree = policy.validate(files); }
         catch (IllegalArgumentException error) { throw failure("SOURCE_STORAGE_UNAVAILABLE"); }
@@ -109,31 +108,48 @@ final class SourceGitStore {
         return oid(run(repo, List.of("mktree", "-z"), input.toByteArray(), 128));
     }
 
-    private void readTree(Path repo, String objectId, String prefix, int depth, List<SourceTree.File> files, long[] total) throws IOException {
-        if (depth >= ProjectSourcePolicy.DEFAULTS.depth()) throw failure("SOURCE_STORAGE_UNAVAILABLE");
-        byte[] bytes = object(repo, "tree", objectId, 256 << 10);
-        int cursor = 0;
-        while (cursor < bytes.length) {
-            int space = index(bytes, cursor, (byte) ' '), nul = index(bytes, space + 1, (byte) 0);
-            if (nul + 21 > bytes.length) throw failure("SOURCE_STORAGE_UNAVAILABLE");
-            String mode = text(Arrays.copyOfRange(bytes, cursor, space));
-            String name = text(Arrays.copyOfRange(bytes, space + 1, nul));
-            String path = prefix + name;
-            if (name.contains("/")) throw failure("SOURCE_STORAGE_UNAVAILABLE");
-            try { policy.validatePath(path); }
-            catch (IllegalArgumentException error) { throw failure("SOURCE_STORAGE_UNAVAILABLE"); }
-            String id = HexFormat.of().formatHex(bytes, nul + 1, nul + 21);
-            cursor = nul + 21;
-            if (mode.equals("40000")) readTree(repo, id, path + "/", depth + 1, files, total);
-            else {
-                if ((!mode.equals("100644") && !mode.equals("100755")) || files.size() >= ProjectSourcePolicy.DEFAULTS.files())
-                    throw failure("SOURCE_STORAGE_UNAVAILABLE");
-                byte[] content = object(repo, "blob", id, (int) ProjectSourcePolicy.DEFAULTS.fileBytes());
-                total[0] += content.length;
-                if (total[0] > ProjectSourcePolicy.DEFAULTS.treeBytes()) throw failure("SOURCE_STORAGE_UNAVAILABLE");
-                files.add(new SourceTree.File(path, content, Integer.parseInt(mode, 8)));
+    private List<SourceTree.File> readTree(Path repo, String root) throws IOException {
+        var leaves = new ArrayList<BlobFile>();
+        List<TreeLevel> level = List.of(new TreeLevel(root, ""));
+        int directories = 1;
+        for (int depth = 0; !level.isEmpty(); depth++) {
+            if (depth >= ProjectSourcePolicy.DEFAULTS.depth()) throw failure("SOURCE_STORAGE_UNAVAILABLE");
+            // One short-lived Git process per level; each returned raw object still verifies its own SHA-1.
+            var trees = objects(repo, "tree", level.stream().map(TreeLevel::id).toList(), 256 << 10);
+            var next = new ArrayList<TreeLevel>();
+            for (var directory : level) {
+                byte[] bytes = trees.get(directory.id()); int cursor = 0;
+                while (cursor < bytes.length) {
+                    int space = index(bytes, cursor, (byte) ' '), nul = index(bytes, space + 1, (byte) 0);
+                    if (nul + 21 > bytes.length) throw failure("SOURCE_STORAGE_UNAVAILABLE");
+                    String mode = text(Arrays.copyOfRange(bytes, cursor, space));
+                    String name = text(Arrays.copyOfRange(bytes, space + 1, nul));
+                    String path = directory.prefix() + name;
+                    if (name.contains("/")) throw failure("SOURCE_STORAGE_UNAVAILABLE");
+                    try { policy.validatePath(path); }
+                    catch (IllegalArgumentException error) { throw failure("SOURCE_STORAGE_UNAVAILABLE"); }
+                    String id = HexFormat.of().formatHex(bytes, nul + 1, nul + 21); cursor = nul + 21;
+                    if (mode.equals("40000")) {
+                        if (++directories > ProjectSourcePolicy.DEFAULTS.files() * ProjectSourcePolicy.DEFAULTS.depth() + 1)
+                            throw failure("SOURCE_STORAGE_UNAVAILABLE");
+                        next.add(new TreeLevel(id, path + "/"));
+                    } else {
+                        if ((!mode.equals("100644") && !mode.equals("100755")) || leaves.size() >= ProjectSourcePolicy.DEFAULTS.files())
+                            throw failure("SOURCE_STORAGE_UNAVAILABLE");
+                        leaves.add(new BlobFile(id, path, Integer.parseInt(mode, 8)));
+                    }
+                }
             }
+            level = next;
         }
+        var blobs = objects(repo, "blob", leaves.stream().map(BlobFile::id).toList(), (int) ProjectSourcePolicy.DEFAULTS.fileBytes());
+        var files = new ArrayList<SourceTree.File>(); long total = 0;
+        for (var leaf : leaves) {
+            byte[] content = blobs.get(leaf.id()); total += content.length;
+            if (total > ProjectSourcePolicy.DEFAULTS.treeBytes()) throw failure("SOURCE_STORAGE_UNAVAILABLE");
+            files.add(new SourceTree.File(leaf.path(), content, leaf.mode()));
+        }
+        return files;
     }
 
     private Stored inspect(Path repo, UUID versionId, String commitId) throws IOException {
@@ -163,21 +179,42 @@ final class SourceGitStore {
         return decodeObject(type, id, limit, output);
     }
 
+    private Map<String, byte[]> objects(Path repo, String type, List<String> ids, int limit) throws IOException {
+        var unique = ids.stream().distinct().toList();
+        if (unique.isEmpty()) return Map.of();
+        for (String id : unique) validOid(id);
+        byte[] input = (String.join("\n", unique) + "\n").getBytes(StandardCharsets.US_ASCII);
+        // Finite batch only, with the same SourceDeadline; no persistent Git session or cross-read cache.
+        byte[] output = run(repo, List.of("cat-file", "--batch"), input,
+                (int) ProjectSourcePolicy.DEFAULTS.treeBytes() + unique.size() * 128);
+        return decodeObjects(type, unique, limit, output);
+    }
+
     static byte[] decodeObject(String type, String id, int limit, byte[] output) throws IOException {
-        int newline = index(output, 0, (byte) '\n');
-        if (newline >= 128) throw failure("SOURCE_STORAGE_UNAVAILABLE");
-        String header = text(Arrays.copyOfRange(output, 0, newline)), prefix = id + " " + type + " ";
-        if (!header.startsWith(prefix)) throw failure("SOURCE_STORAGE_UNAVAILABLE");
-        String length = header.substring(prefix.length());
-        if (!length.matches("0|[1-9][0-9]{0,9}")) throw failure("SOURCE_STORAGE_UNAVAILABLE");
-        final int size;
-        try { size = Integer.parseInt(length); }
-        catch (NumberFormatException error) { throw failure("SOURCE_STORAGE_UNAVAILABLE"); }
-        if (size > limit || output.length - newline - 2 != size || output[output.length - 1] != '\n')
-            throw failure("SOURCE_STORAGE_UNAVAILABLE");
-        byte[] bytes = Arrays.copyOfRange(output, newline + 1, output.length - 1);
-        if (!gitHash(type, bytes).equals(id)) throw failure("SOURCE_STORAGE_UNAVAILABLE");
-        return bytes;
+        return decodeObjects(type, List.of(id), limit, output).get(id);
+    }
+
+    static Map<String, byte[]> decodeObjects(String type, List<String> ids, int limit, byte[] output) throws IOException {
+        var objects = new LinkedHashMap<String, byte[]>(); int cursor = 0; long total = 0;
+        for (String id : ids) {
+            int newline = index(output, cursor, (byte) '\n');
+            if (newline - cursor >= 128) throw failure("SOURCE_STORAGE_UNAVAILABLE");
+            String header = text(Arrays.copyOfRange(output, cursor, newline)), prefix = id + " " + type + " ";
+            if (!header.startsWith(prefix)) throw failure("SOURCE_STORAGE_UNAVAILABLE");
+            String length = header.substring(prefix.length());
+            if (!length.matches("0|[1-9][0-9]{0,9}")) throw failure("SOURCE_STORAGE_UNAVAILABLE");
+            final int size;
+            try { size = Integer.parseInt(length); }
+            catch (NumberFormatException error) { throw failure("SOURCE_STORAGE_UNAVAILABLE"); }
+            long end = (long) newline + size + 2; total += size;
+            if (size > limit || end > output.length || total > ProjectSourcePolicy.DEFAULTS.treeBytes()
+                    || output[(int) end - 1] != '\n') throw failure("SOURCE_STORAGE_UNAVAILABLE");
+            byte[] bytes = Arrays.copyOfRange(output, newline + 1, (int) end - 1);
+            if (!gitHash(type, bytes).equals(id) || objects.putIfAbsent(id, bytes) != null) throw failure("SOURCE_STORAGE_UNAVAILABLE");
+            cursor = (int) end;
+        }
+        if (cursor != output.length) throw failure("SOURCE_STORAGE_UNAVAILABLE");
+        return Map.copyOf(objects);
     }
 
     private String requiredReference(Path repo, UUID versionId) throws IOException {
@@ -247,6 +284,8 @@ final class SourceGitStore {
     private static String message(UUID version, String digest) { return "atoms-source-v1\n" + version + "\n" + digest + "\n"; }
     private static IOException failure(String code) { return new IOException(code); }
     private record Entry(int mode, String type, String oid) {}
+    private record TreeLevel(String id, String prefix) {}
+    private record BlobFile(String id, String path, int mode) {}
     private static final class Node {
         final Map<String, Node> directories = new TreeMap<>();
         final Map<String, Entry> entries = new TreeMap<>();
