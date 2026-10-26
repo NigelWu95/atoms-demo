@@ -51,6 +51,8 @@
 - [ ] **PD08a：预览 HTTP 与浏览器策略**（PD07；至多 5 文件）
   - 精确 stateless 过滤链、CSP sandbox、Origin null CORS/OPTIONS；16/4 交换容量；不转发平台或上游敏感头，错误不回显令牌。
   - 文件：preview controller、security configuration、header policy、边界测试；验证 J：管理 CSRF/CORS 不被放宽，取消释放容量。
+  - 拆为 PD08a1 纯请求/响应浏览器策略、PD08a2 异步有界 HTTP 接入及生命周期验证，避免在一组修改中同时引入策略与并发状态处理。
+  - [x] PD08a1：`ex22-delivery-pd08a-policy-delete.log` 11 项策略检查通过；确切令牌的 assets/api CSP、无凭据 Origin null、请求头白名单、预检、非法路径与无正文 DELETE。此步尚未注册预览过滤链。
 - [ ] **PD08b：真实 Vue 页面预览**（PD08a、PD03；至多 5 文件）
   - 原生样本+Chrome 完成模块加载、CRUD/409，检查 cookie/存储/外部请求限制及换版旧授权失效。
   - 文件：原生应用契约、浏览器测试入口/脚本及最小夹具；验证 A + B；页面不纳入正式工作台。
