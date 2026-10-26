@@ -1,8 +1,10 @@
 package dev.atoms.demo.projectexecution;
 
 import dev.atoms.demo.common.ApiException;
+import dev.atoms.demo.execution.OwnedProcess;
 import dev.atoms.demo.project.ProjectService;
 import dev.atoms.demo.source.ProjectSourceReadGateway;
+import dev.atoms.demo.source.SourceExecutionBudget;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.*;
@@ -41,38 +43,80 @@ public final class ProjectExecutionAccess {
 
     /** Issue from an authorized successful build, without opening a new execution root or reading latest source. */
     public BuildHandle build(UUID owner, UUID project, UUID build) {
+        return build(owner, project, build, budget()::remaining);
+    }
+    public BuildHandle build(UUID owner, UUID project, UUID build, SourceExecutionBudget remaining) {
         return guarded(() -> {
-            requireIds(project, build); var config = authorize(owner); var scope = scope(); var deadline = budget();
-            var current = state(owner, project, build, null);
+            var deadline = budget(remaining); deadline.remaining();
+            requireIds(project, build); var config = authorize(owner); var scope = scope();
+            var current = state(owner, project, build, null, deadline);
             var handle = open(config, scope, current, deadline);
             checked(owner, project, handle, null, deadline); return handle;
         });
     }
     /** A READY database row is insufficient: the original worker must still own this exact serving process. */
     public RunningHandle running(UUID owner, UUID project, UUID run) {
+        return running(owner, project, run, budget()::remaining);
+    }
+    public RunningHandle running(UUID owner, UUID project, UUID run, SourceExecutionBudget remaining) {
         return guarded(() -> {
-            requireIds(project, run); var config = authorize(owner); var scope = scope(); var deadline = budget();
-            var current = state(owner, project, null, run);
+            var deadline = budget(remaining); deadline.remaining();
+            requireIds(project, run); var config = authorize(owner); var scope = scope();
+            var current = state(owner, project, null, run, deadline);
             var build = open(config, scope, current, deadline);
             var handle = new RunningHandle(build, current.run(), scope.ownedProcess(run));
             checked(owner, project, build, handle, deadline); return handle;
         });
     }
     public BuildIdentity identity(UUID owner, UUID project, BuildHandle handle) {
-        return guarded(() -> { checked(owner, project, handle, null, budget()); return view(handle.state); });
+        return identity(owner, project, handle, budget()::remaining);
+    }
+    public BuildIdentity identity(UUID owner, UUID project, BuildHandle handle, SourceExecutionBudget remaining) {
+        return guarded(() -> { checked(owner, project, handle, null, budget(remaining)); return view(handle.state); });
     }
     public RunningIdentity identity(UUID owner, UUID project, RunningHandle handle) {
+        return identity(owner, project, handle, budget()::remaining);
+    }
+    public RunningIdentity identity(UUID owner, UUID project, RunningHandle handle, SourceExecutionBudget remaining) {
         return guarded(() -> {
-            requireHandle(handle); checked(owner, project, handle.build, handle, budget());
+            requireHandle(handle); checked(owner, project, handle.build, handle, budget(remaining));
             return new RunningIdentity(handle.run.id(), handle.run.executionId(), view(handle.build.state));
         });
     }
     /** Immutable Git snapshot for packaging; never reads the mutable build cwd. Reauthorize subsequent actions. */
     public ProjectSourceReadGateway.Snapshot source(UUID owner, UUID project, BuildHandle handle) {
-        return guarded(() -> checked(owner, project, handle, null, budget()));
+        return source(owner, project, handle, budget()::remaining);
+    }
+    public ProjectSourceReadGateway.Snapshot source(UUID owner, UUID project, BuildHandle handle, SourceExecutionBudget remaining) {
+        return guarded(() -> checked(owner, project, handle, null, budget(remaining)));
     }
     public ProjectSourceReadGateway.Snapshot source(UUID owner, UUID project, RunningHandle handle) {
-        return guarded(() -> { requireHandle(handle); return checked(owner, project, handle.build, handle, budget()); });
+        return source(owner, project, handle, budget()::remaining);
+    }
+    public ProjectSourceReadGateway.Snapshot source(UUID owner, UUID project, RunningHandle handle, SourceExecutionBudget remaining) {
+        return guarded(() -> { requireHandle(handle); return checked(owner, project, handle.build, handle, budget(remaining)); });
+    }
+
+    /** Fixed owned-process exchange. Caller supplies a shared time budget, never a port, target URL or process ID. */
+    public ExecutionHttpResponse exchange(UUID owner, UUID project, RunningHandle handle, ExecutionHttpRequest request,
+            SourceExecutionBudget remaining) {
+        return guarded(() -> {
+            requireHandle(handle);
+            if (request == null) throw error(422, "EXECUTION_INVALID_INPUT");
+            var deadline = budget(remaining);
+            checked(owner, project, handle.build, handle, deadline);
+            var target = handle.process.confirmedTarget(handle.run.id(), handle.run.executionId());
+            if (!target.project().equals(project) || !target.id().equals(handle.run.bindingId())
+                    || !target.hash().equals(handle.run.bindingIdentitySha256())) throw revoked();
+            handle.build.scope.check(); serving(handle.build, handle); deadline.remaining();
+            var response = new ExecutionHttpTransport().exchange(target.port(), request, deadline);
+            try { checked(owner, project, handle.build, handle, deadline); }
+            catch (IOException | RuntimeException failure) {
+                if (request.write()) throw ExecutionHttpTransport.uncertain();
+                throw failure;
+            }
+            return response;
+        });
     }
 
     public record BuildIdentity(UUID projectId, UUID buildId, UUID sourceVersionId, String treeSha256,
@@ -100,16 +144,17 @@ public final class ProjectExecutionAccess {
     private record State(ExecutionBuild build, ExecutionArtifact.Summary artifact, ExecutionRun run) {}
 
     private BuildHandle open(ExecutionSettings.Configuration config, ExecutionCoordinator.AccessScope scope, State current,
-            ExecutionProcess.Deadline deadline) throws IOException {
+            OwnedProcess.Budget deadline) throws IOException {
         var artifact = scope.artifact(current.build(), current.artifact().jarSha256(), current.artifact().manifestSha256(), deadline);
         if (artifact == null || !current.artifact().equals(artifact.summary())) throw revoked();
         return new BuildHandle(this, config, scope, new State(current.build(), current.artifact(), null), artifact);
     }
     private ProjectSourceReadGateway.Snapshot checked(UUID owner, UUID project, BuildHandle handle,
-            RunningHandle running, ExecutionProcess.Deadline deadline) throws IOException {
+            RunningHandle running, OwnedProcess.Budget deadline) throws IOException {
+        deadline.remaining();
         if (handle == null || handle.issuer != this || !handle.state.build().ownerId().equals(owner)
                 || !handle.state.build().projectId().equals(project)) throw error(403, "EXECUTION_ACCESS_FORBIDDEN");
-        handle.scope.check(); compare(owner, project, handle, running); serving(handle, running);
+        handle.scope.check(); compare(owner, project, handle, running, deadline); serving(handle, running);
         handle.artifact.verify(deadline);
         var build = handle.state.build();
         var snapshot = source.read(owner, project, build.sourceVersionId(), deadline::remaining);
@@ -117,12 +162,12 @@ public final class ProjectExecutionAccess {
                 || !build.treeSha256().equals(snapshot.version().treeSha256()) || !build.treeSha256().equals(snapshot.tree().sha256())) throw revoked();
         // Source/Git I/O held no DB lock. Recheck both files and authority before returning any data.
         handle.artifact.verify(deadline); handle.scope.check();
-        compare(owner, project, handle, running); serving(handle, running); handle.scope.check(); deadline.remaining();
+        compare(owner, project, handle, running, deadline); serving(handle, running); handle.scope.check(); deadline.remaining();
         return snapshot;
     }
-    private void compare(UUID owner, UUID project, BuildHandle handle, RunningHandle running) {
+    private void compare(UUID owner, UUID project, BuildHandle handle, RunningHandle running, OwnedProcess.Budget deadline) throws IOException {
         if (!handle.configuration.equals(authorize(owner))) throw revoked();
-        var current = state(owner, project, handle.state.build().id(), running == null ? null : running.run.id());
+        var current = state(owner, project, handle.state.build().id(), running == null ? null : running.run.id(), deadline);
         if (!current.build().equals(handle.state.build()) || !current.artifact().equals(handle.state.artifact())
                 || running != null && !current.run().equals(running.run)
                 || !handle.configuration.equals(authorize(owner))) throw revoked();
@@ -131,8 +176,13 @@ public final class ProjectExecutionAccess {
         if (running != null && (running.process == null || handle.scope.ownedProcess(running.run.id()) != running.process
                 || !running.process.serves(running.run.id(), running.run.executionId()))) throw revoked();
     }
-    private State state(UUID owner, UUID project, UUID buildId, UUID runId) {
-        return transaction.execute(tx -> {
+    private State state(UUID owner, UUID project, UUID buildId, UUID runId, OwnedProcess.Budget deadline) throws IOException {
+        long millis = Math.max(1, Math.min(5000, deadline.remaining().toMillis()));
+        var bounded = new TransactionTemplate(Objects.requireNonNull(transaction.getTransactionManager()));
+        bounded.setTimeout((int) ((millis + 999) / 1000));
+        var result = bounded.execute(tx -> {
+            // This transaction's row-lock wait consumes the same request budget as Git and HTTP.
+            jdbc.queryForObject("SELECT set_config('statement_timeout', ?, true)", String.class, millis + "ms");
             if (projects.lock(owner, project.toString()).archived()) throw error(409, "EXECUTION_PROJECT_ARCHIVED");
             authorize(owner); // Configuration may have changed while waiting for the row lock.
             ExecutionRun run = runId == null ? null : runs.get(project, runId);
@@ -150,6 +200,7 @@ public final class ProjectExecutionAccess {
                     || !artifact.manifestSha256().equals(run.manifestSha256()))) throw revoked();
             return new State(build, artifact, run);
         });
+        deadline.remaining(); return result;
     }
     private ExecutionSettings.Configuration authorize(UUID owner) {
         var config = settings.load();
@@ -172,6 +223,18 @@ public final class ProjectExecutionAccess {
         if (handle == null) throw error(403, "EXECUTION_ACCESS_FORBIDDEN");
     }
     private static ExecutionProcess.Deadline budget() { return new ExecutionProcess.Deadline(Duration.ofSeconds(30)); }
+    private static OwnedProcess.Budget budget(SourceExecutionBudget shared) {
+        if (shared == null) throw error(422, "EXECUTION_INVALID_INPUT");
+        var local = budget();
+        return () -> {
+            if (Thread.currentThread().isInterrupted()) throw new IOException("EXECUTION_CANCELLED");
+            try {
+                Duration own = local.remaining(), caller = shared.remaining();
+                if (caller == null || caller.isNegative() || caller.isZero()) throw new IOException();
+                return own.compareTo(caller) < 0 ? own : caller;
+            } catch (IOException | RuntimeException failure) { throw new IOException("EXECUTION_TIMEOUT"); }
+        };
+    }
     private static ApiException revoked() { return error(409, "EXECUTION_ACCESS_REVOKED"); }
     private static ApiException error(int status, String code) { return new ApiException(status, code, "交付访问与当前项目、构建或运行状态不符，请刷新状态。"); }
     @FunctionalInterface private interface Read<T> { T get() throws IOException; }
@@ -183,9 +246,20 @@ public final class ProjectExecutionAccess {
             throw switch (error.code()) {
                 case "EXECUTION_DISABLED", "EXECUTION_FORBIDDEN", "EXECUTION_INVALID_INPUT", "EXECUTION_ACCESS_FORBIDDEN",
                      "EXECUTION_ACCESS_REVOKED", "PROJECT_NOT_FOUND", "EXECUTION_PROJECT_ARCHIVED",
-                     "EXECUTION_BUILD_NOT_FOUND", "EXECUTION_BUILD_OWNER_CHANGED", "RUN_NOT_FOUND" -> error(error.status(), error.code());
+                     "EXECUTION_BUILD_NOT_FOUND", "EXECUTION_BUILD_OWNER_CHANGED", "RUN_NOT_FOUND",
+                     "DELIVERY_UPSTREAM_INVALID", "DELIVERY_UPSTREAM_UNAVAILABLE", "DELIVERY_RESPONSE_TOO_LARGE",
+                     "DELIVERY_TIMEOUT", "DELIVERY_CANCELLED" -> error(error.status(), error.code());
+                case "SOURCE_OPERATION_TIMEOUT" -> error(504, "DELIVERY_TIMEOUT");
+                case "DELIVERY_WRITE_UNCERTAIN" -> ExecutionHttpTransport.uncertain();
                 default -> error(503, "EXECUTION_ACCESS_UNAVAILABLE");
             };
-        } catch (IOException | RuntimeException error) { throw error(503, "EXECUTION_ACCESS_UNAVAILABLE"); }
+        } catch (org.springframework.dao.QueryTimeoutException error) { throw error(504, "DELIVERY_TIMEOUT"); }
+        catch (IOException failure) {
+            throw switch (Objects.toString(failure.getMessage(), "")) {
+                case "EXECUTION_TIMEOUT" -> error(504, "DELIVERY_TIMEOUT");
+                case "EXECUTION_CANCELLED" -> error(503, "DELIVERY_CANCELLED");
+                default -> error(503, "EXECUTION_ACCESS_UNAVAILABLE");
+            };
+        } catch (RuntimeException error) { throw error(503, "EXECUTION_ACCESS_UNAVAILABLE"); }
     }
 }

@@ -113,6 +113,12 @@ class ExecutionHealthTest {
         public static void main(String[] args) throws Exception {
             System.in.readAllBytes();
             var server = HttpServer.create(new InetSocketAddress("127.0.0.1", Integer.parseInt(args[0])), 0);
+            server.createContext("/api/echo", exchange -> {
+                exchange.getRequestBody().readAllBytes();
+                exchange.getResponseHeaders().set("Content-Type", "application/json");
+                exchange.sendResponseHeaders(200, 2);
+                try (var output = exchange.getResponseBody()) { output.write("{}".getBytes(StandardCharsets.UTF_8)); }
+            });
             server.createContext("/api/health", exchange -> {
                 String mode = args[3];
                 if (!exchange.getRequestMethod().equals("GET") || exchange.getRequestHeaders().containsKey("Authorization")

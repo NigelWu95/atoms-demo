@@ -162,10 +162,38 @@ class ExecutionAccessIT {
         assertThat(identity.executionId()).isEqualTo(runs.get(A, admitted.id()).executionId());
         assertThat(identity.build().buildId()).isEqualTo(build.id());
         assertThat(gateway.source(OWNER, A, handle).version().id()).isEqualTo(base.versionId());
+        var request = new ExecutionHttpRequest("GET", "/api/health", null, Map.of("Accept", "application/json"), new byte[0]);
+        var response = gateway.exchange(OWNER, A, handle, request, budget()::remaining);
+        assertThat(response.status()).isEqualTo(200);
+        var body = new com.fasterxml.jackson.databind.ObjectMapper().readTree(response.body());
+        assertThat(body.path("runId").asText()).isEqualTo(identity.runId().toString());
+        assertThat(body.path("executionId").asText()).isEqualTo(identity.executionId().toString());
+        code("DELIVERY_TIMEOUT", () -> gateway.exchange(OWNER, A, handle, request, () -> Duration.ZERO));
+        code("DELIVERY_TIMEOUT", () -> gateway.source(OWNER, A, handle, () -> Duration.ZERO));
+        code("EXECUTION_ACCESS_FORBIDDEN", () -> gateway.exchange(UUID.randomUUID(), A, handle, request, budget()::remaining));
+        // Expire the shared caller budget only during the post-response source recheck.
+        var read = source.readGateway();
+        var delayedRead = mock(ProjectSourceReadGateway.class, org.mockito.AdditionalAnswers.delegatesTo(read));
+        var validationReads = new java.util.concurrent.atomic.AtomicInteger();
+        var expired = new java.util.concurrent.atomic.AtomicBoolean();
+        var armed = new java.util.concurrent.atomic.AtomicBoolean();
+        doAnswer(call -> {
+            var snapshot = read.read(call.getArgument(0), call.getArgument(1), call.getArgument(2), call.getArgument(3));
+            if (armed.get() && validationReads.incrementAndGet() == 2) expired.set(true);
+            return snapshot;
+        }).when(delayedRead).read(eq(OWNER), eq(A), eq(base.versionId()), any(SourceExecutionBudget.class));
+        var sharing = access(delayedRead); var exact = sharing.running(OWNER, A, admitted.id()); armed.set(true);
+        SourceExecutionBudget shared = () -> expired.get() ? Duration.ZERO : Duration.ofSeconds(30);
+        code("DELIVERY_TIMEOUT", () -> sharing.exchange(OWNER, A, exact, request, shared));
+        validationReads.set(0); expired.set(false);
+        var write = new ExecutionHttpRequest("POST", "/api/echo", null, Map.of("Content-Type", "application/json"), "{}".getBytes(StandardCharsets.UTF_8));
+        code("DELIVERY_WRITE_UNCERTAIN", () -> sharing.exchange(OWNER, A, exact, write, shared));
+        assertThat(validationReads).hasValue(2);
         assertThat(fixture.launches).hasValue(1); assertThat(fixture.process.get().isServing()).isTrue();
         code("EXECUTION_ACCESS_FORBIDDEN", () -> access(source.readGateway()).identity(OWNER, A, handle));
         coordinator.stopApplication(OWNER, A, admitted.id());
         code("EXECUTION_ACCESS_REVOKED", () -> gateway.identity(OWNER, A, handle));
+        code("EXECUTION_ACCESS_REVOKED", () -> gateway.exchange(OWNER, A, handle, request, budget()::remaining));
         await(() -> runs.get(A, admitted.id()).finishedAt() != null);
         code("EXECUTION_ACCESS_REVOKED", () -> gateway.running(OWNER, A, admitted.id()));
         assertThat(runs.get(A, admitted.id()).stoppedSha256()).isEqualTo(fixture.process.get().await(Duration.ofSeconds(1)).stopped().digest());

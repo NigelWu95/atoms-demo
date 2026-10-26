@@ -1,6 +1,6 @@
 # 完整工程交付（实施中）
 
-规格和进度分别见 [SPEC-project-delivery.md](../SPEC-project-delivery.md)及[任务清单](../tasks/project-delivery/todo.md)。当前仅完成独立构建测试配置和交付设置基础，预览、同快照下载和恢复 API 尚未交付。
+规格和进度分别见 [SPEC-project-delivery.md](../SPEC-project-delivery.md)及[任务清单](../tasks/project-delivery/todo.md)，证据见[验证记录](project-delivery-verification.md)。当前已完成独立构建测试配置、交付设置及内部原进程 HTTP 交换。浏览器会话预览、同快照下载和恢复 API 尚未交付。
 
 ## 平台配置
 

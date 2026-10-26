@@ -30,14 +30,15 @@
   - 拆为 PD05a 请求对象与策略、PD05b 有界上游传输；分别验证提交，合并后才标记 PD05 完成。
   - [x] PD05a：`.local/ex22-delivery-pd05a-green.log` 五项策略测试通过，涵盖多组路径/查询/头注入、UTF-8 JSON、大小及不可变性；尚未建立任何应用连接。
   - [x] PD05b：`.local/ex22-delivery-pd05b-green.log` 11 项请求/loopback 传输测试通过；新增静态大文件和派发前超时验证后，`ex22-delivery-pd05b-bounds.log` 7 项传输测试通过。覆盖业务 409、模块字节、恶意头、跳转、MIME、超大/慢正文、写入不确定及 HEAD/204；这是故障夹具，不是实际 Vue 应用验收。
-- [ ] **PD06：原运行句柄 HTTP 交换**（PD05；至多 5 文件）
+- [x] **PD06：原运行句柄 HTTP 交换**（PD05；拆为 PD06a/b）
   - 在执行模块内部获取原 owner 的目标，校验前后共享总预算；替换/失权/产物漂移失败，写入不确定结果明确。
   - 文件：ProjectExecutionAccess、ExecutionCoordinator、交换 DTO、执行集成测试；验证 J：旧句柄不复用新运行、总期限、未派发与已派发写故障。
   - 分为 PD06a 将健康验证过的固定目标保存在原 process owner，PD06b 句柄交换/共享预算。复用原 process 引用，避免将端口逐层暴露到协调器或交付 API。
   - [x] PD06a：`ex22-delivery-pd06a-green.log` 13 项进程/真实健康 HTTP 检查通过，目标在健康前不可取、之后不可换、停止即失效。此前 `pd06a-red` 因未等编译退出而与后次编译重叠，输出无效并保留，不计为有效 RED；PD06b 使用单 Maven 的全新编译再次检查本组。
-  - [ ] PD06b：内部句柄交换、共享期限及原生 owner/PG 集成。
+  - [x] PD06b：`ex22-delivery-pd06-second.log` 全新编译后的 30 项相关单测及 3 项实际 owner/PG 集成通过；正常 HTTP 返回原 run/execution，期限和跨 owner/停止边界通过。
+  - 响应后期限耗尽的新增检查发现底层产物校验会转换非标准预算异常，已让预算沿用 `EXECUTION_TIMEOUT` 协议。保留 `ex22-delivery-pd06-postcheck.log` 失败；修正后 `ex22-delivery-pd06-postcheck-fixed.log` 7 项传输与 3 项 owner/PG 集成通过，读取返回超时、已派发写入返回 `DELIVERY_WRITE_UNCERTAIN`。没有重复请求或重新绑定目标。
 
-**C2：** 受限 transport 可验证准确运行响应，尚不声称浏览器可用。
+**C2 已通过：** 受限 transport 已接到准确运行，包含返回前重新校验；尚不声称浏览器可用。
 
 - [ ] **PD07：短期会话预览授权**（PD04、PD06；至多 5 文件）
   - 256-bit token，仅存摘要；十分钟、不续期、32/8 容量；创建/撤销检查归属、CSRF，逐请求核验原会话及准确运行。
