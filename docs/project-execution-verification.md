@@ -1993,3 +1993,14 @@ EX28 完成，只新增测试并复用测试夹具，生产代码未变。EX29 �
 EX27 已将原 A/B 业务库升级为 V2 并保存待办数据。旧 `ExecutionMigrationHistoryIT` 仍要求空业务库，不能直接重复执行其合成历史测试。先单独运行只读空库断言，准确得到 1 项断言失败、零错误，保留 `.local/ex29-history-empty-assumption`。随后仅修改该测试文件：从已批准 B 测试库加载 `test` 用途配置，先确认 schema 为空，合成表/视图/类型/迁移异常全部在事务中回滚；每项前后只读比较 A/B 业务历史一致。仍验证空 schema、失败/部分迁移、超量/非法列、行安全、仅 collation 等拒绝路径，没有删表、clean/repair 或改变业务库。
 
 21:53:16，`sh .local/run-ex22-checks.sh ex22-ex29-history-green.log -Dtest=ExecutionMigrationPolicyTest,ExecutionMigrationsTest -Dit.test=ExecutionMigrationHistoryIT,ExecutionBindingContractIT,ExecutionRuntimeLaunchContractIT -Dexecution.test-config-directory=/Users/wubingheng/atoms-demo/.local/project-execution-acceptance.x5cvui -Pproject-execution-contract verify` 的 **6 单元 + 13 集成**通过，零失败/错误/跳过，1:25。报告和失败证据归档 `.local/ex29-history-evidence-9ppg_3xe`，0700/0600。生产代码无改动；本条不替代后续完整后端回归。
+
+
+## 2026-10-26 · EX29a 原页面及运行时浏览器回归
+
+默认 `playwright.config.ts` 原先只启动 5173 的普通前端，实际 `e2e` 用例已要求 5174 + 8081 的测试后端，导致 22 项前置失败。修正为复用已有 runtime 配置的独立测试服务器、Chrome 上下文及 loopback 代理设置，仅覆盖目录和基础页面 URL。没有改产品页面或测试断言，没有跳过失败场景。
+
+修正后 **22 项基础浏览器通过，4.2 分钟**；随后 **49 项运行时浏览器通过，5.5 分钟**，均零失败/跳过。覆盖邮箱验证码切页恢复、账号/密码、退出与返回、键盘/五档屏宽、项目持久化、生成状态/SSE 恢复、预览检查、同源访客数据隔离、发布上下线、历史工程下载、版本恢复及长工作台内部滚动。真实 Chrome 使用新测试上下文，邮箱与模型仅测试替身，未发送 SMTP 或请求真实上游。
+
+命令工作目录 `frontend`，均显式指定项目隔离 JDK 17.0.14、Node 24.20.0 PATH、EX22 测试 schema 和 `CI=1`，分别执行 `npm run test:e2e` 与 `npm run test:e2e:runtime`；服务器由 Playwright 启停，没有连接日常用户会话。此前 `npm run typecheck/lint/format:check/test:unit/build` 全部通过，其中 **54 文件、372 前端单测**；测试配置修改后再次运行 typecheck/lint/format 均通过。Python 工作副本 helper 的 **11 项**通过。归档 `.local/ex29-browser-evidence-tok2o_sz`，含日志与截图；最初失败归档 `.local/ex29-browser-precondition-failure` 单独保留，未混为通过。
+
+整体后端回归在此后串行开始，同时开启普通执行契约和离线 CLI profile。已通过且生产代码未变的原生种子/锁准备/待办构建与业务迁移契约分别引用原 EX11–27 证据；不会清空已有 V2 业务库来重跑 V1 初始化，也不把默认排除/跳过计作本轮通过。最终完整命令、计数及证据关联在后续记录列明。

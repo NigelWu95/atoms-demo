@@ -1,21 +1,12 @@
-import { defineConfig, devices } from '@playwright/test'
+import { defineConfig } from '@playwright/test'
+import runtime from './playwright.runtime.config'
 
 export default defineConfig({
+  ...runtime,
   testDir: './e2e',
-  fullyParallel: false,
-  workers: 1,
-  retries: 0,
-  reporter: 'list',
+  outputDir: './test-results',
   use: {
-    baseURL: 'http://127.0.0.1:5173',
-    screenshot: 'only-on-failure',
-    trace: 'retain-on-failure',
-  },
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'], channel: 'chrome' } }],
-  webServer: {
-    command: 'npm run dev',
-    url: 'http://127.0.0.1:5173',
-    reuseExistingServer: !process.env.CI,
-    timeout: 30000,
+    ...runtime.use,
+    baseURL: 'http://127.0.0.1:5174',
   },
 })
