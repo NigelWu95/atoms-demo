@@ -383,11 +383,14 @@ U/I/REAL/ALL/COMPAT/DOC 的命令与权限条件见计划 §6。S = 1–2、M = 
 
 ## EX26 · 对应 Vue 业务页面样本
 
-- [ ] 完成 EX26。依赖：EX09、EX25。规模：M（4 文件）。
+- [ ] 完成 EX26。依赖：EX09、EX25。将请求/状态逻辑放入独立 composable，主要文件由 4 个调整为 5 个，分片验证。
+  - [x] EX26a：`App.vue`、`useTodos.ts`、`App.spec.ts`；两版各 22 项前端测试、类型/lint/构建通过。真实 Chrome 临时上下文通过键盘、冲突、四档宽度与 axe 检查，已查看桌面/手机截图。浏览器的可控 API 响应仅用于 UI 验收，不当作真实 Java/PG 联调。
+  - [ ] EX26b：`ExecutionTodoFixture`、`ExecutionTodoBackendContractIT` 接入两版 Vue 源码；真实构建/测试，并核对 JAR 内静态资源和编译版本。
 - 描述：为真实待办 API 提供 Vue 页面与交互测试，第二版增加可辨识的业务字段/行为。
 - 验收：页面调用样本 Java API，处理提交/失败/查询，不走原 HTML/SDK 外壳；V1/V2 有明确文件差异且旧功能仍测；不增加未批准依赖或把样本放入所有新用户工程。
 - 验证：REAL(ExecutionTodoBackendContractIT) 增补前端类型/lint/单测/build；检查 Vue 编译资源进入 JAR 的清单。
-- 主要文件：`ER/todo/App.vue`、`ER/todo/App.spec.ts`、`ET/ExecutionTodoFixture.java`、`ET/ExecutionTodoBackendContractIT.java`。
+- 主要文件：`ER/todo/App.vue`、`ER/todo/useTodos.ts`、`ER/todo/App.spec.ts`、`ET/ExecutionTodoFixture.java`、`ET/ExecutionTodoBackendContractIT.java`。
+- 界面约定：沿用现有深色、浅绿主按钮与字体；单列紧凑布局，顶部输入和主要操作优先，列表展示已加载数量；320px 起无横向滚动，控件至少 44px。明确加载、空列表、错误、编辑和保存状态；冲突保留输入，刷新前明确会放弃编辑；写请求结果不确定时要求先刷新，不自动重放写入。V2 显示优先级选择和文字标识，不依赖颜色区分。
 
 ## EX27 · 两项目两版本真实业务闭环
 

@@ -284,6 +284,10 @@ EX25 的待办样本作为独立验收源码快照保存在测试资源中，不
 
 样本实现依据：[Spring Framework 6.2 JDBC](https://docs.spring.io/spring-framework/reference/6.2/data-access/jdbc/core.html)、[Spring Boot 3.5 测试事务与 MockMvc](https://docs.spring.io/spring-boot/3.5/reference/testing/spring-boot-applications.html)、[PostgreSQL 17 UPDATE RETURNING](https://www.postgresql.org/docs/17/sql-update.html)。
 
+EX26 的 Vue 页面直接请求相对路径 `./api/todos`，V1 支持添加、编辑、完成切换、已加载条目的筛选和分页；V2 增加优先级创建、修改与文字标识。使用现有 Vue 和原模板样式变量，不增加依赖、不经过 iframe 或平台 SDK。界面与请求状态分在 `App.vue` / `useTodos.ts`，响应须通过类型、ID/revision、排序和页长检查；重复分页条目合并时不降低已有 revision。请求串行、10 秒超时，卸载时取消。写入结果不明时保留草稿并要求刷新核对，不自动重放；409 保留编辑内容，放弃并刷新由用户明确操作。成功新增回到全部筛选并恢复输入焦点。
+
+UI 先用受控响应验证操作、错误/空状态、键盘与 320/768/1024/1440 布局，再在真实工程构建中验证两版组件测试、类型/lint/Vite 及网页字节入 JAR。浏览器 mock 不能替代 EX27 的 Java HTTP/业务库闭环。实现依据：[Vue 表单绑定](https://vuejs.org/guide/essentials/forms.html)、[生命周期](https://vuejs.org/guide/essentials/lifecycle.html)、[Vue Test Utils 异步交互](https://test-utils.vuejs.org/guide/advanced/async-suspense.html)。
+
 必须覆盖：
 
 1. 关闭、非维护者、非所有者、归档项目均不能执行；不影响旧网页及旧导出。
