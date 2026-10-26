@@ -43,6 +43,9 @@
 - [ ] **PD07：短期会话预览授权**（PD04、PD06；至多 5 文件）
   - 256-bit token，仅存摘要；十分钟、不续期、32/8 容量；创建/撤销检查归属、CSRF，逐请求核验原会话及准确运行。
   - 文件：授权 registry、service、管理 controller、单测/集成测试；验证 J：串用/登出/过期/容量/重启/归档拒绝。
+  - [x] PD07a：授权内存注册表及并发名额；`ex22-delivery-pd07a-green.log` 9 项注册表/设置检查通过，覆盖 256-bit 随机令牌、单调过期、跨项目/重启失效、32/8 与 16/4 容量、撤销后实际完成才释放名额。
+  - [ ] PD07b：执行模块的轻量项目授权入口；会话/准确句柄服务层分别提交验证。
+  - [ ] PD07c：创建/撤销管理 API 与真实会话/CSRF HTTP 集成。
 - [ ] **PD08a：预览 HTTP 与浏览器策略**（PD07；至多 5 文件）
   - 精确 stateless 过滤链、CSP sandbox、Origin null CORS/OPTIONS；16/4 交换容量；不转发平台或上游敏感头，错误不回显令牌。
   - 文件：preview controller、security configuration、header policy、边界测试；验证 J：管理 CSRF/CORS 不被放宽，取消释放容量。
