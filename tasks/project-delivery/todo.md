@@ -12,11 +12,13 @@
   - 文件：模板测试辅助类及测试、目录清单、平台 POM、模板断言；验证 J：模板清单/打包一致性及配置拒绝路径。超出五文件时拆成 PD02a/b。
   - [x] PD02a：独立 Java 配置辅助类及 4 个文件边界测试。`.local/delivery-pd02-red.log` 记录实现前失败；沙箱 JVM 自附加失败原日志保留，使用隔离 JDK 在主机重跑 `.local/delivery-pd02-green-host.log`，8 个模板 Java 测试全部通过。真实 DB 身份检查待 PD03。
   - [x] PD02b：两份测试源纳入清单/POM，更新三个实际目录/种子断言，共五个文件；`.local/ex22-delivery-pd02-template.log` 模板/依赖策略及真实 Boot JAR 打包检查通过。原生完整种子构建尚未重跑，不将断言更新视为原生通过。
-- [ ] **PD03：待办样本和 worker 接入**（PD02；至多 5 文件）
+- [x] **PD03：待办样本和 worker 接入**（PD02；五个实现/测试文件）
   - 新待办版本去掉固定 A/B 名称，worker 传显式测试配置路径；独立脚本可使用 B_test，事务回滚，业务配置被拒绝。
   - 文件：ExecutionPrivateConfig、相关测试、待办测试样本、原生契约辅助入口；验证 J + A 定向配置与业务测试。记录新快照，不改旧版本。
+  - 证据：`.local/ex22-delivery-pd03-red.log` 复现缺失路径；`ex22-delivery-pd03-worker.log` 10 项通过；新目录 `.local/delivery-pd03-native-3cilnunr/project/backend` 直接执行自身 Maven（无平台类路径），`delivery-pd03-native.log` 16 项通过，包括 A/B 真实身份只读检查、伪造业务用途拒绝和 B_test 六项待办业务测试。
+  - 新增 `@AfterAll` 再检查实际空 schema，`delivery-pd03-rollback.log` 六项通过。以上均不启动应用、不迁移业务库；新源码持久版本及完整 worker 构建留在 PD08b，ZIP 自身全脚本验收留在 PD13。
 
-**C1：** 独立构建配置入口及测试安全边界有实际证据，检查源码/日志无凭据，提交并报告。
+**C1 已通过：** 构建参数入口、模板打包及真实独立 Java/DB 测试已验证；不据此宣称完整下载工程验收完成。
 
 - [ ] **PD04：交付开关与 origin**（无依赖；3–4 文件）
   - 默认关闭、启用时严格校验明确 origin、常量容量/期限；禁用不启动执行资源。

@@ -25,6 +25,20 @@ node scripts/build.mjs --test-config /absolute/private/test.properties
 
 脚本仅向 Maven/Java 测试传递该文件路径，不向 npm 传递数据库配置或环境变量，不支持跳过测试。测试配置的用途与实际数据库由工程自身测试再次检查；不能用运行数据库代替独立测试库。无数据库的初始化 MVC 测试可以使用无参数构建。
 
+数据库测试在 `@ContextConfiguration(initializers = PrivateTestDatabase.class)` 下使用 `@Transactional` 回滚建表与数据；测试前 schema 必须为空。管理员为独立测试库和非特权测试角色设置同一个注释 `atoms-project-execution:test:<bindingId>`，确认该库可用于测试。`bindingId` 是每个测试库独立生成的规范 UUID v4，不是账号或数据库密码。配置格式如下，名称可由使用者选择：
+
+```properties
+purpose=test
+database=my_application_test
+user=my_application_test_role
+password=REPLACE_WITH_DATABASE_PASSWORD
+schema=generated_app
+bindingId=REPLACE_WITH_UUID_V4
+jdbcUrl=jdbc:postgresql://127.0.0.1:5432/my_application_test?currentSchema=generated_app
+```
+
+测试角色需拥有空 `generated_app` schema，不能具有超级用户、创建数据库/角色、复制、绕过 RLS 或角色成员权限。配置严格限制字段，不接受其他 JDBC 参数或环境变量展开。初始化器只读取系统目录确认目标，然后注入测试连接；发现业务用途标记、已有表或错误身份时直接拒绝，不执行清库、迁移或 repair。模板本身不创建测试库/角色，不保存实际配置。
+
 若解压工具未保留执行位，先执行 `chmod u+x backend/mvnw`。配置样例见 `config/application.properties.example`，复制到工程外并设置 0600 权限后再填入运行值。
 
 构建依次执行脚本测试、`npm ci --ignore-scripts`、前端类型/代码/组件检查与生产构建，再将前端产物复制到新的临时资源目录，执行 Maven `clean verify` 并打包 `backend/target/app.jar`。任一阶段失败即停止，不跳过测试。前端构建产物作为 JAR 的 `static/` 资源，不重写源文件。中间临时资源保留供诊断，不自动删除其他目录；只有确认进程结束后再由操作者清理。

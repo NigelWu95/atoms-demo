@@ -6,7 +6,6 @@ import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.context.*;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.jdbc.Sql;
@@ -20,27 +19,17 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 // https://docs.spring.io/spring-boot/3.5/reference/testing/spring-boot-applications.html
 @SpringBootTest(properties = {"spring.flyway.enabled=false"})
 @AutoConfigureMockMvc @Transactional
-@ContextConfiguration(initializers = TodoControllerTest.TestDatabaseOnly.class)
+@ContextConfiguration(initializers = PrivateTestDatabase.class)
 @Sql("classpath:db/migration/V002__todos.sql")
 class TodoControllerTest {
     @Autowired MockMvc mvc;
     @Autowired JdbcTemplate jdbc;
     @Autowired ObjectMapper json;
 
-    public static final class TestDatabaseOnly implements ApplicationContextInitializer<ConfigurableApplicationContext> {
-        @Override public void initialize(ConfigurableApplicationContext context) {
-            var env = context.getEnvironment();
-            String name = env.getProperty("APP_DB_USERNAME", "");
-            String url = env.getProperty("APP_DB_URL", "");
-            if (!Set.of("atoms_exec_a_test_20261020", "atoms_exec_b_test_20261020").contains(name)
-                    || !url.equals("jdbc:postgresql://127.0.0.1:5432/" + name + "?currentSchema=generated_app")
-                    || !url.equals(env.getProperty("spring.datasource.url")) || !name.equals(env.getProperty("spring.datasource.username")))
-                throw new IllegalStateException("Explicit approved todo test database required");
+    @AfterAll static void databaseIsEmptyAfterAllTransactionsRollback() {
+        try (var context = new org.springframework.context.support.GenericApplicationContext()) {
+            new PrivateTestDatabase().initialize(context);
         }
-    }
-
-    @BeforeEach void actualTargetIsDedicated() {
-        assertThat(jdbc.queryForObject("SELECT current_database()=current_user AND current_database() IN ('atoms_exec_a_test_20261020','atoms_exec_b_test_20261020') AND current_schema()='generated_app'", Boolean.class)).isTrue();
     }
 
     @Test void createsTrimmedTitleAndReadsTheRowFromAnotherController() throws Exception {

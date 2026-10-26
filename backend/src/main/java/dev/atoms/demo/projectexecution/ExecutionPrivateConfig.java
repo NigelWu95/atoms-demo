@@ -105,6 +105,7 @@ final class ExecutionPrivateConfig {
         // https://docs.spring.io/spring-boot/3.5/reference/features/external-config.html
         // https://maven.apache.org/surefire-archives/surefire-3.5.6/maven-surefire-plugin/test-mojo.html#excludedEnvironmentVariables
         applyDatabaseEnvironment(builder);
+        builder.environment().put("APP_TEST_CONFIG", file.toString());
         builder.environment().put("APP_PORT", "0");
     }
 

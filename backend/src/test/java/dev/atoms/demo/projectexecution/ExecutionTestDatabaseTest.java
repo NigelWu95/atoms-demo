@@ -27,6 +27,18 @@ class ExecutionTestDatabaseTest {
         assertThat(Files.readString(file)).contains(PASSWORD);
     }
 
+    @Test void managedMavenTestsReceiveExplicitPrivateFileWhileRuntimeDoesNot() throws Exception {
+        Path file = config(Map.of());
+        var config = ExecutionPrivateConfig.read(file, List.of());
+        var builder = new ProcessBuilder("java", "test-fixture");
+        builder.environment().clear();
+        config.applyTestEnvironment(builder);
+        assertThat(builder.environment().get("APP_TEST_CONFIG")).isEqualTo(file.toString());
+        assertThat(builder.environment().get("APP_DB_PASSWORD")).isEqualTo(PASSWORD);
+        assertThat(builder.command()).doesNotContain(file.toString(), PASSWORD);
+        assertThatThrownBy(() -> config.applyRuntimeEnvironment(builder)).hasMessage("EXECUTION_DB_CONFIGURATION_INVALID");
+    }
+
     @Test void rejectsRuntimePlatformSystemTargetsAndConnectionParameterInjection() throws Exception {
         for (var change : List.of(
                 Map.of("purpose", "runtime"), Map.of("port", "18181"), Map.of("schema", "public"),
