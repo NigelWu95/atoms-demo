@@ -10,11 +10,13 @@ import static org.assertj.core.api.Assertions.*;
 
 /** Reviewed test fixtures only. Never adopts an unknown tree or fabricates a successful native application build. */
 final class ExecutionContractSupport {
-    // Pin the EX26-reviewed whole trees. The unit test checks these against the actual maintained samples.
+    // Preserve EX26 snapshots and pin the portable-test-config successors; current samples are checked by the unit test.
     // Fault JVMs run outside the repository and must not load template files relative to their working directory.
     private static final Set<String> BUSINESS_TREES = Set.of(
             "f17d13529edc70c4936cabc73e8b3bc4d569dc2416305033c480a5633cb22f73",
-            "a786407f59d6ad08be8c77aaad27458c5552b1061c9af5438b5ebc3b4c9363d0");
+            "a786407f59d6ad08be8c77aaad27458c5552b1061c9af5438b5ebc3b4c9363d0",
+            "3c99613d599d8a8b273d657582a16a5d1612cda0a14c11de22d7cb63741a5da4",
+            "29013c47de04b8a3f645291511a8178cce1646598d45ea3d1fb7d28e84625193");
     private ExecutionContractSupport() {}
 
     static SourceTree retainedTree(JdbcTemplate jdbc, SourceAgentFixture source, UUID project) throws Exception {

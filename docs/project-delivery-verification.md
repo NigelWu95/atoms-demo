@@ -58,3 +58,10 @@
 `ex22-delivery-pd09-zip.log` 4 项测试全部通过。JDK ZipInputStream 能读取每个条目，固定排序/1980 时间/UTF-8/STORED；本机 `/usr/bin/unzip` 实际解压后文件字节相同，`backend/mvnw` 有执行位、普通文件没有。清单按固定源码/构建及可选运行身份生成，独立放在 `delivery/`，不修改 `project/` 文件。也覆盖完整 16 MiB 源码树、超限、错误身份/路径/模式以及中途预算到期。
 
 ZIP writer 按 [PKWARE 6.3.10 的本地头、中央目录及 Unix 属性约定](https://pkware.cachefly.net/webdocs/casestudies/APPNOTE.TXT)写有界 classic ZIP。标准 unzip 只在验证中使用，生产代码不调用外部 zip/unzip。没有下载 API、鉴权或独立业务工程验收的完成声明。
+
+## 真实应用预览（进行中）
+
+- `ex22-delivery-pd08b-native.log` 首次编译发现测试夹具用了不可访问的 JdbcSession 实现类型，已改用公开 Session 接口；未进入应用构建。
+- `ex22-delivery-pd08b-native-session.log` 原生构建成功：构建 `79815b82-d390-46b6-acbe-832932118b16`，源码 `a3d2b3eb-65cc-4c5f-9ea2-1f899b90ac7c`，树 `29013c47de04b8a3f645291511a8178cce1646598d45ea3d1fb7d28e84625193`，JAR `7cc015cfaf29f07bedd0e913791a05a79fa8ca8274b9ea07daf20e1fd0e1b507`。实际 22 项前端与 15 项 Java 测试通过，原 owned 进程启动成功。
+- 首次 Chrome 失败于添加待办：HTML/JS/CSS/初始 API 均为 200、没有 pageerror，但没有 POST。`.local/delivery-form-probe.mjs` 在独立 Chrome 比较证明：只有 allow-scripts 时 submit 事件不触发；增加 allow-forms 后 JS 可处理，保留 form-action none 时原生 POST 计数为 0。已将这一兼容性修正写入规格，仍禁止同源及平台凭据。原失败证据保留在 `/private/tmp/atoms-ex11-contract.APT7Jb/todo-applications-y6dt7dkp/delivery-browser-1247067733290532586`。
+- 复用构建时 `ex22-delivery-pd08b-browser-forms.log` 暴露验收夹具仅登记旧整树摘要，拒绝本轮正常产生的新源码；新增两个精确的可移植配置样本摘要，保留旧摘要与拒绝未知源码的断言。`ex22-delivery-pd08b-browser-reviewed.log` 的四项夹具单测已通过；真实浏览器结果另记，不以夹具修复冒充浏览器成功。
