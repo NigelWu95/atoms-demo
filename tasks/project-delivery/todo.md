@@ -1,0 +1,64 @@
+# project-delivery 任务清单
+
+依据[规格](../../SPEC-project-delivery.md)及[计划](plan.md)，2026-10-27 开始实施。未勾选不代表完成；测试通过与真实浏览器/下载工程验收分别记录。
+
+- [ ] **PD01：独立构建配置入口**（无依赖；2–3 文件）
+  - `build.mjs` 接受唯一 `--test-config` 私有外部文件，只有 Maven 获得文件路径，npm 不获得配置或凭据；无参数种子构建不变。
+  - 文件：模板 `scripts/build.mjs`、`build.test.mjs`、README；验证 N：脚本次序、拒绝非法文件/参数、环境和参数泄漏检查。
+- [ ] **PD02：可移植 Java 测试配置**（PD01；至多 5 文件）
+  - 模板测试辅助类读取显式 test 配置，检查真实数据库/角色/schema、非超级用户、用途标记与空 schema；初始化 MVC 测试仍不需要 DB。
+  - 文件：模板测试辅助类及测试、目录清单、平台 POM、模板断言；验证 J：模板清单/打包一致性及配置拒绝路径。超出五文件时拆成 PD02a/b。
+- [ ] **PD03：待办样本和 worker 接入**（PD02；至多 5 文件）
+  - 新待办版本去掉固定 A/B 名称，worker 传显式测试配置路径；独立脚本可使用 B_test，事务回滚，业务配置被拒绝。
+  - 文件：ExecutionPrivateConfig、相关测试、待办测试样本、原生契约辅助入口；验证 J + A 定向配置与业务测试。记录新快照，不改旧版本。
+
+**C1：** 独立构建配置入口及测试安全边界有实际证据，检查源码/日志无凭据，提交并报告。
+
+- [ ] **PD04：交付开关与 origin**（无依赖；3–4 文件）
+  - 默认关闭、启用时严格校验明确 origin、常量容量/期限；禁用不启动执行资源。
+  - 文件：DeliverySettings、测试、application.yml、配置说明；验证 J：禁用、非法 origin、无 Host 派生。
+- [ ] **PD05：受限 HTTP 请求及有界响应**（PD04；至多 5 文件）
+  - 限根/静态/api 路径、方法、JSON、头及大小；固定 loopback、无代理/凭据/跳转、有界读取和取消。
+  - 文件：执行 HTTP 请求策略、transport、单测/故障夹具；验证 J：规范化、超量/慢响应、3xx、MIME、预期 JSON 409。
+- [ ] **PD06：原运行句柄 HTTP 交换**（PD05；至多 5 文件）
+  - 在执行模块内部获取原 owner 的目标，校验前后共享总预算；替换/失权/产物漂移失败，写入不确定结果明确。
+  - 文件：ProjectExecutionAccess、ExecutionCoordinator、交换 DTO、执行集成测试；验证 J：旧句柄不复用新运行、总期限、未派发与已派发写故障。
+
+**C2：** 受限 transport 可验证准确运行响应，尚不声称浏览器可用。
+
+- [ ] **PD07：短期会话预览授权**（PD04、PD06；至多 5 文件）
+  - 256-bit token，仅存摘要；十分钟、不续期、32/8 容量；创建/撤销检查归属、CSRF，逐请求核验原会话及准确运行。
+  - 文件：授权 registry、service、管理 controller、单测/集成测试；验证 J：串用/登出/过期/容量/重启/归档拒绝。
+- [ ] **PD08a：预览 HTTP 与浏览器策略**（PD07；至多 5 文件）
+  - 精确 stateless 过滤链、CSP sandbox、Origin null CORS/OPTIONS；16/4 交换容量；不转发平台或上游敏感头，错误不回显令牌。
+  - 文件：preview controller、security configuration、header policy、边界测试；验证 J：管理 CSRF/CORS 不被放宽，取消释放容量。
+- [ ] **PD08b：真实 Vue 页面预览**（PD08a、PD03；至多 5 文件）
+  - 原生样本+Chrome 完成模块加载、CRUD/409，检查 cookie/存储/外部请求限制及换版旧授权失效。
+  - 文件：原生应用契约、浏览器测试入口/脚本及最小夹具；验证 A + B；页面不纳入正式工作台。
+
+**C3：** 实际 Vue/Java 应用经路径预览可用；假上游结果单独标注，保持沙箱不放宽。
+
+- [ ] **PD09：确定性完整源码 ZIP**（无依赖；至多 4 文件）
+  - 固定顺序/时间/STORED/Unix mode，project 文件不变，delivery 元数据独立；严格大小、路径和取消检查。
+  - 文件：DeliveryZip、manifest、单测；验证 J + 标准 ZIP 解压：每文件字节/hash/mode，ZIP 上限和执行权限。
+- [ ] **PD10：准确构建/预览下载**（PD07、PD09；至多 5 文件）
+  - 固定构建读取可停止历史版本；预览下载绑定仍有效原 run；2/1 容量、单一三十秒预算、返回前复核，清单不含私有数据。
+  - 文件：下载 service/controller、DTO、集成测试；验证 J：非 latest、跨项目拒绝、停止/换版/取消、旧模板不重组。
+- [ ] **PD11：源码恢复窄门面**（无依赖；至多 4 文件）
+  - 源码模块提供 head/restore/operation 窄接口，复用现有 coordinator；revision/CAS/幂等，不重复持久化算法。
+  - 文件：source gateway、集成测试；验证 J：冲突/重放/当前版本/异步失败，无业务数据库写入。
+- [ ] **PD12：交付恢复 API**（PD04、PD11；至多 3 文件）
+  - 管理身份+CSRF、规范 UUID/Idempotency-Key、202/operation DTO；恢复不自动构建/启动。
+  - 文件：controller、DTO、HTTP 集成测试；验证 J：越权/错误格式/幂等/恢复后新源码身份。
+
+**C4：** 下载与恢复 API 有固定身份及权限证据，旧源码与业务数据未改写。
+
+- [ ] **PD13：下载工程独立业务验收**（PD03、PD08b、PD10、PD12；至多 5 文件）
+  - A 预览 ZIP 解压后用自身脚本和 B_test 构建，再 B_app 启动；新增/修改/查询/409/重启数据保留，原 A/B 记录不受影响。
+  - 标准解压完整比对 Git 树与模式；V2 及恢复身份可辨；所有 owner 进程真实停止并保留审计。
+  - 文件：DeliveryApplicationContractIT 与受控辅助夹具；验证 A + B，保留命令、来源和退出证据，不用平台 classpath 代构建。
+- [ ] **PD14：兼容性回归与交付说明**（全部前置；文档及必要回归）
+  - 默认关闭完整平台回归，账号/旧生成/导出/发布保留；受影响前端检查及浏览器测试；token/密钥不在日志、ZIP、前端中。
+  - 文件：docs/project-delivery.md、docs/project-delivery-verification.md、能力地图与本清单；验证 J 全量一次及受影响 B；失败逐项说明，不把排除项写成通过。
+
+**C5：** 满足规格完成标准才标记模块完成；后续工作台/真实模型/部署另记，不提前宣称完成。

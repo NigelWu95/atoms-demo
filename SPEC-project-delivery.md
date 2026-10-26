@@ -1,6 +1,6 @@
 # Spec: project-delivery · 实际运行预览与同快照源码交付
 
-状态：2026-10-27，规格草案，待评审；尚未实现或验收。本模块沿用[能力地图](FULL-PROJECT-CAPABILITY-MAP.md)的 `project-delivery`，依赖已验收的 `project-source` 和 `project-execution`。整体连续开发授权见 [Agent 规格 §10](SPEC-project-agent.md#10-2026-10-19-完整闭环实施授权)，具体接口与浏览器边界按本规格评审。旧网页、固定模板预览、下载与发布继续按原规则运行。
+状态：2026-10-27，用户已确认本规格，进入实施；尚未完成验收。实施顺序与进度见 [计划](tasks/project-delivery/plan.md)和[任务清单](tasks/project-delivery/todo.md)。本模块沿用[能力地图](FULL-PROJECT-CAPABILITY-MAP.md)的 `project-delivery`，依赖已验收的 `project-source` 和 `project-execution`。整体连续开发授权见 [Agent 规格 §10](SPEC-project-agent.md#10-2026-10-19-完整闭环实施授权)。旧网页、固定模板预览、下载与发布继续按原规则运行。
 
 ## 1. 目标与可见结果
 
