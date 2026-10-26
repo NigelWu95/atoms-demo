@@ -13,6 +13,45 @@ import static org.assertj.core.api.Assertions.*;
 
 class ExecutionToolProbeTest {
     @TempDir Path temporary;
+    @Test void probeMayTakeMoreThanTenSecondsWithinItsThirtySecondLimit() throws Exception {
+        var locations = ExecutionToolchainTest.installation(temporary.toRealPath());
+        Files.writeString(locations.node(), "#!/bin/sh\n/bin/sleep 11\nprintf 'v24.20.0\\n'\n");
+        var budget = new ExecutionProcess.Deadline(Duration.ofSeconds(60));
+        var tools = ExecutionToolchain.capture(locations, List.of(), budget);
+        try (var paths = new ExecutionPaths(temporary.toRealPath().resolve("execution"), List.of())) {
+            UUID task = UUID.randomUUID(), execution = UUID.randomUUID();
+            var home = ExecutionToolHome.create(paths, paths.createBuild(task), budget);
+            var result = new ExecutionToolProbe().run(tools, ExecutionToolchain.Kind.NODE, home, budget, () -> false, task, execution);
+            assertThat(result.summary().version()).isEqualTo("24.20.0");
+            assertThat(result.stopped().matches(task, execution, home.home())).isTrue();
+        }
+    }
+
+    @Test void shorterTaskDeadlineStillStopsAnAlreadyLaunchedProbeWithMatchingReceipt() throws Exception {
+        var locations = ExecutionToolchainTest.installation(temporary.toRealPath());
+        Files.writeString(locations.node(), "#!/bin/sh\nprintf launched > probe-launched\n/bin/sleep 11\nprintf 'v24.20.0\\n'\n");
+        var setup = new ExecutionProcess.Deadline(Duration.ofSeconds(60));
+        var tools = ExecutionToolchain.capture(locations, List.of(), setup);
+        try (var paths = new ExecutionPaths(temporary.toRealPath().resolve("execution"), List.of())) {
+            UUID task = UUID.randomUUID(), execution = UUID.randomUUID();
+            var home = ExecutionToolHome.create(paths, paths.createBuild(task), setup);
+            // Begin the short task deadline after launch, so slow test setup cannot turn this into a no-process test.
+            var deadline = new java.util.concurrent.atomic.AtomicReference<ExecutionProcess.Deadline>();
+            OwnedProcess.Budget budget = () -> {
+                if (Files.exists(home.home().resolve("probe-launched")))
+                    deadline.compareAndSet(null, new ExecutionProcess.Deadline(Duration.ofMillis(250)));
+                return deadline.get() == null ? setup.remaining() : deadline.get().remaining();
+            };
+            assertThatThrownBy(() -> new ExecutionToolProbe().run(tools, ExecutionToolchain.Kind.NODE, home,
+                    budget, () -> false, task, execution)).isInstanceOfSatisfying(OwnedProcess.Failure.class, failure -> {
+                        assertThat(failure).hasMessage("EXECUTION_TIMEOUT").hasNoCause();
+                        assertThat(failure.stopped()).isNotNull();
+                        assertThat(failure.stopped().matches(task, execution, home.home())).isTrue();
+                    });
+            assertThat(home.home().resolve("probe-launched")).hasContent("launched");
+        }
+    }
+
     @Test void nodeVersionProbeDoesNotReadUnusedMavenInstallationButFullVerificationStillRejectsItsDrift() throws Exception {
         var locations = ExecutionToolchainTest.installation(temporary.toRealPath());
         Files.writeString(locations.node(), "#!/bin/sh\nprintf 'v24.20.0\\n'\n");

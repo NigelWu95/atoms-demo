@@ -26,7 +26,7 @@ final class ExecutionToolProbe {
     OwnedProcess.Result<Version> run(ExecutionToolchain tools, ExecutionToolchain.Kind kind, ExecutionToolHome home,
                                     OwnedProcess.Budget taskBudget, BooleanSupplier cancelled, UUID task, UUID execution,
                                     OwnedProcess.Preflight inputs) throws IOException {
-        var probeDeadline = new ExecutionProcess.Deadline(Duration.ofSeconds(10));
+        var probeDeadline = new ExecutionProcess.Deadline(Duration.ofSeconds(30));
         OwnedProcess.Budget budget = () -> {
             Duration total = taskBudget.remaining(), probe = probeDeadline.remaining();
             return total.compareTo(probe) < 0 ? total : probe;
