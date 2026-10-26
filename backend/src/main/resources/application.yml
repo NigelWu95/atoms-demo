@@ -24,6 +24,9 @@ spring:
     init:
       mode: never
 atoms:
+  project-delivery:
+    enabled: ${PROJECT_DELIVERY_ENABLED:false}
+    origin: ${PROJECT_DELIVERY_ORIGIN:}
   project-execution:
     enabled: ${PROJECT_EXECUTION_ENABLED:false}
     root: ${PROJECT_EXECUTION_ROOT:}

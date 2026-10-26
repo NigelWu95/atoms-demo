@@ -20,12 +20,14 @@
 
 **C1 已通过：** 构建参数入口、模板打包及真实独立 Java/DB 测试已验证；不据此宣称完整下载工程验收完成。
 
-- [ ] **PD04：交付开关与 origin**（无依赖；3–4 文件）
+- [x] **PD04：交付开关与 origin**（无依赖；4 文件）
   - 默认关闭、启用时严格校验明确 origin、常量容量/期限；禁用不启动执行资源。
   - 文件：DeliverySettings、测试、application.yml、配置说明；验证 J：禁用、非法 origin、无 Host 派生。
+  - `.local/ex22-delivery-pd04-green.log` 新旧设置共 12 项通过；不包含任何预览 HTTP 路由或执行资源启动。
 - [ ] **PD05：受限 HTTP 请求及有界响应**（PD04；至多 5 文件）
   - 限根/静态/api 路径、方法、JSON、头及大小；固定 loopback、无代理/凭据/跳转、有界读取和取消。
   - 文件：执行 HTTP 请求策略、transport、单测/故障夹具；验证 J：规范化、超量/慢响应、3xx、MIME、预期 JSON 409。
+  - 拆为 PD05a 请求对象与策略、PD05b 有界上游传输；分别验证提交，合并后才标记 PD05 完成。
 - [ ] **PD06：原运行句柄 HTTP 交换**（PD05；至多 5 文件）
   - 在执行模块内部获取原 owner 的目标，校验前后共享总预算；替换/失权/产物漂移失败，写入不确定结果明确。
   - 文件：ProjectExecutionAccess、ExecutionCoordinator、交换 DTO、执行集成测试；验证 J：旧句柄不复用新运行、总期限、未派发与已派发写故障。
