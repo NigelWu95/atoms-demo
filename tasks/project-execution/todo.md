@@ -1,6 +1,6 @@
 # project-execution · 开发任务
 
-状态：2026-10-26，规格及 EX01–EX30 计划已获确认，EX01–24、C-EX08 已完成。内部交付接口关联固定源码版本、封存产物与原运行进程，三类任务支持有界分页、事件续读和白名单诊断；全部 557 单元 + 180 项相关集成通过，见[证据](../../docs/project-execution-verification.md#2026-10-26--ex24-有界查询与安全诊断)。当前测试环境 59 条运行全部终结，五份旧未决审计和原运行/绑定保持不变，未删除失败证据。下一项 EX25 真实待办后端验收样本。新模式默认关闭，完整业务验收与网页接入尚未完成。唯一依据为[规格](../../SPEC-project-execution.md)与[计划](plan.md)，不复用旧工程导出的 PE 编号；勾选须附真实证据。
+状态：2026-10-26，规格及 EX01–EX30 计划已获确认，EX01–25、C-EX08 已完成。EX24 的 557 单元 + 180 相关集成基线保留；EX25 新增真实待办 Java/SQL 样本，两版均构建为 JAR，分别通过 10/11 项 Java 测试，去掉冲突保护的反例准确失败；58 项相关单元兼容通过，见[证据](../../docs/project-execution-verification.md#2026-10-26--ex25-真实待办后端样本)。当前测试环境 59 条运行全部终结，五份旧未决审计和原运行/绑定保持不变，未删除失败证据。下一项 EX26 为对应 Vue 业务页面，EX27 常驻 HTTP 与业务数据升级/重启验收仍未完成。新模式默认关闭，网页接入仍待后续。唯一依据为[规格](../../SPEC-project-execution.md)与[计划](plan.md)，不复用旧工程导出的 PE 编号；勾选须附真实证据。
 
 执行环境沿用已获准的项目隔离 Liberica 17.0.14+10，仅命令级指定；原 Oracle 17.0.5、全局默认、私有 env、服务器和旧审计均不变。原生枚举故障未捕获原 errno，不能宣布根因完全证实，保留监测。EX11 原生构建、完整回归和变异证据见[验证记录](../../docs/project-execution-verification.md#ex11b--实际-jar-与失败版本验收)。
 
@@ -374,11 +374,12 @@ U/I/REAL/ALL/COMPAT/DOC 的命令与权限条件见计划 §6。S = 1–2、M = 
 
 ## EX25 · 真实待办后端验收样本
 
-- [ ] 完成 EX25。依赖：EX11、EX18。规模：M（5 文件）。
+- [x] 完成 EX25。依赖：EX11、EX18。规模：M（5 文件）。
 - 描述：在受控样本中增加真正 Java 业务 API、SQL 表及测试，作为可变源码输入而非平台通用数据服务。
 - 验收：新增/修改/查询待办实际访问独立 PG；V1/V2 业务改动及额外迁移向量明确，拒绝用内存 Map 或平台 SDK 代替；样本无秘密，测试只连接专用测试库。
 - 验证：REAL(ExecutionTodoBackendContractIT)，执行样本 Java 测试并断言 DB 结果；样本可作为后续两轮编辑的固定预期。
 - 主要文件：`ER/todo/TodoController.java`、`ER/todo/V002__todos.sql`、`ER/todo/TodoControllerTest.java`、`ET/ExecutionTodoFixture.java`、`ET/ExecutionTodoBackendContractIT.java`。
+- 证据：缺夹具 RED 后修正一处夹具返回类型；10:13:49 真实 V1/V2 构建通过，各含 15 项原模板前端测试及 10/11 项 Java 测试。10:20:27 的 58 单元 + 1 原生变异契约通过，错误工程因预期 409 却返回 200 被拒绝且无封存产物。真实 SQL 与 MVC 请求在专用测试库执行，表与数据事务回滚；未将此当成常驻 HTTP、业务库升级或 Vue 页面验收。证据 `.local/ex25-evidence-x4y3ca23`，详见验证记录。
 
 ## EX26 · 对应 Vue 业务页面样本
 

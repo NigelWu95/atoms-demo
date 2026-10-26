@@ -1,6 +1,6 @@
 # Spec: project-execution · 完整工程受控构建与本机进程
 
-状态：2026-10-26，用户已确认本规格及 §10 三项取舍、[实施计划](tasks/project-execution/plan.md)与[任务清单](tasks/project-execution/todo.md)。EX01–22、C-EX07 已完成，启动恢复、有界常驻管理和故障收尾已接统一协调者。停止等待修复在用户批准的新 schema 完成原场景与相关兼容复验，全部 552 单元 + 95 集成通过，见[记录](docs/project-execution-verification.md#2026-10-26--ex22-整项收尾)；五份旧未决审计保留。下一项 EX23 交付身份契约。新模式默认关闭，真实业务验收与网页接入尚未完成。本地闭环范围见 [Agent 规格 §10](SPEC-project-agent.md#10-2026-10-19-完整闭环实施授权)。此前实际 npm 的通过/超时及故障证据分别保留。
+状态：2026-10-26，用户已确认本规格及 §10 三项取舍、[实施计划](tasks/project-execution/plan.md)与[任务清单](tasks/project-execution/todo.md)。EX01–25、C-EX08 已完成：内部构建/运行交付身份、有界查询与安全诊断已验证，真实待办 Java/SQL 样本的两版工程均通过 npm/Maven 构建，冲突保护退化的业务反例被实际测试拒绝，见[记录](docs/project-execution-verification.md#2026-10-26--ex25-真实待办后端样本)。五份旧未决审计保留。下一项 EX26 为对应 Vue 业务页面；EX27 的常驻 HTTP、业务迁移和重启持久化尚未验收。新模式默认关闭，网页交付仍未接入。本地闭环范围见 [Agent 规格 §10](SPEC-project-agent.md#10-2026-10-19-完整闭环实施授权)。此前实际 npm 的通过/超时及故障证据分别保留。
 
 模块 ID 沿用[能力地图](FULL-PROJECT-CAPABILITY-MAP.md)的 `project-execution`，依赖 `project-source`，不反向依赖 Agent、交付或工作台。上游只读门面 PS21 已完成；当前网页仍走旧固定模板链路。
 
@@ -277,6 +277,12 @@ EX23 的 `ProjectExecutionAccess` 只提供内部 `build` / `running` 句柄签�
 ## 9. 验收、命令与回退
 
 先按 JUnit 红绿循环实现准入、身份、预算和失败状态；真实 Git/PG 验证快照与持久状态；受控子进程验证取消、期限和未知结果；最后运行人工审阅过的 Vue/Java/SQL 测试工程。假进程通过不能代替真正构建与 HTTP 业务验收。
+
+EX25 的待办样本作为独立验收源码快照保存在测试资源中，不替换新用户的默认模板，不写入平台的通用数据表。V1 的 `POST /api/todos` 创建任务，`GET /api/todos` 以 ID 游标返回最多 100 条，`GET /api/todos/{id}` 读取一条，`PUT /api/todos/{id}` 用 revision 比较并原子更新；过期修改返回 409，缺失记录返回 404，非法输入返回 400。标题按 Unicode 字符数限制为 160。V2 新增 0–2 优先级、Java 处理逻辑和 V003 SQL；旧客户端未传优先级时保留已有值。
+
+样本不新增依赖，沿用批准的完整模板清单、锁文件和 POM。真实构建运行样本的 Spring MVC 与 PostgreSQL 测试，随后把业务 Java 类和 SQL 封装进 JAR。样本测试在上下文初始化时限定已批准 A/B 测试库，并拒绝数据源覆盖；关闭自动 Flyway，由测试事务执行实际 DDL 与业务请求，结束时整体回滚，不使用 clean/repair，也不删除旧审计。此步证明业务源码及 SQL 可构建并在真实 PG 上工作，不等于已完成常驻 HTTP 进程、数据升级/重启或 Vue 页面验收；这些仍属 EX26–27。
+
+样本实现依据：[Spring Framework 6.2 JDBC](https://docs.spring.io/spring-framework/reference/6.2/data-access/jdbc/core.html)、[Spring Boot 3.5 测试事务与 MockMvc](https://docs.spring.io/spring-boot/3.5/reference/testing/spring-boot-applications.html)、[PostgreSQL 17 UPDATE RETURNING](https://www.postgresql.org/docs/17/sql-update.html)。
 
 必须覆盖：
 
