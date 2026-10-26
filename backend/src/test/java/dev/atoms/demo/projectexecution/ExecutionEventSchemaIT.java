@@ -52,6 +52,10 @@ class ExecutionEventSchemaIT {
         fails(() -> jdbc.update("UPDATE " + task.table + " SET " + task.flag + "=true WHERE id=?", task.id));
         assertThat(jdbc.queryForObject("SELECT " + task.flag + " FROM " + task.table + " WHERE id=?", Boolean.class, task.id)).isFalse();
         assertThat(count(task)).isEqualTo(1000);
+        fails(() -> finish(jdbc, task));
+        assertThat(jdbc.queryForObject("SELECT finished_at IS NULL FROM " + task.table + " WHERE id=?", Boolean.class, task.id)).isTrue();
+        if (!kind.equals("RUN")) assertThat(jdbc.queryForObject("SELECT count(*) FROM execution_task_slots WHERE task_id=?", Integer.class, task.id)).isEqualTo(1);
+        if (kind.equals("PREPARATION")) assertThat(jdbc.queryForObject("SELECT status FROM source_edit_leases WHERE task_id=?", String.class, task.id)).isEqualTo("ACTIVE");
     }
 
     @ParameterizedTest @ValueSource(strings = {"BUILD", "PREPARATION", "RUN"})
