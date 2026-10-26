@@ -33,6 +33,7 @@ final class ExecutionApplicationFixture implements AutoCloseable {
     private final AnnotationConfigApplicationContext runtime;
     private final ExecutionTestDatabase tests;
     private final ExecutionMigrationReview migrations;
+    final ExecutionRunReconciliation reconciliation;
     private final Map<UUID, ExecutionTestDatabase.Verified> testIdentities = new HashMap<>();
     private final Map<UUID, SourceAgentFixture.Base> bases = new HashMap<>();
     private final Map<UUID, ExecutionBindingRepository.Target> targets = new HashMap<>();
@@ -87,6 +88,8 @@ final class ExecutionApplicationFixture implements AutoCloseable {
                     (java.util.function.Supplier<ExecutionCoordinator>) () -> coordinator);
             migrations = new ExecutionMigrationReview(runtime.getBean(ExecutionSettings.class), new ExecutionMigrationReviewRepository(jdbc),
                     transactions, source.readGateway(), business);
+            reconciliation = new ExecutionRunReconciliation(runtime.getBean(ExecutionSettings.class), jdbc, transactions,
+                    source.readGateway(), business, coordinator);
             System.out.printf("execution_application_root path=%s%n", root);
         } catch (Exception | Error failure) { source.close(); throw failure; }
     }
@@ -106,11 +109,15 @@ final class ExecutionApplicationFixture implements AutoCloseable {
         throw new IllegalStateException("Business history is not a reviewed application version");
     }
 
-    ExecutionBuild build(UUID project, SourceTree tree) throws Exception {
+    SourceAgentFixture.Base acceptSource(UUID project, SourceTree tree) throws Exception {
         var base = bases.get(project); assertThat(base).isNotNull();
         if (!source.snapshot(OWNER, project, base.versionId()).sha256().equals(tree.sha256())) {
             base = source.accept(OWNER, base, tree); bases.put(project, base);
         }
+        return base;
+    }
+    ExecutionBuild build(UUID project, SourceTree tree) throws Exception {
+        var base = acceptSource(project, tree);
         var accepted = runtime.getBean(ProjectExecutionService.class).submit(OWNER, project, base.versionId(), UUID.randomUUID().toString());
         System.out.printf("execution_application_build_started project=%s build=%s source=%s%n", project, accepted.id(), base.versionId());
         var repository = new ExecutionBuildRepository(jdbc);
@@ -126,11 +133,12 @@ final class ExecutionApplicationFixture implements AutoCloseable {
         return build;
     }
 
-    ExecutionBuild retainedBuild(UUID project, String property) throws Exception {
+    ExecutionBuild retainedBuild(UUID project, String property) throws Exception { return retainedBuild(project, property, 1); }
+    ExecutionBuild retainedBuild(UUID project, String property, int version) throws Exception {
         String raw = System.getProperty(property); assertThat(raw).as(property).isNotBlank();
         var build = new ExecutionBuildRepository(jdbc).get(project, UUID.fromString(raw));
         assertThat(build.status()).isEqualTo("SUCCEEDED"); assertThat(build.finishedAt()).isNotNull();
-        assertThat(build.treeSha256()).isEqualTo(ExecutionTodoFixture.application(1).sha256());
+        assertThat(build.treeSha256()).isEqualTo(ExecutionTodoFixture.application(version).sha256());
         assertThat(source.snapshot(OWNER, project, build.sourceVersionId()).sha256()).isEqualTo(build.treeSha256());
         var artifact = artifact(build); // Reopens the exact retained artifact under this coordinator's execution root.
         assertThat(artifact.evidenceFor(build).frontend().tests()).isEqualTo(22);
@@ -158,14 +166,27 @@ final class ExecutionApplicationFixture implements AutoCloseable {
         System.out.printf("execution_application_refused project=%s build=%s code=%s%n", build.projectId(), build.id(), code);
     }
 
-    ExecutionRun start(ExecutionBuild build, UUID review) throws Exception {
+    ExecutionRun admit(ExecutionBuild build, UUID review) throws Exception {
         var run = coordinator.startApplication(OWNER, build.projectId(), build.id(), target(build.projectId()).id(), review, UUID.randomUUID().toString())
                 .toCompletableFuture().get(150, TimeUnit.SECONDS);
-        owned.add(run);
+        owned.add(run); return run;
+    }
+    ExecutionRun start(ExecutionBuild build, UUID review) throws Exception {
+        var run = admit(build, review);
         await(() -> current(run).status().equals("READY") || current(run).finishedAt() != null, 140);
         var ready = current(run); assertThat(ready.status()).as("Actual app launch: %s", ready.errorCode()).isEqualTo("READY");
         System.out.printf("execution_application_ready project=%s run=%s execution=%s build=%s%n", ready.projectId(), ready.id(), ready.executionId(), ready.buildId());
         return ready;
+    }
+    void awaitStoppedFailure(ExecutionRun failed) throws Exception {
+        long until = System.nanoTime() + Duration.ofSeconds(10).toNanos();
+        for (;;) {
+            try (var scope = coordinator.open(failed)) { scope.checkAuthority(); return; }
+            catch (java.io.IOException | dev.atoms.demo.common.ApiException unavailable) {
+                if (System.nanoTime() >= until) throw unavailable;
+                Thread.sleep(100);
+            }
+        }
     }
     void stop(ExecutionRun run) throws Exception {
         var process = coordinator.accessScope().ownedProcess(run.id()); assertThat(process).isNotNull();

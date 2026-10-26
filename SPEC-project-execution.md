@@ -1,6 +1,6 @@
 # Spec: project-execution · 完整工程受控构建与本机进程
 
-状态：2026-10-26，用户已确认本规格及 §10 三项取舍、[实施计划](tasks/project-execution/plan.md)与[任务清单](tasks/project-execution/todo.md)。EX01–26、C-EX08 与 EX27a/b/c1 已完成：两个真实 Vue + Java + SQL 应用的 V1/V2 原生构建、HTTP、独立数据、准确迁移批准、旧代码拒绝及重启持久化均通过，见[验收记录](docs/project-execution-verification.md#2026-10-26--ex27c1-双应用-v2-升级与重启)。单次工具探测按本次确认调整为 30 秒，构建总期限仍为 1800 秒。五份旧未决审计保留；真实失败迁移及其核对流程（EX27c2）、EX28–30 仍未完成，EX27 整项与 C-EX09 未勾选。新模式默认关闭，网页交付仍未接入。本地闭环范围见 [Agent 规格 §10](SPEC-project-agent.md#10-2026-10-19-完整闭环实施授权)。
+状态：2026-10-26，用户已确认本规格及 §10 三项取舍、[实施计划](tasks/project-execution/plan.md)与[任务清单](tasks/project-execution/todo.md)。EX01–27 与 C-EX09 已完成：两个真实 Vue + Java + SQL 应用的 V1/V2 原生构建、HTTP、独立数据、准确迁移批准、旧代码拒绝及重启持久化均通过；实际失败迁移、明确核对和新协调器启动兼容版本也已通过，见[验收记录](docs/project-execution-verification.md#2026-10-26--ex27c2c-真实失败迁移确认与兼容版本重启)。单次工具探测为已确认的 30 秒，构建总期限仍为 1800 秒。五份旧未决审计保留；EX28–30 仍未完成。新模式默认关闭，网页交付仍未接入。本地闭环范围见 [Agent 规格 §10](SPEC-project-agent.md#10-2026-10-19-完整闭环实施授权)。
 
 模块 ID 沿用[能力地图](FULL-PROJECT-CAPABILITY-MAP.md)的 `project-execution`，依赖 `project-source`，不反向依赖 Agent、交付或工作台。上游只读门面 PS21 已完成；当前网页仍走旧固定模板链路。
 
@@ -326,4 +326,4 @@ env PATH=/Users/wubingheng/.nvm/versions/node/v24.20.0/bin:$PATH \
 
 Always：先测试、再实现；冻结输入、逐项授权、完整证据、错误真实可见。Ask first：改变已确认预算或迁移边界、实际创建数据库/角色、扩大依赖策略或启用不可信项目执行。Never：继承平台秘密、执行模型命令字符串、修改个人配置、删除失败审计、以假构建替代真实验收。
 
-2026-10-26，用户确认[失败迁移显式核对方案](docs/design/project-execution/failed-migration-reconciliation.md)。仅针对原协调器持有、原 worker 已结束、持久 pending=false 且具有准确停止摘要的未 READY 启动失败；维护者明确接受当前数据库状态后，保存追加审计并结束该失败任务。不能据此认领重启前进程或处理旧未决审计。V030 与内部持久仓库（c2a）已实现并通过 17 单元 + 29 集成测试；实际维护入口、原 job 释放及真实失败迁移验收仍待 c2b/c，不自动启动该流程。确认不代表数据库已回滚。
+2026-10-26，用户确认[失败迁移显式核对方案](docs/design/project-execution/failed-migration-reconciliation.md)。仅针对原协调器持有、原 worker 已结束、持久 pending=false 且具有准确停止摘要的未 READY 启动失败；维护者明确接受当前数据库状态后，保存追加审计并结束该失败任务。不能据此认领重启前进程或处理旧未决审计。V030、内部核对服务及原 job 释放均已实现：c2a 17 单元 + 29 集成，c2b1 30 单元 + 29 集成，c2b2 32 单元 + 12 集成分别通过；c2c 的实际迁移失败、明确确认、兼容版本重启及数据保留于 20:30:02 通过。入口仍仅供可信维护者内部调用，不自动启动该流程。确认不代表数据库已回滚；事务性失败样本的表/行/历史不变另有实际验证，不推广为任意 SQL 的保证。
