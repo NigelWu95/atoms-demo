@@ -51,6 +51,11 @@ final class ExecutionRunProcess {
 
     synchronized boolean isAlive() { return running != null && running.isAlive(); }
     synchronized boolean isServing() { return phase == Phase.SERVING && isAlive(); }
+    /** Read-only identity check; unlike confirmReady this cannot promote a starting process. */
+    synchronized boolean serves(UUID expectedRun, UUID expectedExecution) {
+        return run.equals(expectedRun) && execution.equals(expectedExecution) && phase == Phase.SERVING
+                && running != null && running.matches(run, execution, directory) && running.isAlive();
+    }
 
     /** Caller must first validate the fixed-target HTTP response. These IDs alone do not prove health. */
     synchronized boolean confirmReady(UUID echoedRun, UUID echoedExecution) {

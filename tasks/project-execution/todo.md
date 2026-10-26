@@ -349,7 +349,7 @@ U/I/REAL/ALL/COMPAT/DOC 的命令与权限条件见计划 §6。S = 1–2、M = 
 
 - [ ] 完成 EX23。依赖：EX04、EX10、EX20–22。原 3 文件估计未包含访问协调者原资源的装配，拆为以下小片，每片最多 5 个主要文件。
   - [x] EX23a：协调者签发本次资源范围，复用原封存目录和原 worker 的进程能力；关闭/失权后失效，不新开根租约（Coordinator、Environment、RuntimeResources、CoordinatorAccessTest、EnvironmentTest）。2026-10-26：RED 缺失接口，GREEN 16/16；真实 PG/Git/进程组合留 EX23b。
-  - [ ] EX23b：内部消费者使用不可自行构造的 BuildHandle/RunningHandle；每次校验 owner/归档/配置/原构建及文件，源码固定来源版本；运行还匹配原进程和执行身份（ProjectExecutionAccess、ExecutionAccessIT、RuntimeFixture、RunProcess、RunProcessTest）。覆盖真实 PG/Git/HTTP、V1 构建后项目更新 V2、异主/异项目/异发行者、停止与文件替换；不新增代理/下载 HTTP。
+  - [x] EX23b：内部消费者使用不可自行构造的 BuildHandle/RunningHandle；每次校验 owner/归档/配置/原构建及文件，源码固定来源版本；运行还匹配原进程和执行身份（ProjectExecutionAccess、ExecutionAccessIT、RuntimeFixture、RunProcess、RunProcessTest）。覆盖真实 PG/Git/HTTP、V1 构建后项目更新 V2、异主/异项目/异发行者、停止与文件替换；不新增代理/下载 HTTP。2026-10-26：RED 缺失接口；修正 Java 17 switch 编译后 GREEN 22 单元 + 3 集成。
   - [ ] EX23c：变异、相关回归和私有证据收尾，更新规格与完成状态；不修改原 A/B 源码头或业务数据，版本竞争用新临时源码项目。
 - 描述：提供窄的内部访问门面，将来源版本、封存产物与真实运行关联。
 - 验收：授权不可混项目，篡改产物或失效运行即拒绝；句柄不能由路径/端口/UUID DTO 自行构造，不泄漏配置；来源仍取构建 V1，项目后来变 V2 不改变下载依据。

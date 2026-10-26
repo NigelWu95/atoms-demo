@@ -21,15 +21,20 @@ class ExecutionRunProcessTest {
         var process = start("hang", new ExecutionProcess.Deadline(Duration.ofSeconds(1), clock::get));
         try {
             eventually(process::isAlive);
+            assertThat(process.serves(run, execution)).isFalse();
             assertThat(process.confirmReady(UUID.randomUUID(), execution)).isFalse();
             assertThat(process.confirmReady(run, UUID.randomUUID())).isFalse();
             assertThat(process.isServing()).isFalse();
             assertThat(process.confirmReady(run, execution)).isTrue();
+            assertThat(process.serves(run, execution)).isTrue();
+            assertThat(process.serves(UUID.randomUUID(), execution)).isFalse();
+            assertThat(process.serves(run, UUID.randomUUID())).isFalse();
             clock.set(Duration.ofSeconds(20).toNanos());
             assertThatThrownBy(() -> process.await(Duration.ofMillis(150))).isInstanceOf(TimeoutException.class);
             assertThat(process.isServing()).isTrue();
             assertThat(process.confirmReady(run, execution)).isTrue();
             process.requestStop(); process.requestStop();
+            assertThat(process.serves(run, execution)).isFalse();
             assertThat(process.confirmReady(run, execution)).isFalse();
             var stopped = process.await(Duration.ofSeconds(12));
             assertThat(stopped.code()).isEqualTo("RUN_STOPPED");
