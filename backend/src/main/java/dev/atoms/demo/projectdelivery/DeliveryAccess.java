@@ -45,6 +45,17 @@ final class DeliveryAccess {
         guard(grant); return grants.exchange(grant);
     }
 
+    DeliverySettings.Configuration management(UUID owner, String session, SourceExecutionBudget budget) {
+        var configuration = configuration(); session(session, owner); check(budget); return configuration;
+    }
+
+    DeliveryGrants.Grant owned(UUID owner, UUID project, UUID preview, String session, SourceExecutionBudget budget) {
+        management(owner, session, budget);
+        var grant = grants.owned(owner, project, preview);
+        if (!grant.session().equals(session)) throw DeliveryGrants.missing();
+        guard(grant); return grant;
+    }
+
     /** OPTIONS/download consumers still verify the original process even when they send no application request. */
     void validate(DeliveryGrants.Grant grant, SourceExecutionBudget budget) {
         try {
