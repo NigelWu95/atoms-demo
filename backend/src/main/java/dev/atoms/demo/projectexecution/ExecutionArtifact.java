@@ -109,6 +109,14 @@ final class ExecutionArtifact {
         return evidence;
     }
     void verify(OwnedProcess.Budget budget) throws IOException {
+        verifyContents(budget);
+        try { paths.checkCapacity(budget); check(budget); }
+        catch (IOException | RuntimeException error) { throw sanitized(error); }
+    }
+
+    /** Read-only delivery checks the sealed artifact, not storage occupied by unrelated build workspaces.
+     * Creation, sealing and runtime admission continue to use verify() and its full root-capacity check. */
+    void verifyContents(OwnedProcess.Budget budget) throws IOException {
         try {
             check(budget);
             Path directory = paths.directory(task);
@@ -121,7 +129,7 @@ final class ExecutionArtifact {
             }
             if (!jar.equals(scan(directory.resolve("app.jar"), MAX_JAR_BYTES, true, budget))
                     || !manifest.equals(scan(directory.resolve("manifest.json"), 16384, true, budget))) throw invalid();
-            paths.directory(task); paths.checkCapacity(budget); check(budget);
+            paths.directory(task); check(budget);
         } catch (IOException | RuntimeException error) { throw sanitized(error); }
     }
 

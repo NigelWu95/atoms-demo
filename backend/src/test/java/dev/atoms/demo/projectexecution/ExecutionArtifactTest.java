@@ -75,6 +75,21 @@ class ExecutionArtifactTest {
         }
     }
 
+    @Test void readOnlyVerificationKeepsByteIdentityWithoutScanningUnrelatedBuildCapacity() throws Exception {
+        try (var paths = new ExecutionPaths(temporary.toRealPath().resolve("read-only"), List.of(), 64 << 10, 0)) {
+            var build = build(); var task = paths.createBuild(build.id()); input(paths, task);
+            var artifact = ExecutionArtifact.seal(paths, task, build, evidence(), budget(), () -> {});
+            // A different build's output is irrelevant to the bytes of this already sealed artifact.
+            Files.write(paths.project(task).resolve("unrelated-output"), new byte[64 << 10]);
+            artifact.verifyContents(budget());
+            assertThatThrownBy(() -> artifact.verify(budget())).hasMessage("EXECUTION_STORAGE_CAPACITY");
+            Path jar = artifact.jar(); var modified = Files.getLastModifiedTime(jar);
+            Files.write(jar, new byte[]{80, 75, 3, 4, 4, 5, 6}); Files.setLastModifiedTime(jar, modified);
+            assertThatThrownBy(() -> artifact.verifyContents(budget())).hasMessage("EXECUTION_ARTIFACT_INVALID");
+            assertThatThrownBy(() -> artifact.verifyContents(() -> Duration.ZERO)).hasMessage("EXECUTION_TIMEOUT");
+        }
+    }
+
     @Test void refusesMissingEmptyOversizedLinkedAndWritableInputs() throws Exception {
         for (String mode : List.of("missing", "empty", "large", "symlink", "hardlink", "directory", "writable", "target-link")) {
             Path root = temporary.toRealPath().resolve(mode);

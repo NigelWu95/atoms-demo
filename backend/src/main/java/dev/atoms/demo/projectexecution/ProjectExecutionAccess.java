@@ -168,13 +168,13 @@ public final class ProjectExecutionAccess {
         if (handle == null || handle.issuer != this || !handle.state.build().ownerId().equals(owner)
                 || !handle.state.build().projectId().equals(project)) throw error(403, "EXECUTION_ACCESS_FORBIDDEN");
         handle.scope.check(); compare(owner, project, handle, running, deadline); serving(handle, running);
-        handle.artifact.verify(deadline);
+        handle.artifact.verifyContents(deadline);
         var build = handle.state.build();
         var snapshot = source.read(owner, project, build.sourceVersionId(), deadline::remaining);
         if (!build.sourceVersionId().equals(snapshot.version().id()) || !project.equals(snapshot.version().projectId())
                 || !build.treeSha256().equals(snapshot.version().treeSha256()) || !build.treeSha256().equals(snapshot.tree().sha256())) throw revoked();
         // Source/Git I/O held no DB lock. Recheck both files and authority before returning any data.
-        handle.artifact.verify(deadline); handle.scope.check();
+        handle.artifact.verifyContents(deadline); handle.scope.check();
         compare(owner, project, handle, running, deadline); serving(handle, running); handle.scope.check(); deadline.remaining();
         return snapshot;
     }
