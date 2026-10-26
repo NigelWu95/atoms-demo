@@ -148,8 +148,7 @@ class ExecutionAccessIT {
         var registry = ExecutionDatabaseBinding.load(Map.of(A, configuration.resolve(ExecutionBindingContractIT.A_DB + ".properties")),
                 List.of(root, parent), Set.of("atoms_demo", "atoms_demo_test"), Set.of("postgres", "atoms_test"));
         var target = registry.verify(A, budget()); var history = registry.history(A, budget());
-        var tree = new ProjectSourcePolicy().validate(List.of(new SourceTree.File(ExecutionMigrations.SOURCE + "V001__execution_contract_fixture.sql",
-                ExecutionRunAdmissionIT.SQL.getBytes(StandardCharsets.UTF_8), 0100644)));
+        var tree = ExecutionContractSupport.retainedTree(jdbc, source, A);
         var base = source.initializeExisting(OWNER, A, tree);
         var fixture = new ExecutionRuntimeFixture(settings, projects, jdbc, transactions, source.readGateway(), tools, registry, target);
         resources = fixture; var build = fixture.seal(base, tree); start();

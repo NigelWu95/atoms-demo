@@ -44,10 +44,9 @@ class ExecutionRuntimeSchedulerIT {
         var registry = ExecutionDatabaseBinding.load(Map.of(PROJECT, configuration.resolve(ExecutionBindingContractIT.A_DB + ".properties")),
                 List.of(root, parent), Set.of("atoms_demo", "atoms_demo_test"), Set.of("postgres", "atoms_test"));
         var target = registry.verify(PROJECT, budget()); var history = registry.history(PROJECT, budget());
-        var tree = new ProjectSourcePolicy().validate(List.of(new SourceTree.File(ExecutionMigrations.SOURCE + "V001__execution_contract_fixture.sql",
-                ExecutionRunAdmissionIT.SQL.getBytes(StandardCharsets.UTF_8), 0100644)));
         try (var source = new SourceAgentFixture(jdbc, projects, transactions, root)) {
-            source.start(database); var base = source.initializeExisting(OWNER, PROJECT, tree);
+            source.start(database); var tree = ExecutionContractSupport.retainedTree(jdbc, source, PROJECT);
+            var base = source.initializeExisting(OWNER, PROJECT, tree);
             var tools = ExecutionToolchain.capture(ExecutionToolchainTest.installation(parent.resolve("dispatcher-tools-" + UUID.randomUUID())), List.of(root), budget());
             Path executionRoot = parent.resolve("runtime-dispatch-" + UUID.randomUUID());
             var environment = new MockEnvironment().withProperty("atoms.project-execution.enabled", "true")

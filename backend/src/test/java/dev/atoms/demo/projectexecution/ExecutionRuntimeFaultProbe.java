@@ -60,8 +60,7 @@ public final class ExecutionRuntimeFaultProbe {
         var projects = new ProjectService(jdbc);
         stage = "source";
         var source = new SourceAgentFixture(jdbc, projects, transactions, sourceRoot); source.start(database);
-        var tree = new ProjectSourcePolicy().validate(List.of(new SourceTree.File(ExecutionMigrations.SOURCE + "V001__execution_contract_fixture.sql",
-                ExecutionRunAdmissionIT.SQL.getBytes(StandardCharsets.UTF_8), 0100644)));
+        var tree = ExecutionContractSupport.retainedTree(jdbc, source, PROJECT);
         var base = source.initializeExisting(OWNER, PROJECT, tree);
         var registry = ExecutionDatabaseBinding.load(Map.of(PROJECT, configuration.resolve(ExecutionBindingContractIT.A_DB + ".properties")),
                 List.of(sourceRoot, evidence.getParent()), Set.of("atoms_demo", "atoms_demo_test"), Set.of("postgres", "atoms_test"));
