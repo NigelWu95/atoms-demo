@@ -52,3 +52,9 @@
 - `ex22-delivery-pd08a-lifecycle.log`：5 项单测通过。被中断仍未退出的 worker 保持名额；实际完成才释放，不能把超时响应覆盖为成功。
 
 测试 URI 拒绝经过实际 Tomcat/Spring firewall；错误 JSON 没有回显令牌。管理路径仍保留原 CSRF/CORS 语义。浏览器能力与下载工程验收分别留待 PD08b/PD13。
+
+## 固定源码 ZIP
+
+`ex22-delivery-pd09-zip.log` 4 项测试全部通过。JDK ZipInputStream 能读取每个条目，固定排序/1980 时间/UTF-8/STORED；本机 `/usr/bin/unzip` 实际解压后文件字节相同，`backend/mvnw` 有执行位、普通文件没有。清单按固定源码/构建及可选运行身份生成，独立放在 `delivery/`，不修改 `project/` 文件。也覆盖完整 16 MiB 源码树、超限、错误身份/路径/模式以及中途预算到期。
+
+ZIP writer 按 [PKWARE 6.3.10 的本地头、中央目录及 Unix 属性约定](https://pkware.cachefly.net/webdocs/casestudies/APPNOTE.TXT)写有界 classic ZIP。标准 unzip 只在验证中使用，生产代码不调用外部 zip/unzip。没有下载 API、鉴权或独立业务工程验收的完成声明。
