@@ -13,6 +13,21 @@ import static org.assertj.core.api.Assertions.*;
 
 class ExecutionToolProbeTest {
     @TempDir Path temporary;
+    @Test void nodeVersionProbeDoesNotReadUnusedMavenInstallationButFullVerificationStillRejectsItsDrift() throws Exception {
+        var locations = ExecutionToolchainTest.installation(temporary.toRealPath());
+        Files.writeString(locations.node(), "#!/bin/sh\nprintf 'v24.20.0\\n'\n");
+        var budget = new ExecutionProcess.Deadline(Duration.ofSeconds(30));
+        var tools = ExecutionToolchain.capture(locations, List.of(), budget);
+        Files.writeString(locations.maven().getParent().getParent().resolve("lib/maven-core-3.9.11.jar"), "changed-unused-tool");
+        try (var paths = new ExecutionPaths(temporary.toRealPath().resolve("execution"), List.of())) {
+            UUID task = UUID.randomUUID(), execution = UUID.randomUUID();
+            var home = ExecutionToolHome.create(paths, paths.createBuild(task), budget);
+            var result = new ExecutionToolProbe().run(tools, ExecutionToolchain.Kind.NODE, home, budget, () -> false, task, execution);
+            assertThat(result.summary().version()).isEqualTo("24.20.0");
+            assertThat(result.stopped().matches(task, execution, home.home())).isTrue();
+            assertThatThrownBy(() -> tools.verify(budget)).hasMessage("EXECUTION_TOOL_CHANGED");
+        }
+    }
     @Test void acceptsOnlyPinnedReleaseFamiliesAndNeverReturnsRawOutput() throws Exception {
         assertThat(ExecutionToolProbe.version(ExecutionToolchain.Kind.NODE, "v24.20.0\n")).isEqualTo("24.20.0");
         assertThat(ExecutionToolProbe.version(ExecutionToolchain.Kind.NPM, "11.19.0\n")).isEqualTo("11.19.0");

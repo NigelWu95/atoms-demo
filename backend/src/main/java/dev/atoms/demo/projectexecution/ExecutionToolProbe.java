@@ -38,7 +38,7 @@ final class ExecutionToolProbe {
                         jvmSettings(text, home.home(), home.temporary(), tools.javaHome());
                     return null;
                 }, () -> {
-                    tools.verify(budget); home.verify(budget);
+                    tools.verifyProbe(kind, budget); home.verify(budget);
                     // Keep this inside OwnedProcess: a refusal must carry its positive no-process proof.
                     // OwnedProcess checks cancellation and the same budget again before builder.start().
                     inputs.check();

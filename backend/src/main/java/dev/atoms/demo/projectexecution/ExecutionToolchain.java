@@ -88,6 +88,15 @@ final class ExecutionToolchain {
         for (Kind kind : Kind.values()) verify(kind, budget);
     }
     void verifyJava(OwnedProcess.Budget budget) throws IOException { verify(Kind.JAVA, budget); }
+    /** Match the exact executable/runtime closure of probe(); full worker verification remains independent. */
+    void verifyProbe(Kind kind, OwnedProcess.Budget budget) throws IOException {
+        switch (kind) {
+            case NODE -> verify(Kind.NODE, budget);
+            case NPM -> { verify(Kind.NODE, budget); verify(Kind.NPM, budget); }
+            case JAVA -> verify(Kind.JAVA, budget);
+            case MAVEN -> { verify(Kind.JAVA, budget); verify(Kind.MAVEN, budget); }
+        }
+    }
     private void verify(Kind kind, OwnedProcess.Budget budget) throws IOException {
         requireBudget(budget);
         try {

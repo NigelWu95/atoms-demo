@@ -13,6 +13,24 @@ class ExecutionToolchainTest {
     @TempDir Path temporary;
     private ExecutionProcess.Deadline deadline() { return new ExecutionProcess.Deadline(Duration.ofSeconds(30)); }
 
+    @Test void eachProbeChecksItsExecutableAndRuntimeDependenciesWithoutWeakeningWholeBuildVerification() throws Exception {
+        for (var probe : ExecutionToolchain.Kind.values()) for (var changed : ExecutionToolchain.Kind.values()) {
+            var locations = installation(Files.createDirectory(temporary.toRealPath().resolve(probe + "-" + changed)));
+            var tools = ExecutionToolchain.capture(locations, List.of(), deadline());
+            Path file = switch (changed) {
+                case NODE -> locations.node(); case NPM -> locations.npm().toRealPath();
+                case JAVA -> locations.java(); case MAVEN -> locations.maven();
+            };
+            Files.writeString(file, "changed-tool-identity");
+            boolean needed = probe == changed || probe == ExecutionToolchain.Kind.NPM && changed == ExecutionToolchain.Kind.NODE
+                    || probe == ExecutionToolchain.Kind.MAVEN && changed == ExecutionToolchain.Kind.JAVA;
+            if (needed) assertThatThrownBy(() -> tools.verifyProbe(probe, deadline())).hasMessage("EXECUTION_TOOL_CHANGED");
+            else tools.verifyProbe(probe, deadline());
+            assertThatThrownBy(() -> tools.verify(deadline())).hasMessage("EXECUTION_TOOL_CHANGED");
+            assertThatThrownBy(() -> tools.verifyProbe(probe, () -> Duration.ZERO)).hasMessage("EXECUTION_TIMEOUT");
+        }
+    }
+
     @Test void unitTestUserDataStaysInPrivateTemporaryHomeWithPackageConfigurationPinned() throws Exception {
         var tools = ExecutionToolchain.capture(installation(temporary.toRealPath()), List.of(), deadline());
         try (var paths = new ExecutionPaths(temporary.toRealPath().resolve("execution"), List.of())) {

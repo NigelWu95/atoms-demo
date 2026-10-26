@@ -397,12 +397,13 @@ U/I/REAL/ALL/COMPAT/DOC 的命令与权限条件见计划 §6。S = 1–2、M = 
 - [ ] 完成 EX27。依赖：EX15、EX20–26。原 3 文件估计未包含既有运行夹具的“空业务库 + 单文件源码”前提；真实迁移后该前提不再成立，按以下顺序拆片，每片最多 5 个主要文件。
   - [x] EX27a1：受控样本选择与逐字节迁移 ZIP 共用助手及测试，调整 RuntimeFixture、RunAdmissionIT、RunHealthIT（5 文件）。仅接受原单 SQL 或已评审的待办 V1/V2 完整树，未知源变化拒绝；不修改源码头或业务数据，不将 ZIP 元数据夹具宣称为真实构建。缺类 RED 后 9 单元 + 5 集成通过；补充独立 cwd 探针先失败，改为固定评审树摘要后最终 10 单元 + 5 集成通过，原 SQL 字节和运行身份验证保留。
   - [x] EX27a2：RuntimeSchedulerIT、RuntimeFaultProbe、AccessIT 改为复用同一受控源码读取（3 文件）。11:22:27 的 10 单元 + 8 集成通过，包括调度/切换/失权、两个独立 JVM 故障探针和访问句柄；78 条运行全部终结，原绑定、旧审计不变，证据 `.local/ex27a-evidence-0tgb_dbd`。实际业务迁移后仍须再次验证这些用例，不将当前空库上的兼容检查当作 EX27b/c 已完成。
-  - [ ] EX27b：ApplicationContractIT 与业务夹具接入原 A/B 绑定、完整构建、HTTP 增改查、两进程隔离和重启持久化。保持旧源码版和全部运行记录，实际配置与端口在启动前复验。
+  - [x] EX27b0：原生 Node 探测触发 10 秒超时后，按固定命令核验实际使用的工具（Toolchain、ToolProbe 及两项测试，4 文件）。保留 10 秒和任务总期限、输入复核、停止证明及整套构建核验。回归 RED 后 13 单元 + 12 集成通过，真实 Node 探测 6.711 秒；测量报告及临时诊断源码保留于 `.local/ex27b-probe-scope-evidence`。完整应用仍须 EX27b 验证，未因单次探测通过宣称全流程通过。
+  - [ ] EX27b：ApplicationContractIT、ApplicationFixture 与 TodoFixture 的上下文装配复用（3 文件），接入原 A/B 绑定、完整构建、HTTP 增改查、两进程隔离和重启持久化。保持旧源码版和全部运行记录，实际配置与端口在启动前复验；仅用原 worker 能力停止进程，PID 只读比较。
   - [ ] EX27c：V2 增量构建与迁移批准、失败升级/旧代码拒绝、运行来源及前端资源核对；汇总前后端和原夹具的真实证据。遇到未知数据库历史即停止，不自动 clean/repair。
 - 描述：真实构建并运行 A/B 两个工程，验证业务行为、数据分离、增量版本与重启持久化。
 - 验收：不同 Java 进程/端口/DB，A 的新增/修改/查询及重启保留数据，停 A 不影响 B；V2 的 Java API 与前端资源确实变化，未改行为保持；迁移先阻断再准确批准，失败升级/旧版恢复不冒称数据回滚。
 - 验证：REAL(ExecutionApplicationContractIT)；保存 HTTP 断言、版本/树/JAR 摘要及进程停止证据；同源快照交接验收，不冒称网页 ZIP 已验收。
-- 主要文件：`ET/ExecutionApplicationContractIT.java`、`ET/ExecutionContractSupport.java`、`ET/ExecutionTodoFixture.java`。
+- 主要文件：a 按上述兼容小片；b 为 `ET/ExecutionApplicationContractIT.java`、`ET/ExecutionApplicationFixture.java`、`ET/ExecutionTodoFixture.java`；c 继续在该验收夹具内实现，并按实际改动另分片。
 - 前提：A/B 业务与测试库准确目标另获批准；真实依赖下载在许可范围；零 DeepSeek/SMTP 调用。
 
 ## C-EX09 · 实际应用已运行
