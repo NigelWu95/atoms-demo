@@ -48,6 +48,39 @@ class ExecutionDiagnosticsTest {
                 .hasMessage("EXECUTION_REPORT_INVALID").hasNoCause()
                 .satisfies(error -> assertThat(error.getSuppressed()).isEmpty());
     }
+    @Test void eventDtoRetainsOnlyKnownFieldsAndNeverCopiesToolText() {
+        var id = java.util.UUID.randomUUID();
+        var detail = ExecutionDiagnostics.event("{\"operation\":\"UNIT_TEST\",\"phase\":\"completed\",\"executionId\":\"" + id
+                + "\",\"code\":null,\"files\":1,\"tests\":2,\"suites\":1,\"stdoutBytes\":5,\"stderrBytes\":0,"
+                + "\"stderr\":\"PRIVATE_CANARY\",\"command\":\"/private/CANARY\",\"source\":\"CANARY\"}");
+        assertThat(detail.type()).isEqualTo("OPERATION"); assertThat(detail.executionId()).isEqualTo(id);
+        assertThat(detail.counts()).containsEntry("tests", 2L).containsEntry("stderrBytes", 0L);
+        assertThat(detail.toString()).doesNotContain("CANARY", "/private", "command", "source");
+        assertThatThrownBy(() -> detail.counts().put("secret", 1L)).isInstanceOf(UnsupportedOperationException.class);
+        var stage = ExecutionDiagnostics.event("{\"status\":\"STOPPING\",\"stopRequested\":true,\"executionPending\":true,\"code\":\"RUN_STOP_PENDING\"}");
+        assertThat(stage.type()).isEqualTo("STAGE"); assertThat(stage.stopRequested()).isTrue();
+        assertThat(stage.code()).isEqualTo("RUN_STOP_PENDING");
+        assertThat(ExecutionDiagnostics.event("{\"probe\":\"JAVA\",\"phase\":\"completed\",\"executionId\":\"" + id
+                + "\",\"version\":\"CANARY\",\"sha256\":\"CANARY\",\"files\":2,\"bytes\":99}").type()).isEqualTo("PROBE");
+    }
+    @Test void invalidEventValuesAndForgedErrorPrefixesAreReplacedWithFixedDiagnostics() {
+        for (String input : List.of("", "{}", "null", "[]", "{\"status\":\"CANARY\"}",
+                "{\"status\":\"READY\",\"status\":\"FAILED\"}", "{\"status\":\"READY\"} {}",
+                "{\"operation\":\"npm run CANARY\",\"phase\":\"started\"}",
+                "{\"status\":\"READY\",\"stopRequested\":\"CANARY\"}",
+                "{\"status\":\"READY\",\"tests\":-1}", "{\"status\":\"READY\",\"tests\":1.5}",
+                "{\"status\":\"READY\",\"files\":999999999999999999999}",
+                "{\"status\":\"READY\",\"executionId\":\"1-1-1-1-1\"}", "x".repeat(1025))) {
+            var detail = ExecutionDiagnostics.event(input);
+            assertThat(detail.type()).isEqualTo("UNAVAILABLE");
+            assertThat(detail.code()).isEqualTo("EXECUTION_DIAGNOSTIC_UNAVAILABLE");
+            assertThat(detail.toString()).doesNotContain("CANARY");
+        }
+        assertThat(ExecutionDiagnostics.event(null).type()).isEqualTo("UNAVAILABLE");
+        assertThat(ExecutionDiagnostics.errorCode("EXECUTION_PRIVATE_CANARY")).isEqualTo("EXECUTION_DIAGNOSTIC_UNAVAILABLE");
+        assertThat(ExecutionDiagnostics.errorCode("RUN_RECOVERY_UNCERTAIN")).isEqualTo("RUN_RECOVERY_UNCERTAIN");
+        assertThat(ExecutionDiagnostics.errorCode(null)).isNull();
+    }
     static byte[] bytes(String value) { return value.getBytes(StandardCharsets.UTF_8); }
     static String report() {
         return """

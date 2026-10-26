@@ -358,7 +358,11 @@ U/I/REAL/ALL/COMPAT/DOC 的命令与权限条件见计划 §6。S = 1–2、M = 
 
 ## EX24 · 有界任务查询与安全诊断
 
-- [ ] 完成 EX24。依赖：EX07、EX14、EX17、EX23。规模：M（4 文件）。
+- [ ] 完成 EX24。依赖：EX07、EX14、EX17、EX23。原 4 文件估计遗漏准备/运行尚无事件表，按每片最多 5 个主要文件拆分。
+  - [x] EX24a：诊断字段、枚举和错误码白名单，恶意/异常报告仅返回固定降级结果（ExecutionDiagnostics、ExecutionDiagnosticsTest）。缺方法 RED 后，08:37:27 诊断及报告/前端兼容 14 项通过。
+  - [ ] EX24b：追加 V029，为准备/运行记录状态事件，与状态提交同事务；三类事件的连续序号、1000 条/64 KiB 配额及不可变性验证（迁移、ExecutionEventSchemaIT）。不伪造旧任务历史，不修改旧迁移。
+  - [ ] EX24c：三类任务和事件查询、绑定 owner/project/kind/task 的游标、每页 1–100、权限复核与诊断 DTO（ExecutionQuery、ExecutionQueryIT）。
+  - [ ] EX24d：有效变异、相关回归、只读审计与文档收尾；无 HTTP 接口、模型调用或部署。
 - 描述：补齐构建/准备/运行的稳定分页查询，统一此前阶段事件的可消费 DTO。
 - 验收：每次归属检查，游标混用/越界拒绝，最多 100 条；任务最多 1000 事件/64 KiB，超额不无界写入；不含源正文、命令、路径、JDBC、stderr 或 canary，只返回已解析的白名单诊断。
 - 验证：I(ExecutionQueryIT) + U(ExecutionDiagnosticsTest)，分页中新增任务、配额事务失败及恶意输出；日志捕获验证无敏感原文。
