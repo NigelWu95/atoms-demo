@@ -251,7 +251,7 @@ class ExecutionPreparationSchedulerIT {
         assertThat(preparations.get(waiting.projectId(), waiting.id())).isEqualTo(waiting);
     }
 
-    private void start() {
+    void start() {
         coordinator = createCoordinator(); coordinator.start(); assertThat(coordinator.isRunning()).isTrue();
     }
     private ExecutionCoordinator createCoordinator() {
@@ -276,26 +276,26 @@ class ExecutionPreparationSchedulerIT {
     private DependencyPreparationService newService() {
         return new DependencyPreparationService(settings, preparations, projects, source.readGateway(), edits, source.environment(), config, transactions);
     }
-    private SourceAgentFixture.Base base() throws Exception {
+    SourceAgentFixture.Base base() throws Exception {
         var initial = source.create(owner); var files = new ArrayList<SourceTree.File>();
         for (String name : Files.readAllLines(Path.of("../templates/full-project-v1.files")))
             if (!name.equals("frontend/package-lock.json")) files.add(new SourceTree.File(name,
                     Files.readAllBytes(Path.of("../templates/full-project-v1").resolve(name)), name.equals("backend/mvnw") ? 0100755 : 0100644));
         return source.accept(owner, initial, new ProjectSourcePolicy().validate(files));
     }
-    private DependencyPreparationRepository.Task submit(SourceAgentFixture.Base base) {
+    DependencyPreparationRepository.Task submit(SourceAgentFixture.Base base) {
         var result = service.submit(owner, base.projectId(), new DependencyPreparationService.Input(base.versionId(), base.revision()), UUID.randomUUID().toString());
         var task = preparations.get(base.projectId(), result.id()); tasks.add(task); return task;
     }
-    private ExecutionBuild build() {
+    ExecutionBuild build() {
         var base = source.create(owner); var result = buildService.submit(owner, base.projectId(), base.versionId(), UUID.randomUUID().toString());
         var build = builds.get(base.projectId(), result.id()); buildTasks.add(build); return build;
     }
     private List<Path> protectedRoots() { return List.of(temporary.resolve("source"), temporary.resolve("work")); }
-    private Path marker(DependencyPreparationRepository.Task task) { return markers.resolve(task.id() + ".started"); }
-    private Path buildMarker(ExecutionBuild build) { return settings.load().root().resolve("builds/" + build.id() + "/project/frontend/started"); }
-    private boolean terminal(DependencyPreparationRepository.Task task) { return preparations.get(task.projectId(), task.id()).finishedAt() != null; }
-    private void assertReleased(DependencyPreparationRepository.Task task) {
+    Path marker(DependencyPreparationRepository.Task task) { return markers.resolve(task.id() + ".started"); }
+    Path buildMarker(ExecutionBuild build) { return settings.load().root().resolve("builds/" + build.id() + "/project/frontend/started"); }
+    boolean terminal(DependencyPreparationRepository.Task task) { return preparations.get(task.projectId(), task.id()).finishedAt() != null; }
+    void assertReleased(DependencyPreparationRepository.Task task) {
         assertThat(service.handle(task.id())).isNull();
         assertThat(jdbc.queryForMap("SELECT status,execution_pending FROM source_edit_leases WHERE id=?", task.editLeaseId()))
                 .containsEntry("status", "RELEASED").containsEntry("execution_pending", false);
@@ -313,7 +313,7 @@ class ExecutionPreparationSchedulerIT {
                 + "fs.writeFileSync(marker+'.started',String(process.pid));\n"
                 + (block ? "const timer=setInterval(()=>{if(fs.existsSync(marker+'.release'))clearInterval(timer);},25);\n" : "") + "}\n");
     }
-    private void await(BooleanSupplier condition) throws Exception {
+    void await(BooleanSupplier condition) throws Exception {
         long deadline = System.nanoTime() + Duration.ofSeconds(60).toNanos();
         while (!condition.getAsBoolean() && System.nanoTime() < deadline) Thread.sleep(50);
         assertThat(condition.getAsBoolean()).as("Expected owned execution progress within 60 seconds").isTrue();
