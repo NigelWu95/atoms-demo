@@ -59,7 +59,7 @@ final class ExecutionHealth {
                     || !text(body, "stage", "INITIALIZED") || !text(body, "runId", run.toString())
                     || !text(body, "executionId", execution.toString())) throw invalid();
             remaining(budget);
-            return process.confirmReady(run, execution) ? new Confirmed(process, run, execution, binding) : null;
+            return process.confirmReady(run, execution, binding) ? new Confirmed(process, run, execution, binding) : null;
         } catch (TimeoutException error) { remaining(budget); return null; }
         catch (InterruptedException error) { Thread.currentThread().interrupt(); throw new IOException("RUN_CANCELLED"); }
         catch (ExecutionException error) {

@@ -17,7 +17,13 @@ class ExecutionHealthTest {
 
     @Test void confirmsActualHttpIdentityAndReceiptExpiresWhenOwnedProcessStops() throws Exception {
         try (var fixture = launch("valid")) {
+            assertThatThrownBy(() -> fixture.process.confirmedTarget(run, execution)).hasMessage("RUN_TARGET_UNAVAILABLE");
             var confirmed = awaitHealth(fixture);
+            assertThat(fixture.process.confirmedTarget(run, execution)).isEqualTo(fixture.binding);
+            var wrong = new ExecutionBindingRepository.Target(project, UUID.randomUUID(), 5432, "sample", "sample", fixture.binding.port(), 1, 2);
+            assertThat(fixture.process.confirmReady(run, execution, wrong)).isFalse();
+            assertThat(fixture.process.confirmedTarget(run, execution)).isEqualTo(fixture.binding);
+            assertThatThrownBy(() -> fixture.process.confirmedTarget(UUID.randomUUID(), execution)).hasMessage("RUN_TARGET_UNAVAILABLE");
             assertThat(confirmed.matches(run, execution, fixture.binding)).isTrue();
             assertThat(confirmed.matches(UUID.randomUUID(), execution, fixture.binding)).isFalse();
             assertThat(confirmed.matches(run, UUID.randomUUID(), fixture.binding)).isFalse();
@@ -26,6 +32,7 @@ class ExecutionHealthTest {
             assertThat(fixture.process.isServing()).isTrue();
             fixture.close();
             assertThat(confirmed.matches(run, execution, fixture.binding)).isFalse();
+            assertThatThrownBy(() -> fixture.process.confirmedTarget(run, execution)).hasMessage("RUN_TARGET_UNAVAILABLE");
         }
     }
 

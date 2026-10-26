@@ -34,6 +34,8 @@
   - 在执行模块内部获取原 owner 的目标，校验前后共享总预算；替换/失权/产物漂移失败，写入不确定结果明确。
   - 文件：ProjectExecutionAccess、ExecutionCoordinator、交换 DTO、执行集成测试；验证 J：旧句柄不复用新运行、总期限、未派发与已派发写故障。
   - 分为 PD06a 将健康验证过的固定目标保存在原 process owner，PD06b 句柄交换/共享预算。复用原 process 引用，避免将端口逐层暴露到协调器或交付 API。
+  - [x] PD06a：`ex22-delivery-pd06a-green.log` 13 项进程/真实健康 HTTP 检查通过，目标在健康前不可取、之后不可换、停止即失效。此前 `pd06a-red` 因未等编译退出而与后次编译重叠，输出无效并保留，不计为有效 RED；PD06b 使用单 Maven 的全新编译再次检查本组。
+  - [ ] PD06b：内部句柄交换、共享期限及原生 owner/PG 集成。
 
 **C2：** 受限 transport 可验证准确运行响应，尚不声称浏览器可用。
 

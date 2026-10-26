@@ -22,6 +22,7 @@ final class ExecutionRunProcess {
     private final CompletableFuture<Outcome> completion = new CompletableFuture<>();
     private Phase phase = Phase.STARTING;
     private OwnedProcess.Running running;
+    private ExecutionBindingRepository.Target confirmedTarget;
 
     private ExecutionRunProcess(ProcessBuilder builder, UUID run, UUID execution, OwnedProcess.Budget startup) {
         this.run = Objects.requireNonNull(run); this.execution = Objects.requireNonNull(execution);
@@ -65,6 +66,19 @@ final class ExecutionRunProcess {
         if (phase != Phase.STARTING) return false;
         try { remaining(); } catch (IOException error) { return false; }
         phase = Phase.SERVING; return true;
+    }
+
+    /** Only the fixed-target HTTP health probe supplies a binding; it cannot be changed for this process. */
+    synchronized boolean confirmReady(UUID echoedRun, UUID echoedExecution, ExecutionBindingRepository.Target target) {
+        if (target == null || confirmedTarget != null && !confirmedTarget.equals(target)
+                || !confirmReady(echoedRun, echoedExecution)) return false;
+        confirmedTarget = target; return true;
+    }
+
+    /** Package-only: no caller-supplied port and no recovery from a database READY row. */
+    synchronized ExecutionBindingRepository.Target confirmedTarget(UUID expectedRun, UUID expectedExecution) throws IOException {
+        if (confirmedTarget == null || !serves(expectedRun, expectedExecution)) throw new IOException("RUN_TARGET_UNAVAILABLE");
+        return confirmedTarget;
     }
 
     synchronized void requestStop() {
