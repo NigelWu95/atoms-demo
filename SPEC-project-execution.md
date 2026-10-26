@@ -258,6 +258,8 @@ finish 仅接受匹配构建 UUID、执行 UUID、tool-home cwd 的真实停止�
 
 列表/事件使用有界游标分页。给交付模块的是经核对的构建/运行身份与内部受控句柄，不是浏览器可指定的磁盘路径或代理目标；每次访问仍重新授权。错误采用既有 `ApiException` 稳定码，不泄露命令、路径或底层异常。
 
+EX23 的 `ProjectExecutionAccess` 只提供内部 `build` / `running` 句柄签发、身份读取和来源快照读取，不增加 HTTP 路由。句柄私有构造且绑定签发者、owner/project、当前协调者资源及固定构建身份；每次读取在短事务中重新授权，再在事务外校验原封存文件及指定源码版本，返回前再核对权限与协调权。成功构建 V1 不随项目最新 V2 改变。运行句柄还必须匹配原 worker 持有的同一个存活进程和执行 ID，停止后不可复用。协调者关闭或失权会撤销本次资源范围；访问不新开执行根租约，也不返回磁盘路径、端口、凭据或可序列化的访问授权。
+
 实现位于 `backend/src/main/java/dev/atoms/demo/projectexecution/`，对应测试位于 `backend/src/test/java/dev/atoms/demo/projectexecution/`，受控样本位于 `backend/src/test/resources/projectexecution/`；追加数据库迁移，维护说明/验证记录放入 `docs/`。现有 `execution/OwnedProcess` 有 Agent 专用错误码，由 `ExecutionProcess` 明确适配，不能直接把其结果当新构建证据。旧 `workspace`/`instances` 固定模板代码不改成混杂的双模式执行器。
 
 `ExecutionTestDatabase.load` 只装载上述内部注册表，不连接数据库；`verify(projectId, budget)` 才创建并关闭一个有界只读连接。未登记项目、无效/漂移配置、重复绑定、实际目标不符、连接不可用和预算耗尽分别返回 `EXECUTION_DB_BINDING_NOT_FOUND`、`EXECUTION_DB_CONFIGURATION_INVALID`、`EXECUTION_DB_BINDING_CONFLICT`、`EXECUTION_DB_TARGET_REJECTED`、`EXECUTION_DB_UNAVAILABLE`、`EXECUTION_TIMEOUT`。异常不携带底层 cause/suppressed 连接详情。连接/读超时和语句期限从剩余整秒预算取值且最多 3/5/5 秒，不把 0 传给 JDBC 表示无限等待；不足 1 秒直接拒绝。该内部类不是自动启动的 Spring 组件，后续协调者须先按现有开关和权限准入。

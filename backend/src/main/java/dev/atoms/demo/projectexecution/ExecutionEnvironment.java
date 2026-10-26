@@ -111,6 +111,14 @@ final class ExecutionEnvironment implements ExecutionCoordinator.Factory {
                     protectedRoots, () -> { check(); coordination.check(); });
             return runtimeResources;
         }
+        @Override public ExecutionArtifact artifact(ExecutionBuild build, String jarHash, String manifestHash, OwnedProcess.Budget budget) throws IOException {
+            check();
+            var result = ExecutionArtifact.openSuccessful(paths, build, jarHash, manifestHash, budget);
+            check(); return result;
+        }
+        @Override public synchronized ExecutionRunProcess ownedProcess(UUID run) throws IOException {
+            check(); return runtimeResources == null ? null : runtimeResources.ownedProcess(run);
+        }
         @Override public synchronized void close() throws IOException {
             if (runtimeResources != null && runtimeResources.hasHeldProcesses()) throw new IOException("RUN_PROCESS_UNSETTLED");
             paths.close();

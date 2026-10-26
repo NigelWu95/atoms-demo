@@ -194,6 +194,18 @@ class ExecutionEnvironmentTest {
         try (var reopened = new ExecutionPaths(root, List.of())) { reopened.checkedRoot(); }
     }
 
+    @Test void deliveryReadsUseOriginalRootAndTheSameReadinessGate() throws Exception {
+        register(privateConfig(Map.of()));
+        try (var resources = environment.open()) {
+            assertThat(resources.ownedProcess(UUID.randomUUID())).isNull();
+            when(source.readyForExecution()).thenReturn(false);
+            assertThatThrownBy(() -> resources.ownedProcess(UUID.randomUUID())).hasMessage("EXECUTION_ENVIRONMENT_UNAVAILABLE");
+            assertThatThrownBy(() -> resources.artifact(mock(ExecutionBuild.class), "unused", "unused", () -> java.time.Duration.ofSeconds(5)))
+                    .hasMessage("EXECUTION_ENVIRONMENT_UNAVAILABLE");
+            assertThat(root.resolve("builds")).isEmptyDirectory();
+        }
+    }
+
     private Path privateConfig(Map<String, String> changes) throws Exception {
         var fixture = new ExecutionTestDatabaseTest(); fixture.temporary = temporary;
         return fixture.config(changes);

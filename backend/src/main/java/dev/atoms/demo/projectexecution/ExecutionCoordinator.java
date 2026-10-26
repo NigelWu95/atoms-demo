@@ -34,6 +34,10 @@ final class ExecutionCoordinator implements SmartLifecycle, AutoCloseable {
         }
         /** Optional runtime resources; attachment alone never starts a task or claims an old run. */
         default ExecutionRuntimeResources runtime(OwnedProcess.Preflight coordination) throws IOException { return null; }
+        default ExecutionArtifact artifact(ExecutionBuild build, String jarHash, String manifestHash, OwnedProcess.Budget budget) throws IOException {
+            throw new IOException("EXECUTION_ARTIFACT_UNAVAILABLE");
+        }
+        default ExecutionRunProcess ownedProcess(UUID run) throws IOException { return null; }
         @Override void close() throws IOException;
     }
     /** Trusted resource assembly only; never supplied by a request or generated source. */
@@ -190,10 +194,34 @@ final class ExecutionCoordinator implements SmartLifecycle, AutoCloseable {
 
     private void checkAuthority() throws IOException {
         if (!running.get() || stopping.get() || !settings.enabled() || !sourceReady.getAsBoolean()) throw unavailable();
-        requireLease(); resources.check();
+        var current = resources;
+        if (current == null) throw unavailable();
+        requireLease(); current.check();
+        if (current != resources || !isRunning()) throw unavailable();
     }
     private void requireLease() {
-        if (lease == null || !lease.healthy()) throw unavailable();
+        var current = lease;
+        if (current == null || !current.healthy() || current != lease) throw unavailable();
+    }
+
+    /** Internal read scope tied to this coordinator lifetime, not a new root lease or reconstructible DTO. */
+    AccessScope accessScope() throws IOException {
+        outsideTransaction(); checkAuthority();
+        var scope = new AccessScope(resources); scope.check(); return scope;
+    }
+    final class AccessScope {
+        private final WorkerResources original;
+        private AccessScope(WorkerResources original) { this.original = original; }
+        void check() throws IOException {
+            outsideTransaction(); checkAuthority();
+            if (original == null || original != resources) throw unavailable();
+        }
+        ExecutionArtifact artifact(ExecutionBuild build, String jarHash, String manifestHash, OwnedProcess.Budget budget) throws IOException {
+            check(); var result = original.artifact(build, jarHash, manifestHash, budget); check(); return result;
+        }
+        ExecutionRunProcess ownedProcess(UUID run) throws IOException {
+            check(); var result = original.ownedProcess(run); check(); return result;
+        }
     }
 
     CompletionStage<ExecutionRun> startApplication(UUID owner, UUID project, UUID build, UUID binding, UUID review, String key) throws IOException {

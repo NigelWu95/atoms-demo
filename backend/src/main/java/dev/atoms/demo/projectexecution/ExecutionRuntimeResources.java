@@ -54,5 +54,6 @@ final class ExecutionRuntimeResources {
         return worker.run(ticket);
     }
     boolean hasHeldProcesses() { return worker.hasHeldProcesses(); }
+    ExecutionRunProcess ownedProcess(UUID run) { return worker.ownedProcess(run); }
     void requestStopOwned() { worker.requestStopOwned(); }
 }
