@@ -18,7 +18,7 @@ class DeliveryHttpPolicyTest {
         assertThat(response.getHeader("Content-Security-Policy")).contains("sandbox allow-scripts;", "frame-ancestors https://platform.example",
                 "script-src https://platform.example" + prefix + "assets/", "connect-src https://platform.example" + prefix + "api/")
                 .doesNotContain("allow-same-origin", "unsafe-eval", "attacker.example");
-        assertThat(response.getHeader("X-Frame-Options")).isNull();
+        assertThat(response.getHeader("X-Frame-Options")).isEqualTo("SAMEORIGIN");
         assertThat(response.getHeader("Access-Control-Allow-Origin")).isEqualTo("null");
         assertThat(response.getHeader("Access-Control-Allow-Credentials")).isNull();
         assertThat(response.getHeader("Referrer-Policy")).isEqualTo("no-referrer");

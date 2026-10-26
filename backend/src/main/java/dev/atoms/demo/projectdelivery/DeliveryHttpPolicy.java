@@ -78,7 +78,9 @@ final class DeliveryHttpPolicy {
 
     static void authorized(HttpServletRequest request, HttpServletResponse response, Route route, String origin) {
         String base = origin + DeliveryGrants.PREFIX + route.token() + "/", assets = base + "assets/";
-        response.setHeader("X-Frame-Options", null); // CSP frame-ancestors permits only the configured parent.
+        // Servlet containers need not remove a header on setHeader(name, null). Keep a valid fallback;
+        // modern browsers enforce the narrower configured CSP frame-ancestors policy.
+        response.setHeader("X-Frame-Options", "SAMEORIGIN");
         response.setHeader("Content-Security-Policy", "sandbox allow-scripts; default-src 'none'; script-src " + assets
                 + "; style-src 'unsafe-inline' " + assets + "; font-src " + assets + "; img-src data: " + assets
                 + "; connect-src " + base + "api/; base-uri 'none'; object-src 'none'; worker-src 'none'; frame-src 'none'"
