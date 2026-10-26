@@ -21,6 +21,8 @@ final class ExecutionRunReconciliationRepository {
     private final ExecutionRunRepository runs;
     ExecutionRunReconciliationRepository(JdbcTemplate jdbc) { this.jdbc = jdbc; runs = new ExecutionRunRepository(jdbc); }
 
+    ExecutionRun read(UUID owner, UUID project, UUID run) { return locked(owner, project, run); }
+
     View inspect(UUID owner, UUID project, UUID run, String history) {
         if (!hash(history)) throw ExecutionRun.error(422, "RUN_INVALID_INPUT");
         var row = locked(owner, project, run);
@@ -29,25 +31,15 @@ final class ExecutionRunReconciliationRepository {
     }
 
     Audit acknowledge(UUID owner, View expected, String currentHistory, String key) {
-        if (expected == null || expected.run() == null || !hash(expected.historySha256()) || !hash(currentHistory)
-                || key == null || key.isBlank() || key.length() > 128
-                || key.codePoints().anyMatch(c -> Character.isISOControl(c) || c >= 0xd800 && c <= 0xdfff))
-            throw ExecutionRun.error(422, "RUN_INVALID_INPUT");
+        valid(expected, key);
+        if (!hash(currentHistory)) throw ExecutionRun.error(422, "RUN_INVALID_INPUT");
         var original = expected.run();
         eligible(original);
         var current = locked(owner, original.projectId(), original.id());
         if (!owner.equals(original.ownerId()) || !currentHistory.equals(expected.historySha256())) conflict();
         String keyHash = digest(key), confirmation = fingerprint(expected);
-        var prior = jdbc.query("SELECT * FROM execution_run_reconciliations WHERE project_id=? AND (run_id=? OR key_sha256=?)",
-                ROW, original.projectId(), original.id(), keyHash);
-        if (!prior.isEmpty()) {
-            if (prior.size() != 1) conflict();
-            var audit = prior.get(0);
-            if (!audit.runId().equals(original.id()) || !audit.approvedBy().equals(owner) || !audit.keySha256().equals(keyHash)
-                    || !audit.confirmationSha256().equals(confirmation) || !current.status().equals("FAILED")
-                    || current.finishedAt() == null || current.executionPending() || !audit.stoppedSha256().equals(current.stoppedSha256())) conflict();
-            return audit;
-        }
+        var prior = previous(owner, expected, current, keyHash, confirmation);
+        if (prior != null) return prior;
         if (!current.equals(original)) conflict();
         eligible(current);
         UUID id = UUID.randomUUID();
@@ -61,6 +53,31 @@ final class ExecutionRunReconciliationRepository {
         if (jdbc.update("UPDATE execution_runs SET status='FAILED',finished_at=clock_timestamp() WHERE id=? AND status='NEEDS_RECONCILIATION' AND NOT execution_pending",
                 current.id()) != 1) conflict();
         return jdbc.queryForObject("SELECT * FROM execution_run_reconciliations WHERE id=?", ROW, id);
+    }
+
+    /** Read an already committed acceptance, without claiming to re-inspect today's business database. */
+    Audit confirmed(UUID owner, View expected, String key) {
+        valid(expected, key); eligible(expected.run());
+        var current = locked(owner, expected.run().projectId(), expected.run().id());
+        if (!owner.equals(expected.run().ownerId())) conflict();
+        return previous(owner, expected, current, digest(key), fingerprint(expected));
+    }
+    private Audit previous(UUID owner, View expected, ExecutionRun current, String keyHash, String confirmation) {
+        var original = expected.run();
+        var prior = jdbc.query("SELECT * FROM execution_run_reconciliations WHERE project_id=? AND (run_id=? OR key_sha256=?)",
+                ROW, original.projectId(), original.id(), keyHash);
+        if (prior.isEmpty()) return null;
+        if (prior.size() != 1) conflict();
+        var audit = prior.get(0);
+        if (!audit.runId().equals(original.id()) || !audit.approvedBy().equals(owner) || !audit.keySha256().equals(keyHash)
+                || !audit.confirmationSha256().equals(confirmation) || !current.status().equals("FAILED")
+                || current.finishedAt() == null || current.executionPending() || !audit.stoppedSha256().equals(current.stoppedSha256())) conflict();
+        return audit;
+    }
+    private static void valid(View expected, String key) {
+        if (expected == null || expected.run() == null || !hash(expected.historySha256()) || key == null || key.isBlank() || key.length() > 128
+                || key.codePoints().anyMatch(c -> Character.isISOControl(c) || c >= 0xd800 && c <= 0xdfff))
+            throw ExecutionRun.error(422, "RUN_INVALID_INPUT");
     }
 
     private ExecutionRun locked(UUID owner, UUID project, UUID run) {

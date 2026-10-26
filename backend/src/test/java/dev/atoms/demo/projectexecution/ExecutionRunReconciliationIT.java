@@ -36,7 +36,10 @@ class ExecutionRunReconciliationIT {
     @Test void explicitAcknowledgementIsAtomicIdempotentAndPreservesOriginalFailure() {
         var failed = stoppedFailure();
         var view = repository.inspect(fixture.owner, fixture.project, failed.id(), HISTORY);
+        assertThat(repository.read(fixture.owner, fixture.project, failed.id())).isEqualTo(failed);
+        assertThat(repository.confirmed(fixture.owner, view, "confirm-one")).isNull();
         var audit = repository.acknowledge(fixture.owner, view, HISTORY, "confirm-one");
+        assertThat(repository.confirmed(fixture.owner, view, "confirm-one")).isEqualTo(audit);
         assertThat(repository.acknowledge(fixture.owner, view, HISTORY, "confirm-one")).isEqualTo(audit);
         var ended = fixture.repository.get(fixture.project, failed.id());
         assertThat(ended.status()).isEqualTo("FAILED"); assertThat(ended.finishedAt()).isNotNull();
