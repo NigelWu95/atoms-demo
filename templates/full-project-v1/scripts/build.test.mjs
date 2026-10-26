@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdir, mkdtemp, readFile, realpath, symlink, writeFile } from 'node:fs/promises';
+import { chmod, link, mkdir, mkdtemp, readFile, realpath, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -72,4 +72,50 @@ test('symbolic frontend directory is rejected before any command starts', async 
   let calls = 0;
   await assert.rejects(build(root, { run: async () => { calls++; } }));
   assert.equal(calls, 0);
+});
+
+test('explicit private test config reaches only Maven as a path, never npm or child environment', async () => {
+  const root = await fixture();
+  const privateRoot = await realpath(await mkdtemp(join(tmpdir(), 'full-project-test-config-')));
+  const config = join(privateRoot, 'test database.properties');
+  await writeFile(config, 'password=TEST_PASSWORD_CANARY', { mode: 0o600 });
+  const calls = [];
+  await build(root, { args: ['--test-config', config], env: { PATH: '/usr/bin:/bin', APP_TEST_CONFIG: 'ignored',
+    APP_DB_PASSWORD: 'ENV_PASSWORD_CANARY', JAVA_TOOL_OPTIONS: '-Dtest=skip' }, run: async (command, args, options) => {
+    calls.push({ command, args, options });
+    assert.deepEqual(options.env, { PATH: '/usr/bin:/bin' });
+    if (command.endsWith('/mvnw')) await writeFile(join(root, 'backend/target/app.jar'), 'fake-output');
+  } });
+  assert.ok(calls.at(-1).args.includes('-Dfull-project.test-config=' + config));
+  assert.ok(!JSON.stringify(calls.slice(0, -1)).includes(privateRoot));
+  assert.ok(!JSON.stringify(calls).includes('PASSWORD_CANARY'));
+  assert.ok(!calls.at(-1).args.some(arg => arg.includes('skipTests')));
+});
+
+test('invalid flags and non-private test configs fail before any build command', async () => {
+  const root = await fixture();
+  const privateRoot = await realpath(await mkdtemp(join(tmpdir(), 'full-project-invalid-config-')));
+  const config = join(privateRoot, 'test.properties');
+  await writeFile(config, 'purpose=test', { mode: 0o600 });
+  const symbolic = join(privateRoot, 'symbolic.properties');
+  await symlink(config, symbolic);
+  const internal = join(root, 'test.properties');
+  await writeFile(internal, 'purpose=test', { mode: 0o600 });
+  const publicFile = join(privateRoot, 'public.properties');
+  await writeFile(publicFile, 'purpose=test', { mode: 0o600 });
+  await chmod(publicFile, 0o644);
+  const empty = join(privateRoot, 'empty.properties');
+  await writeFile(empty, '', { mode: 0o600 });
+  const oversized = join(privateRoot, 'large.properties');
+  await writeFile(oversized, 'x'.repeat(16 * 1024 + 1), { mode: 0o600 });
+  const hardlink = join(privateRoot, 'hardlink.properties');
+  await link(config, hardlink);
+  for (const args of [['--skip-tests'], ['--test-config'], ['--test-config', 'relative.properties'],
+    ['--test-config', symbolic], ['--test-config', internal], ['--test-config', publicFile],
+    ['--test-config', empty], ['--test-config', oversized], ['--test-config', hardlink],
+    ['--test-config', config, '--skip-tests'], ['--test-config', privateRoot]]) {
+    let calls = 0;
+    await assert.rejects(build(root, { args, run: async () => { calls++; } }));
+    assert.equal(calls, 0, 'configuration must be rejected before dependency installation');
+  }
 });

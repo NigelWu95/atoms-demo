@@ -17,6 +17,14 @@ node --test scripts/process.test.mjs scripts/build.test.mjs scripts/start.test.m
 node scripts/build.mjs
 ```
 
+含数据库业务测试的工程应显式传入工程目录之外、当前用户拥有且权限为 0600 的测试配置：
+
+```sh
+node scripts/build.mjs --test-config /absolute/private/test.properties
+```
+
+脚本仅向 Maven/Java 测试传递该文件路径，不向 npm 传递数据库配置或环境变量，不支持跳过测试。测试配置的用途与实际数据库由工程自身测试再次检查；不能用运行数据库代替独立测试库。无数据库的初始化 MVC 测试可以使用无参数构建。
+
 若解压工具未保留执行位，先执行 `chmod u+x backend/mvnw`。配置样例见 `config/application.properties.example`，复制到工程外并设置 0600 权限后再填入运行值。
 
 构建依次执行脚本测试、`npm ci --ignore-scripts`、前端类型/代码/组件检查与生产构建，再将前端产物复制到新的临时资源目录，执行 Maven `clean verify` 并打包 `backend/target/app.jar`。任一阶段失败即停止，不跳过测试。前端构建产物作为 JAR 的 `static/` 资源，不重写源文件。中间临时资源保留供诊断，不自动删除其他目录；只有确认进程结束后再由操作者清理。
