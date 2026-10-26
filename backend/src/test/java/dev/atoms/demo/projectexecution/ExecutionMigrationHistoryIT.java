@@ -12,18 +12,26 @@ import static org.assertj.core.api.Assertions.*;
 class ExecutionMigrationHistoryIT {
     Path directory;
     static final UUID A = ExecutionBindingContractIT.A, B = ExecutionBindingContractIT.B;
-    @BeforeEach void explicitTarget() {
+    final Map<UUID, ExecutionMigrationHistory.Snapshot> businessBefore = new HashMap<>();
+    @BeforeEach void explicitTarget() throws Exception {
         String value = System.getProperty("execution.test-config-directory");
         assertThat(value).as("Explicit approved database configuration directory").isNotBlank(); directory = Path.of(value);
+        for (UUID project : List.of(A, B)) businessBefore.put(project, registry().history(project, budget()));
     }
-    @Test void completeInspectionConfirmsEmptyBusinessSchemasWithoutWriting() throws Exception {
+    @AfterEach void businessHistoriesRemainUnchanged() throws Exception {
+        for (var entry : businessBefore.entrySet()) assertThat(registry().history(entry.getKey(), budget())).isEqualTo(entry.getValue());
+    }
+    @Test void completeInspectionReadsExistingBusinessAndEmptyTestSchemasWithoutWriting() throws Exception {
         var registry = registry();
         for (UUID project : List.of(A, B)) {
             var first = registry.history(project, budget());
-            assertThat(first.state().exists()).isFalse(); assertThat(first.state().objects()).isZero();
-            assertThat(first.state().applied()).isEmpty();
+            assertThat(first).isEqualTo(businessBefore.get(project));
             assertThat(registry.history(project, budget())).isEqualTo(first);
             assertThat(first.binding()).isEqualTo(registry.verify(project, budget()));
+        }
+        try (var db = fixture()) {
+            var empty = ExecutionMigrationHistory.read(db, budget());
+            assertThat(empty.exists()).isFalse(); assertThat(empty.objects()).isZero(); assertThat(empty.applied()).isEmpty();
         }
     }
     @Test void readsRealPostgresHistoryAndDetectsChangedFailedAndPartialUpgradeStates() throws Exception {
@@ -44,7 +52,6 @@ class ExecutionMigrationHistoryIT {
                         .hasMessage("RUN_MIGRATION_INCOMPATIBLE");
             } finally { db.rollback(); }
         }
-        assertThat(registry().history(B, budget()).state().objects()).isZero();
     }
     @Test void refusesAViewInsteadOfHistoryAndDetectsNonTableSchemaObjects() throws Exception {
         try (var db = fixture()) {
@@ -90,7 +97,6 @@ class ExecutionMigrationHistoryIT {
                 assertThatThrownBy(() -> ExecutionMigrationHistory.read(db, budget())).hasMessage("RUN_MIGRATION_HISTORY_INVALID");
             } finally { db.rollback(); }
         }
-        assertThat(registry().history(B,budget()).state().objects()).isZero();
     }
     @Test void schemaWithOnlyACollationIsNotAnEmptyInitializationTarget() throws Exception {
         try (var db=fixture()) {
@@ -103,13 +109,16 @@ class ExecutionMigrationHistoryIT {
                         .hasMessage("RUN_MIGRATION_INCOMPATIBLE");
             } finally { db.rollback(); }
         }
-        assertThat(registry().history(B,budget()).state().objects()).isZero();
     }
     private Connection fixture() throws Exception {
-        var config = ExecutionPrivateConfig.readBusiness(file("atoms_exec_b_app_20261020"), List.of());
-        assertThat(registry().history(B, budget()).state().objects()).as("Never overwrite existing application state").isZero();
-        var db = DriverManager.getConnection(config.jdbcUrl(), config.inspectionProperties(5)); db.setReadOnly(false); db.setAutoCommit(false);
-        return db;
+        // Synthetic history is confined to the already-approved test DB and rolled back, never the populated business DB.
+        var config = ExecutionPrivateConfig.read(file("atoms_exec_b_test_20261020"), List.of());
+        var db = DriverManager.getConnection(config.jdbcUrl(), config.inspectionProperties(5));
+        try {
+            db.setReadOnly(false); db.setAutoCommit(false);
+            assertThat(ExecutionMigrationHistory.read(db, budget()).objects()).as("Never overwrite an occupied test schema").isZero();
+            return db;
+        } catch (Exception | AssertionError failure) { db.close(); throw failure; }
     }
     private void createHistory(Connection db) throws SQLException {
         try (var command = db.createStatement()) {

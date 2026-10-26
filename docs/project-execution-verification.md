@@ -1986,3 +1986,10 @@ EX27 和 C-EX09 完成。EX28–30 的组合故障验证、全量兼容回归及
 21:11:39，`sh .local/run-ex22-checks.sh ex22-ex28d-restored.log -Dtest=ExecutionSettingsTest,ExecutionRuntimeDispatcherTest,ExecutionRunReconciliationTest -Dit.test=ExecutionSnapshotIT,ExecutionCancellationIT,ExecutionMigrationReviewIT,ExecutionQueryIT verify` 的 **35 单元 + 29 集成**通过，零失败/错误/跳过，1:18。只读审计仍为 110 条运行全部终结、容量占位/协调锁为零，3 条迁移批准和 1 条核对审计保留，原 A/B 绑定与五份旧未决审计未改。9 项真实私有值对本轮后端差异、日志及平台 JAR classes 扫描零匹配。证据 `.local/ex28d-evidence-1a7z_td1`，0700/0600。
 
 EX28 完成，只新增测试并复用测试夹具，生产代码未变。EX29 前端类型/lint/format、372 单测、build 及 Python 11 项先通过；默认浏览器命令随后暴露未启动测试后端且端口不匹配的前置配置问题，22 项失败报告保留 `.local/ex29-browser-precondition-failure`。该问题由 EX29a 修正测试服务器配置后复验，不计为已通过浏览器验收。完整后端、离线 CLI 与最终维护文档仍待 EX29–30。
+
+
+## 2026-10-26 · EX29 迁移历史夹具适配已升级业务库
+
+EX27 已将原 A/B 业务库升级为 V2 并保存待办数据。旧 `ExecutionMigrationHistoryIT` 仍要求空业务库，不能直接重复执行其合成历史测试。先单独运行只读空库断言，准确得到 1 项断言失败、零错误，保留 `.local/ex29-history-empty-assumption`。随后仅修改该测试文件：从已批准 B 测试库加载 `test` 用途配置，先确认 schema 为空，合成表/视图/类型/迁移异常全部在事务中回滚；每项前后只读比较 A/B 业务历史一致。仍验证空 schema、失败/部分迁移、超量/非法列、行安全、仅 collation 等拒绝路径，没有删表、clean/repair 或改变业务库。
+
+21:53:16，`sh .local/run-ex22-checks.sh ex22-ex29-history-green.log -Dtest=ExecutionMigrationPolicyTest,ExecutionMigrationsTest -Dit.test=ExecutionMigrationHistoryIT,ExecutionBindingContractIT,ExecutionRuntimeLaunchContractIT -Dexecution.test-config-directory=/Users/wubingheng/atoms-demo/.local/project-execution-acceptance.x5cvui -Pproject-execution-contract verify` 的 **6 单元 + 13 集成**通过，零失败/错误/跳过，1:25。报告和失败证据归档 `.local/ex29-history-evidence-9ppg_3xe`，0700/0600。生产代码无改动；本条不替代后续完整后端回归。
