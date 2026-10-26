@@ -58,7 +58,7 @@ final class ExecutionTodoFixture implements AutoCloseable {
                     .withProperty("atoms.project-execution.root", root.resolve("execution").toString())
                     .withProperty("atoms.project-execution.policy", approval.toString())
                     .withProperty("atoms.project-execution.test-databases", new ObjectMapper().writeValueAsString(Map.of(base.projectId().toString(), privateConfig.toString())));
-            runtime = runtime(config, projects, transactions);
+            runtime = runtime(config, source, jdbc, database, projects, transactions);
         } catch (Exception | Error failure) { source.close(); throw failure; }
     }
 
@@ -95,7 +95,8 @@ final class ExecutionTodoFixture implements AutoCloseable {
         assertThat(testDatabase.verify(base.projectId(), new ExecutionProcess.Deadline(Duration.ofSeconds(15)))).isEqualTo(originalDatabase);
     }
 
-    private AnnotationConfigApplicationContext runtime(MockEnvironment config, ProjectService projects, PlatformTransactionManager transactions) {
+    static AnnotationConfigApplicationContext runtime(MockEnvironment config, SourceAgentFixture source, JdbcTemplate jdbc,
+            DataSource database, ProjectService projects, PlatformTransactionManager transactions) {
         var context = new AnnotationConfigApplicationContext();
         try {
             context.setEnvironment(config);
