@@ -9,6 +9,8 @@ backend/src/main/java/dev/atoms/generated/HealthController.java
 backend/src/main/resources/application.yml
 backend/src/main/resources/db/migration/V001__application_metadata.sql
 backend/src/test/java/dev/atoms/generated/HealthControllerTest.java
+backend/src/test/java/dev/atoms/generated/PrivateTestDatabase.java
+backend/src/test/java/dev/atoms/generated/PrivateTestDatabaseTest.java
 config/application.properties.example
 frontend/.npmrc
 frontend/dev/boundary.spec.ts

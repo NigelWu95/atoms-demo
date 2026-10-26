@@ -28,7 +28,7 @@ class FullProjectTemplatePackagingIT {
             }
         };
         var source = new FullProjectTemplateCatalog(loader).load();
-        assertThat(source.files()).hasSize(35);
+        assertThat(source.files()).hasSize(37);
         assertThat(new FullProjectTemplateCatalog().load().sha256()).isEqualTo(source.sha256());
         var factory = DocumentBuilderFactory.newInstance();
         factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
@@ -78,7 +78,7 @@ class FullProjectTemplatePackagingIT {
             assertThat(process.waitFor(30, TimeUnit.SECONDS)).isTrue();
             assertThat(process.exitValue()).isZero();
             var tree = new FullProjectTemplateCatalog().load();
-            assertThat(Files.readString(output)).isEqualTo("full-project-v1 " + tree.sha256() + " 35\n");
+            assertThat(Files.readString(output)).isEqualTo("full-project-v1 " + tree.sha256() + " 37\n");
         } finally { if (process.isAlive()) process.destroyForcibly().waitFor(); }
     }
 }

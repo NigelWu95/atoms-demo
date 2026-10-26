@@ -227,7 +227,7 @@ class ExecutionNpmPolicyTest {
             files.add(new SourceTree.File(name, Files.readAllBytes(Path.of("../templates/full-project-v1").resolve(name)),
                     name.equals("backend/mvnw") ? 0100755 : 0100644));
         var policy = new ExecutionNpmPolicy(Files.readAllBytes(Path.of("src/main/resources/projectexecution/seed-dependency-policy.json")));
-        assertThat(files).hasSize(35);
+        assertThat(files).hasSize(37);
         assertThat(policy.checkBuild(new ProjectSourcePolicy().validate(files)).packages()).isEqualTo(237);
     }
 

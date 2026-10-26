@@ -201,6 +201,8 @@
           <include>backend/src/main/resources/application.yml</include>
           <include>backend/src/main/resources/db/migration/V001__application_metadata.sql</include>
           <include>backend/src/test/java/dev/atoms/generated/HealthControllerTest.java</include>
+          <include>backend/src/test/java/dev/atoms/generated/PrivateTestDatabase.java</include>
+          <include>backend/src/test/java/dev/atoms/generated/PrivateTestDatabaseTest.java</include>
           <include>config/application.properties.example</include>
           <include>frontend/.npmrc</include>
           <include>frontend/dev/boundary.spec.ts</include>

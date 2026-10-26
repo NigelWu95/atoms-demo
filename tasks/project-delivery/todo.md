@@ -7,11 +7,11 @@
   - 文件：模板 `scripts/build.mjs`、`build.test.mjs`、README；验证 N：脚本次序、拒绝非法文件/参数、环境和参数泄漏检查。
   - 证据：`.local/delivery-pd01-red.log` 两项新增失败复现缺口；`.local/delivery-pd01-green.log` 全部 14 个脚本测试通过。只证明参数和执行边界，真实 Java 配置/下载构建待 PD02/03/13。
   - 模板打包检查发现新增测试占位符不在已有源码策略白名单，改用已有 `RUNTIME_CANARY`，未放宽策略。`.local/ex22-delivery-pd01-template-fixed.log` 模板单测 5 项、真实 Boot JAR 模板打包检查 2 项通过；原失败日志保留。
-- [ ] **PD02：可移植 Java 测试配置**（PD01；至多 5 文件）
+- [x] **PD02：可移植 Java 测试配置**（PD01；拆为 PD02a/b）
   - 模板测试辅助类读取显式 test 配置，检查真实数据库/角色/schema、非超级用户、用途标记与空 schema；初始化 MVC 测试仍不需要 DB。
   - 文件：模板测试辅助类及测试、目录清单、平台 POM、模板断言；验证 J：模板清单/打包一致性及配置拒绝路径。超出五文件时拆成 PD02a/b。
   - [x] PD02a：独立 Java 配置辅助类及 4 个文件边界测试。`.local/delivery-pd02-red.log` 记录实现前失败；沙箱 JVM 自附加失败原日志保留，使用隔离 JDK 在主机重跑 `.local/delivery-pd02-green-host.log`，8 个模板 Java 测试全部通过。真实 DB 身份检查待 PD03。
-  - [ ] PD02b：两份测试源纳入清单/POM，更新三个实际目录/种子断言，共五个文件；检查真实 Boot JAR 模板打包及依赖策略。不得跳过新增测试或改变旧快照。
+  - [x] PD02b：两份测试源纳入清单/POM，更新三个实际目录/种子断言，共五个文件；`.local/ex22-delivery-pd02-template.log` 模板/依赖策略及真实 Boot JAR 打包检查通过。原生完整种子构建尚未重跑，不将断言更新视为原生通过。
 - [ ] **PD03：待办样本和 worker 接入**（PD02；至多 5 文件）
   - 新待办版本去掉固定 A/B 名称，worker 传显式测试配置路径；独立脚本可使用 B_test，事务回滚，业务配置被拒绝。
   - 文件：ExecutionPrivateConfig、相关测试、待办测试样本、原生契约辅助入口；验证 J + A 定向配置与业务测试。记录新快照，不改旧版本。

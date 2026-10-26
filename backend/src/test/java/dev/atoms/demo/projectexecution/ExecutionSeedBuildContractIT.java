@@ -78,8 +78,8 @@ class ExecutionSeedBuildContractIT {
                 assertThat(manifest.path("sourceVersionId").asText()).isEqualTo(base.versionId().toString());
                 assertThat(manifest.path("treeSha256").asText()).isEqualTo(seed.sha256());
                 assertThat(manifest.at("/evidence/frontend/tests").asInt()).isPositive();
-                // Two baseline health checks plus two managed-runtime identity checks.
-                assertThat(manifest.at("/evidence/javaTests/tests").asInt()).isEqualTo(4);
+                // Four health/identity checks and four private test-configuration checks.
+                assertThat(manifest.at("/evidence/javaTests/tests").asInt()).isEqualTo(8);
                 String digest = sha256(artifact.resolve("app.jar"));
                 assertThat(manifest.path("jarSha256").asText()).isEqualTo(digest);
                 assertThat(jdbc.queryForObject("SELECT jar_sha256 FROM execution_builds WHERE id=?", String.class, success.id())).isEqualTo(digest);
@@ -174,7 +174,7 @@ class ExecutionSeedBuildContractIT {
         for (String name : Files.readAllLines(Path.of("../templates/full-project-v1.files")))
             files.add(new SourceTree.File(name, Files.readAllBytes(Path.of("../templates/full-project-v1").resolve(name)),
                     name.equals("backend/mvnw") ? 0100755 : 0100644));
-        assertThat(files).hasSize(35);
+        assertThat(files).hasSize(37);
         return new ProjectSourcePolicy().validate(files);
     }
     private static SourceTree brokenSeed(SourceTree seed, String failure) {
