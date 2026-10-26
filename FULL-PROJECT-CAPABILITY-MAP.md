@@ -1,16 +1,16 @@
 # 完整源码工程与 Coding Agent · 能力地图
 
-状态：2026-10-26，`project-source` 内部模块及 `project-agent` 的 PA01–PA33 离线能力已验收；`project-execution` 的 EX01–22、C-EX07 已完成，内部常驻调度、停止、换版、启动恢复及故障收尾已接通。停止等待修复在用户批准的新 schema 完成复验，552 单元 + 95 项相关集成通过，详见[记录](docs/project-execution-verification.md#2026-10-26--ex22-整项收尾)；五份旧未决审计全部保留。下一项 EX23 交付身份契约。新模式默认关闭，真实模型、完整业务应用验收、交付和工作台接入仍待完成，未部署。
+状态：2026-10-27，源码模块、Agent PA01–PA33 离线能力及执行模块 EX01–30 / C-EX10 已完成内部验收。两个真实 Vue/Java/SQL 应用的 V1/V2 构建、HTTP、独立 PG、准确迁移批准、重启持久化及失败迁移核对通过；完整兼容回归和原生契约已收口，见[执行记录](docs/project-execution-verification.md)和[维护说明](docs/project-execution.md)。新模式默认关闭，真实模型、网页交付、工作台接入及部署尚未完成；旧未决审计保留。
 
 ## 目标与现状
 
-执行模块现已接通源码就绪检查、私有测试库装配和 Spring 生命周期：队列取消/到期/权限变化原子结算，默认 1、最多 4 个 worker，已领取/待核对任务保留容量等待实际停止。修复了扫描途中容量释放导致后项超车的问题。真实原始种子构建包含 15 项前端、2 项 Java 测试和实际 JAR；前端失败、Java 编译失败的后续版本均保留旧产物，关闭后资源可重新取得，详见[证据](docs/project-execution-verification.md#2026-10-24--ex12c2b2b-spring-调度与原生组合验收)。网页仍使用原有链路，页面按钮和本机应用启动尚待后续接入。
+执行模块现已接通源码就绪检查、私有测试库装配和 Spring 生命周期：队列取消/到期/权限变化原子结算，默认 1、最多 4 个 worker，已领取/待核对任务保留容量等待实际停止。修复了扫描途中容量释放导致后项超车的问题。EX12 阶段的原始种子构建包含 15 项前端、2 项 Java 测试和实际 JAR；前端失败、Java 编译失败的后续版本均保留旧产物，关闭后资源可重新取得，详见[证据](docs/project-execution-verification.md#2026-10-24--ex12c2b2b-spring-调度与原生组合验收)。EX29 补验当前种子已包含 15 项前端和 4 项 Java 测试，两个损坏后续版本仍被拒绝。网页仍使用原有链路，页面按钮和本机应用启动尚待后续接入。
 
 平台重启先核对中断构建：未启动或已有明确停止记录的非封存阶段可以结束并释放名额；结果丢失和封存/提交间隙保留待核对，不自动重跑。成功终态和旧产物不变，恢复未决时不启动新构建。该行为通过独立 JVM 异常退出、另一个全新 JVM 恢复验证，见[恢复证据](docs/project-execution-verification.md#2026-10-24--ex13c-真实-jvm-崩溃与重新启动)。
 
 让用户描述需求后得到可持续修改的完整 Vue + Spring Boot 17 + PostgreSQL 工程，包含实际前端、后端业务接口和数据库迁移。预览运行该工程的构建结果，下载提供对应的同一份源码快照。
 
-当前网页生成链路仍是模型生成 `view.html`、`styles.css`、`main.js`，数据库保存不可变产物，再与固定工程模板组装。新源码模块已能在磁盘 Git 管理完整 Vue/Java/SQL 树及增量版本，内部 Claude Code 适配器已通过真实 CLI + 假模型服务的两轮编辑与恢复验收，执行 worker 已能实际构建完整种子工程。真实 DeepSeek、新工程常驻运行和网页接入尚未完成。已有工程下载和本机运行不等于网页已经支持任意后端业务代码生成。
+当前网页生成链路仍是模型生成 `view.html`、`styles.css`、`main.js`，数据库保存不可变产物，再与固定工程模板组装。新源码模块已能在磁盘 Git 管理完整 Vue/Java/SQL 树及增量版本，内部 Claude Code 适配器已通过真实 CLI + 假模型服务的两轮编辑与恢复验收，执行 worker 已能实际构建完整种子工程。真实 DeepSeek 和网页接入尚未完成；新工程常驻运行已完成内部实际业务验收。已有工程下载和本机运行不等于网页已经支持任意后端业务代码生成。
 
 原有固定模板能力与验收记录保留在 [原能力地图](CAPABILITY-MAP.md)。本地图描述新模式，不追溯修改旧模式的功能及安全结论。
 
@@ -18,7 +18,7 @@
 |---|---|---|---|
 | `project-source` | 每项目完整源码 Git 仓库、不可变版本、工作副本、元数据、旧产物显式导入 | 现有项目身份与所有权 | 内部模块已验收、默认关闭；[使用说明](docs/project-source.md)、[测试证据](docs/project-source-verification.md)、[任务清单](tasks/project-source/todo.md) |
 | `project-agent` | Claude Code + DeepSeek 在任务副本中读取及修改 Vue、Java、SQL 等文件，提交可检查的变更 | `project-source` | PA01–PA33 内部离线验收完成，默认 4 并发；最终后端 290 单元 + 272 集成通过，CLI 2.1.302 / 2.1.303 精确适配。见[维护说明](docs/project-agent.md)、[证据](docs/project-agent-verification.md)、[任务清单](tasks/project-agent/todo.md)。真实模型 PA-LIVE 未完成，旧两份测试未决审计保留；不代表实际构建运行或工作台已交付 |
-| `project-execution` | 对固定源码版本测试、构建、启动本机进程；构建失败保留上一可用结果，数据库迁移另行核对 | `project-source` | [规格](SPEC-project-execution.md)、[实施计划](tasks/project-execution/plan.md)与 [EX 任务清单](tasks/project-execution/todo.md)已确认；EX01–22 完成。真实种子构建、npm 准备、业务库绑定、内部常驻启动/健康/停止/换版、恢复与故障收尾已验收，见[证据](docs/project-execution-verification.md#2026-10-26--ex22-整项收尾)。完整业务应用、交付身份/查询及网页尚待完成 |
+| `project-execution` | 对固定源码版本测试、构建、启动本机进程；构建失败保留上一可用结果，数据库迁移另行核对 | `project-source` | EX01–30 与 C-EX10 已完成，实际业务应用及两轮前后端版本、迁移/失败核对、重启持久化、交付身份、有界查询和原链路回归均已内部验收。[维护说明](docs/project-execution.md)、[任务](tasks/project-execution/todo.md)、[证据](docs/project-execution-verification.md)。网页预览/下载及工作台尚未接入 |
 | `project-delivery` | 实际应用预览、同快照下载、代码版本恢复；明确业务数据边界 | `project-source`、`project-execution` | 待规格评审 |
 | `project-workbench` | 文件树、差异、任务与构建状态、实际进程预览及增量开发入口 | 以上模块 | 待规格评审 |
 

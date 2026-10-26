@@ -78,7 +78,8 @@ class ExecutionSeedBuildContractIT {
                 assertThat(manifest.path("sourceVersionId").asText()).isEqualTo(base.versionId().toString());
                 assertThat(manifest.path("treeSha256").asText()).isEqualTo(seed.sha256());
                 assertThat(manifest.at("/evidence/frontend/tests").asInt()).isPositive();
-                assertThat(manifest.at("/evidence/javaTests/tests").asInt()).isEqualTo(2);
+                // Two baseline health checks plus two managed-runtime identity checks.
+                assertThat(manifest.at("/evidence/javaTests/tests").asInt()).isEqualTo(4);
                 String digest = sha256(artifact.resolve("app.jar"));
                 assertThat(manifest.path("jarSha256").asText()).isEqualTo(digest);
                 assertThat(jdbc.queryForObject("SELECT jar_sha256 FROM execution_builds WHERE id=?", String.class, success.id())).isEqualTo(digest);

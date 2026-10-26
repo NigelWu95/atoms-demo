@@ -1,6 +1,6 @@
 # 完整工程执行 · 验证记录
 
-本模块依据[已确认规格](../SPEC-project-execution.md)及[EX 任务清单](../tasks/project-execution/todo.md)实施。仅记录实际运行过的检查，不以计划、假子进程或历史通过数替代完整工程构建/业务验收。当前尚无真实生成应用构建/运行结论，日常开关未启用。
+本模块依据[已确认规格](../SPEC-project-execution.md)及[EX 任务清单](../tasks/project-execution/todo.md)实施。仅记录实际运行过的检查，不以计划、假子进程或历史通过数替代完整工程构建/业务验收。截至 2026-10-27，受控完整 Vue/Java/SQL 样本的内部构建、本机运行、两版业务和失败恢复已验收，EX01–30 完成；各类原生/模拟/浏览器证据分别列出。真实模型生成、新网页交付与部署仍未验收，日常开关未启用。
 
 ## 2026-10-20 · EX01 配置
 
@@ -2004,3 +2004,100 @@ EX27 已将原 A/B 业务库升级为 V2 并保存待办数据。旧 `ExecutionM
 命令工作目录 `frontend`，均显式指定项目隔离 JDK 17.0.14、Node 24.20.0 PATH、EX22 测试 schema 和 `CI=1`，分别执行 `npm run test:e2e` 与 `npm run test:e2e:runtime`；服务器由 Playwright 启停，没有连接日常用户会话。此前 `npm run typecheck/lint/format:check/test:unit/build` 全部通过，其中 **54 文件、372 前端单测**；测试配置修改后再次运行 typecheck/lint/format 均通过。Python 工作副本 helper 的 **11 项**通过。归档 `.local/ex29-browser-evidence-tok2o_sz`，含日志与截图；最初失败归档 `.local/ex29-browser-precondition-failure` 单独保留，未混为通过。
 
 整体后端回归在此后串行开始，同时开启普通执行契约和离线 CLI profile。已通过且生产代码未变的原生种子/锁准备/待办构建与业务迁移契约分别引用原 EX11–27 证据；不会清空已有 V2 业务库来重跑 V1 初始化，也不把默认排除/跳过计作本轮通过。最终完整命令、计数及证据关联在后续记录列明。
+
+
+## 2026-10-26 · EX29b 完整后端与离线 CLI 回归
+
+22:44:18，完整后端 **591 单元 + 591 集成**通过，零失败/错误/跳过，43:09。本轮基于 `9eebcc3`，生产代码相对真实失败迁移验收的 `06f3ec5` 无差异；仅增加故障反例、适配隔离测试夹具和修正浏览器启动配置。包含实际 CLI 的 `AgentCliContractIT` 5 项、`AgentCliJourneyContractIT` 1 项和 `AgentCliBoundaryContractIT` 1 项，全部使用 loopback 假上游，未调用真实 DeepSeek。
+
+```sh
+sh .local/run-ex22-checks.sh ex22-ex29-full.log \
+  -Pproject-execution-contract,agent-cli-contract \
+  '-Dit.test=*IT,!ExecutionSeedBuildContractIT,!ExecutionTodoBackendContractIT,!ExecutionApplicationContractIT,!ExecutionApplicationUpgradeIT,!ExecutionApplicationMigrationFailureIT,!ExecutionLockPreparationContractIT' \
+  -Dexecution.test-config-directory=/Users/wubingheng/atoms-demo/.local/project-execution-acceptance.x5cvui \
+  -Dexecution.contract-directory=/private/tmp/atoms-ex11-contract.APT7Jb \
+  -Dexecution.runtime-fixture-root=/Users/wubingheng/atoms-demo/.local/project-runtime-ex22-6kc9y53e \
+  -Datoms.agent.test.cli=/Users/wubingheng/atoms-demo/.local/ex11-cli-2.1.303.XX2V2d/node_modules/@anthropic-ai/claude-code-darwin-x64/claude \
+  verify
+```
+
+runner 仍使用项目内 JDK 17.0.14、Node 24.20.0 和 `atoms_verify_20261025_ex22` 测试 schema，Maven 离线执行。实际 CLI 摘要仍为 `6c5d63b43568c5d60963d40f05b0087cb03ba44a90740d27adc505f4157806db`。收集器逐一核对本轮日志、XML 计数和报告时间，并将已执行 IT 类名与源码列表扣除上述 6 项后的集合比较，确认无遗漏；不是依靠 target 中的旧报告汇总。9 项真实私有值对日志、报告、当前差异和平台 JAR classes 扫描零匹配。归档 `.local/ex29-full-evidence-3vlflcc_`，0700/0600，保留脚本、报告与汇总。
+
+上述显式分离的 6 类原生契约中，种子、npm 锁准备和待办前后端构建可重复，正在本轮另行复验，以覆盖 EX27c0 的批量 Git 读取改动；结果单独记录。三个有状态业务契约沿用 EX27b、EX27c1、EX27c2c 的实际 V1→V2→失败升级/恢复证据，原业务数据及迁移历史必须保留，不能重置再造结果。普通回归包含真实业务库 V2 上的迁移历史只读检查和原运行故障探针。
+
+
+### 原生复验发现的旧种子测试计数
+
+本轮首个种子构建已实际成功，源码、Vue 15 项测试、Java 4 项测试、JAR 与清单均已产生。但外层 `ExecutionSeedBuildContractIT` 仍要求 Java 测试数为 2，在行 81 准确失败（1 断言失败、零错误）。来源已核对：`0c9ebe1` 为模板健康响应加入运行身份，同时增加“独立启动不伪造身份”和“错误身份拒绝”两项测试；种子契约中的旧计数遗漏更新。不是忽略失败用例，也不是工程的 4 项测试有失败。首份 XML/text 保留 `.local/ex29-native-seed-count-failure`；本轮尚不能据此宣称种子故障版本验收完成。
+
+待办样本的 Java 10/11 项计数包含这 4 项健康测试，断言仍正确。当前原生批次继续完成待办及锁准备，结束后再修改种子契约为准确的 4 项，并完整复跑种子成功/前端失败/Java 失败组合。生产源码与模板均不修改，首次失败和最终复验结果分别记录。
+
+
+### 首轮原生结果与网络失败定位
+
+23:41:52，首轮原生批次结束：**4 单元通过；5 契约中 3 通过、1 断言失败、1 错误，零跳过**，56:32。两个待办版本组合和真实 npm 锁准备通过；种子外层旧计数失败；过期写入变异工程虽然被执行器拒绝，但因预期测试报告不存在而报错，不能将此当作业务反例已验收。
+
+变异构建 `e17b8839-ae1a-428f-a59b-64ca28048d20` 的 Java target 只有空报告目录，尚无编译产物。其独立 Maven 缓存中 `org.sonatype.plexus:plexus-build-api:0.0.7` 的 `.lastUpdated` 明确记录下载传输超时，与编译前退出相符。没有修改 registry、代理、证书校验或依赖版本；后续仅原样复跑该业务反例。另将种子契约的准确 Java 测试数修正为 4，保留成功源码/JAR核验和两个损坏版本必须拒绝的断言。
+
+已通过的四份实际待办构建如下（前端 / Java 测试数）：
+
+| 样本 | 测试数 | 构建 ID | 源码树摘要 |
+|---|---|---|---|
+| Vue + 后端 V1 | 22 / 10 | `2bc3f236-15da-4328-b5e8-d03ed43f5b0b` | `f17d13529edc70c4936cabc73e8b3bc4d569dc2416305033c480a5633cb22f73` |
+| Vue + 后端 V2 | 22 / 11 | `4139be7d-a92e-460a-8d75-fe639b4894c3` | `a786407f59d6ad08be8c77aaad27458c5552b1061c9af5438b5ebc3b4c9363d0` |
+| 后端 V1 | 15 / 10 | `b52f36e5-d235-4725-b4b9-b6493dff129b` | `06d7d025550be9356ab9255006f4bbfa12bf78ddb437bbbec53b01b3b3cf9212` |
+| 后端 V2 | 15 / 11 | `c2350ff3-ad02-454e-9b95-c9d05c28b4d1` | `ef89622a4abdb50c39d73c8eefa45ab844c3c8dfb313a5b6c70daa048e3ab89d` |
+
+两版 Java API、SQL 及 Vue 资源分别进入真实 JAR，资源逐字节比较通过；专用测试库中的表/数据按契约事务回滚。原生 CLI、工具和参数与前述命令相同，首轮命令选择 `-Dtest=ExecutionContractSupportTest` 与 `-Dit.test=ExecutionSeedBuildContractIT,ExecutionLockPreparationContractIT,ExecutionTodoBackendContractIT`，单独启用 `project-execution-contract` 并传入已批准 Node/npm/JDK/Maven 绝对路径。
+
+首轮完整日志、XML、四份成功构建清单/前后端报告和下载超时证据在 `.local/ex29-native-first-evidence-1gau44ac`，0700/0600；XML 与本轮日志计数/时间一致，9 项私有值扫描零匹配（包含这四份 JAR classes）。首次种子成功构建尚未通过其故障版本契约，不列入上表。仅复跑种子完整契约和 `ExecutionTodoBackendContractIT#staleWriteMutationIsRejectedByTheActualBusinessTests`，结果待后续记录。
+
+
+## 2026-10-27 · EX29b 定向复验与最后种子补验
+
+00:04:08，第二批 **4 单元通过，2 契约中 1 通过、1 断言失败，零错误/跳过**，8:06。过期写入变异 `760335f5-5724-4ba0-b772-05b3295db345` 真实执行了 6 项业务测试，恰有预期的 409/200 断言失败，无测试错误；外层契约通过，确认执行器拒绝该工程且没有封存产物。XML 和明确失败方法已核对，原生反例据此完成。
+
+种子这次未到达已修正的计数断言：独立 Maven 缓存记录 Spring Boot `3.5.16` parent POM 下载连接被重置，真实构建返回 `EXECUTION_PROCESS_FAILED`，外层正确拒绝把它当成成功。只读 curl 复查两个出错的 Maven Central 公开地址，均为 HTTP 200（3.775 / 2.505 秒）；没有修改镜像源、代理、证书或工具环境。随后仅原样复跑 `ExecutionSeedBuildContractIT`，不重复已通过的其他契约，不放宽期限。
+
+第二批日志、外层报告、真实变异报告和依赖连接重置记录在 `.local/ex29-native-retry-evidence-zk4nu7un`，0700/0600；失败数保留，不将整批说成绿色。第一批已通过的三项契约与本批通过的一项分别关联，最终种子结果待后续记录。
+
+
+## 2026-10-27 · EX29b 种子通过及最终资源核对
+
+00:18:01，最后种子批次 **4 单元 + 1 原生契约通过**，零失败/错误/跳过，11:37。真实种子包含 15 项前端及 4 项 Java 测试，构建 `9d03d3ab-d2b1-4a3c-bb72-1655b56dc041`，源码版本 `7c08757e-0a58-4cd8-ba71-048f755a57dd`，JAR SHA-256 `5a138a90b75853665c4e98cd04faaafaed262f4d8ff88a8b9d848c88bcfffc20`。后续损坏前端的真实报告为 16 项中 15 通过、1 预期失败；损坏 Java 工程实际进入编译（保留 compiler 输入/输出记录，没有依赖下载错误），两者均被拒绝且无封存产物，原成功源码/JAR 不变。
+
+```sh
+sh .local/run-ex22-checks.sh ex22-ex29-seed-final.log \
+  -Pproject-execution-contract -Dtest=ExecutionContractSupportTest \
+  -Dit.test=ExecutionSeedBuildContractIT \
+  -Dexecution.test-config-directory=/Users/wubingheng/atoms-demo/.local/project-execution-acceptance.x5cvui \
+  -Dexecution.contract-directory=/private/tmp/atoms-ex11-contract.APT7Jb \
+  -Dexecution.contract-node=/Users/wubingheng/.nvm/versions/node/v24.20.0/bin/node \
+  -Dexecution.contract-npm=/Users/wubingheng/.nvm/versions/node/v24.20.0/bin/npm \
+  -Dexecution.contract-java=/Users/wubingheng/atoms-demo/.local/jdk17-comparison.LlvDQi/jdk-17.0.14.jdk/bin/java \
+  -Dexecution.contract-maven=/Users/wubingheng/.m2/wrapper/dists/apache-maven-3.9.11/a2d47e15/bin/mvn \
+  verify
+```
+
+本批证据 `.local/ex29-native-seed-evidence-eqwospn6`，0700/0600，包括 XML、实际清单、前后端报告、失败前端报告及 Java 编译记录。JAR 摘要重新计算一致，报告与本批日志计数/时间匹配，9 项私有值扫描零匹配。最终不同层次的完成证据如下，不将多批重复单元用例相加，也不隐藏两次下载故障和旧计数失败：
+
+| 检查 | 本轮最终依据 |
+|---|---|
+| 全部普通后端、执行 DB 契约、离线 CLI | 10-26 22:44:18 的 591 单元 + 591 集成，全部通过；三项安装版 CLI 类共 7 项，假上游 |
+| 种子成功/两个损坏版本 | 本批 1 项完整契约通过，15 前端 + 4 Java |
+| 真实 npm 锁准备 | 首轮 1 项通过，准备追加源码版本及重复操作保持来源 |
+| 待办后端 V1/V2、Vue V1/V2 | 首轮 2 项通过、四份成功 JAR，各 15/22 前端及 10/11 Java |
+| 真实过期写入反例 | 第二批 1 项通过，明确捕获 409/200 业务断言，拒绝封存 |
+| 有状态业务 V1、V2 升级、失败迁移恢复 | 关联 EX27b / EX27c1 / EX27c2c 的三项真实契约；保留已升级业务数据，不重复 V1 初始化。生产代码和模板相对 `06f3ec5` 无变化 |
+| 平台前端与浏览器 | 372 单元、22 基础 + 49 runtime 浏览器、typecheck/lint/format/build 通过 |
+| 工作副本 Python | 11 项通过 |
+
+最终只读审计 `.local/ex29-readonly-audit.txt`：当前验证库 **126 条运行全部终结，容量占位 0、协调/绑定锁 0**；3 条迁移批准和 1 条核对审计保留，原 A/B 绑定与五份旧未决审计摘要不变。测试端口 8081、5174、18181、18182 无监听；未操作日常进程。没有真实模型/SMTP、私有 env 修改、推送或部署。
+
+## 2026-10-27 · EX30 / C-EX10 维护文档收口
+
+新增 `docs/project-execution.md`，按实际代码列出开关/预算、私有数据库配置、内部入口、状态查询、迁移批准和已停止失败的明确核对；说明代码恢复与数据库恢复不同、本机普通进程不是安全沙箱。同步能力地图、规格、ADR、计划和清单，保留历史计数与失败记录。7 份文档的 71 个本地链接/锚点及 `git diff --check` 通过；任务 ID、未完成状态、配置/接口名称和交付边界人工核对。
+
+EX01–30 和 C-EX10 据上述实际证据完成，结论仅为**完整工程内部构建与本机运行已验收，默认关闭**。`project-delivery` 的实际预览/同快照 ZIP、`project-workbench`、真实 DeepSeek 和远程部署仍待后续，不因内部收口提前声明网页交付完成。
+
+最终收口归档 `.local/ex29-close-evidence-hz0_wxoy`，包含只读审计、文档检查脚本、差异和汇总；30 个任务、10 个检查点及全部勾选状态校验通过。9 项实际私有值对本轮文档/差异及三批原生归档再次扫描，零匹配。原失败证据全部保留。

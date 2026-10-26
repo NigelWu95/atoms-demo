@@ -1,6 +1,6 @@
 # Spec: project-execution · 完整工程受控构建与本机进程
 
-状态：2026-10-26，用户已确认本规格及 §10 三项取舍、[实施计划](tasks/project-execution/plan.md)与[任务清单](tasks/project-execution/todo.md)。EX01–27 与 C-EX09 已完成：两个真实 Vue + Java + SQL 应用的 V1/V2 原生构建、HTTP、独立数据、准确迁移批准、旧代码拒绝及重启持久化均通过；实际失败迁移、明确核对和新协调器启动兼容版本也已通过，见[验收记录](docs/project-execution-verification.md#2026-10-26--ex27c2c-真实失败迁移确认与兼容版本重启)。单次工具探测为已确认的 30 秒，构建总期限仍为 1800 秒。五份旧未决审计保留；EX28–30 仍未完成。新模式默认关闭，网页交付仍未接入。本地闭环范围见 [Agent 规格 §10](SPEC-project-agent.md#10-2026-10-19-完整闭环实施授权)。
+状态：2026-10-27，用户已确认本规格及 §10 三项取舍、[实施计划](tasks/project-execution/plan.md)与[任务清单](tasks/project-execution/todo.md)。EX01–30 与 C-EX10 已完成内部验收：两个真实 Vue + Java + SQL 应用的 V1/V2 构建、HTTP、独立数据、准确迁移批准、重启及失败迁移明确核对通过，组合故障、秘密反例、完整兼容回归和原生补验也已完成，见[验收记录](docs/project-execution-verification.md)。单次工具探测为已确认的 30 秒，构建总期限仍为 1800 秒。五份旧未决审计保留。维护方式见[内部执行说明](docs/project-execution.md)。新模式默认关闭，网页交付仍未接入。本地闭环范围见 [Agent 规格 §10](SPEC-project-agent.md#10-2026-10-19-完整闭环实施授权)。
 
 模块 ID 沿用[能力地图](FULL-PROJECT-CAPABILITY-MAP.md)的 `project-execution`，依赖 `project-source`，不反向依赖 Agent、交付或工作台。上游只读门面 PS21 已完成；当前网页仍走旧固定模板链路。
 
