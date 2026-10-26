@@ -1,6 +1,10 @@
 # 完整工程交付（实施中）
 
-规格和进度分别见 [SPEC-project-delivery.md](../SPEC-project-delivery.md)及[任务清单](../tasks/project-delivery/todo.md)，证据见[验证记录](project-delivery-verification.md)。当前已完成独立构建测试配置、交付设置、内部原进程 HTTP 交换及会话预览授权的创建/撤销管理接口。浏览器资源传输、同快照下载和恢复 API 尚未交付。
+规格和进度分别见 [SPEC-project-delivery.md](../SPEC-project-delivery.md)及[任务清单](../tasks/project-delivery/todo.md)，证据见[验证记录](project-delivery-verification.md)。当前已完成独立构建测试配置、交付设置、原进程 HTTP 交换、会话授权及有界预览 HTTP 接口。真实 Vue 浏览器验收、同快照下载和恢复 API 尚未完成，正式工作台尚未接入。
+
+管理入口为 `POST /api/projects/{projectId}/delivery/runs/{runId}/previews` 和 `DELETE /api/projects/{projectId}/delivery/previews/{previewId}`，沿用登录会话与 CSRF，只接受空对象或无正文。签发结果内的 `iframeUrl` 是短期能力链接，应按秘密处理，不记录进日志或长期存储。
+
+新预览使用独立的精确路径过滤链，不能访问平台会话；原会话从数据库只读检查，不因预览访问续期。Servlet 非阻塞读取/写入与有界线程池共享 30 秒期限；取消后仍未结束的后台工作继续占用名额，实际结束才释放。配置遵循 [Spring Security 多过滤链](https://docs.spring.io/spring-security/reference/6.5/servlet/configuration/java.html#_multiple_httpsecurity_instances)和 [Servlet 异步上下文](https://tomcat.apache.org/tomcat-10.1-doc/servletapi/jakarta/servlet/AsyncContext.html)语义。正式嵌入必须保留 `sandbox="allow-scripts" referrerpolicy="no-referrer"`，实际浏览器兼容性仍待下阶段验证。
 
 ## 平台配置
 

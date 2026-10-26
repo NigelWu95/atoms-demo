@@ -43,3 +43,12 @@
 - `ex22-delivery-pd07b-project-green.log`：4 项注册表单测、3 项实际 owner/PG 集成通过；管理操作可核验项目权限，无需重新取得活跃进程。
 - `ex22-delivery-pd07b-session-green.log`：14 项会话服务/注册表/设置单测通过，原会话失效或配置变化后旧令牌不可恢复，原运行句柄不会换成新进程，写响应后的失权明确返回不确定且不重试。这里模拟 SessionAccess/执行门面；真实登录会话、CSRF 及浏览器验证仍待后续记录。
 - `ex22-delivery-pd07c-http.log`：14 项定向单测、7 项真实 HTTP/PG 会话检查通过。创建/撤销沿用现有 CSRF 链，匿名和跨 owner 被拒绝，不接受 URL/query 或非规范 UUID，重复撤销成功，实际退出使旧授权失效；管理 OPTIONS 没有 Origin null CORS 许可。本组仅模拟执行门面，不启动应用。
+
+## 预览 HTTP 接入
+
+- `ex22-delivery-pd08a-policy-delete.log`：11 项请求/浏览器策略检查通过，包括无正文 DELETE。
+- `ex22-delivery-pd08a-http-admission.log`：15 项单测、14 项真实 HTTP/PG 检查通过。覆盖 HTML、JSON 写入/409、OPTIONS、请求头隔离、慢上传 30 秒截止、断开释放、登录退出和会话不续期。执行返回值受控，尚不是实际 Vue/Java 工程。
+- 前两次 HTTP 失败保留：`ex22-delivery-pd08a-http.log` 发现 Tomcat 不会以 null 移除已有 XFO，改为明确 SAMEORIGIN 后备并由 CSP frame-ancestors 限定父页；`ex22-delivery-pd08a-http-fixed.log` 的并发测试中探测请求抢占慢请求名额，改为等待四个请求实际入场后检查，没有修改容量政策。
+- `ex22-delivery-pd08a-lifecycle.log`：5 项单测通过。被中断仍未退出的 worker 保持名额；实际完成才释放，不能把超时响应覆盖为成功。
+
+测试 URI 拒绝经过实际 Tomcat/Spring firewall；错误 JSON 没有回显令牌。管理路径仍保留原 CSRF/CORS 语义。浏览器能力与下载工程验收分别留待 PD08b/PD13。

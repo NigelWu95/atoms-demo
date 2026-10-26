@@ -48,12 +48,14 @@
     - 项目授权入口已完成：`ex22-delivery-pd07b-project-green.log` 4 项授权注册表单测、3 项实际 owner/PG 集成通过。管理撤销无需重新取得已停止运行的句柄，仍检查维护者、归属、归档和期限。
     - `ex22-delivery-pd07b-session-green.log` 14 项会话服务/注册表/设置单测通过；原会话撤销、配置变化和原句柄失效会撤销授权，响应后写入状态不确定不重试。HTTP 会话与 CSRF 留在 PD07c 验证。
   - [x] PD07c：创建/撤销管理 API 与真实会话/CSRF HTTP 集成。`ex22-delivery-pd07c-http.log` 14 项定向单测、7 项真实 HTTP/PG 会话集成通过；覆盖缺少 CSRF、匿名、跨 owner、非法目标/ID、撤销幂等、实际退出后授权永久失效。执行门面在此 HTTP 测试中模拟，实际进程证据见 PD06。
-- [ ] **PD08a：预览 HTTP 与浏览器策略**（PD07；至多 5 文件）
+- [x] **PD08a：预览 HTTP 与浏览器策略**（PD07；至多 5 文件）
   - 精确 stateless 过滤链、CSP sandbox、Origin null CORS/OPTIONS；16/4 交换容量；不转发平台或上游敏感头，错误不回显令牌。
   - 文件：preview controller、security configuration、header policy、边界测试；验证 J：管理 CSRF/CORS 不被放宽，取消释放容量。
   - 拆为 PD08a1 纯请求/响应浏览器策略、PD08a2 异步有界 HTTP 接入及生命周期验证，避免在一组修改中同时引入策略与并发状态处理。
   - [x] PD08a1：`ex22-delivery-pd08a-policy-delete.log` 11 项策略检查通过；确切令牌的 assets/api CSP、无凭据 Origin null、请求头白名单、预检、非法路径与无正文 DELETE。此步尚未注册预览过滤链。
     - HTTP 验证发现 Tomcat 不以 `setHeader(name, null)` 移除已有 XFO；改为 `SAMEORIGIN` 后备，现代浏览器由明确 CSP frame-ancestors 约束。`ex22-delivery-pd08a-http-fixed.log` 中该项已通过，整组因并发测试自身入场竞争未通过，保留失败证据并另行修正测试同步。
+  - [x] PD08a2：`ex22-delivery-pd08a-http-admission.log` 15 项单测与 14 项真实 HTTP/PG 集成通过；严格过滤链、JSON 409、无凭据转发、30 秒慢上传、断开释放、管理 CSRF、不续期、firewall 错误不回显令牌。并发测试等待四个实际入场完成，避免探测请求抢占名额。
+  - `ex22-delivery-pd08a-lifecycle.log` 5 项单测通过；客户端已超时但 worker 忽略中断未返回时仍占名额，实际返回后才释放，迟到结果不覆盖超时。此阶段执行响应为受控夹具，真实应用和 Chrome 留在 PD08b。
 - [ ] **PD08b：真实 Vue 页面预览**（PD08a、PD03；至多 5 文件）
   - 原生样本+Chrome 完成模块加载、CRUD/409，检查 cookie/存储/外部请求限制及换版旧授权失效。
   - 文件：原生应用契约、浏览器测试入口/脚本及最小夹具；验证 A + B；页面不纳入正式工作台。
