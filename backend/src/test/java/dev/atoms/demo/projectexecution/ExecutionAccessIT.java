@@ -102,6 +102,10 @@ class ExecutionAccessIT {
         var base = source.create(OWNER); var foreign = source.create(OWNER);
         buildResources(); var build = ExecutionRuntimeFixture.seal(paths, tools, jdbc, OWNER, base, source.snapshot(OWNER, base.projectId(), base.versionId())); start();
         var read = source.readGateway(); var gateway = access(read); var handle = gateway.build(OWNER, base.projectId(), build.id());
+        gateway.authorizeProject(OWNER, base.projectId(), budget()::remaining);
+        code("DELIVERY_TIMEOUT", () -> gateway.authorizeProject(OWNER, base.projectId(), () -> Duration.ZERO));
+        code("EXECUTION_FORBIDDEN", () -> gateway.authorizeProject(UUID.randomUUID(), base.projectId(), budget()::remaining));
+        code("PROJECT_NOT_FOUND", () -> gateway.authorizeProject(other, base.projectId(), budget()::remaining));
         code("EXECUTION_DISABLED", () -> disabled.build(OWNER, base.projectId(), build.id()));
         code("EXECUTION_ACCESS_FORBIDDEN", () -> gateway.identity(other, base.projectId(), handle));
         code("EXECUTION_ACCESS_FORBIDDEN", () -> gateway.identity(OWNER, foreign.projectId(), handle));
@@ -118,6 +122,7 @@ class ExecutionAccessIT {
         try {
             projects.archive(OWNER, base.projectId().toString(), true);
             code("EXECUTION_PROJECT_ARCHIVED", () -> gateway.source(OWNER, base.projectId(), handle));
+            code("EXECUTION_PROJECT_ARCHIVED", () -> gateway.authorizeProject(OWNER, base.projectId(), budget()::remaining));
         } finally { projects.archive(OWNER, base.projectId().toString(), false); }
         try {
             jdbc.update("UPDATE projects SET owner_id=? WHERE id=?", other, base.projectId());

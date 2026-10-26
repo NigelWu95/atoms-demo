@@ -24,7 +24,7 @@ public final class ProjectExecutionAccess {
     private final JdbcTemplate jdbc;
     private final ProjectService projects;
     private final ProjectSourceReadGateway source;
-    private final TransactionTemplate transaction;
+    private final PlatformTransactionManager transactions;
     private final Supplier<ExecutionCoordinator> coordinator;
     private final ExecutionBuildRepository builds;
     private final ExecutionRunRepository runs;
@@ -37,8 +37,21 @@ public final class ProjectExecutionAccess {
     ProjectExecutionAccess(ExecutionSettings settings, JdbcTemplate jdbc, ProjectService projects,
             ProjectSourceReadGateway source, PlatformTransactionManager transactions, Supplier<ExecutionCoordinator> coordinator) {
         this.settings = settings; this.jdbc = jdbc; this.projects = projects; this.source = source; this.coordinator = coordinator;
-        transaction = new TransactionTemplate(transactions); transaction.setTimeout(5);
+        this.transactions = transactions;
         builds = new ExecutionBuildRepository(jdbc); runs = new ExecutionRunRepository(jdbc);
+    }
+
+    /** Read-only gate for delivery management, including revocation when a prior run has already stopped. */
+    public void authorizeProject(UUID owner, UUID project, SourceExecutionBudget remaining) {
+        guarded(() -> {
+            if (project == null) throw error(422, "EXECUTION_INVALID_INPUT");
+            var deadline = budget(remaining); deadline.remaining(); var configuration = authorize(owner);
+            return metadata(deadline, () -> {
+                if (projects.lock(owner, project.toString()).archived()) throw error(409, "EXECUTION_PROJECT_ARCHIVED");
+                if (!configuration.equals(authorize(owner))) throw revoked();
+                return null;
+            });
+        });
     }
 
     /** Issue from an authorized successful build, without opening a new execution root or reading latest source. */
@@ -177,12 +190,7 @@ public final class ProjectExecutionAccess {
                 || !running.process.serves(running.run.id(), running.run.executionId()))) throw revoked();
     }
     private State state(UUID owner, UUID project, UUID buildId, UUID runId, OwnedProcess.Budget deadline) throws IOException {
-        long millis = Math.max(1, Math.min(5000, deadline.remaining().toMillis()));
-        var bounded = new TransactionTemplate(Objects.requireNonNull(transaction.getTransactionManager()));
-        bounded.setTimeout((int) ((millis + 999) / 1000));
-        var result = bounded.execute(tx -> {
-            // This transaction's row-lock wait consumes the same request budget as Git and HTTP.
-            jdbc.queryForObject("SELECT set_config('statement_timeout', ?, true)", String.class, millis + "ms");
+        return metadata(deadline, () -> {
             if (projects.lock(owner, project.toString()).archived()) throw error(409, "EXECUTION_PROJECT_ARCHIVED");
             authorize(owner); // Configuration may have changed while waiting for the row lock.
             ExecutionRun run = runId == null ? null : runs.get(project, runId);
@@ -199,6 +207,19 @@ public final class ProjectExecutionAccess {
                     || !build.treeSha256().equals(run.treeSha256()) || !artifact.jarSha256().equals(run.jarSha256())
                     || !artifact.manifestSha256().equals(run.manifestSha256()))) throw revoked();
             return new State(build, artifact, run);
+        });
+    }
+    private <T> T metadata(OwnedProcess.Budget deadline, Supplier<T> query) throws IOException {
+        long millis = Math.max(1, Math.min(5000, deadline.remaining().toMillis()));
+        var bounded = new TransactionTemplate(transactions);
+        bounded.setTimeout((int) ((millis + 999) / 1000));
+        var result = bounded.execute(tx -> {
+            // Account for time spent obtaining a connection before setting the query/row-lock deadline.
+            final long available;
+            try { available = Math.max(1, Math.min(5000, deadline.remaining().toMillis())); }
+            catch (IOException expired) { throw error(504, "DELIVERY_TIMEOUT"); }
+            jdbc.queryForObject("SELECT set_config('statement_timeout', ?, true)", String.class, available + "ms");
+            return query.get();
         });
         deadline.remaining(); return result;
     }
