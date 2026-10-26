@@ -70,3 +70,9 @@ ZIP writer 按 [PKWARE 6.3.10 的本地头、中央目录及 Unix 属性约定](
 - `ex22-delivery-pd08b-readonly.log`：**17 单元 + 4 实际集成，零失败/错误/跳过**。包括文件篡改、准确版本/权限、真实 Chrome 的模块加载、新增/编辑/查询、跨页 409 及恢复刷新、浏览器隔离、桌面与移动布局。原生 owned 应用确实停止；重新启动同一构建后旧授权仍拒绝、刚写入的数据保留、原五条记录和 A/B 测试库不变。
 - 浏览器证据：`/private/tmp/atoms-ex11-contract.APT7Jb/todo-applications-y6dt7dkp/delivery-browser-14882716247113117923` 的 `result.json`、`desktop.png`、`mobile.png`。逐请求耗时无令牌；文档约 1.7 秒、新增约 1.8 秒、修改约 2.1 秒。私有 `preview.json` 含短期能力地址，不提交、不打印。
 - 成功运行 `6650fb44-930d-49e4-b23f-4a6a16db07a1` 和重启运行 `c862d3f5-5fd9-4ee2-902b-b3f08b5575ef` 均有原 owner 的停止证明。此结果完成 PD08b；下载 API、恢复 API、ZIP 独立构建运行及全量兼容性回归仍待后续，模块尚未整体完成。
+
+## 下载 API（PD10）
+
+`ex22-delivery-pd10a-source.log` 14 项单测通过；`ex22-delivery-pd10b-http.log` 7 单元 + 7 真实 HTTP/PG 集成通过。实际 Tomcat 非阻塞 ZIP 响应可被标准 ZIP reader 读取，逐文件字节与固定输入一致，清单保持原 build/source/run/execution，附件名仅使用 UUID，长度准确，no-store 与原管理 CSP 保留，无 CORS 放宽。缺少登录、跨 owner、异常 ID/query 拒绝；退出后不能下载；原运行停止时预览下载失败，已成功历史构建仍可下载。
+
+生命周期验证覆盖全局 2/会话 1、超时后生成器不响应中断仍保留名额、迟到结果不覆盖错误、慢写出继续占名额、首字节之前超时不会留下成功 ZIP 状态。这里使用执行门面控制故障；真实下载工程的自身脚本构建及 B 数据库运行仍归 PD13。

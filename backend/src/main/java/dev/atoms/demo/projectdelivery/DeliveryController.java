@@ -3,6 +3,8 @@ package dev.atoms.demo.projectdelivery;
 import com.fasterxml.jackson.databind.JsonNode;
 import dev.atoms.demo.common.ApiException;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
 import java.security.Principal;
 import java.util.UUID;
 import org.springframework.http.ResponseEntity;
@@ -13,7 +15,29 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/projects/{projectId}/delivery")
 final class DeliveryController {
     private final DeliveryAccess access;
-    DeliveryController(DeliveryAccess access) { this.access = access; }
+    private final DeliveryDownloads downloads;
+    DeliveryController(DeliveryAccess access, DeliveryDownloads downloads) { this.access = access; this.downloads = downloads; }
+
+    @GetMapping("/builds/{buildId}")
+    DeliverySources.BuildView inspect(@PathVariable String projectId, @PathVariable String buildId,
+            Principal principal, HttpServletRequest request) {
+        readOnly(request);
+        return downloads.inspect(owner(principal), id(projectId), id(buildId), session(request));
+    }
+
+    @GetMapping("/builds/{buildId}/source.zip")
+    void buildSource(@PathVariable String projectId, @PathVariable String buildId, Principal principal,
+            HttpServletRequest request, HttpServletResponse response) throws IOException {
+        readOnly(request);
+        downloads.open(owner(principal), id(projectId), id(buildId), session(request), false, request, response);
+    }
+
+    @GetMapping("/previews/{previewId}/source.zip")
+    void previewSource(@PathVariable String projectId, @PathVariable String previewId, Principal principal,
+            HttpServletRequest request, HttpServletResponse response) throws IOException {
+        readOnly(request);
+        downloads.open(owner(principal), id(projectId), id(previewId), session(request), true, request, response);
+    }
 
     @PostMapping("/runs/{runId}/previews")
     ResponseEntity<DeliveryGrants.Preview> create(@PathVariable String projectId, @PathVariable String runId,
@@ -34,6 +58,11 @@ final class DeliveryController {
     private static void empty(JsonNode body, HttpServletRequest request) {
         if (request.getQueryString() != null || body != null && (!body.isObject() || !body.isEmpty()))
             throw new ApiException(422, "INVALID_INPUT", "此接口只接受空对象，不接受目标地址或其他参数。");
+    }
+    private static void readOnly(HttpServletRequest request) {
+        empty(null, request);
+        if (request.getContentLengthLong() > 0 || request.getHeader("Transfer-Encoding") != null)
+            throw new ApiException(422, "INVALID_INPUT", "下载接口不接受请求正文。");
     }
     static UUID id(String value) {
         try {

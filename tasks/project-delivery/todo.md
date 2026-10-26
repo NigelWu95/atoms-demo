@@ -70,9 +70,11 @@
   - 固定顺序/时间/STORED/Unix mode，project 文件不变，delivery 元数据独立；严格大小、路径和取消检查。
   - 文件：DeliveryZip、manifest、单测；验证 J + 标准 ZIP 解压：每文件字节/hash/mode，ZIP 上限和执行权限。
   - `ex22-delivery-pd09-zip.log` 4 项通过：JDK 读取及本机标准 unzip 解压逐文件比对、UTF-8 文件名与 100755 执行位、固定身份与确定性、非法路径/软链接模式、16 MiB 满额树、超限与中途预算到期。不读取当前模板；这里只完成打包，下载授权/API 待 PD10。
-- [ ] **PD10：准确构建/预览下载**（PD07、PD09；至多 5 文件）
+- [x] **PD10：准确构建/预览下载**（PD07、PD09；至多 5 文件）
   - 固定构建读取可停止历史版本；预览下载绑定仍有效原 run；2/1 容量、单一三十秒预算、返回前复核，清单不含私有数据。
   - 文件：下载 service/controller、DTO、集成测试；验证 J：非 latest、跨项目拒绝、停止/换版/取消、旧模板不重组。
+  - PD10a：`ex22-delivery-pd10a-source.log` 14 项单测通过；固定快照、原会话/运行、配置和身份变化、统一剩余预算，无 latest 或当前模板回退。
+  - PD10b：`ex22-delivery-pd10b-http.log` 7 项单测 + 7 项真实 HTTP/PG 集成通过；ZIP 字节/清单/附件头、登录权限、停止后预览下载拒绝但历史构建仍可下载。全局 2/会话 1，未结束的生成器或慢写出持续占名额，未提交响应超时不会保留成功 ZIP 状态。真实 ZIP 独立运行留待 PD13。
 - [ ] **PD11：源码恢复窄门面**（无依赖；至多 4 文件）
   - 源码模块提供 head/restore/operation 窄接口，复用现有 coordinator；revision/CAS/幂等，不重复持久化算法。
   - 文件：source gateway、集成测试；验证 J：冲突/重放/当前版本/异步失败，无业务数据库写入。
