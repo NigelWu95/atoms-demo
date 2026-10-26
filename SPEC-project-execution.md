@@ -1,6 +1,6 @@
 # Spec: project-execution · 完整工程受控构建与本机进程
 
-状态：2026-10-26，用户已确认本规格及 §10 三项取舍、[实施计划](tasks/project-execution/plan.md)与[任务清单](tasks/project-execution/todo.md)。EX01–26、C-EX08 已完成：内部交付身份、有界查询与安全诊断已验证；真实待办/优先级的 Vue + Java + SQL 两版工程通过 npm/Maven 构建，各 22 前端及 10/11 Java 测试通过，浏览器验证过的静态资源与实际 JAR 一致，见[记录](docs/project-execution-verification.md#2026-10-26--ex26-vue-业务页面)。五份旧未决审计保留。EX27a/b 已完成两个真实应用的 HTTP、独立数据及重启持久化验收，见[记录](docs/project-execution-verification.md#2026-10-26--ex27b-双应用真实-http-与重启持久化)。下一项 EX27c 为 V2 升级及失败迁移，整项未完成。新模式默认关闭，网页交付仍未接入。本地闭环范围见 [Agent 规格 §10](SPEC-project-agent.md#10-2026-10-19-完整闭环实施授权)。此前实际 npm 的通过/超时及故障证据分别保留。
+状态：2026-10-26，用户已确认本规格及 §10 三项取舍、[实施计划](tasks/project-execution/plan.md)与[任务清单](tasks/project-execution/todo.md)。EX01–26、C-EX08 与 EX27a/b/c1 已完成：两个真实 Vue + Java + SQL 应用的 V1/V2 原生构建、HTTP、独立数据、准确迁移批准、旧代码拒绝及重启持久化均通过，见[验收记录](docs/project-execution-verification.md#2026-10-26--ex27c1-双应用-v2-升级与重启)。单次工具探测按本次确认调整为 30 秒，构建总期限仍为 1800 秒。五份旧未决审计保留；真实失败迁移及其核对流程（EX27c2）、EX28–30 仍未完成，EX27 整项与 C-EX09 未勾选。新模式默认关闭，网页交付仍未接入。本地闭环范围见 [Agent 规格 §10](SPEC-project-agent.md#10-2026-10-19-完整闭环实施授权)。
 
 模块 ID 沿用[能力地图](FULL-PROJECT-CAPABILITY-MAP.md)的 `project-execution`，依赖 `project-source`，不反向依赖 Agent、交付或工作台。上游只读门面 PS21 已完成；当前网页仍走旧固定模板链路。
 

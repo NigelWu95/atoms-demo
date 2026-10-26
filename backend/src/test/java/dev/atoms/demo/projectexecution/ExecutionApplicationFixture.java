@@ -32,6 +32,7 @@ final class ExecutionApplicationFixture implements AutoCloseable {
     private final DataSource database;
     private final AnnotationConfigApplicationContext runtime;
     private final ExecutionTestDatabase tests;
+    private final ExecutionMigrationReview migrations;
     private final Map<UUID, ExecutionTestDatabase.Verified> testIdentities = new HashMap<>();
     private final Map<UUID, SourceAgentFixture.Base> bases = new HashMap<>();
     private final Map<UUID, ExecutionBindingRepository.Target> targets = new HashMap<>();
@@ -84,6 +85,8 @@ final class ExecutionApplicationFixture implements AutoCloseable {
             coordinator = runtime.getBean(ExecutionCoordinator.class);
             access = new ProjectExecutionAccess(runtime.getBean(ExecutionSettings.class), jdbc, projects, source.readGateway(), transactions,
                     (java.util.function.Supplier<ExecutionCoordinator>) () -> coordinator);
+            migrations = new ExecutionMigrationReview(runtime.getBean(ExecutionSettings.class), new ExecutionMigrationReviewRepository(jdbc),
+                    transactions, source.readGateway(), business);
             System.out.printf("execution_application_root path=%s%n", root);
         } catch (Exception | Error failure) { source.close(); throw failure; }
     }
@@ -121,6 +124,38 @@ final class ExecutionApplicationFixture implements AutoCloseable {
         System.out.printf("execution_application_build project=%s build=%s source=%s tree=%s jar=%s%n",
                 project, build.id(), build.sourceVersionId(), build.treeSha256(), artifact.summary().jarSha256());
         return build;
+    }
+
+    ExecutionBuild retainedBuild(UUID project, String property) throws Exception {
+        String raw = System.getProperty(property); assertThat(raw).as(property).isNotBlank();
+        var build = new ExecutionBuildRepository(jdbc).get(project, UUID.fromString(raw));
+        assertThat(build.status()).isEqualTo("SUCCEEDED"); assertThat(build.finishedAt()).isNotNull();
+        assertThat(build.treeSha256()).isEqualTo(ExecutionTodoFixture.application(1).sha256());
+        assertThat(source.snapshot(OWNER, project, build.sourceVersionId()).sha256()).isEqualTo(build.treeSha256());
+        var artifact = artifact(build); // Reopens the exact retained artifact under this coordinator's execution root.
+        assertThat(artifact.evidenceFor(build).frontend().tests()).isEqualTo(22);
+        System.out.printf("execution_application_baseline project=%s build=%s source=%s tree=%s jar=%s%n",
+                project, build.id(), build.sourceVersionId(), build.treeSha256(), artifact.summary().jarSha256());
+        return build;
+    }
+    ExecutionMigrationReview.View migrationView(ExecutionBuild build) throws Exception {
+        return migrations.inspect(OWNER, build.projectId(), build.id(), artifact(build), budget());
+    }
+    UUID approveMigration(ExecutionBuild build, ExecutionMigrationReview.View view) throws Exception {
+        assertThat(view.projectId()).isEqualTo(build.projectId()); assertThat(view.buildId()).isEqualTo(build.id());
+        return migrations.approve(OWNER, build.projectId(), build.id(), view.historySha256(), view.targetSha256(), artifact(build), budget());
+    }
+    void assertStartRejected(ExecutionBuild build, UUID review, String code) throws Exception {
+        var before = jdbc.queryForObject("SELECT count(*) FROM execution_runs WHERE project_id=?", Long.class, build.projectId());
+        Throwable failure = catchThrowable(() -> {
+            var unexpected = coordinator.startApplication(OWNER, build.projectId(), build.id(), target(build.projectId()).id(), review, UUID.randomUUID().toString())
+                    .toCompletableFuture().get(150, TimeUnit.SECONDS);
+            owned.add(unexpected); // Even an unexpected admission must be closed by its original owner.
+        });
+        while (failure instanceof ExecutionException || failure instanceof CompletionException) failure = failure.getCause();
+        assertThat(failure).isInstanceOfSatisfying(dev.atoms.demo.common.ApiException.class, error -> assertThat(error.code()).isEqualTo(code));
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM execution_runs WHERE project_id=?", Long.class, build.projectId())).isEqualTo(before);
+        System.out.printf("execution_application_refused project=%s build=%s code=%s%n", build.projectId(), build.id(), code);
     }
 
     ExecutionRun start(ExecutionBuild build, UUID review) throws Exception {
