@@ -6,6 +6,7 @@
   - `build.mjs` 接受唯一 `--test-config` 私有外部文件，只有 Maven 获得文件路径，npm 不获得配置或凭据；无参数种子构建不变。
   - 文件：模板 `scripts/build.mjs`、`build.test.mjs`、README；验证 N：脚本次序、拒绝非法文件/参数、环境和参数泄漏检查。
   - 证据：`.local/delivery-pd01-red.log` 两项新增失败复现缺口；`.local/delivery-pd01-green.log` 全部 14 个脚本测试通过。只证明参数和执行边界，真实 Java 配置/下载构建待 PD02/03/13。
+  - 模板打包检查发现新增测试占位符不在已有源码策略白名单，改用已有 `RUNTIME_CANARY`，未放宽策略。`.local/ex22-delivery-pd01-template-fixed.log` 模板单测 5 项、真实 Boot JAR 模板打包检查 2 项通过；原失败日志保留。
 - [ ] **PD02：可移植 Java 测试配置**（PD01；至多 5 文件）
   - 模板测试辅助类读取显式 test 配置，检查真实数据库/角色/schema、非超级用户、用途标记与空 schema；初始化 MVC 测试仍不需要 DB。
   - 文件：模板测试辅助类及测试、目录清单、平台 POM、模板断言；验证 J：模板清单/打包一致性及配置拒绝路径。超出五文件时拆成 PD02a/b。
