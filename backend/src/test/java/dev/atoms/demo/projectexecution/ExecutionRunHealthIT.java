@@ -4,7 +4,6 @@ import dev.atoms.demo.project.ProjectService;
 import dev.atoms.demo.source.*;
 import java.io.IOException;
 import java.net.*;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.time.Duration;
 import java.util.*;
@@ -43,10 +42,9 @@ class ExecutionRunHealthIT {
         var registry = ExecutionDatabaseBinding.load(Map.of(PROJECT, configuration.resolve(ExecutionBindingContractIT.A_DB + ".properties")),
                 List.of(root, parent), Set.of("atoms_demo", "atoms_demo_test"), Set.of("postgres", "atoms_test"));
         var target = registry.verify(PROJECT, budget()); var history = registry.history(PROJECT, budget());
-        var tree = new ProjectSourcePolicy().validate(List.of(new SourceTree.File(
-                ExecutionMigrations.SOURCE + "V001__execution_contract_fixture.sql", ExecutionRunAdmissionIT.SQL.getBytes(StandardCharsets.UTF_8), 0100644)));
         try (var source = new SourceAgentFixture(jdbc, projects, transactions, root)) {
-            source.start(database); var base = source.initializeExisting(OWNER, PROJECT, tree);
+            source.start(database); var tree = ExecutionContractSupport.retainedTree(jdbc, source, PROJECT);
+            var base = source.initializeExisting(OWNER, PROJECT, tree);
             var lease = new ExecutionCoordinatorLease(database);
             ExecutionPaths paths = null; var owned = new AtomicReference<ExecutionRunProcess>();
             var threads = Executors.newSingleThreadExecutor(); Future<ExecutionRun> future = null;
@@ -179,8 +177,7 @@ class ExecutionRunHealthIT {
         var builds = new ExecutionBuildRepository(jdbc); var build = builds.get(PROJECT, id);
         var task = paths.createBuild(id); Path backend = ExecutionRootLease.directory(paths.project(task).resolve("backend"));
         try (var zip = new ZipOutputStream(Files.newOutputStream(Files.createDirectory(backend.resolve("target")).resolve("app.jar")))) {
-            zip.putNextEntry(new ZipEntry(ExecutionMigrations.JAR + "V001__execution_contract_fixture.sql"));
-            zip.write(ExecutionRunAdmissionIT.SQL.getBytes(StandardCharsets.UTF_8)); zip.closeEntry();
+            ExecutionContractSupport.writeMigrations(zip, tree);
         }
         var identities = new EnumMap<ExecutionToolchain.Kind, ExecutionToolFiles.Summary>(ExecutionToolchain.Kind.class);
         for (var kind : ExecutionToolchain.Kind.values()) identities.put(kind, tools.identity(kind));

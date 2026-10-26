@@ -4,7 +4,6 @@ import dev.atoms.demo.execution.OwnedProcess;
 import dev.atoms.demo.project.ProjectService;
 import dev.atoms.demo.source.*;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.time.Duration;
 import java.util.*;
@@ -91,8 +90,7 @@ final class ExecutionRuntimeFixture implements ExecutionCoordinator.WorkerResour
         var repository = new ExecutionBuildRepository(jdbc); var build = repository.get(project, id);
         var task = paths.createBuild(id); Path backend = ExecutionRootLease.directory(paths.project(task).resolve("backend"));
         try (var zip = new ZipOutputStream(Files.newOutputStream(Files.createDirectory(backend.resolve("target")).resolve("app.jar")))) {
-            zip.putNextEntry(new ZipEntry(ExecutionMigrations.JAR + "V001__execution_contract_fixture.sql"));
-            zip.write(ExecutionRunAdmissionIT.SQL.getBytes(StandardCharsets.UTF_8)); zip.closeEntry();
+            ExecutionContractSupport.writeMigrations(zip, tree);
         }
         var identities = new EnumMap<ExecutionToolchain.Kind, ExecutionToolFiles.Summary>(ExecutionToolchain.Kind.class);
         for (var kind : ExecutionToolchain.Kind.values()) identities.put(kind, tools.identity(kind));

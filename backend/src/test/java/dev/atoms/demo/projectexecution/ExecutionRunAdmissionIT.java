@@ -2,7 +2,6 @@ package dev.atoms.demo.projectexecution;
 
 import dev.atoms.demo.project.ProjectService;
 import dev.atoms.demo.source.*;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.time.Duration;
 import java.util.*;
@@ -50,8 +49,7 @@ class ExecutionRunAdmissionIT {
         var historyBefore = registry.history(PROJECT, budget());
         try (var source = new SourceAgentFixture(jdbc, projects, transactions, root)) {
             source.start(database);
-            var tree = new ProjectSourcePolicy().validate(List.of(new SourceTree.File(
-                    ExecutionMigrations.SOURCE + "V001__execution_contract_fixture.sql", SQL.getBytes(StandardCharsets.UTF_8), 0100644)));
+            var tree = ExecutionContractSupport.retainedTree(jdbc, source, PROJECT);
             var base = source.initializeExisting(OWNER, PROJECT, tree);
             Path executionRoot = executionParent.resolve("admission-" + UUID.randomUUID());
             try (var paths = new ExecutionPaths(executionRoot, List.of(root.resolve("source"), root.resolve("work")))) {
@@ -162,8 +160,7 @@ class ExecutionRunAdmissionIT {
         var builds = new ExecutionBuildRepository(jdbc); var build = builds.get(PROJECT, id);
         var task = paths.createBuild(id); Path backend = ExecutionRootLease.directory(paths.project(task).resolve("backend"));
         try (var zip = new ZipOutputStream(Files.newOutputStream(Files.createDirectory(backend.resolve("target")).resolve("app.jar")))) {
-            zip.putNextEntry(new ZipEntry(ExecutionMigrations.JAR + "V001__execution_contract_fixture.sql"));
-            zip.write(SQL.getBytes(StandardCharsets.UTF_8)); zip.closeEntry();
+            ExecutionContractSupport.writeMigrations(zip, tree);
         }
         var tools = new EnumMap<ExecutionToolchain.Kind, ExecutionToolFiles.Summary>(ExecutionToolchain.Kind.class);
         for (var kind : ExecutionToolchain.Kind.values()) tools.put(kind, new ExecutionToolFiles.Summary(HASH, 1, 20));
