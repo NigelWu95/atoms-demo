@@ -24,6 +24,8 @@ spring:
     init:
       mode: never
 atoms:
+  project-workbench:
+    enabled: ${PROJECT_WORKBENCH_ENABLED:false}
   project-delivery:
     enabled: ${PROJECT_DELIVERY_ENABLED:false}
     origin: ${PROJECT_DELIVERY_ORIGIN:}

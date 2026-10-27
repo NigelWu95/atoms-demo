@@ -46,6 +46,11 @@ public final class ExecutionQuery {
         transaction = new TransactionTemplate(transactions); transaction.setTimeout(5);
     }
 
+    /** Existing maintainer/project gate; archived owners may still inspect and cancel their work. */
+    public void authorizeProject(UUID owner, UUID project) {
+        read(owner, project, Kind.BUILD, 1, () -> null);
+    }
+
     /** Unique descending keyset; new tasks never shift an offset or duplicate already consumed rows. */
     public Page<TaskView> tasks(UUID owner, UUID project, Kind kind, String cursor, int limit) {
         return read(owner, project, kind, limit, () -> {

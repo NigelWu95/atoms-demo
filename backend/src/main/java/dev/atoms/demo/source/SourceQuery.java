@@ -88,12 +88,19 @@ final class SourceQuery {
     }
 
     List<Entry> tree(UUID owner, UUID project, UUID version) {
-        return snapshot(owner, project, version).tree().files().stream()
+        return tree(owner, project, version, new SourceDeadline(environment.operationTimeout()));
+    }
+
+    List<Entry> tree(UUID owner, UUID project, UUID version, SourceDeadline deadline) {
+        return snapshot(owner, project, version, deadline).tree().files().stream()
                 .map(file -> new Entry(file.path(), file.mode(), file.size(), hash(file.content()))).toList();
     }
 
     SourceDiff.Result diff(UUID owner, UUID project, UUID before, UUID after) {
-        var deadline = new SourceDeadline(environment.operationTimeout());
+        return diff(owner, project, before, after, new SourceDeadline(environment.operationTimeout()));
+    }
+
+    SourceDiff.Result diff(UUID owner, UUID project, UUID before, UUID after, SourceDeadline deadline) {
         var oldTree = snapshot(owner, project, before, deadline).tree();
         var newTree = snapshot(owner, project, after, deadline).tree();
         var result = new SourceDiff().compare(oldTree, newTree);
@@ -102,9 +109,13 @@ final class SourceQuery {
     }
 
     SourceTree.File file(UUID owner, UUID project, UUID version, String path) {
+        return file(owner, project, version, path, new SourceDeadline(environment.operationTimeout()));
+    }
+
+    SourceTree.File file(UUID owner, UUID project, UUID version, String path, SourceDeadline deadline) {
         service.authorize(owner, project);
         new ProjectSourcePolicy().validatePath(path);
-        return snapshot(owner, project, version).tree().files().stream().filter(file -> file.path().equals(path)).findFirst()
+        return snapshot(owner, project, version, deadline).tree().files().stream().filter(file -> file.path().equals(path)).findFirst()
                 .orElseThrow(() -> new ApiException(404, "SOURCE_FILE_MISSING", "源码文件不存在。"));
     }
 
