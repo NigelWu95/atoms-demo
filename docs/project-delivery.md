@@ -1,6 +1,6 @@
 # 完整工程交付
 
-本模块提供真实应用预览、固定源码 ZIP 下载和源码版本恢复的后端能力。真实 Vue + Spring Boot + PostgreSQL 待办应用已通过平台预览、下载后独立构建运行及重启持久化验收；最终兼容性结果见[验证记录](project-delivery-verification.md)。**正式工作台尚未接入这些新接口，新模式默认关闭。** 原有工作台和导出流程继续保留。
+本模块提供真实应用预览、固定源码 ZIP 下载和源码版本恢复的后端能力。真实 Vue + Spring Boot + PostgreSQL 待办应用已通过平台预览、下载后独立构建运行及重启持久化验收；最终兼容性结果见[验证记录](project-delivery-verification.md)。**正式工作台已接入这些接口，新模式仍默认关闭。** 原有工作台和导出流程继续保留。
 
 规格见 [SPEC-project-delivery.md](../SPEC-project-delivery.md)，实施项见[任务清单](../tasks/project-delivery/todo.md)。
 
@@ -61,4 +61,4 @@ node scripts/start.mjs --config /absolute/private/runtime.properties
 - 预览授权十分钟，最多 32 个/每会话 8 个；HTTP 交换最多 16 个/每授权 4 个；下载最多 2 个/每会话 1 个。交换和下载各使用单一 30 秒预算；取消后实际未结束的工作继续占名额，避免重复派发。
 - 首版支持相对资源 URL、ES modules 和有界 JSON CRUD。Cookie 登录、localStorage/IndexedDB、Service Worker、WebSocket/SSE、大文件传输、外站资源和 history 路由回退不在预览契约内；不通过开放同源执行来掩盖不兼容。
 
-正式工作台的文件树、Agent 对话、构建/启动编排由下一模块接入。完整工程新模式的真实付费模型闭环、公开发布和远程部署未在本次验收中完成；本次没有增加服务器、外网隧道或独立实例服务。
+正式工作台的文件树、Agent 需求、构建/启动编排见[工作台模块](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-workbench.md)。完整工程新模式的真实付费模型闭环、公开发布和远程部署未在本次验收中完成；本次没有增加服务器、外网隧道或独立实例服务。

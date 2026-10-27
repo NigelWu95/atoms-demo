@@ -2,7 +2,7 @@
 
 提交说明：[实现思路、完成程度与后续优先级](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-summary.md)。
 
-2026-10-27 **完整工程交付后端已完成本地内部验收（未推送、未部署）**：真实 Vue + Spring Boot + PostgreSQL 应用通过平台路径预览、固定 Git 源码 ZIP 下载、下载目录自身脚本构建启动、CRUD/冲突和重启持久化检查。源码恢复追加版本，旧预览继续下载对应的原源码；下载不携带平台账号、密钥或业务数据。后端一次完整回归与定向修复复验、372 项前端单测及 71 项 Chrome 用例完成验证。**新模式仍默认关闭，正式工作台接入和真实模型端到端联调尚未完成**；以下带部署时间的条目继续描述旧线上链路。见[交付说明](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-delivery.md)、[验收记录](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-delivery-verification.md)和[能力地图](https://github.com/NigelWu95/atoms-demo/blob/main/FULL-PROJECT-CAPABILITY-MAP.md)。
+2026-10-27 **完整工程工作台已实现并完成本地验收（未推送、未部署）**：新增 `/projects/:id/engineering`，接通初始化、Agent 需求与任务、文件树/差异、依赖准备、构建、迁移核对、启动/停止、真实预览、固定源码下载及恢复。正式页面已实际启动 A/B 两个 Vue + Spring Boot 应用，下载身份与预览一致，刷新/切标签保留输入，停止后业务数据与迁移历史不变。旧工作台与导出入口保留。**新模式仍默认关闭，真实付费模型的端到端效果尚未验收**；以下带部署时间的条目继续描述旧线上链路。见[工作台说明](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-workbench.md)、[本轮验收](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-workbench-verification.md)、[交付验收](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-delivery-verification.md)和[能力地图](https://github.com/NigelWu95/atoms-demo/blob/main/FULL-PROJECT-CAPABILITY-MAP.md)。
 
 2026-10-18 **侧栏、账号邮箱与顶部工具已在本地实现（未部署、未推送）**：桌面侧栏可收为图标栏，手机保留“导航与账号”；首页右上角和工作区左下角显示已登录邮箱，点击可查看完整地址。工作台说明及草稿状态并入标题区；两种下载仍直接展示，检查、应用说明/修改记录、构建与进程改为顶部可展开面板，面板内部滚动，Escape 可关闭并回到入口。收起侧栏或工具不重载应用、不清空输入；错误与保存警告仍直接展示。下方带部署时间的条目为线上版本记录，具体本地验证范围见 [WR07 验收](https://github.com/NigelWu95/atoms-demo/blob/main/docs/design/iteration-experience/verification.md#2026-10-18wr07-可收起侧栏账号邮箱与顶部工具)。
 

@@ -29,13 +29,14 @@
 | 路径 | 契约 |
 |---|---|
 | GET `/capabilities` | 本身份和项目的可用状态与固定原因，无路径/配置秘密 |
+| GET `/source/head` | 当前源码引用、revision 和状态 |
 | GET `/source/versions`、`/source/versions/{versionId}/tree`、`/file?path=…` | 固定不可变源码、版本游标、相对源码路径；白名单元数据及有界 UTF-8 正文 |
 | GET `/source/diff?before=…&after=…` | 已有 128 KiB 差异预览及截断标记 |
-| POST `/source/initialize`、GET `/source/operations/{id}` | 服务器固定模板；只追加初始源码，返回已持久化操作并轮询 |
+| POST `/source/initialize`、GET `/source/operations/{id}`、GET `/source/operations` | 服务器固定模板；只追加初始源码，返回已持久化操作；刷新恢复最近 10 次初始化/恢复记录 |
 | GET/POST `/agent/tasks`、GET `/agent/tasks/{id}`、GET `/events`、POST `/cancel` | 既有 Agent 提交/读取/取消及有界事件，不接受 CLI 参数或工具列表 |
 | GET/POST `/builds`、GET `/builds/{id}`、POST `/builds/{id}/cancel` | 固定源码构建、既有队列及取消 |
 | GET/POST `/preparations`、POST `/preparations/{id}/cancel` | 既有受控 npm 锁准备，准确基线与幂等请求 |
-| GET `/runs`、GET `/builds/{id}/migration`、POST `/builds/{id}/migration-approvals` | 运行列表及显式迁移核对/批准 |
+| GET `/runtime`、GET `/runs`、GET `/builds/{id}/migration`、POST `/builds/{id}/migration-approvals` | 协调器/绑定可用性、运行列表及显式迁移核对/批准 |
 | POST `/runs`、POST `/runs/{id}/stop` | 经原协调器启动/替换/停止准确运行，禁止 PID 操作 |
 | GET `/execution/{kind}/{id}/events` | 复用执行模块绑定 owner/project/kind/task 的游标与脱敏事件 |
 
@@ -48,6 +49,8 @@
 Vue composable 持有当前项目请求代次、AbortController 和轮询计时器。路由、身份或会话变化立即中断旧读取并清空私有内容；迟到响应不能写入另一个项目。只在可见页面且有活动任务时串行轮询，不叠加请求；分页及事件使用服务端游标，去重，错误停止自动轮询并提供刷新。
 
 需求草稿复用已有项目草稿保存；源码和任务的事实来自服务器。预览令牌只存当前组件内存，不入 URL 查询、localStorage、日志或分享链接。已提交需求及执行事件必须能在刷新后查询；没有后台持久化的信息不得标为“已保存”。
+
+页面展示最近 50 次 Agent 提交和最近 1000 条所选任务事件；版本、构建、依赖准备和运行记录通过显式分页加载。单文件显示至多 256 KiB UTF-8 正文，截断不改变 Git 原文件或下载。未确认写请求的原请求/幂等键只保留在当前页面内存；整页刷新后查询持久任务，不能承诺仍能重试原请求。
 
 ## 5. 技术与文件
 
