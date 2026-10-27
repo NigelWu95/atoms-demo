@@ -76,6 +76,10 @@ public final class SourceAgentFixture implements AutoCloseable {
         return new ProjectSourceReadGateway(source, repository, environment,
                 (java.util.function.Supplier<SourceCoordinator>) () -> coordinator);
     }
+    public ProjectSourceRestorationGateway restorationGateway() {
+        return new ProjectSourceRestorationGateway(source, repository, environment,
+                (java.util.function.Supplier<SourceCoordinator>) () -> coordinator);
+    }
     public ProjectSourceEnvironment environment() { return environment; }
     public Base accept(UUID owner, Base base, SourceTree tree) {
         var intent = source.admit(owner, base.projectId(), new SourceRequest("ACCEPT", base.versionId(), base.revision(),

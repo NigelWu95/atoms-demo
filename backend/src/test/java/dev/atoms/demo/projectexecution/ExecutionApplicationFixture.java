@@ -173,7 +173,10 @@ final class ExecutionApplicationFixture implements AutoCloseable {
     }
     ExecutionRun start(ExecutionBuild build, UUID review) throws Exception {
         var run = admit(build, review);
-        await(() -> current(run).status().equals("READY") || current(run).finishedAt() != null, 140);
+        await(() -> {
+            var current = current(run);
+            return Set.of("READY", "NEEDS_RECONCILIATION").contains(current.status()) || current.finishedAt() != null;
+        }, 140);
         var ready = current(run); assertThat(ready.status()).as("Actual app launch: %s", ready.errorCode()).isEqualTo("READY");
         System.out.printf("execution_application_ready project=%s run=%s execution=%s build=%s%n", ready.projectId(), ready.id(), ready.executionId(), ready.buildId());
         return ready;

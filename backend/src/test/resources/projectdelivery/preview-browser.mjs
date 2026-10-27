@@ -5,9 +5,11 @@ import { once } from 'node:events'
 import assert from 'node:assert/strict'
 
 const config = JSON.parse(await readFile(process.argv[2], 'utf8'))
-assert.match(config.iframePath, /^\/api\/delivery\/preview\/[A-Za-z0-9_-]{43}\/$/)
+if (config.direct) assert.equal(config.iframePath, '/')
+else assert.match(config.iframePath, /^\/api\/delivery\/preview\/[A-Za-z0-9_-]{43}\/$/)
 const { chromium, expect } = createRequire(`${config.frontend}/package.json`)('@playwright/test')
-const origin = 'http://127.0.0.1:5174'
+const origin = config.direct ? 'http://127.0.0.1:18182' : 'http://127.0.0.1:5174'
+const redact = text => config.direct ? text : text.replaceAll(config.iframePath, '/preview/[redacted]/')
 let stage = 'listen', browser, blockedManagement = 0, externalRequests = 0
 const proxyRequests = []
 const server = createServer((request, response) => {
@@ -36,15 +38,15 @@ const errors = [], responses = [], consoleErrors = [], failedRequests = []
 async function app(page) {
   page.on('pageerror', error => errors.push(error.name))
   page.on('console', message => {
-    if (message.type() === 'error' && consoleErrors.length < 20) consoleErrors.push(message.text().replaceAll(config.iframePath, '/preview/[redacted]/'))
+    if (message.type() === 'error' && consoleErrors.length < 20) consoleErrors.push(redact(message.text()))
   })
   page.on('request', request => { if (!request.url().startsWith(origin)) externalRequests++ })
-  page.on('requestfailed', request => failedRequests.push({ method: request.method(), path: request.url().replaceAll(config.iframePath, '/preview/[redacted]/'), reason: request.failure()?.errorText }))
+  page.on('requestfailed', request => failedRequests.push({ method: request.method(), path: redact(request.url()), reason: request.failure()?.errorText }))
   page.on('response', response => {
     if (response.url().startsWith(origin + config.iframePath)) responses.push({ status: response.status(), type: response.headers()['content-type'] ?? '', formsAllowed: response.headers()['content-security-policy']?.includes('allow-scripts allow-forms') })
   })
   await page.goto(origin, { waitUntil: 'domcontentloaded' })
-  const frame = page.frameLocator('iframe')
+  const frame = config.direct ? page : page.frameLocator('iframe')
   await expect(frame.locator('main[data-sample-version="2"]')).toBeVisible({ timeout: 40000 })
   await expect(frame.getByRole('status')).toHaveText('列表已更新。', { timeout: 40000 })
   return frame
@@ -59,7 +61,7 @@ async function findRow(frame, id) {
   return row
 }
 try {
-  server.listen(5174, '127.0.0.1'); await once(server, 'listening')
+  if (!config.direct) { server.listen(5174, '127.0.0.1'); await once(server, 'listening') }
   stage = 'launch'; browser = await chromium.launch({ channel: 'chrome', headless: true })
   const context = await browser.newContext({ viewport: { width: 1280, height: 900 } })
   await context.addCookies([{ name: 'delivery_test_canary', value: 'synthetic-only', url: origin, httpOnly: true }])
@@ -87,7 +89,7 @@ try {
   stage = 'sandbox'
   const actual = page.frames().find(value => value.url().startsWith(origin + config.iframePath))
   assert.ok(actual)
-  const isolation = await actual.evaluate(async () => {
+  const isolation = config.direct ? { standalone: true } : await actual.evaluate(async () => {
     const denied = action => { try { action(); return false } catch (error) { return error.name === 'SecurityError' } }
     const cookie = denied(() => document.cookie), storage = denied(() => localStorage.getItem('delivery_test_canary'))
     const external = await fetch('https://delivery-test.invalid/probe').then(() => false, () => true)
@@ -95,15 +97,16 @@ try {
     const topNavigation = denied(() => { window.top.location.href = '/outside' })
     return { origin: self.origin, cookie, storage, external, management, topNavigation }
   })
-  assert.deepEqual(isolation, { origin: 'null', cookie: true, storage: true, external: true, management: true, topNavigation: true })
+  if (!config.direct) assert.deepEqual(isolation, { origin: 'null', cookie: true, storage: true, external: true, management: true, topNavigation: true })
   assert.equal(page.url(), `${origin}/`); assert.equal(blockedManagement, 0); assert.equal(externalRequests, 0)
   assert.ok(responses.some(response => response.status === 409))
   assert.ok(responses.some(response => response.status === 200 && /javascript/.test(response.type)))
   assert.ok(responses.some(response => response.status === 200 && /text\/css/.test(response.type)))
   assert.deepEqual(errors, [])
-  stage = 'screenshots'; await page.screenshot({ path: `${config.directory}/desktop.png` })
+  stage = 'screenshots'; await actual.evaluate(() => scrollTo(0, 0)); await page.screenshot({ path: `${config.directory}/desktop.png` })
   await page.setViewportSize({ width: 390, height: 844 })
   await expect(frame.getByRole('heading', { name: '今天，先做这几件。' })).toBeVisible()
+  await actual.evaluate(() => scrollTo(0, 0))
   assert.ok(await actual.evaluate(() => document.documentElement.scrollWidth <= innerWidth))
   await page.screenshot({ path: `${config.directory}/mobile.png` })
   const result = { passed: true, id: item.id, sampleVersion: 2, moduleLoaded: true, conflict: true, ...isolation }
@@ -116,10 +119,10 @@ try {
     input: document.querySelector('#new-title')?.value, addDisabled: document.querySelector('[data-test="add"]')?.disabled })).catch(() => null)
   await page?.screenshot({ path: `${config.directory}/failure.png` }).catch(() => {})
   await writeFile(`${config.directory}/failure.json`, JSON.stringify({ stage, error: error.name, errors, consoleErrors,
-    message: error.message.replaceAll(config.iframePath, '/preview/[redacted]/'), responses, proxyRequests, failedRequests, state }), { mode: 0o600 })
+    message: redact(error.message), responses, proxyRequests, failedRequests, state }), { mode: 0o600 })
   process.stderr.write(JSON.stringify({ failed: true, stage, error: error.name }))
   process.exitCode = 1
 } finally {
   await browser?.close()
-  server.closeAllConnections(); await new Promise(resolve => server.close(resolve))
+  if (server.listening) { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)) }
 }
