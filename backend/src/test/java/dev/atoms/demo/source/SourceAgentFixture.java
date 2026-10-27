@@ -58,6 +58,9 @@ public final class SourceAgentFixture implements AutoCloseable {
         return new Base(project, result.resultVersionId(), 1);
     }
     public ProjectSourceEditGateway gateway() { return gateway; }
+    public ProjectSourceWorkbenchGateway workbenchGateway() {
+        return new ProjectSourceWorkbenchGateway(source, repository, environment);
+    }
     /** Retained, explicitly selected contract project: reuse only an identical, genuinely readable snapshot. */
     public Base initializeExisting(UUID owner, UUID project, SourceTree tree) {
         source.authorize(owner, project);

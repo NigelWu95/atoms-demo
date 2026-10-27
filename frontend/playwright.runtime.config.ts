@@ -29,9 +29,11 @@ export default defineConfig({
       // Admission tests need a configured gateway, never real credentials or execution.
       env: { DEEPSEEK_API_KEY: 'test-only-key', GENERATION_MAX_MODEL_CALLS: '100000' },
       cwd: '../backend',
+      stdout: 'pipe',
       url: 'http://127.0.0.1:8081/test-lab',
       reuseExistingServer: !process.env.CI,
-      timeout: 120000,
+      // A cold Java compile now includes the complete source/agent/execution modules.
+      timeout: 300000,
       gracefulShutdown: { signal: 'SIGTERM', timeout: 10000 },
     },
     {

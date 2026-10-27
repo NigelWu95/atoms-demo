@@ -29,6 +29,8 @@ final class ExecutionApplicationFixture implements AutoCloseable {
     final ExecutionCoordinator coordinator;
     final ExecutionDatabaseBinding business;
     final ProjectExecutionAccess access;
+    final ExecutionQuery query;
+    final ProjectExecutionWorkbench workbench;
     private final DataSource database;
     private final AnnotationConfigApplicationContext runtime;
     private final ExecutionTestDatabase tests;
@@ -84,6 +86,9 @@ final class ExecutionApplicationFixture implements AutoCloseable {
             for (String tool : List.of("node", "npm", "java", "maven")) config.withProperty("atoms.project-execution." + tool, required("execution.contract-" + tool).toString());
             runtime = ExecutionTodoFixture.runtime(config, source, jdbc, database, projects, transactions);
             coordinator = runtime.getBean(ExecutionCoordinator.class);
+            query = new ExecutionQuery(runtime.getBean(ExecutionSettings.class), jdbc, projects, transactions);
+            workbench = new ProjectExecutionWorkbench(query, jdbc, transactions,
+                    (java.util.function.Supplier<ExecutionCoordinator>) () -> coordinator);
             access = new ProjectExecutionAccess(runtime.getBean(ExecutionSettings.class), jdbc, projects, source.readGateway(), transactions,
                     (java.util.function.Supplier<ExecutionCoordinator>) () -> coordinator);
             migrations = new ExecutionMigrationReview(runtime.getBean(ExecutionSettings.class), new ExecutionMigrationReviewRepository(jdbc),
@@ -135,10 +140,13 @@ final class ExecutionApplicationFixture implements AutoCloseable {
 
     ExecutionBuild retainedBuild(UUID project, String property) throws Exception { return retainedBuild(project, property, 1); }
     ExecutionBuild retainedBuild(UUID project, String property, int version) throws Exception {
+        return retainedBuild(project, property, ExecutionTodoFixture.application(version).sha256());
+    }
+    ExecutionBuild retainedBuild(UUID project, String property, String expectedTreeSha256) throws Exception {
         String raw = System.getProperty(property); assertThat(raw).as(property).isNotBlank();
         var build = new ExecutionBuildRepository(jdbc).get(project, UUID.fromString(raw));
         assertThat(build.status()).isEqualTo("SUCCEEDED"); assertThat(build.finishedAt()).isNotNull();
-        assertThat(build.treeSha256()).isEqualTo(ExecutionTodoFixture.application(version).sha256());
+        assertThat(build.treeSha256()).isEqualTo(expectedTreeSha256);
         assertThat(source.snapshot(OWNER, project, build.sourceVersionId()).sha256()).isEqualTo(build.treeSha256());
         var artifact = artifact(build); // Reopens the exact retained artifact under this coordinator's execution root.
         assertThat(artifact.evidenceFor(build).frontend().tests()).isEqualTo(22);
@@ -236,6 +244,24 @@ final class ExecutionApplicationFixture implements AutoCloseable {
     }
     JsonNode json(UUID project, String method, String path, Object body, int status) throws Exception {
         return JSON.readTree(request(project, method, path, body, status));
+    }
+    List<String> storedTodos(UUID project) throws Exception {
+        assertThat(project).isIn(A, B);
+        String name = project.equals(A) ? ExecutionBindingContractIT.A_DB : ExecutionBindingContractIT.B_DB;
+        var config = ExecutionPrivateConfig.readBusiness(directory("execution.test-config-directory").resolve(name + ".properties"), protectedRoots);
+        assertThat(config.bindingId()).isEqualTo(targets.get(project).id());
+        var result = new ArrayList<String>();
+        try (var connection = java.sql.DriverManager.getConnection(config.jdbcUrl(), config.inspectionProperties(5))) {
+            connection.setReadOnly(true); connection.setAutoCommit(false);
+            try (var statement = connection.createStatement()) {
+                statement.setQueryTimeout(5);
+                try (var rows = statement.executeQuery("SELECT row_to_json(t)::text FROM generated_app.todos t ORDER BY id LIMIT 1001")) {
+                    while (rows.next()) result.add(rows.getString(1));
+                }
+                assertThat(result.size()).isLessThanOrEqualTo(1000);
+            } finally { connection.rollback(); }
+        }
+        return result;
     }
     List<JsonNode> allTodos(UUID project) throws Exception {
         var rows = new ArrayList<JsonNode>(); long after = 0;
