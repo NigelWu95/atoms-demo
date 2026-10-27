@@ -1,6 +1,6 @@
 # Spec: project-agent · Claude Code + DeepSeek 完整工程编辑
 
-状态：2026-10-19，用户已确认规格、[实施计划](tasks/project-agent/plan.md)与[任务清单](tasks/project-agent/todo.md)，并将范围扩展至完整本地开发闭环（§10）。PA01–PA33 内部离线验收完成：完整源码编辑、默认 4 并发、查询/保留、原生模板/初始化、连续两轮旅程、拒绝边界及取消恢复。最终后端全量 290 单元 + 272 集成通过；当前精确支持 CLI 2.1.302 / 2.1.303，未知版本仍拒绝。旧两份测试未决审计保留，不能将新隔离 schema 的通过视作旧执行已结算。真实付费模型 PA-LIVE、实际构建运行、交付和工作台仍未完成；不是完整产品交付或部署声明。检查点用于汇报，不重复请求逐项批准；真实调用与部署仍需另行授权。
+状态：2026-10-27，用户已确认规格、[实施计划](https://github.com/NigelWu95/atoms-demo/blob/main/tasks/project-agent/plan.md)与[任务清单](https://github.com/NigelWu95/atoms-demo/blob/main/tasks/project-agent/todo.md)，范围为完整本地开发闭环（§10）。PA01–PA33 内部离线验收完成；执行、交付与完整工程工作台亦已完成本地 A/B 原生应用验收，构建失败的显式修复入口已接通。Agent 原阶段后端 290 单元 + 272 集成通过；CLI 精确支持 2.1.302 / 2.1.303 / 2.1.308，未知版本仍拒绝。历史未决审计保留，不能将新隔离 schema 的通过视作旧执行已结算。真实付费模型 PA-LIVE 与远程部署仍未完成，按[联调方案](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-agent-live-plan.md)确定项目和启动次数后执行；不重复请求普通开发切片批准。
 
 模块索引：[完整工程能力地图](FULL-PROJECT-CAPABILITY-MAP.md)。上游：[源码模块](SPEC-project-source.md)。总体方向：[ADR-016](docs/decisions/016-full-project-source-and-coding-agent.md)。本文不是整个工程改造的完成声明，也不是执行生成后端的授权。
 
@@ -41,7 +41,7 @@
 - §4 所列主要参数与 `--max-turns 24` 组合后追加 `--version`，退出码为 0。这只证明解析器接受参数，不能证明权限、工具执行或 DeepSeek 协议已工作。
 - 未运行 `auth`、`doctor`、`update` 或普通模型会话；未读取个人认证。远程服务器的 CLI 版本、系统策略和可执行路径尚未探测。
 
-2026-10-19 追加探测：本机已安装版本变为 2.1.303；在不改个人配置、不安装/更新 CLI 的情况下完成同参数离线工具、完整两轮工程编辑和拒绝边界验收。精确支持集合为 2.1.302 / 2.1.303，不接受后续版本范围；具体红绿测试和版本证据见 [验证记录](docs/project-agent-verification.md)。
+2026-10-19 追加探测：本机已安装版本变为 2.1.303；在不改个人配置、不安装/更新 CLI 的情况下完成同参数离线工具、完整两轮工程编辑和拒绝边界验收。精确支持集合为 2.1.302 / 2.1.303 / 2.1.308，不接受后续版本范围；具体红绿测试和版本证据见 [验证记录](docs/project-agent-verification.md)。
 
 ### 2.1 官方依据及不能直接推断的部分
 
@@ -105,7 +105,7 @@ Agent 任务始终绑定非空源码版本和修订号。新项目先完成无�
 
 机器受管策略、加载的工具或 MCP/plugin 状态与批准配置不符时拒绝继续。`system/init` 核对是侦测补充，不是事前防泄漏保证；真实密钥启用前，必须在同机通过无秘密的离线 canary 行为验收。
 
-2026-10-19 实测补充：2.1.302 / 2.1.303 在 safe-mode 下仍报告 `cc-plugin-agents-md`、`cc-plugin-plugin-authoring` 两个内置模块。解析器仅识别这两个精确版本及 `path=builtin`、同名 `source=@builtin` 的元数据组合，不接受外部目录插件、未知模块或 MCP/skills。测试中的 CLAUDE.md、AGENTS.md 未被自动加入请求；这不是机器受管策略或 keychain 的完整隔离证明。
+2026-10-19 实测补充：2.1.302 / 2.1.303 / 2.1.308 在 safe-mode 下仍报告 `cc-plugin-agents-md`、`cc-plugin-plugin-authoring` 两个内置模块。解析器仅识别这两个精确版本及 `path=builtin`、同名 `source=@builtin` 的元数据组合，不接受外部目录插件、未知模块或 MCP/skills。测试中的 CLAUDE.md、AGENTS.md 未被自动加入请求；这不是机器受管策略或 keychain 的完整隔离证明。
 
 ### 4.2 模型、预算与时间
 

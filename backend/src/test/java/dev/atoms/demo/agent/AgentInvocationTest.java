@@ -30,12 +30,13 @@ class AgentInvocationTest {
                 .containsEntry("ANTHROPIC_BASE_URL", "https://api.deepseek.com/anthropic")
                 .containsEntry("CLAUDE_CONFIG_DIR", root.resolve("config").toString())
                 .containsEntry("CLAUDE_CODE_MAX_OUTPUT_TOKENS", "128000")
+                .containsEntry("ENABLE_TOOL_SEARCH", "false")
                 .containsEntry("CLAUDE_CODE_MAX_RETRIES", "0").containsEntry("API_TIMEOUT_MS", "300000");
         assertThat(env.keySet()).containsExactlyInAnyOrder("PATH", "LANG", "LC_ALL", "TZ", "TMPDIR", "TMP", "TEMP",
                 "CLAUDE_CONFIG_DIR", "DISABLE_AUTOUPDATER", "DISABLE_UPDATES", "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC",
                 "ANTHROPIC_BASE_URL", "ANTHROPIC_API_KEY", "ANTHROPIC_MODEL", "ANTHROPIC_DEFAULT_OPUS_MODEL",
                 "ANTHROPIC_DEFAULT_SONNET_MODEL", "ANTHROPIC_DEFAULT_HAIKU_MODEL", "CLAUDE_CODE_MAX_OUTPUT_TOKENS",
-                "CLAUDE_CODE_MAX_RETRIES", "API_TIMEOUT_MS");
+                "CLAUDE_CODE_MAX_RETRIES", "API_TIMEOUT_MS", "ENABLE_TOOL_SEARCH");
         assertThat(env).doesNotContainKeys("HOME", "APP_DB_PASSWORD", "SMTP_PASSWORD", "NODE_OPTIONS",
                 "ANTHROPIC_AUTH_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN", "HTTP_PROXY", "HTTPS_PROXY", "DEEPSEEK_API_KEY");
     }

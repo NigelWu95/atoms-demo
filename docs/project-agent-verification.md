@@ -1,6 +1,6 @@
 # project-agent · 离线实施与兼容性记录
 
-日期：2026-10-18～19。PA01–PA33 内部离线验收完成，真实模型 PA-LIVE 未验收，完整应用构建/运行/交付/工作台仍未完成。只使用本机假 Anthropic 服务和公开测试字符串，不调用真实 DeepSeek、不改个人 Claude 配置、不部署、不推送。任务状态以 [清单](../tasks/project-agent/todo.md)为准，操作说明见[维护指南](project-agent.md)。下文历史失败记录保留，不代表最终回归仍失败。
+最近更新：2026-10-27。PA01–PA33 内部离线验收完成，本次新增 Claude Code 2.1.308 兼容复验；真实模型 PA-LIVE 未验收。后续执行、交付及工作台已完成本地验收，见[能力地图](https://github.com/NigelWu95/atoms-demo/blob/main/FULL-PROJECT-CAPABILITY-MAP.md)。本文件记录的 CLI 检查只使用本机假 Anthropic 服务和测试字符串，不调用真实 DeepSeek、不改个人 Claude 配置、不部署、不推送。任务状态以[清单](https://github.com/NigelWu95/atoms-demo/blob/main/tasks/project-agent/todo.md)为准。下文保留原阶段失败及修复证据。
 
 ## PA32–PA33：最终全量与交接（2026-10-19 15:31）
 
@@ -464,3 +464,16 @@ PA17a（03:06）：新增调度器独占会话租约，与 Worker 并发数无�
 PA18a（03:12）：独立完成授权列表和有界阶段事件存储，不依赖尚未完成的调度循环。先缺类红测；`./mvnw -B -Dit.test=ProjectAgentQueryIT test-compile failsafe:integration-test failsafe:verify` **5 项通过、0 失败/错误/跳过**。每次读取在项目行锁下核对当前维护者/归属，页长至多 100，序号连续；总量 4096 项/256 KiB，保留 1 项/1 KiB 给终态。白名单字段不包括提示、源码和原始输出，损坏/过期明确报错。工具访问路径数命名 observedPaths，不冒充实际修改文件数；终态后不追加用量。阶段自动写入和真实模型用量验收仍待接通。
 
 PA18b / PA17b 前置（03:39）：阶段和结果事件随任务状态在同一事务写入，停止证据确认后才追加结构化用量；从 QUEUED 到 NO_CHANGES 的真实受控进程旅程有完整单调记录。先运行定向测试实际失败（阶段为空），再接入。源码生命周期 phase 改为 MAX_VALUE-100，提供就绪读取，确保未来 Agent MAX_VALUE 的启停先后；先缺接口红测。`./mvnw -B '-Dit.test=ProjectAgentWorkerIT,ProjectAgentQueryIT,ProjectAgentCancellationIT,ProjectAgentRecoveryIT,ProjectSourceLifecycleIT' test-compile failsafe:integration-test failsafe:verify` **21 项通过、0 失败/错误/跳过**，含旧源码恢复/有界关闭。仍无真实模型调用或新 Agent 调度循环。
+
+## 2026-10-27 · Claude Code 2.1.308 兼容复验
+
+当前维护入口和工作台能力见[使用说明](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-agent.md)。本次继续采用真实 CLI、假 Key 与本机假模型服务，没有调用 DeepSeek，也没有更新个人 Claude 安装或配置。
+
+- 初次 `ex22-agent-cli-2308-20261027.log`：18 单元通过，9 集成中 1 失败、6 错误。npm 包标注 2.1.308，但其 `bin/claude.exe` 是不可执行的 500 字节占位脚本，文件准入正确拒绝；包版本不代表原生安装完整。
+- 选用本机现存、经私有空环境版本探测的 2.1.308 原生文件。`ex22-agent-cli-2308-native-20261027.log`：18 单元通过，9 集成中 4 失败。实际文件往返及两轮源码保存成功，但网关请求额外声明 `DeferredToolPlaceholder`，不满足固定五工具契约，因此未接受此结果为兼容通过。
+- 根据[官方网关说明](https://code.claude.com/docs/en/mcp#tool-search-through-an-llm-gateway)，在平台子进程的明确环境中加入 `ENABLE_TOOL_SEARCH=false`。保留原来的精确工具断言、权限和版本检查，不放行额外工具或通用插件。
+- `ex22-agent-cli-2308-upfront-20261027.log`：**18 单元 + 9 集成通过，0 失败/错误/跳过，BUILD SUCCESS**。覆盖生产进程拥有者、两种工具参数格式、五工具实际操作、Vue/Java/SQL 连续两轮修改并重新读取同一版本、目录外/链接拒绝、Shell/MCP/子 Agent 与合成私有配置拒绝，以及协调者互斥。
+
+使用项目私有 Java 17.0.14、既有 EX22 测试 schema，单个 Maven 顺序运行。命令为 `sh .local/run-ex22-checks.sh ex22-agent-cli-2308-upfront-20261027.log -Pagent-cli-contract '-Dtest=AgentCliProbeTest,AgentStreamDecoderTest,AgentInvocationTest' '-Dit.test=AgentCliContractIT,AgentCliJourneyContractIT,AgentCliBoundaryContractIT,AgentCoordinatorLeaseIT' -Datoms.agent.test.cli=<已验证原生文件绝对路径> verify`。此前两个失败日志保留，不覆盖；没有将离线响应计为真实模型生成效果。正式精确版本增加 2.1.308，未知版本仍拒绝。
+
+只读收尾核对：无活动 Agent，模型启动预留仍为 5，A 源码基线不变；159 条应用运行全部结束、任务槽和协调锁为 0，旧五份未决审计保留。A7/B4 业务行摘要及各 3 条迁移历史不变，8081/5174/18181/18182 无监听遗留。

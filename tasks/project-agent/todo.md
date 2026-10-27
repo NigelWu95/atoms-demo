@@ -1,6 +1,6 @@
 # project-agent · 开发任务
 
-状态：2026-10-19，范围见规格 §10。PA01–PA30 内部切片已完成；PA31 在获准新建的测试 schema 中发现四并发收尾未决，原/新审计均保留，完整组合尚未通过。PA32a 修复重复中断并补脱敏诊断；后端单元 288、定向集成 13、源码 Python 11、前端单元 372、浏览器 71 均通过；CLI 显式 profile 15 单元 + 9 集成通过。实际业务构建运行、工作台及真实 DeepSeek 仍未验收，PA-LIVE 未获授权。唯一依据为 [已确认规格](../../SPEC-project-agent.md)和[本模块计划](plan.md)。不重复使用旧 EB/PS 清单，不把定向检查或旧人工验收勾为整体完成。
+状态：2026-10-27，范围见规格 §10。PA01–PA33 内部离线验收已完成，Agent 原阶段最终后端 290 单元 + 272 集成通过，旧未决审计继续保留。执行、交付与完整工程工作台现已完成本地 A/B 原生应用验收，构建失败的显式修复入口已接通；各阶段具体证据分别记录，不以模拟响应代表真实模型效果。PA-LIVE 尚未执行，项目与两次启动的[具体联调方案](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-agent-live-plan.md)已准备。依据为[已确认规格](https://github.com/NigelWu95/atoms-demo/blob/main/SPEC-project-agent.md)和[本模块计划](https://github.com/NigelWu95/atoms-demo/blob/main/tasks/project-agent/plan.md)。下方保留历史失败与修复记录。
 
 每项 S=1–2、M=3–5 个主要文件（含测试）；实际超出先拆子任务，不藏进巨型文件。路径缩写：A=backend/src/main/java/dev/atoms/demo/agent，AT=backend/src/test/java/dev/atoms/demo/agent，S/ST=对应 source 包，M=backend/src/main/resources/db/migration，T=templates/full-project-v1。Agent 包和原生后端模板目录已创建。U/I/CLI/ALL/PY/FRONT/BROWSER/DOC 命令定义在计划 §6。
 
@@ -379,3 +379,12 @@
 
 - PA01–PA33 全部有证据后可交接内部接口，状态写“离线适配验收完成”。PA-LIVE 未完成则保留未完成，不称真实接入成功。
 - 后续 project-execution / project-delivery / project-workbench 仍按能力地图单独评审，不在此偷偷启用 Shell 或改 UI。
+
+## 2026-10-27 · CLI 2.1.308 兼容跟进
+
+- [x] 核对 npm 占位入口与实际原生文件，未修改个人安装或配置。
+- [x] 平台子进程关闭工具延迟加载，继续固定五种文件工具与原权限边界；18 单元 + 9 CLI/协调集成通过。
+- [x] 更新已完成的执行、交付和工作台现状，准备固定测试 A、最多两次启动的真实联调方案。
+- [ ] PA-LIVE：项目与次数预算确认后执行。当前无真实模型调用，离线检查不计为真实生成效果。
+
+失败原因、官方依据和通过证据见[兼容复验](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-agent-verification.md#2026-10-27--claude-code-21308-兼容复验)。

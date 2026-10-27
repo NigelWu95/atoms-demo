@@ -36,7 +36,8 @@ class AgentCliProbeTest {
     @Test void acceptsOnlyPinnedVersionsAndSuccessfulExit() throws Exception {
         AgentCliProbe.requireVersion(0, "2.1.302 (Claude Code)\n".getBytes(StandardCharsets.UTF_8));
         AgentCliProbe.requireVersion(0, "2.1.303 (Claude Code)\n".getBytes(StandardCharsets.UTF_8));
-        for (String value : new String[] {"2.1.301 (Claude Code)\n", "2.1.304 (Claude Code)\n", "2.1.303-beta (Claude Code)\n", "2.1.302\n",
+        AgentCliProbe.requireVersion(0, "2.1.308 (Claude Code)\n".getBytes(StandardCharsets.UTF_8));
+        for (String value : new String[] {"2.1.301 (Claude Code)\n", "2.1.304 (Claude Code)\n", "2.1.309 (Claude Code)\n", "2.1.308-beta (Claude Code)\n", "2.1.302\n",
                 "2.1.302 (Claude Code)\nsecret-canary", ""}) {
             assertThatThrownBy(() -> AgentCliProbe.requireVersion(0, value.getBytes(StandardCharsets.UTF_8)))
                     .hasMessage("AGENT_CLI_UNSUPPORTED");

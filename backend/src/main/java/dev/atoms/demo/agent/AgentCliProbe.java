@@ -16,7 +16,7 @@ import java.util.Objects;
 /** Version probing is explicit and credential-free; no update or personal configuration commands. */
 final class AgentCliProbe {
     // Exact, behavior-tested releases only; never accept an arbitrary semver range.
-    static final java.util.Set<String> SUPPORTED_VERSIONS = java.util.Set.of("2.1.302", "2.1.303");
+    static final java.util.Set<String> SUPPORTED_VERSIONS = java.util.Set.of("2.1.302", "2.1.303", "2.1.308");
     private AgentCliProbe() {}
 
     static Identity verify(Path executable, Path config, Path temporary) throws IOException {

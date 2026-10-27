@@ -41,6 +41,9 @@ final class AgentInvocation {
         environment.put("CLAUDE_CODE_MAX_OUTPUT_TOKENS", Integer.toString(settings.maxOutputTokens()));
         environment.put("CLAUDE_CODE_MAX_RETRIES", "0");
         environment.put("API_TIMEOUT_MS", "300000");
+        // Gateways gained default deferred-tool placeholders in 2.1.304. Keep the fixed five-tool protocol.
+        // https://code.claude.com/docs/en/mcp#tool-search-through-an-llm-gateway
+        environment.put("ENABLE_TOOL_SEARCH", "false");
         return builder;
     }
 
