@@ -11,6 +11,7 @@ import ArtifactPanel from '../components/ArtifactPanel.vue'
 import ConversationPanel from '../components/ConversationPanel.vue'
 import PublicationPanel from '../components/PublicationPanel.vue'
 import ToolDisclosure from '../components/ToolDisclosure.vue'
+import EngineeringEntry from '../components/EngineeringEntry.vue'
 import { useProjectDraft } from '../composables/useProjectDraft'
 import { matchesRepair, type RepairProposal } from '../runtime/previewRepair'
 
@@ -141,6 +142,7 @@ watch(
         <h1 v-else tabindex="-1">需求草稿 <span class="outline-badge">未保存</span></h1>
       </div>
       <div class="workbench-meta">
+        <EngineeringEntry v-if="project" :project-id="project.id" />
         <ToolDisclosure class="workbench-help" label="工作台说明">
           <p class="workbench-notice">
             {{ project ? '项目名称已保存到数据库。' : '这是尚未保存的需求草稿。' }}

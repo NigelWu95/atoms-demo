@@ -8,6 +8,7 @@ import PublicAppPage from './pages/PublicAppPage.vue'
 import AccountPage from './pages/AccountPage.vue'
 import AccountSettingsPage from './pages/AccountSettingsPage.vue'
 import WorkspaceCreatePage from './pages/WorkspaceCreatePage.vue'
+import EngineeringWorkbenchPage from './pages/EngineeringWorkbenchPage.vue'
 
 export function createAppRouter(history: RouterHistory) {
   const router = createRouter({
@@ -24,6 +25,11 @@ export function createAppRouter(history: RouterHistory) {
         path: '/projects/:id',
         component: WorkbenchPage,
         meta: { title: '项目工作台', workbench: true },
+      },
+      {
+        path: '/projects/:id/engineering',
+        component: EngineeringWorkbenchPage,
+        meta: { title: '完整工程工作台', workbench: true },
       },
       {
         path: '/preview/:id/:versionId',
