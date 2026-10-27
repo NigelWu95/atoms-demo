@@ -41,10 +41,10 @@ class ExecutionDatabaseLaunchIT {
             assertThat(result.stopped().matches(build, execution, backend)).isTrue();
             assertThat(result.summary().stdoutBytes()).isEqualTo(4); // "ok" from both real JVMs.
             assertThat(invocation.builder().environment()).isEqualTo(environment).doesNotContainKeys(
-                    "APP_DB_URL", "APP_DB_USERNAME", "APP_DB_PASSWORD", "APP_PORT");
+                    "APP_DB_URL", "APP_DB_USERNAME", "APP_DB_PASSWORD", "APP_PORT", "APP_TEST_CONFIG");
             assertThat(invocation.builder().command()).isEqualTo(command);
             assertThat(launch.toString()).doesNotContain(target.getValue(), configuration.toString());
-            assertThat(result.toString()).doesNotContain(target.getValue(), "PRIVATE_OUTPUT_CANARY");
+            assertThat(result.toString()).doesNotContain(target.getValue(), configuration.toString(), "PRIVATE_OUTPUT_CANARY");
         }
         assertThat(registry.verify(A, deadline())).isEqualTo(first);
         assertThat(registry.verify(B, deadline())).isEqualTo(second);
@@ -240,7 +240,7 @@ class ExecutionDatabaseLaunchIT {
                 .map(path -> Path.of(path).toAbsolutePath().normalize().toString())
                 .collect(java.util.stream.Collectors.joining(java.io.File.pathSeparator));
         return new ExecutionProcess.Invocation(javaHome.resolve("bin/java"),
-                List.of("-cp", classpath, Fixture.class.getName(), database, mode),
+                List.of("-cp", classpath, Fixture.class.getName(), database, mode, file(database).toString()),
                 directory, temporary.toRealPath(), temporary.toRealPath(), javaHome, temporary.toRealPath());
     }
 
@@ -252,7 +252,12 @@ class ExecutionDatabaseLaunchIT {
             if (System.getenv().keySet().stream().anyMatch(key -> key.contains("PROXY") || key.contains("API_KEY")
                     || key.equals("SPRING_APPLICATION_JSON") || key.startsWith("SPRING_DATASOURCE")
                     || key.equals("SMTP_PASSWORD") || key.equals("JAVA_TOOL_OPTIONS"))) System.exit(12);
-            if (System.getenv().keySet().stream().filter(key -> key.startsWith("APP_")).count() != 4) System.exit(13);
+            if (!System.getenv().keySet().stream().filter(key -> key.startsWith("APP_")).collect(java.util.stream.Collectors.toSet())
+                    .equals(Set.of("APP_DB_URL", "APP_DB_USERNAME", "APP_DB_PASSWORD", "APP_PORT", "APP_TEST_CONFIG"))) System.exit(13);
+            if (args.length != 3 || !args[2].equals(System.getenv("APP_TEST_CONFIG"))) System.exit(18);
+            Path testConfig = Path.of(args[2]);
+            if (!testConfig.isAbsolute() || !Files.isRegularFile(testConfig, LinkOption.NOFOLLOW_LINKS)
+                    || !Files.getPosixFilePermissions(testConfig).equals(PosixFilePermissions.fromString("rw-------"))) System.exit(19);
             var environment = new org.springframework.core.env.StandardEnvironment();
             String url = environment.resolveRequiredPlaceholders("${APP_DB_URL}");
             if (!url.equals("jdbc:postgresql://127.0.0.1:5432/" + args[0] + "?currentSchema=generated_app")) System.exit(14);
@@ -272,7 +277,7 @@ class ExecutionDatabaseLaunchIT {
             } catch (java.sql.SQLException error) { System.exit(16); }
             if (args[1].equals("spawn")) {
                 var child = new ProcessBuilder(Path.of(System.getProperty("java.home"), "bin", "java").toString(),
-                        "-cp", System.getProperty("java.class.path"), Fixture.class.getName(), args[0], "single")
+                        "-cp", System.getProperty("java.class.path"), Fixture.class.getName(), args[0], "single", args[2])
                         .inheritIO().start();
                 if (child.waitFor() != 0) System.exit(17);
             }
