@@ -1,6 +1,6 @@
 # 完整工程交付（实施中）
 
-规格和进度分别见 [SPEC-project-delivery.md](../SPEC-project-delivery.md)及[任务清单](../tasks/project-delivery/todo.md)，证据见[验证记录](project-delivery-verification.md)。当前已完成独立构建测试配置、交付设置、原进程 HTTP 交换、会话授权及有界预览 HTTP 接口。真实 Vue 浏览器验收已通过，同快照下载 API 已完成，恢复 API 尚未完成，正式工作台尚未接入。
+规格和进度分别见 [SPEC-project-delivery.md](../SPEC-project-delivery.md)及[任务清单](../tasks/project-delivery/todo.md)，证据见[验证记录](project-delivery-verification.md)。当前已完成独立构建测试配置、交付设置、原进程 HTTP 交换、会话授权及有界预览 HTTP 接口。真实 Vue 浏览器验收已通过，同快照下载 API 已完成，源码恢复 API 已完成，下载目录中的完整构建/运行验收尚未完成，正式工作台尚未接入。
 
 管理入口为 `POST /api/projects/{projectId}/delivery/runs/{runId}/previews` 和 `DELETE /api/projects/{projectId}/delivery/previews/{previewId}`，沿用登录会话与 CSRF，只接受空对象或无正文。签发结果内的 `iframeUrl` 是短期能力链接，应按秘密处理，不记录进日志或长期存储。
 
@@ -11,6 +11,12 @@
 `GET /api/projects/{projectId}/delivery/builds/{buildId}` 返回准确构建身份和源码规模；其 `/source.zip` 下载该构建的不可变完整源码，即使应用已停止也可用。`GET /api/projects/{projectId}/delivery/previews/{previewId}/source.zip` 只接受创建该预览的原登录会话，且原运行必须仍有效；停止或换版不回退到别的构建。
 
 两类 ZIP 都在内存有界生成、复核后以附件返回，原文件放在 `project/`，交付清单单独放在 `delivery/`。不读取当前模板，不包含运行配置、JAR 或数据库数据。最多两个下载、每会话一个；非阻塞写出期间仍占名额，超时生成器真正结束才释放。普通浏览器下载使用平台登录会话，不使用 iframe 中的路径令牌；接口不增加跨域许可。
+
+## 源码恢复
+
+先 `GET /api/projects/{projectId}/delivery/source-head` 取得当前 `sourceVersionId` 和 `revision`，再向同前缀的 `/restorations` 提交 `targetSourceVersionId`、`expectedSourceVersionId`、`expectedRevision`，携带现有 CSRF 和唯一 `Idempotency-Key`。202 仅表示收到操作；通过 `/operations/{operationId}` 查询结果，以 `COMMITTED` 和 `resultSourceVersionId` 判断成功。
+
+相同请求与幂等键重放同一操作，旧 revision 冲突返回 409。恢复通过原源码协调器追加版本，不移动旧历史，也不自动构建、启动、切换预览或回滚业务数据。未知结果保留 `NEEDS_RECONCILIATION`，不能当作确定失败直接重新提交另一个请求。
 
 ## 平台配置
 

@@ -76,3 +76,9 @@ ZIP writer 按 [PKWARE 6.3.10 的本地头、中央目录及 Unix 属性约定](
 `ex22-delivery-pd10a-source.log` 14 项单测通过；`ex22-delivery-pd10b-http.log` 7 单元 + 7 真实 HTTP/PG 集成通过。实际 Tomcat 非阻塞 ZIP 响应可被标准 ZIP reader 读取，逐文件字节与固定输入一致，清单保持原 build/source/run/execution，附件名仅使用 UUID，长度准确，no-store 与原管理 CSP 保留，无 CORS 放宽。缺少登录、跨 owner、异常 ID/query 拒绝；退出后不能下载；原运行停止时预览下载失败，已成功历史构建仍可下载。
 
 生命周期验证覆盖全局 2/会话 1、超时后生成器不响应中断仍保留名额、迟到结果不覆盖错误、慢写出继续占名额、首字节之前超时不会留下成功 ZIP 状态。这里使用执行门面控制故障；真实下载工程的自身脚本构建及 B 数据库运行仍归 PD13。
+
+## 源码恢复与管理 API（PD11/12）
+
+`ex22-delivery-pd11-restore-status.log`：34 策略单测 + 3 真实 Git/PG 集成通过。验证恢复追加新版本、basedOn/restoredFrom、原两份树字节不变、恢复当前版本也追加历史、相同幂等键返回原操作、冲突键/旧 revision/越权拒绝、不可用协调器不创建新意图。模拟写 Git 后未知异常时保留 `NEEDS_RECONCILIATION` 和原 head；最初 `pd11-restore.log` 的断言误期望 FAILED，原失败保留，修正测试尊重已有恢复语义，未改工作器规则。
+
+`ex22-delivery-pd12-http.log`：5 单测 + 7 真实 HTTP/PG 集成通过，覆盖恢复 202、状态查询、登录/CSRF/归属、严格请求字段/UUID/revision/幂等键、409 与未知结果展示、下载兼容性。状态 DTO 不暴露内部执行 ID、请求/幂等摘要、owner 或磁盘路径。HTTP 测试模拟源码门面；实际发布算法由上述 Git/PG 集成验证。

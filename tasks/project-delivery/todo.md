@@ -75,14 +75,17 @@
   - 文件：下载 service/controller、DTO、集成测试；验证 J：非 latest、跨项目拒绝、停止/换版/取消、旧模板不重组。
   - PD10a：`ex22-delivery-pd10a-source.log` 14 项单测通过；固定快照、原会话/运行、配置和身份变化、统一剩余预算，无 latest 或当前模板回退。
   - PD10b：`ex22-delivery-pd10b-http.log` 7 项单测 + 7 项真实 HTTP/PG 集成通过；ZIP 字节/清单/附件头、登录权限、停止后预览下载拒绝但历史构建仍可下载。全局 2/会话 1，未结束的生成器或慢写出持续占名额，未提交响应超时不会保留成功 ZIP 状态。真实 ZIP 独立运行留待 PD13。
-- [ ] **PD11：源码恢复窄门面**（无依赖；至多 4 文件）
+- [x] **PD11：源码恢复窄门面**（无依赖；至多 4 文件）
   - 源码模块提供 head/restore/operation 窄接口，复用现有 coordinator；revision/CAS/幂等，不重复持久化算法。
   - 文件：source gateway、集成测试；验证 J：冲突/重放/当前版本/异步失败，无业务数据库写入。
-- [ ] **PD12：交付恢复 API**（PD04、PD11；至多 3 文件）
+  - `ex22-delivery-pd11-restore-status.log` 34 项策略单测及 3 项真实 Git/PG 集成通过：恢复追加新版本、旧树不变、CAS/跨 owner/同键冲突拒绝、相同请求重放，以及未知结果保持待核对。首次 `pd11-restore.log` 中夹具误将未知结果期望为 FAILED，已修正断言，未放宽源码工作器状态规则；已有 Journey 集成在该日志也通过。
+- [x] **PD12：交付恢复 API**（PD04、PD11；至多 3 文件）
   - 管理身份+CSRF、规范 UUID/Idempotency-Key、202/operation DTO；恢复不自动构建/启动。
   - 文件：controller、DTO、HTTP 集成测试；验证 J：越权/错误格式/幂等/恢复后新源码身份。
 
-**C4：** 下载与恢复 API 有固定身份及权限证据，旧源码与业务数据未改写。
+  - `ex22-delivery-pd12-http.log` 5 项单测及 7 项真实 HTTP/PG 集成通过：202 + 可轮询白名单 DTO、登录/CSRF/归属、规范 UUID、必需幂等键、整数 revision、未知字段拒绝、409 与待核对状态保留。无构建/启动调用。
+
+**C4 已通过：** 下载与恢复 API 有固定身份及权限证据，旧源码与业务数据未改写。
 
 - [ ] **PD13：下载工程独立业务验收**（PD03、PD08b、PD10、PD12；至多 5 文件）
   - A 预览 ZIP 解压后用自身脚本和 B_test 构建，再 B_app 启动；新增/修改/查询/409/重启数据保留，原 A/B 记录不受影响。
