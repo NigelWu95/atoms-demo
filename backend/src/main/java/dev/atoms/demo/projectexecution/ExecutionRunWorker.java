@@ -13,6 +13,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 
 /** Holds one runtime for its entire lifetime. A future coordinator supplies its exclusive lease and bounded executor. */
 final class ExecutionRunWorker {
+    private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(ExecutionRunWorker.class);
     @FunctionalInterface interface ToolCapture {
         ExecutionToolchain load(ExecutionRunService.Claim claim) throws IOException;
     }
@@ -75,25 +76,33 @@ final class ExecutionRunWorker {
                 claim.configuration.root().resolve("runs").resolve(run.id().toString()));
         ExecutionRunProcess process = null; ExecutionRunProcess.Outcome outcome = null;
         boolean attempted = false, committed = false, interrupted = false;
-        String failure = null;
+        String failure = null; long started = System.nanoTime();
         try {
             coordination.check(); remaining(claim.budget);
-            var tools = toolCapture.load(claim);
+            var tools = toolCapture.load(claim); phase(run.id(), "TOOLS_VERIFIED", started);
             remaining(claim.budget); verifyResources(claim, tools); service.recheck(claim, null);
+            phase(run.id(), "INPUTS_RECHECKED", started);
             var command = ExecutionRunCommand.prepare(paths, run.id(), execution, tools, claim.artifact,
                     claim.identity.build(), claim.identity.binding(), claim.budget);
+            phase(run.id(), "COMMAND_PREPARED", started);
             var grant = databases.authorizeLaunch(run.projectId(), run.id(), execution, command, claim.budget);
-            var builder = grant.builder(claim.budget);
+            phase(run.id(), "DATABASE_AUTHORIZED", started);
+            var builder = grant.builder(claim.budget); phase(run.id(), "COMMAND_BOUND", started);
             portAvailable(claim.identity.binding().port()); coordination.check(); remaining(claim.budget);
             attempted = true;
             journal.begin(execution); // Commit acknowledgement is required before calling even the launcher adapter.
             committed = true;
+            phase(run.id(), "EXECUTION_JOURNALED", started);
             process = launcher.start(builder, run.id(), execution, claim.budget, () -> {
+                phase(run.id(), "OWNED_PREFLIGHT_BEGIN", started);
                 coordination.check(); verifyResources(claim, tools); service.recheck(claim, execution);
+                phase(run.id(), "OWNED_INPUTS_RECHECKED", started);
                 grant.verify(claim.budget); portAvailable(claim.identity.binding().port());
+                phase(run.id(), "OWNED_PREFLIGHT_COMPLETE", started);
             });
             owned.put(run.id(), process);
             outcome = serve(claim, execution, process, command, journal);
+            LOG.debug("application_run_ended run={} outcome={} stopEvidence={}", run.id(), outcome.code(), outcome.stopped() != null);
         } catch (InterruptedException error) {
             interrupted = true; failure = "RUN_CANCELLED";
         } catch (IOException | RuntimeException error) {
@@ -164,6 +173,11 @@ final class ExecutionRunWorker {
     }
     private static ExecutionRunProcess.Outcome unknown(ExecutionRunProcess.Output output) {
         return new ExecutionRunProcess.Outcome("RUN_PROCESS_UNSETTLED", output, null);
+    }
+    private static void phase(UUID run, String phase, long started) {
+        // Fixed labels and internal UUID only: no argv, private paths, credentials or raw exception messages.
+        LOG.debug("application_start_phase run={} phase={} elapsedMs={}", run, phase,
+                java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started));
     }
     private static String failureCode(Exception error) {
         String code = error instanceof ApiException api ? api.code() : Objects.toString(error.getMessage(), "");
