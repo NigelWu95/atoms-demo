@@ -17,7 +17,7 @@ final class ExecutionStoppedRunMaintenance implements ExecutionRunReconciliation
     private final ExecutionCoordinatorLease lease;
     private final ExecutionPaths paths;
     private final UUID owner, project, run;
-    private boolean closed, scopeOpen;
+    private boolean closing, closed, scopeOpen;
 
     static ExecutionStoppedRunMaintenance acquire(ExecutionSettings settings, DataSource database,
             BooleanSupplier sourceReady, List<Path> protectedRoots, UUID owner, UUID project, UUID run) throws IOException {
@@ -89,7 +89,7 @@ final class ExecutionStoppedRunMaintenance implements ExecutionRunReconciliation
     }
     private void checkAuthority() throws IOException {
         try {
-            if (closed || !configuration.equals(settings.load()) || !configuration.maintainerIds().contains(owner)
+            if (closing || closed || !configuration.equals(settings.load()) || !configuration.maintainerIds().contains(owner)
                     || !sourceReady.getAsBoolean() || !lease.healthy()) throw unavailable();
         } catch (RuntimeException error) { throw unavailable(); }
     }
@@ -100,9 +100,12 @@ final class ExecutionStoppedRunMaintenance implements ExecutionRunReconciliation
         outside();
         if (closed) return;
         if (scopeOpen) throw unavailable();
+        closing = true;
+        boolean failed = false;
+        try { paths.close(); } catch (IOException error) { failed = true; }
+        try { lease.close(); } catch (SQLException error) { failed = true; }
+        if (failed) throw unavailable();
         closed = true;
-        try { paths.close(); }
-        finally { try { lease.close(); } catch (SQLException error) { throw unavailable(); } }
     }
     private static void outside() throws IOException {
         if (TransactionSynchronizationManager.isActualTransactionActive()) throw new IOException("EXECUTION_TRANSACTION_ACTIVE");

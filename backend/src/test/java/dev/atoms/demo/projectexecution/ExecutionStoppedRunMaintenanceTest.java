@@ -120,6 +120,17 @@ class ExecutionStoppedRunMaintenanceTest {
         }
     }
 
+    @Test void failedDisposalStaysRevokedButCanRetryReleasingItsOwnLease() throws Exception {
+        var maintenance = acquire();
+        when(connection.createStatement().executeQuery(contains("pg_advisory_unlock"))).thenThrow(new SQLException("private-unlock"));
+        doThrow(new SQLException("private-abort")).doNothing().when(connection).abort(any());
+        assertThatThrownBy(maintenance::close).hasMessage("RUN_RECONCILIATION_UNAVAILABLE").hasNoCause();
+        assertThatThrownBy(() -> maintenance.open(failed())).isInstanceOf(IOException.class);
+        verify(connection, never()).close();
+        maintenance.close(); verify(connection, times(2)).abort(any()); verify(connection).close();
+        maintenance.close(); verify(connection, times(2)).abort(any());
+    }
+
     @Test void ambientTransactionsAreRejectedBeforeResourceAcquisition() {
         try {
             TransactionSynchronizationManager.setActualTransactionActive(true);
