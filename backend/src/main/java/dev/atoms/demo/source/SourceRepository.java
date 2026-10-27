@@ -38,6 +38,9 @@ class SourceRepository {
     SourceOperation operation(UUID project, UUID id) {
         return first(jdbc.query("SELECT * FROM source_operations WHERE project_id=? AND id=?", OPERATION, project, id));
     }
+    List<SourceOperation> workbenchOperations(UUID project) {
+        return jdbc.query("SELECT * FROM source_operations WHERE project_id=? AND kind IN ('INITIALIZE','RESTORE') ORDER BY created_at DESC,id DESC LIMIT 10", OPERATION, project);
+    }
     SourceOperation findByKey(UUID project, String key) {
         return first(jdbc.query("SELECT * FROM source_operations WHERE project_id=? AND idempotency_sha256=?", OPERATION, project, key));
     }

@@ -12,6 +12,11 @@ class ProjectSourceWorkbenchIT extends SourceIntegrationSupport {
     @Test void readsPublishedFilesAndDiffWithoutExposingRepositoryMetadata() throws Exception {
         var first = publish(null, 0, "hello"); var second = publish(first, 1, "世界");
         var gateway = gateway();
+        assertThat(gateway.operations(owner, project)).singleElement().satisfies(op -> {
+            assertThat(op.kind()).isEqualTo("INITIALIZE"); assertThat(op.status()).isEqualTo("COMMITTED");
+            assertThat(op.resultVersionId()).isEqualTo(first);
+        });
+        assertThatThrownBy(() -> gateway.operations(stranger, project)).isInstanceOf(ApiException.class);
         var page = gateway.versions(owner, project, null, 1);
         assertThat(page.items()).extracting(ProjectSourceWorkbenchGateway.Version::id).containsExactly(second);
         assertThat(page.nextBeforeVersion()).isEqualTo(2);

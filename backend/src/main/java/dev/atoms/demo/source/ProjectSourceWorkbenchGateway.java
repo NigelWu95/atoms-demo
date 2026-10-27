@@ -17,10 +17,11 @@ public final class ProjectSourceWorkbenchGateway {
     private final ProjectSourceService service;
     private final SourceQuery query;
     private final ProjectSourceEnvironment environment;
+    private final SourceRepository repository;
     private final Semaphore readers = new Semaphore(4);
 
     ProjectSourceWorkbenchGateway(ProjectSourceService service, SourceRepository repository, ProjectSourceEnvironment environment) {
-        this.service = service; this.environment = environment;
+        this.service = service; this.environment = environment; this.repository = repository;
         query = new SourceQuery(service, repository, environment);
     }
 
@@ -69,7 +70,14 @@ public final class ProjectSourceWorkbenchGateway {
     }
 
     public Operation operation(UUID owner, UUID project, UUID id) {
-        var op = service.operation(owner, project, id);
+        return view(service.operation(owner, project, id));
+    }
+    public List<Operation> operations(UUID owner, UUID project) {
+        service.authorize(owner, project);
+        var result = repository.workbenchOperations(project).stream().map(ProjectSourceWorkbenchGateway::view).toList();
+        service.authorize(owner, project); return result;
+    }
+    private static Operation view(SourceOperation op) {
         return new Operation(op.id(), op.kind(), op.status(), op.resultVersionId(), op.errorCode(), op.createdAt(), op.finishedAt());
     }
 

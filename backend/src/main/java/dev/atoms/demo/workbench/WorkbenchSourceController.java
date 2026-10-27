@@ -64,4 +64,8 @@ final class WorkbenchSourceController {
             Principal principal, HttpServletRequest request) {
         query(request); access.require(owner(principal), id(projectId)); return source.operation(owner(principal), id(projectId), id(operationId));
     }
+    @GetMapping("/source/operations")
+    List<ProjectSourceWorkbenchGateway.Operation> operations(@PathVariable String projectId, Principal principal, HttpServletRequest request) {
+        query(request); access.require(owner(principal), id(projectId)); return source.operations(owner(principal), id(projectId));
+    }
 }
