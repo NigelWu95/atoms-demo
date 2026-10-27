@@ -39,10 +39,18 @@ final class ExecutionPaths implements AutoCloseable {
         this(root, protectedRoots, ExecutionSettings.ROOT_MAX_BYTES, ExecutionSettings.MIN_FREE_BYTES);
     }
 
+    static ExecutionPaths existing(Path root, List<Path> protectedRoots) throws IOException {
+        return new ExecutionPaths(root, protectedRoots, ExecutionSettings.ROOT_MAX_BYTES, ExecutionSettings.MIN_FREE_BYTES, true);
+    }
+
     ExecutionPaths(Path root, List<Path> protectedRoots, long maxBytes, long reserveBytes) throws IOException {
+        this(root, protectedRoots, maxBytes, reserveBytes, false);
+    }
+
+    private ExecutionPaths(Path root, List<Path> protectedRoots, long maxBytes, long reserveBytes, boolean requireExisting) throws IOException {
         if (maxBytes <= 0 || reserveBytes < 0) throw ExecutionRootLease.unavailable();
         this.root = root; this.maxBytes = maxBytes; this.reserveBytes = reserveBytes;
-        lease = new ExecutionRootLease(root, protectedRoots);
+        lease = requireExisting ? ExecutionRootLease.existing(root, protectedRoots) : new ExecutionRootLease(root, protectedRoots);
         try {
             for (Area area : Area.values()) {
                 Path path = root.resolve(area.directory);

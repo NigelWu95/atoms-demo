@@ -13,6 +13,18 @@ import static org.assertj.core.api.Assertions.*;
 class ExecutionPathsTest {
     @TempDir Path temporary;
 
+    @Test void maintenanceReopensExistingAreasWithoutCreatingOrRepairingThem() throws Exception {
+        Path root = temporary.toRealPath().resolve("existing");
+        assertThatThrownBy(() -> ExecutionPaths.existing(root, List.of())).isInstanceOf(IOException.class);
+        assertThat(Files.exists(root)).isFalse();
+        try (var paths = new ExecutionPaths(root, List.of())) { paths.createRun(UUID.randomUUID()); }
+        try (var paths = ExecutionPaths.existing(root, List.of())) { assertThat(paths.checkedRoot()).isEqualTo(root); }
+        Files.move(root.resolve("runs"), root.resolve("retained-runs"));
+        assertThatThrownBy(() -> ExecutionPaths.existing(root, List.of())).isInstanceOf(IOException.class);
+        assertThat(Files.exists(root.resolve("runs"))).isFalse();
+        assertThat(Files.isDirectory(root.resolve("retained-runs"))).isTrue();
+    }
+
     @Test void distinctPrivateAreasAndTaskCapabilitiesSurviveNeitherReplacementNorForeignIssuer() throws Exception {
         Path parent = temporary.toRealPath(), root = parent.resolve("execution");
         try (var paths = new ExecutionPaths(root, List.of());

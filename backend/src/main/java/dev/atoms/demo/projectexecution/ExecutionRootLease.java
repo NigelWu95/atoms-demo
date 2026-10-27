@@ -29,11 +29,20 @@ final class ExecutionRootLease implements AutoCloseable {
         this(root, protectedRoots, new com.sun.security.auth.module.UnixSystem().getUid());
     }
 
+    static ExecutionRootLease existing(Path root, List<Path> protectedRoots) throws IOException {
+        return new ExecutionRootLease(root, protectedRoots, new com.sun.security.auth.module.UnixSystem().getUid(), true);
+    }
+
     ExecutionRootLease(Path root, List<Path> protectedRoots, long uid) throws IOException {
+        this(root, protectedRoots, uid, false);
+    }
+
+    private ExecutionRootLease(Path root, List<Path> protectedRoots, long uid, boolean requireExisting) throws IOException {
         if (uid <= 0) throw new IOException("EXECUTION_ROOT_REFUSED");
         validateRoot(root, protectedRoots);
         this.root = root; this.marker = root.resolve(".atoms-execution-root"); this.uid = uid;
         created = !Files.exists(root, LinkOption.NOFOLLOW_LINKS);
+        if (created && requireExisting) throw unavailable();
         if (created) directory(root);
         rootKey = directoryKey(root);
         // Reject local duplicates BEFORE opening another descriptor for the locked inode.

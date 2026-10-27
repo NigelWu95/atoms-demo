@@ -13,6 +13,21 @@ import static org.assertj.core.api.Assertions.*;
 class ExecutionRootLeaseTest {
     @TempDir Path temporary;
 
+    @Test void maintenanceOnlyOpensAnExistingMarkedRootAndKeepsExclusiveOwnership() throws Exception {
+        Path root = temporary.toRealPath().resolve("maintenance");
+        assertThatThrownBy(() -> ExecutionRootLease.existing(root, List.of())).isInstanceOf(IOException.class);
+        assertThat(Files.exists(root)).isFalse();
+        try (var original = new ExecutionRootLease(root, List.of())) {
+            assertThatThrownBy(() -> ExecutionRootLease.existing(root, List.of())).isInstanceOf(IOException.class);
+            assertThat(probe(root)).isEqualTo(9);
+        }
+        try (var maintenance = ExecutionRootLease.existing(root, List.of())) {
+            assertThat(maintenance.created()).isFalse(); assertThat(maintenance.checked()).isEqualTo(root);
+            assertThat(probe(root)).isEqualTo(9);
+        }
+        assertThat(probe(root)).isZero();
+    }
+
     @Test void oneOwnerAcrossJvmsEvenAfterLocalDuplicateAndRepeatedChecks() throws Exception {
         Path root = temporary.toRealPath().resolve("execution");
         try (var lease = new ExecutionRootLease(root, List.of())) {
