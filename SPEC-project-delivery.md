@@ -1,6 +1,6 @@
 # Spec: project-delivery · 实际运行预览与同快照源码交付
 
-状态：2026-10-27，用户已确认本规格，进入实施；尚未完成验收。实施顺序与进度见 [计划](tasks/project-delivery/plan.md)和[任务清单](tasks/project-delivery/todo.md)。本模块沿用[能力地图](FULL-PROJECT-CAPABILITY-MAP.md)的 `project-delivery`，依赖已验收的 `project-source` 和 `project-execution`。整体连续开发授权见 [Agent 规格 §10](SPEC-project-agent.md#10-2026-10-19-完整闭环实施授权)。旧网页、固定模板预览、下载与发布继续按原规则运行。
+状态：2026-10-27，PD01–PD14 与 C1–C5 已完成内部验收，包括真实应用预览、下载工程独立构建运行、源码恢复和兼容性回归；新模式默认关闭，正式工作台尚未接入。证据见[验证记录](docs/project-delivery-verification.md)，实施顺序与进度见[计划](tasks/project-delivery/plan.md)和[任务清单](tasks/project-delivery/todo.md)。本模块沿用[能力地图](FULL-PROJECT-CAPABILITY-MAP.md)的 `project-delivery`，依赖已验收的 `project-source` 和 `project-execution`。整体连续开发授权见 [Agent 规格 §10](SPEC-project-agent.md#10-2026-10-19-完整闭环实施授权)。旧网页、固定模板预览、下载与发布继续按原规则运行。
 
 ## 1. 目标与可见结果
 
@@ -27,7 +27,9 @@
 
 应用自带 Cookie 登录、localStorage/IndexedDB、Service Worker、WebSocket/SSE、大文件上传下载、外站资源、任意反向代理和 history 路由回退不在首版预览契约内。相应工程仍可作为源码下载，但不能声称这些行为已与平台预览一致；不兼容必须显示原因，不能放开同源执行兜底。公开发布、自动申请数据库、真实模型调用和远程部署不属于本模块。
 
-## 3. 已有代码与需要补齐的边界
+## 3. 实施前基线与模块边界
+
+下表保留设计开始时的缺口，便于说明复用关系。现已补齐受限 HTTP 交换、源码恢复门面和独立测试配置；实现及验收见[交付说明](docs/project-delivery.md)和[验证记录](docs/project-delivery-verification.md)。
 
 | 现有实现 | 复用方式 / 缺口 |
 |---|---|
@@ -43,9 +45,9 @@
 
 HTTP 交换共享一个总期限，动作前后重新校验授权、原进程及固定产物。已有交付句柄校验不能被缓存的 READY 状态替代。需要复用源码层的剩余时间重载，不能把多个 30 秒操作叠加为无界请求。先在真实 Chrome 验证这一传输能运行现有 Vue/Java 样本，再扩展完整交付 API。
 
-## 4. API 契约草案
+## 4. API 契约
 
-以下是待实现路径，不是当前可调用接口。管理 API 沿用平台身份和 CSRF；projectId 及各 ID 为规范 UUID。每次检查开关、维护者资格、项目归属及归档状态。
+以下路径已实现，默认关闭；正式工作台尚未接入。管理 API 沿用平台身份和 CSRF；projectId 及各 ID 为规范 UUID。每次检查开关、维护者资格、项目归属及归档状态。
 
 | 方法与路径 | 请求 / 结果 |
 |---|---|
@@ -61,7 +63,7 @@ HTTP 交换共享一个总期限，动作前后重新校验授权、原进程及
 统一身份 DTO 为 projectId、sourceVersionId、treeSha256、buildId、jarSha256、manifestSha256；运行身份另含 runId、executionId。新增 DTO 沿用 Java record、规范 UUID 与固定错误码，例如：
 
 ```java
-public record PreviewView(UUID id, Instant expiresAt, String iframeUrl,
+public record PreviewView(UUID previewId, Instant expiresAt, String iframeUrl,
         ProjectExecutionAccess.RunningIdentity identity) {}
 ```
 
@@ -126,12 +128,12 @@ ZIP 中 `project/` 是完整 Git 源码树：路径、文件字节和 100644/100
 
 ## 8. 验证方法与命令
 
-按风险先验证真实 Vue 模块加载与 JSON 请求在不透明来源下可用，再实现完整授权/下载/恢复。测试层级必须区分：纯策略单测、HTTP/PG 集成、真实运行+Chrome、下载目录中的真实工程构建/运行，不能用假上游或静态页面替代后两者。下面是规划命令，尚未运行，测试类/入口在实现时创建。
+按风险先验证真实 Vue 模块加载与 JSON 请求在不透明来源下可用，再实现完整授权/下载/恢复。测试层级必须区分：纯策略单测、HTTP/PG 集成、真实运行+Chrome、下载目录中的真实工程构建/运行，不能用假上游或静态页面替代后两者。下面是常用验证入口；本轮实际命令、计数和失败记录见[验证记录](docs/project-delivery-verification.md)。
 
 ```sh
 # 仓库根目录；复用已批准 runner / JDK / Node / 隔离测试 schema
 sh .local/run-ex22-checks.sh ex22-delivery-focused.log \
-  '-Dtest=Delivery*Test' '-Dit.test=Delivery*IT,!DeliveryApplicationContractIT' verify
+  '-Dtest=Delivery*Test' '-Dit.test=Delivery*IT' verify
 
 # 完成阶段的平台回归；不按默认排除的原生/CLI 契约为已通过
 sh .local/run-ex22-checks.sh ex22-delivery-all.log verify
@@ -146,7 +148,7 @@ CI=1 npm run test:e2e
 CI=1 npm run test:e2e:runtime
 
 # 下载工程：在解压后的 project/，私有配置另放，禁止执行未知下载代码
-# --test-config 是本模块拟新增的入口，当前脚本尚未支持；完成后按此验收
+# --test-config 已实现，只向工程自己的 Maven/Java 测试传递外部配置路径
 node scripts/build.mjs --test-config /absolute/private/test.properties
 node scripts/start.mjs --config /absolute/private/runtime.properties
 ```
@@ -171,6 +173,6 @@ node scripts/start.mjs --config /absolute/private/runtime.properties
 
 ## 10. 评审点
 
-建议按本稿确定三项产品边界：使用现有 HTTP 路径和短期私有预览，不新增域名/端口；首版采用不透明来源及无 Cookie 的 JSON 业务预览；下载固定源码快照，恢复源码不自动切换应用或业务数据。
+用户已确认三项产品边界：使用现有 HTTP 路径和短期私有预览，不新增域名/端口；首版采用不透明来源及无 Cookie 的 JSON 业务预览；下载固定源码快照，恢复源码不自动切换应用或业务数据。
 
-这些选择需要通过真实浏览器和下载工程验收才能兑现，当前仅完成了代码核对与规格设计。若浏览器无法满足该边界，先报告证据并调整规格，不临时允许同源脚本或平台凭据转发。规格通过后进入本模块实施计划与任务分解，继续遵守整体连续开发授权，不逐个小任务询问是否开始。
+上述边界已通过 PD13 的真实浏览器和下载工程验收；最终兼容性状态以任务清单为准。后续若浏览器无法满足该边界，先报告证据并调整规格，不临时允许同源脚本或平台凭据转发。继续遵守整体连续开发授权，不逐个小任务询问是否开始。

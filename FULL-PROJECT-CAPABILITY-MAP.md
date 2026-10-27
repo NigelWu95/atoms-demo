@@ -1,6 +1,6 @@
 # 完整源码工程与 Coding Agent · 能力地图
 
-状态：2026-10-27，源码模块、Agent PA01–PA33 离线能力及执行模块 EX01–30 / C-EX10 已完成内部验收。两个真实 Vue/Java/SQL 应用的 V1/V2 构建、HTTP、独立 PG、准确迁移批准、重启持久化及失败迁移核对通过；完整兼容回归和原生契约已收口，见[执行记录](docs/project-execution-verification.md)和[维护说明](docs/project-execution.md)。新模式默认关闭，真实模型、网页交付、工作台接入及部署尚未完成；旧未决审计保留。
+状态：2026-10-27，源码模块、Agent PA01–PA33 离线能力、执行模块 EX01–30 / C-EX10 及交付模块 PD01–PD14 / C1–C5 已完成内部验收。真实 Vue/Java/SQL 应用已验证构建、独立 PG、版本更新、迁移核对、路径预览、固定源码 ZIP 独立运行和重启持久化；见[执行记录](docs/project-execution-verification.md)及[交付记录](docs/project-delivery-verification.md)。新模式默认关闭，真实模型、正式工作台接入及部署尚未完成；旧未决审计保留。
 
 ## 目标与现状
 
@@ -18,8 +18,8 @@
 |---|---|---|---|
 | `project-source` | 每项目完整源码 Git 仓库、不可变版本、工作副本、元数据、旧产物显式导入 | 现有项目身份与所有权 | 内部模块已验收、默认关闭；[使用说明](docs/project-source.md)、[测试证据](docs/project-source-verification.md)、[任务清单](tasks/project-source/todo.md) |
 | `project-agent` | Claude Code + DeepSeek 在任务副本中读取及修改 Vue、Java、SQL 等文件，提交可检查的变更 | `project-source` | PA01–PA33 内部离线验收完成，默认 4 并发；最终后端 290 单元 + 272 集成通过，CLI 2.1.302 / 2.1.303 精确适配。见[维护说明](docs/project-agent.md)、[证据](docs/project-agent-verification.md)、[任务清单](tasks/project-agent/todo.md)。真实模型 PA-LIVE 未完成，旧两份测试未决审计保留；不代表实际构建运行或工作台已交付 |
-| `project-execution` | 对固定源码版本测试、构建、启动本机进程；构建失败保留上一可用结果，数据库迁移另行核对 | `project-source` | EX01–30 与 C-EX10 已完成，实际业务应用及两轮前后端版本、迁移/失败核对、重启持久化、交付身份、有界查询和原链路回归均已内部验收。[维护说明](docs/project-execution.md)、[任务](tasks/project-execution/todo.md)、[证据](docs/project-execution-verification.md)。网页预览/下载及工作台尚未接入 |
-| `project-delivery` | 实际应用预览、同快照下载、代码版本恢复；明确业务数据边界 | `project-source`、`project-execution` | [规格](SPEC-project-delivery.md)已于 2026-10-27 确认，按[任务清单](tasks/project-delivery/todo.md)实施；先补独立构建测试配置，再验证 Vue 路径预览、同快照 ZIP 与源码恢复，尚未完成验收 |
+| `project-execution` | 对固定源码版本测试、构建、启动本机进程；构建失败保留上一可用结果，数据库迁移另行核对 | `project-source` | EX01–30 与 C-EX10 已完成，实际业务应用及两轮前后端版本、迁移/失败核对、重启持久化、交付身份、有界查询和原链路回归均已内部验收。[维护说明](docs/project-execution.md)、[任务](tasks/project-execution/todo.md)、[证据](docs/project-execution-verification.md)。预览/下载已由交付模块验证，正式工作台尚未接入 |
+| `project-delivery` | 实际应用预览、同快照下载、代码版本恢复；明确业务数据边界 | `project-source`、`project-execution` | PD01–PD14 / C1–C5 完成内部验收。真实 Vue 页面、HTTP ZIP 标准解压与逐文件比对、自身脚本独立构建/启动、CRUD/409 和重启持久化通过；源码恢复追加版本，原预览 ZIP 不变。默认关闭，正式页面接入另计。[使用说明](docs/project-delivery.md)、[证据](docs/project-delivery-verification.md)、[任务](tasks/project-delivery/todo.md) |
 | `project-workbench` | 文件树、差异、任务与构建状态、实际进程预览及增量开发入口 | 以上模块 | 待规格评审 |
 
 建设顺序：`project-source` → `project-agent` → `project-execution` → `project-delivery` → `project-workbench`。

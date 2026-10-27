@@ -1,6 +1,6 @@
-# project-delivery 验证记录（实施中）
+# project-delivery 验证记录（内部验收完成）
 
-2026-10-27，按[已确认规格](../SPEC-project-delivery.md)推进。此文档只记录已有证据，不把内部单测或 HTTP 夹具视为真实 Vue/下载工程验收。总体进度见[任务清单](../tasks/project-delivery/todo.md)。当前没有 push、部署、真实模型或邮件调用。
+2026-10-27，按[已确认规格](../SPEC-project-delivery.md)完成 PD01–PD14 / C1–C5。此文档按时间保留过程和失败记录，段落中的“尚未完成”指当时状态；最终结果见末尾汇总，不把内部单测或 HTTP 夹具视为真实 Vue/下载工程验收。总体进度见[任务清单](../tasks/project-delivery/todo.md)。当前没有 push、部署、真实模型或邮件调用；正式工作台尚未接入，新模式默认关闭。
 
 ## 独立构建配置
 
@@ -84,7 +84,7 @@ ZIP writer 按 [PKWARE 6.3.10 的本地头、中央目录及 Unix 属性约定](
 `ex22-delivery-pd12-http.log`：5 单测 + 7 真实 HTTP/PG 集成通过，覆盖恢复 202、状态查询、登录/CSRF/归属、严格请求字段/UUID/revision/幂等键、409 与未知结果展示、下载兼容性。状态 DTO 不暴露内部执行 ID、请求/幂等摘要、owner 或磁盘路径。HTTP 测试模拟源码门面；实际发布算法由上述 Git/PG 集成验证。
 
 
-## PD13 当前阻塞与只读检查（2026-10-27）
+## PD13 初次阻塞与只读检查（已在下文解决）
 
 已补齐真实下载 ZIP 的逐文件/执行位比对、自身 `build.mjs`/`start.mjs`、B 库浏览器 CRUD/409、重启数据保留，以及恢复后旧预览仍下载原源码的验收代码。**这些新增步骤尚未实际走通，不能计为通过。**
 
@@ -95,7 +95,7 @@ ZIP writer 按 [PKWARE 6.3.10 的本地头、中央目录及 Unix 属性约定](
 - `.local/delivery-startup-readonly/InspectStartupCosts.java` 只读工具检查通过：全工具捕获约 8.12 秒，Java 再检查约 1.68 秒；当前 Java 的 109 个文件、279705349 字节、SHA-256 `cf900a03e3bf843231bbf4758c8359b6cf97f49e1823fe04de145db88fc3b7dc` 与原成功构建清单一致。此观察不能替代完整启动各阶段计时，也不能证明所有负载下均在启动预算内。
 - 临时生产诊断已移除。验收夹具改为及时识别 NEEDS_RECONCILIATION 并报告真实错误，而不是再等待通用超时；不改变生产启动预算或失败状态规则。
 
-## PD14 已完成的前端检查（后端整体验收仍未完成）
+## PD14 前端检查（先行记录）
 
 `.local/delivery-pd14-frontend-{typecheck,lint,format:check,test:unit,build}.log`：类型检查、Lint、格式检查、54 文件 / 372 项单元测试及生产构建全部成功，执行脚本退出 0。浏览器脚本通过 Node 语法检查。前端源文件未改动。
 
@@ -107,3 +107,80 @@ ZIP writer 按 [PKWARE 6.3.10 的本地头、中央目录及 Unix 属性约定](
 ## 已确认的重启后恢复（2026-10-27）
 
 用户确认[恢复方案](design/project-delivery/startup-recovery-review.md)后完成仅打开已有根的维护能力与固定 owner/project/run 核对。14 项目录/锁检查、31 单元 + 11 集成通过；pending 拒绝条件变异能被检出，恢复后 7 项通过。`ex22-delivery-recovery-approved-run.log` 的 7 单元 + 1 实际恢复通过，准确来源、真实绑定和当前历史均经原输入校验；追加审计 `c4d7e03a-58e9-47ac-bc37-77387c0cae09` 后结束唯一获准运行。A/B 的 6/3 条记录、结构、迁移历史和其他运行/绑定/源码元数据在恢复前后相同，幂等重放没有第二份审计。未重建进程能力或修改业务数据。
+
+
+## PD13 完整原生验收通过
+
+`ex22-delivery-pd13-recovered.log`：30 单元 + 1 真实原生集成，零失败/错误/跳过，Maven 退出 0。基于原构建 `79815b82-d390-46b6-acbe-832932118b16`，没有替换旧源码或 JAR。
+
+- 平台预览实际加载 Vue 模块，Chrome 完成新增/修改、跨页旧 revision 的 409、刷新及 opaque-origin 隔离检查。
+- 实际 HTTP 下载 ZIP，经标准 unzip 解压后逐文件字节及 Git 执行位与原快照一致；清单固定原 source/build/run/execution。
+- 原协调器执行源码恢复，追加版本 `d8106bb9-aace-405b-ba8b-a0a8c30cb4ee`；原运行保持 READY，恢复前后的同一预览 ZIP 字节完全一致。
+- 解压工程自己的 `scripts/build.mjs --test-config ...` 完成 Node 脚本检查、npm 安装/类型/Lint、22 项 Vue 测试、前端构建、15 项 Java 测试和自身 JAR 打包。构建不使用平台 classpath 或 worker；源码构建后仍逐字节相同。
+- 工程自己的 `scripts/start.mjs --config ...` 启动 B 应用。真实 Chrome 完成同样的新增、编辑优先级、409 和刷新；停止后重启，新增记录仍在。B 原三条记录保留，A 在下载/构建/独立运行期间的七条记录完全不变；原 A 六条记录在平台预览写入之前也已逐条保留核对。
+- 原 A 应用停止及重启后旧预览均拒绝，新写入数据保留。原进程和解压工程的两次运行都保留自有停止证明，A/B 测试数据库身份及空 schema 不变。
+
+独立目录 `/private/tmp/atoms-ex11-contract.APT7Jb/todo-applications-y6dt7dkp/delivery-independent-17277187989348381113`，包含源码 ZIP、manifest、构建/运行输出、实际停止证明及桌面/手机截图；私有运行配置在解压工程之外，未进入 ZIP。截图已实际检查，无横向溢出。归档 `.local/delivery-pd14-native-evidence-eqjskd4h`；日志、报告、ZIP 和 JAR 应用资源对 9 项真实配置秘密值扫描零匹配。
+
+新增固定阶段 DEBUG 日志只记录内部 UUID、固定阶段和耗时，不记录命令/环境/凭据。此次初次启动前检查约 39 秒；120 秒启动上限未改变。较早失败缺乏完整阶段计时，不能声称已由这次成功定位其全部原因。后端全量兼容性与原平台浏览器回归仍在 PD14 完成。
+
+## PD14 首次完整回归及测试夹具修正
+
+`ex22-delivery-pd14-full.log` 于 15:30:56 结束，退出 1，33:34。127 个单元测试类的 647 项通过；139 个集成测试类共 612 项，其中 598 项通过、1 项断言失败、13 项错误，零跳过。日志与本轮新 XML 逐类核对，归档 `.local/delivery-pd14-full-evidence-b6xqmd91`；没有将旧报告混入本轮结果。
+
+- `ExecutionDatabaseLaunchIT` 三项失败：PD03 增加 `APP_TEST_CONFIG` 后，旧受控子 JVM 仍断言只有四个 APP 变量，因而主动以 13 退出。独立最小复现使用非秘密合成环境证明此分支，不访问数据库。夹具改为精确检查五个变量名、预期私有配置路径和 0600 权限，并继续检查父/子 JVM 的数据库身份、原调用不被修改及结果不泄密；不是删除隔离断言。
+- `DeliveryPreviewIT` 七项与 `DeliveryRestorationIT` 四项因上下文初始化失败而未执行：日志显示 PostgreSQL 非超级用户连接槽耗尽。进入交付测试前已有十九个缓存 Spring 上下文连接池，新增上下文使其累积到二十个，每池上限五。交付模块四个 HTTP 测试类改为在类结束后关闭自身上下文，释放连接池及服务器，不修改数据库上限、生产池配置或其他会话。
+- 修正仅涉及上述五个测试文件，生产源码、模板、前端及原生交付实现未变。接着定向复验全部交付 HTTP 测试和真实数据库启动契约；复验结果单独记录，首次完整回归仍保留失败状态。
+
+完整回归显式开启 `project-execution-contract,agent-cli-contract`，实际 CLI 为本机 2.1.303 的受控离线上游，不调用付费模型。单独排除六个既有原生构建/有状态契约，沿用 [EX29 及原生业务验收记录](project-execution-verification.md#2026-10-27--ex29b-种子通过及最终资源核对)；本轮 `ExecutionDeliveryPreviewContractIT` 与固定记录 `ExecutionStoppedRunRecoveryContractIT` 已分别实际执行，不在全量任务中重复改写状态。八项排除不计为本轮完整回归通过数。
+
+## PD14 后端定向复验通过
+
+`ex22-delivery-pd14-fixtures-corrected.log`：42 单元 + 30 集成通过，退出 0，零失败/错误/跳过。实际子 JVM 的准确测试库、配置路径、重复授权/并发拒绝均通过；交付管理、预览、下载、恢复全部 HTTP 测试通过。四个交付测试上下文逐个关闭，日志核对同时存活的连接池峰值 1，结束遗留 0。较早 `ex22-delivery-pd14-fixtures-fixed.log` 因 DirtiesContext import 包名错误编译失败，未执行测试，已修正并保留原日志。
+
+归档 `.local/delivery-pd14-focused-evidence-k647568_`，逐项覆盖首次全量的三个失败测试类，没有排除或跳过失败项。修正提交 `fa7072c`、`db396d2` 只改变五个测试文件；两批实际生产源码、前端与模板的组合 SHA-256 均为 `99104f10128b06df09e208d2f18e491416b9cb8ef4063ec188589037694e2ffc`。因此最终后端证据覆盖 **647 单元 / 612 集成的不同用例**，由一次完整回归及定向修复复验组成，不称为单次全量绿色，也不把重跑用例重复相加。日志、XML、差异对 9 项实际秘密值扫描零匹配。
+
+复验命令：
+
+```sh
+sh .local/run-ex22-checks.sh ex22-delivery-pd14-fixtures-corrected.log \
+  '-Dtest=ExecutionTestDatabaseTest,ExecutionBusinessConfigTest,Delivery*Test' \
+  -Pproject-execution-contract \
+  '-Dit.test=ExecutionDatabaseLaunchIT,ExecutionTestDatabaseIT,Delivery*IT' \
+  -Dexecution.test-config-directory=/Users/wubingheng/atoms-demo/.local/project-execution-acceptance.x5cvui \
+  verify
+```
+
+首次完整回归使用同一 runner，参数如下；不要删去有状态契约的排除项后在已有 V2 库重放 V1 初始化：
+
+```sh
+sh .local/run-ex22-checks.sh ex22-delivery-pd14-full.log \
+  -Pproject-execution-contract,agent-cli-contract \
+  '-Dit.test=*IT,!ExecutionSeedBuildContractIT,!ExecutionTodoBackendContractIT,!ExecutionApplicationContractIT,!ExecutionApplicationUpgradeIT,!ExecutionApplicationMigrationFailureIT,!ExecutionLockPreparationContractIT,!ExecutionDeliveryPreviewContractIT,!ExecutionStoppedRunRecoveryContractIT' \
+  -Dexecution.test-config-directory=/Users/wubingheng/atoms-demo/.local/project-execution-acceptance.x5cvui \
+  -Dexecution.contract-directory=/private/tmp/atoms-ex11-contract.APT7Jb \
+  -Dexecution.runtime-fixture-root=/Users/wubingheng/atoms-demo/.local/project-runtime-ex22-6kc9y53e \
+  -Datoms.agent.test.cli=/Users/wubingheng/atoms-demo/.local/ex11-cli-2.1.303.XX2V2d/node_modules/@anthropic-ai/claude-code-darwin-x64/claude \
+  verify
+```
+
+## PD14 浏览器、资源核对与最终汇总
+
+`delivery-pd14-browser-host.log`：22 项通过，5.1 分钟；`delivery-pd14-browser-host-runtime.log`：49 项通过，4.5 分钟。两套真实 Chrome 用例均零失败/跳过，runner 退出 0；覆盖邮箱切页/登录返回、账号同步、响应式及无障碍、生成请求恢复、共享预览、工程下载、版本恢复、发布、数据冲突和工作台内部滚动。邮件传输与模型响应使用既有受控夹具，不能当成真实 SMTP/付费模型联调。沙箱内首次 webServer 启动失败的 `delivery-pd14-browser.log` 保留，未执行用例；随后在获准主机环境运行成功。
+
+两套浏览器依次执行，均为 `CI=true`，由 Playwright 自行启动和停止现有 8081/5174 夹具，没有复用个人浏览器会话；JAVA_HOME 使用项目隔离 17.0.14，Node 为 24.20.0，EX22 测试 schema，新交付开关为 false。用户默认 Java 仍为 17.0.5。
+
+最终只读核对：当前测试 schema 的 **157 条运行全部结束**，执行任务槽 0、协调/绑定锁 0；3 条迁移批准及 2 条核对审计保留。新增的第二条核对正是本轮已批准的固定停止运行恢复。原五份未决审计及此前执行/绑定记录摘要保持不变；A/B 绑定及数据库/角色 OID 未变。当前 A/B 分别 7/4 条业务记录，各 3 条迁移历史；原数据保留的前后比较见 PD13 实际契约。8081、5174、18181、18182 均无监听。
+
+| 验证层级 | 最终证据 |
+|---|---|
+| 平台后端 | 647 单元、612 集成的不同用例；一次全量及定向修复复验，保留首次 14 项失败 |
+| 前端静态与单元 | 类型、Lint、格式、372 单测、生产构建通过 |
+| 原平台 Chrome | 22 页面 + 49 运行时通过 |
+| 新完整工程交付 | 1 个完整原生契约；自身脚本、22 Vue + 15 Java 检查、真实 A 预览 / B 下载独立运行、重启与源码恢复通过 |
+| 固定记录恢复 | 1 个显式批准的实际恢复契约，原子审计及幂等重放通过 |
+| 私有信息与资源 | 10 项实际秘密值对最终差异、浏览器证据、源码 ZIP、平台及独立 JAR 应用资源扫描零匹配；端口和执行资源已释放 |
+
+收口归档 `.local/delivery-pd14-close-evidence-qelel48d`（目录 0700，文件 0600），包含两套浏览器输出/截图、首次失败、静态检查日志、只读审计、runner 及汇总，并关联原生/全量/定向三份归档。未推送 GitHub、未部署、未调用真实模型或发送邮件、未修改个人配置。
+
+**PD01–PD14 与 C1–C5 完成内部验收。** 本结论限于交付后端及样本业务；正式工作台的新模式入口、真实模型端到端生成和公开发布/部署尚未完成，默认开关仍关闭。

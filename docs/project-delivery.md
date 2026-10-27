@@ -1,31 +1,64 @@
-# 完整工程交付（实施中）
+# 完整工程交付
 
-规格和进度分别见 [SPEC-project-delivery.md](../SPEC-project-delivery.md)及[任务清单](../tasks/project-delivery/todo.md)，证据见[验证记录](project-delivery-verification.md)。当前已完成独立构建测试配置、交付设置、原进程 HTTP 交换、会话授权及有界预览 HTTP 接口。真实 Vue 浏览器验收已通过，同快照下载 API 已完成，源码恢复 API 已完成，下载目录中的完整构建/运行验收尚未完成，正式工作台尚未接入。PD13 最新启动超时留下已停止的待核对记录，当前恢复范围见[待确认方案](design/project-delivery/startup-recovery-review.md)；完整交付验收尚未通过。
+本模块提供真实应用预览、固定源码 ZIP 下载和源码版本恢复的后端能力。真实 Vue + Spring Boot + PostgreSQL 待办应用已通过平台预览、下载后独立构建运行及重启持久化验收；最终兼容性结果见[验证记录](project-delivery-verification.md)。**正式工作台尚未接入这些新接口，新模式默认关闭。** 原有工作台和导出流程继续保留。
 
-管理入口为 `POST /api/projects/{projectId}/delivery/runs/{runId}/previews` 和 `DELETE /api/projects/{projectId}/delivery/previews/{previewId}`，沿用登录会话与 CSRF，只接受空对象或无正文。签发结果内的 `iframeUrl` 是短期能力链接，应按秘密处理，不记录进日志或长期存储。
+规格见 [SPEC-project-delivery.md](../SPEC-project-delivery.md)，实施项见[任务清单](../tasks/project-delivery/todo.md)。
 
-新预览使用独立的精确路径过滤链，不能访问平台会话；原会话从数据库只读检查，不因预览访问续期。Servlet 非阻塞读取/写入与有界线程池共享 30 秒期限；取消后仍未结束的后台工作继续占用名额，实际结束才释放。配置遵循 [Spring Security 多过滤链](https://docs.spring.io/spring-security/reference/6.5/servlet/configuration/java.html#_multiple_httpsecurity_instances)和 [Servlet 异步上下文](https://tomcat.apache.org/tomcat-10.1-doc/servletapi/jakarta/servlet/AsyncContext.html)语义。正式嵌入必须保留 `sandbox="allow-scripts allow-forms" referrerpolicy="no-referrer"`；allow-forms 用于 Vue 的 JS 表单事件，CSP `form-action 'none'` 仍禁止原生表单请求，不加入 allow-same-origin。真实 Chrome 已验证新增、修改、409 冲突和桌面/移动布局；停止或重启后旧授权不可复用。
+## 预览与下载如何保持一致
 
-## 固定源码下载
+预览固定在一个已就绪的运行，并绑定其 owner / project / sourceVersion / tree / build / JAR / manifest / run / execution 身份。网页和 JSON 业务 API 由该应用自己的 Java 进程提供，经平台的受控路径转发；不是再把生成内容装进平台 SDK 页面。
 
-`GET /api/projects/{projectId}/delivery/builds/{buildId}` 返回准确构建身份和源码规模；其 `/source.zip` 下载该构建的不可变完整源码，即使应用已停止也可用。`GET /api/projects/{projectId}/delivery/previews/{previewId}/source.zip` 只接受创建该预览的原登录会话，且原运行必须仍有效；停止或换版不回退到别的构建。
+下载从该构建对应的不可变 Git 快照读取 Vue、Java、SQL、锁文件、脚本、配置样例和测试。不会读取正在修改的目录，也不会按最新模板重新拼工程。ZIP 中原文件在 `project/`，身份清单和交付说明在 `delivery/`。文件字节与 Git 执行位保留；不含 JAR、node_modules、平台账号/对话、私有配置或业务数据。
 
-两类 ZIP 都在内存有界生成、复核后以附件返回，原文件放在 `project/`，交付清单单独放在 `delivery/`。不读取当前模板，不包含运行配置、JAR 或数据库数据。最多两个下载、每会话一个；非阻塞写出期间仍占名额，超时生成器真正结束才释放。普通浏览器下载使用平台登录会话，不使用 iframe 中的路径令牌；接口不增加跨域许可。
+相同的是源码及验收过的业务行为。下载工程使用单独的数据库和配置，已有业务数据不会随源码复制；它自己的新增数据会在自己的数据库中持久化。构建工具与依赖环境不同也可能使 JAR 字节不同，不将“同源码”表述成跨环境可重复二进制构建。
+
+实际验收覆盖了：平台页面新增/修改/冲突刷新；HTTP 下载 ZIP 后逐文件比对；下载工程自己的脚本构建和启动；下载版同样的浏览器操作；两次进程重启后数据保留；原 A/B 数据不被覆盖。恢复源码产生新版本后，仍在运行的旧预览继续下载它原来的源码，ZIP 字节保持相同。
+
+## 管理接口
+
+以下路径均在 `/api/projects/{projectId}/delivery` 下，ID 为规范 UUID。沿用平台登录会话、维护者配置、项目归属和归档检查；写操作需要原 CSRF。接口默认关闭，不能通过猜测 ID 获得运行或文件访问权。
+
+| 方法与路径 | 作用 |
+|---|---|
+| GET `/builds/{buildId}` | 固定构建身份和源码文件数/大小 |
+| GET `/builds/{buildId}/source.zip` | 下载成功构建的固定源码；运行已停止仍可下载 |
+| POST `/runs/{runId}/previews` | 为准确就绪运行创建短期预览，返回 previewId、expiresAt、iframeUrl 和身份 |
+| DELETE `/previews/{previewId}` | 撤销自己的预览授权，不停止应用进程 |
+| GET `/previews/{previewId}/source.zip` | 下载原登录会话的有效预览源码；失效后拒绝，不转为最新版本 |
+| GET `/source-head` | 当前源码版本、revision 和状态 |
+| POST `/restorations` | 按准确目标及预期 head 追加恢复版本，返回 202 |
+| GET `/operations/{operationId}` | 查询该项目的源码恢复操作 |
+
+创建/撤销预览只接受无正文或空对象，不接受目标 URL、端口、路径或额外 query。预览访问路径是 `/api/delivery/preview/{token}/...`；`iframeUrl` 含短期访问令牌，应按秘密处理，不记录日志或长期保存。下载使用登录会话，不使用 iframe 路径令牌。
 
 ## 源码恢复
 
-先 `GET /api/projects/{projectId}/delivery/source-head` 取得当前 `sourceVersionId` 和 `revision`，再向同前缀的 `/restorations` 提交 `targetSourceVersionId`、`expectedSourceVersionId`、`expectedRevision`，携带现有 CSRF 和唯一 `Idempotency-Key`。202 仅表示收到操作；通过 `/operations/{operationId}` 查询结果，以 `COMMITTED` 和 `resultSourceVersionId` 判断成功。
+先取得 `/source-head`，再向 `/restorations` 提交 `targetSourceVersionId`、`expectedSourceVersionId`、`expectedRevision`，同时携带 CSRF 和唯一 `Idempotency-Key`。202 表示操作已接收；以查询到的 `COMMITTED` 和 `resultSourceVersionId` 判断成功。
 
-相同请求与幂等键重放同一操作，旧 revision 冲突返回 409。恢复通过原源码协调器追加版本，不移动旧历史，也不自动构建、启动、切换预览或回滚业务数据。未知结果保留 `NEEDS_RECONCILIATION`，不能当作确定失败直接重新提交另一个请求。
+相同请求与幂等键只对应同一操作，旧 revision 冲突返回 409。恢复追加历史，不移动或删除旧 Git 版本，不自动构建、启动、切换预览或回滚业务数据。未知结果保留 `NEEDS_RECONCILIATION`，不能换一个请求标识盲目重复提交。
 
-## 平台配置
+启动失败后的数据库确认与源码恢复是两种不同操作。已停止但未 READY 的运行可能需要维护者核对当前数据库状态。重启后的维护入口只处理明确选择、具备持久停止证明的运行；复核源码/产物/绑定/迁移历史后，显式确认并追加审计。它不会接管旧进程或回滚数据。实现和本轮固定记录的确认见[恢复说明](design/project-delivery/startup-recovery-review.md)。
 
-`PROJECT_DELIVERY_ENABLED` 默认 `false`，关闭时不解析 origin、不启动执行资源。开启必须同时显式设置 `PROJECT_DELIVERY_ORIGIN`，例如开发页面实际访问的 `http://127.0.0.1:5174`。该值仅含协议、主机和端口，不附带 `/`、路径、查询、用户信息或 fragment；不是应用进程监听地址。禁止用客户端 Host/转发头推导此配置。
+## 下载工程怎么运行
 
-交付设置不自动打开 `PROJECT_EXECUTION_ENABLED`，不新增维护者或数据库绑定；实际操作仍须执行模块授权。授权固定十分钟、最多 32 个/每会话 8 个；HTTP 交换最多 16 个/每授权 4 个；下载最多 2 个/每会话 1 个。超额请求将拒绝，未实现接口不能因设置这些配置而被视为可用。
+在解压的 `project/` 中，使用工程自己的脚本：
 
-## 下载工程的独立测试配置
+```sh
+node scripts/build.mjs --test-config /absolute/private/test.properties
+node scripts/start.mjs --config /absolute/private/runtime.properties
+```
 
-未来快照中的构建脚本支持 `node scripts/build.mjs --test-config /absolute/private/test.properties`。配置为工程外当前用户拥有的私有文件，只向 Maven/Java 测试传递路径，不向 npm 传递数据库凭据。格式和数据库准备要求见[模板说明](../templates/full-project-v1/README.md)。Java 初始化器要求测试用途标记、非特权角色及空 schema，业务测试事务回滚；不创建或清空数据库。
+准备 Java 17、Node 24.20.x、npm 11.19.x，以及独立的 PostgreSQL 运行库和测试库。Maven 由工程 wrapper 使用；首次依赖安装需要可用的依赖源；平台执行器使用的工具版本与摘要仍须符合其绑定策略。具体配置字段、用途标记、非特权角色和空测试 schema 的要求见[工程模板说明](../templates/full-project-v1/README.md)。运行库和测试库不能混用。
 
-旧源码快照不修改，也不在下载时补丁替换。新脚本、测试辅助类与业务测试修改需要形成正常的新源码版本，再构建与预览。源码一致不代表已有数据相同；当前独立 Java 测试证明不能替代后续 ZIP 的完整构建、运行及浏览器验收。
+两个配置文件放在源码目录之外，权限 0600。构建脚本向 Maven/Java 测试传递测试配置路径，不向 npm 传递数据库凭据；测试回滚自己的数据，不清库。启动脚本以前台本机 Java 进程运行已构建 JAR，地址/端口由独立运行配置确定。旧源码快照不在下载时补丁升级。
+
+## 平台配置和边界
+
+- `PROJECT_DELIVERY_ENABLED` 默认 `false`；开启时必须设置明确的 `PROJECT_DELIVERY_ORIGIN`，如开发页面的 `http://127.0.0.1:5174`。只含协议、主机、端口，不含末尾 `/`、路径、query 或 fragment；不从 Host/转发头推导。
+- 开启交付不自动开启执行模块或创建数据库绑定。仍需既有执行器、源代码协调器、受信维护者及项目自己的绑定。
+- 正式嵌入保持 `sandbox="allow-scripts allow-forms" referrerpolicy="no-referrer"`，不加入 allow-same-origin。allow-forms 支持 Vue 的 JS 表单事件，CSP `form-action 'none'` 仍阻止原生表单提交。浏览器不能读取平台 Cookie、父页或平台管理 API。
+- 每次读取持续核对原会话和准确运行，不靠缓存的 READY 状态。停止、换版、撤销、登出或过期使旧预览失效；浏览预览不会续期平台登录。
+- 预览授权十分钟，最多 32 个/每会话 8 个；HTTP 交换最多 16 个/每授权 4 个；下载最多 2 个/每会话 1 个。交换和下载各使用单一 30 秒预算；取消后实际未结束的工作继续占名额，避免重复派发。
+- 首版支持相对资源 URL、ES modules 和有界 JSON CRUD。Cookie 登录、localStorage/IndexedDB、Service Worker、WebSocket/SSE、大文件传输、外站资源和 history 路由回退不在预览契约内；不通过开放同源执行来掩盖不兼容。
+
+正式工作台的文件树、Agent 对话、构建/启动编排由下一模块接入。完整工程新模式的真实付费模型闭环、公开发布和远程部署未在本次验收中完成；本次没有增加服务器、外网隧道或独立实例服务。
