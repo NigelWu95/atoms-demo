@@ -30,13 +30,20 @@ class ProjectAgentQueryIT extends AgentIntegrationSupport {
     @Test void listsAndEventsAreBoundToTheCurrentOwnerAndProjectNotJustTheTaskId() {
         var task = submit("PRIVATE_PROMPT_CANARY"); stage(task.id());
         assertThat(query.list(owner, task.projectId(), 100)).hasSize(1);
+        assertThat(query.workbenchTasks(owner, task.projectId(), 50)).singleElement().satisfies(detail -> {
+            assertThat(detail.prompt()).isEqualTo("PRIVATE_PROMPT_CANARY");
+            assertThat(detail.toString()).doesNotContain("PRIVATE_PROMPT_CANARY");
+        });
+        assertThat(query.workbenchTask(owner, task.projectId(), task.id()).task().id()).isEqualTo(task.id());
         var page = query.events(owner, task.projectId(), task.id(), 0, 100);
         assertThat(page.events()).hasSize(1);
         assertThat(page.toString()).doesNotContain("PRIVATE_PROMPT_CANARY");
         assertThatThrownBy(() -> query.events(stranger, task.projectId(), task.id(), 0, 100)).isInstanceOf(ApiException.class);
         var another = source.create(owner);
+        assertThatThrownBy(() -> query.workbenchTask(owner, another.projectId(), task.id())).isInstanceOf(ApiException.class);
         assertThatThrownBy(() -> query.events(owner, another.projectId(), task.id(), 0, 100)).isInstanceOf(ApiException.class);
         jdbc.update("UPDATE projects SET owner_id=? WHERE id=?", stranger, task.projectId());
+        assertThatThrownBy(() -> query.workbenchTasks(owner, task.projectId(), 50)).isInstanceOf(ApiException.class);
         assertThatThrownBy(() -> query.list(owner, task.projectId(), 100)).isInstanceOf(ApiException.class);
         assertThatThrownBy(() -> query.events(owner, task.projectId(), task.id(), 0, 100)).isInstanceOf(ApiException.class);
     }

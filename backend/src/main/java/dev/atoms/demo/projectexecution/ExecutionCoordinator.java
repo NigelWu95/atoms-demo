@@ -38,6 +38,7 @@ final class ExecutionCoordinator implements SmartLifecycle, AutoCloseable, Execu
             throw new IOException("EXECUTION_ARTIFACT_UNAVAILABLE");
         }
         default ExecutionRunProcess ownedProcess(UUID run) throws IOException { return null; }
+        default ExecutionMigrationReview migrationReview() throws IOException { throw new IOException("RUN_DB_BINDING_NOT_FOUND"); }
         @Override void close() throws IOException;
     }
     /** Trusted resource assembly only; never supplied by a request or generated source. */
@@ -221,6 +222,9 @@ final class ExecutionCoordinator implements SmartLifecycle, AutoCloseable, Execu
         }
         ExecutionRunProcess ownedProcess(UUID run) throws IOException {
             check(); var result = original.ownedProcess(run); check(); return result;
+        }
+        ExecutionMigrationReview migrationReview() throws IOException {
+            check(); var result = original.migrationReview(); check(); return result;
         }
     }
 

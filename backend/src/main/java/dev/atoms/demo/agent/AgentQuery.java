@@ -36,6 +36,24 @@ public class AgentQuery {
             return tasks.list(project, limit).stream().map(ProjectAgentService::view).toList();
         });
     }
+    /** The owning workbench may read its submitted requirement; never include it in diagnostics/toString. */
+    public record WorkbenchTask(ProjectAgentService.TaskView task, String prompt) {
+        @Override public String toString() { return "WorkbenchTask[id=" + task.id() + "]"; }
+    }
+    public List<WorkbenchTask> workbenchTasks(UUID owner, UUID project, int limit) {
+        limit(limit);
+        return transaction.execute(status -> {
+            authorize(owner, project);
+            return tasks.list(project, limit).stream().map(task -> new WorkbenchTask(ProjectAgentService.view(task), task.prompt())).toList();
+        });
+    }
+    public WorkbenchTask workbenchTask(UUID owner, UUID project, UUID taskId) {
+        return transaction.execute(status -> {
+            authorize(owner, project); var task = tasks.get(taskId);
+            if (task == null || !task.projectId().equals(project)) throw new ApiException(404, "AGENT_TASK_MISSING", "任务不存在或当前账号无权访问。");
+            return new WorkbenchTask(ProjectAgentService.view(task), task.prompt());
+        });
+    }
     public EventPage events(UUID owner, UUID project, UUID taskId, int after, int limit) {
         limit(limit); if (after<0 || after>4096) throw AgentTask.invalid();
         return transaction.execute(status -> {

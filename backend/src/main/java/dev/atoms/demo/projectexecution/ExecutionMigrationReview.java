@@ -30,6 +30,11 @@ final class ExecutionMigrationReview {
     View inspect(UUID owner, UUID project, UUID build, ExecutionArtifact artifact, OwnedProcess.Budget budget) throws IOException {
         return checked(owner,project,build,artifact,budget).view();
     }
+    record Inspection(View view, List<ExecutionMigrations.Migration> migrations, int appliedCount) {}
+    Inspection inspectForWorkbench(UUID owner, UUID project, UUID build, ExecutionArtifact artifact, OwnedProcess.Budget budget) throws IOException {
+        var checked = checked(owner, project, build, artifact, budget);
+        return new Inspection(checked.view(), checked.target().migrations(), checked.database().state().applied().size());
+    }
     UUID approve(UUID owner, UUID project, UUID build, String expectedHistory, String expectedTarget,
                  ExecutionArtifact artifact, OwnedProcess.Budget budget) throws IOException {
         var checked=checked(owner,project,build,artifact,budget);

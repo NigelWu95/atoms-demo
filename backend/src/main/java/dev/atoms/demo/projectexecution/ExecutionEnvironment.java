@@ -119,6 +119,11 @@ final class ExecutionEnvironment implements ExecutionCoordinator.Factory {
         @Override public synchronized ExecutionRunProcess ownedProcess(UUID run) throws IOException {
             check(); return runtimeResources == null ? null : runtimeResources.ownedProcess(run);
         }
+        @Override public ExecutionMigrationReview migrationReview() throws IOException {
+            check();
+            if (runtimeDatabases == null) throw new IOException("RUN_DB_BINDING_NOT_FOUND");
+            return new ExecutionMigrationReview(settings, new ExecutionMigrationReviewRepository(jdbc), transactions, source, runtimeDatabases);
+        }
         @Override public synchronized void close() throws IOException {
             if (runtimeResources != null && runtimeResources.hasHeldProcesses()) throw new IOException("RUN_PROCESS_UNSETTLED");
             paths.close();
