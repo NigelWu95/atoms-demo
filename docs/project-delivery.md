@@ -1,6 +1,6 @@
 # 完整工程交付（实施中）
 
-规格和进度分别见 [SPEC-project-delivery.md](../SPEC-project-delivery.md)及[任务清单](../tasks/project-delivery/todo.md)，证据见[验证记录](project-delivery-verification.md)。当前已完成独立构建测试配置、交付设置、原进程 HTTP 交换、会话授权及有界预览 HTTP 接口。真实 Vue 浏览器验收已通过，同快照下载 API 已完成，源码恢复 API 已完成，下载目录中的完整构建/运行验收尚未完成，正式工作台尚未接入。
+规格和进度分别见 [SPEC-project-delivery.md](../SPEC-project-delivery.md)及[任务清单](../tasks/project-delivery/todo.md)，证据见[验证记录](project-delivery-verification.md)。当前已完成独立构建测试配置、交付设置、原进程 HTTP 交换、会话授权及有界预览 HTTP 接口。真实 Vue 浏览器验收已通过，同快照下载 API 已完成，源码恢复 API 已完成，下载目录中的完整构建/运行验收尚未完成，正式工作台尚未接入。PD13 最新启动超时留下已停止的待核对记录，当前恢复范围见[待确认方案](design/project-delivery/startup-recovery-review.md)；完整交付验收尚未通过。
 
 管理入口为 `POST /api/projects/{projectId}/delivery/runs/{runId}/previews` 和 `DELETE /api/projects/{projectId}/delivery/previews/{previewId}`，沿用登录会话与 CSRF，只接受空对象或无正文。签发结果内的 `iframeUrl` 是短期能力链接，应按秘密处理，不记录进日志或长期存储。
 

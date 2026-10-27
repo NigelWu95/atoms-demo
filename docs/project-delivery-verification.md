@@ -82,3 +82,23 @@ ZIP writer 按 [PKWARE 6.3.10 的本地头、中央目录及 Unix 属性约定](
 `ex22-delivery-pd11-restore-status.log`：34 策略单测 + 3 真实 Git/PG 集成通过。验证恢复追加新版本、basedOn/restoredFrom、原两份树字节不变、恢复当前版本也追加历史、相同幂等键返回原操作、冲突键/旧 revision/越权拒绝、不可用协调器不创建新意图。模拟写 Git 后未知异常时保留 `NEEDS_RECONCILIATION` 和原 head；最初 `pd11-restore.log` 的断言误期望 FAILED，原失败保留，修正测试尊重已有恢复语义，未改工作器规则。
 
 `ex22-delivery-pd12-http.log`：5 单测 + 7 真实 HTTP/PG 集成通过，覆盖恢复 202、状态查询、登录/CSRF/归属、严格请求字段/UUID/revision/幂等键、409 与未知结果展示、下载兼容性。状态 DTO 不暴露内部执行 ID、请求/幂等摘要、owner 或磁盘路径。HTTP 测试模拟源码门面；实际发布算法由上述 Git/PG 集成验证。
+
+
+## PD13 当前阻塞与只读检查（2026-10-27）
+
+已补齐真实下载 ZIP 的逐文件/执行位比对、自身 `build.mjs`/`start.mjs`、B 库浏览器 CRUD/409、重启数据保留，以及恢复后旧预览仍下载原源码的验收代码。**这些新增步骤尚未实际走通，不能计为通过。**
+
+- `ex22-delivery-pd13-independent.log`：4 项契约单测通过，实际应用启动前失败，`RUN_START_FAILED`；记录 `7d7b0851-59c7-4746-830e-ab8336b2c1bf` 未签发 execution ID，已结束。该通用错误也覆盖启动准备失败，先前将它认定为操作系统创建进程失败不准确；目前没有证据定位其具体内部原因。
+- `ex22-delivery-pd13-diagnostic.log`：4 项契约单测通过，实际运行 `dab70c67-efd9-4ff9-a155-c6069afaa4cb` 启动超时。数据库保留 `NEEDS_RECONCILIATION / RUN_START_TIMEOUT`、`execution_pending=false` 和停止摘要，未进入 READY。验收主线程随后因通用等待期限失败，关闭断言也暴露未结束记录；没有声称该轮成功或静默重试。
+- 原 JVM 已结束，因此此前仅支持原协调器的显式数据确认接口不能处理本条记录。[具体恢复方案](design/project-delivery/startup-recovery-review.md)待用户确认；当前未更新状态、追加恢复审计或改业务数据，也未创建替代数据库/绑定。
+- `.local/InspectDeliveryRuns.java` 只读确认旧五份未决审计及其原绑定/运行记录摘要未变；当前执行槽与协调锁均为 0。A 待办 6 条、B 待办 3 条，各有 3 条迁移历史。没有本轮失败前的完整行摘要基线，不能仅凭当前读取声称全部业务数据前后相同。
+- `.local/delivery-startup-readonly/InspectStartupCosts.java` 只读工具检查通过：全工具捕获约 8.12 秒，Java 再检查约 1.68 秒；当前 Java 的 109 个文件、279705349 字节、SHA-256 `cf900a03e3bf843231bbf4758c8359b6cf97f49e1823fe04de145db88fc3b7dc` 与原成功构建清单一致。此观察不能替代完整启动各阶段计时，也不能证明所有负载下均在启动预算内。
+- 临时生产诊断已移除。验收夹具改为及时识别 NEEDS_RECONCILIATION 并报告真实错误，而不是再等待通用超时；不改变生产启动预算或失败状态规则。
+
+## PD14 已完成的前端检查（后端整体验收仍未完成）
+
+`.local/delivery-pd14-frontend-{typecheck,lint,format:check,test:unit,build}.log`：类型检查、Lint、格式检查、54 文件 / 372 项单元测试及生产构建全部成功，执行脚本退出 0。浏览器脚本通过 Node 语法检查。前端源文件未改动。
+
+这不替代 PD13 的下载应用运行和最终后端兼容性回归；任务清单中的 PD13、PD14 和 C5 继续保持未完成。
+
+最终 `ex22-delivery-pd13-compile-and-zip.log` 的 8 项源码契约/ZIP 单测和平台打包通过（退出 0），包括本机标准 unzip。报告已归档 `.local/delivery-pd13-compile-evidence-mdrp7_ja`；打包 JAR 已核对不含临时生产诊断。9 项已配置秘密值对本轮差异、拟提交新文件及相关日志扫描零匹配。新增独立工程验收代码仅完成编译，仍不宣称原生运行通过。

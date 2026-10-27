@@ -91,8 +91,11 @@
   - A 预览 ZIP 解压后用自身脚本和 B_test 构建，再 B_app 启动；新增/修改/查询/409/重启数据保留，原 A/B 记录不受影响。
   - 标准解压完整比对 Git 树与模式；V2 及恢复身份可辨；所有 owner 进程真实停止并保留审计。
   - 文件：DeliveryApplicationContractIT 与受控辅助夹具；验证 A + B，保留命令、来源和退出证据，不用平台 classpath 代构建。
+  - 2026-10-27：验收代码已补齐；实际重跑被启动阶段失败阻断。新运行 `dab70c67-efd9-4ff9-a155-c6069afaa4cb` 已有停止摘要、pending=false，但未 READY 且原 JVM 已结束，需[明确恢复方案](../../docs/design/project-delivery/startup-recovery-review.md)确认后继续；不得跳过、删除或改写旧审计以完成验收。
 - [ ] **PD14：兼容性回归与交付说明**（全部前置；文档及必要回归）
   - 默认关闭完整平台回归，账号/旧生成/导出/发布保留；受影响前端检查及浏览器测试；token/密钥不在日志、ZIP、前端中。
   - 文件：docs/project-delivery.md、docs/project-delivery-verification.md、能力地图与本清单；验证 J 全量一次及受影响 B；失败逐项说明，不把排除项写成通过。
+
+  - 前端类型/Lint/格式、372 单测与生产构建已通过（`delivery-pd14-frontend-*.log`）；最终后端和浏览器兼容性回归尚未完成。
 
 **C5：** 满足规格完成标准才标记模块完成；后续工作台/真实模型/部署另记，不提前宣称完成。
