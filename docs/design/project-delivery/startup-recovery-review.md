@@ -1,6 +1,6 @@
-# 本轮启动超时的恢复方案（待确认）
+# 本轮启动超时的恢复方案（已确认，固定记录恢复完成）
 
-2026-10-27。交付模块 PD13 的真实验收尚未通过；本文件不授权执行恢复，不修改已有迁移或失败审计。
+2026-10-27。交付模块 PD13 的真实验收尚未通过；用户已确认按本方案恢复本轮固定失败记录；不修改已有迁移或删除失败审计。
 
 ## 已确认的状态
 
@@ -13,7 +13,7 @@
 
 证据：`.local/ex22-delivery-pd13-independent.log`、`.local/ex22-delivery-pd13-diagnostic.log`、只读 `.local/InspectDeliveryRuns.java`。原失败不删除，不通过重建测试库绕过。
 
-## 拟实施的准确范围
+## 已确认的实施范围
 
 补充仅供可信维护者使用的、重启后已停止运行的数据确认入口。首轮仅处理上述一个运行，继续保留原五份未决审计。
 
@@ -37,4 +37,14 @@
 
 > 仅支持本次原协调器仍持有资源、实际 worker 已退出且数据库已持久保存 `execution_pending=false` 和停止摘要的启动失败。
 
-同一方案明确排除“JVM 重启后遗留的记录”。本轮原 JVM 已结束，拟增加的是该既有范围之外的显式维护能力。当前交付规格的实施授权不被解释为接受未知业务数据或绕过这条边界。
+同一方案明确排除“JVM 重启后遗留的记录”。本轮原 JVM 已结束，因此单独提交本方案；用户于 2026-10-27 确认后，授权扩展至上述固定记录的显式维护，不包含其他旧未决记录。
+
+## 实施与实际结果
+
+- `ExecutionStoppedRunMaintenance` 只持有已有根的文件锁和平台协调锁，限定单一 owner/project/run；复用既有 `ExecutionRunReconciliation` 的来源核对、历史复核、原子审计和幂等确认，不创建 dispatcher 或进程能力。
+- `ex22-delivery-recovery-existing-root.log`：14 项通过；`ex22-delivery-recovery-maintenance.log`：31 单元 + 11 数据库集成通过。删除 pending 拒绝条件的临时变异被测试检出，恢复后 `ex22-delivery-recovery-maintenance-restored.log` 的 7 项通过。
+- `ex22-delivery-recovery-approved-run.log`：7 单元 + 1 固定记录原生恢复通过。审计 `c4d7e03a-58e9-47ac-bc37-77387c0cae09`，历史摘要 `9753e7226fb093634343185377fb1e48fe5bd8bce209ff6dbfed9f8657175c18`。
+- 准确源码、封存产物及真实绑定已核对；A 6 条、B 3 条业务行、表结构及迁移历史在恢复操作前后相同；其余运行、绑定、源码版本未改变。相同幂等键重放仍只有一份审计。原失败记录保留错误与停止摘要，现为 FAILED。
+- 私有证据位于原应用根 `delivery-startup-recovery-dab70c67-efd9-4ff9-a155-c6069afaa4cb/`。确认视图在写入之前保存；发生响应丢失可按同一视图与幂等键核对，不从数据重建进程所有权。
+
+固定记录的恢复契约必须显式指定 `execution.accept-stopped-run`，不会加入普通回归自动执行。此结果只是解除本轮阻塞；PD13 完整应用验收与 PD14 兼容性检查仍须继续。

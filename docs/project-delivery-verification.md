@@ -102,3 +102,8 @@ ZIP writer 按 [PKWARE 6.3.10 的本地头、中央目录及 Unix 属性约定](
 这不替代 PD13 的下载应用运行和最终后端兼容性回归；任务清单中的 PD13、PD14 和 C5 继续保持未完成。
 
 最终 `ex22-delivery-pd13-compile-and-zip.log` 的 8 项源码契约/ZIP 单测和平台打包通过（退出 0），包括本机标准 unzip。报告已归档 `.local/delivery-pd13-compile-evidence-mdrp7_ja`；打包 JAR 已核对不含临时生产诊断。9 项已配置秘密值对本轮差异、拟提交新文件及相关日志扫描零匹配。新增独立工程验收代码仅完成编译，仍不宣称原生运行通过。
+
+
+## 已确认的重启后恢复（2026-10-27）
+
+用户确认[恢复方案](design/project-delivery/startup-recovery-review.md)后完成仅打开已有根的维护能力与固定 owner/project/run 核对。14 项目录/锁检查、31 单元 + 11 集成通过；pending 拒绝条件变异能被检出，恢复后 7 项通过。`ex22-delivery-recovery-approved-run.log` 的 7 单元 + 1 实际恢复通过，准确来源、真实绑定和当前历史均经原输入校验；追加审计 `c4d7e03a-58e9-47ac-bc37-77387c0cae09` 后结束唯一获准运行。A/B 的 6/3 条记录、结构、迁移历史和其他运行/绑定/源码元数据在恢复前后相同，幂等重放没有第二份审计。未重建进程能力或修改业务数据。
