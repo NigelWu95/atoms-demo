@@ -2,10 +2,20 @@
 import { computed, type UnwrapNestedRefs } from 'vue'
 import type { useEngineeringWorkbench } from '../composables/useEngineeringWorkbench'
 import { statusLabel, terminal } from '../api/projectWorkbenchTasks'
+import EngineeringBuildRepair from './EngineeringBuildRepair.vue'
+import type { BuildRepairProposal, BuildRepairContext } from '../runtime/buildRepair'
 const props = defineProps<{
   workbench: UnwrapNestedRefs<ReturnType<typeof useEngineeringWorkbench>>
 }>()
-const emit = defineEmits<{ sourceFile: [version: string, path: string]; build: [id: string] }>()
+const emit = defineEmits<{
+  sourceFile: [version: string, path: string]
+  build: [id: string]
+  repair: [proposal: BuildRepairProposal, description: string]
+}>()
+const repairContext = computed<BuildRepairContext | null>(() => {
+  const { project, head } = props.workbench
+  return project && head ? { projectId: project.id, ownerId: project.ownerId, head } : null
+})
 const buildSelection = computed({
   get: () => props.workbench.selectedBuildId,
   set: (value: string) => emit('build', value),
@@ -101,6 +111,13 @@ function start() {
     <p v-if="workbench.selectedBuild?.errorCode" class="inline-error">
       {{ workbench.selectedBuild.errorCode }}
     </p>
+    <EngineeringBuildRepair
+      v-if="workbench.selectedBuild?.status === 'FAILED'"
+      :context="repairContext"
+      :build="workbench.selectedBuild"
+      :disabled="!workbench.canEdit || !workbench.capabilities?.agentEnabled"
+      @submit="(proposal, description) => emit('repair', proposal, description)"
+    />
     <button
       v-if="workbench.taskCursors.builds"
       type="button"

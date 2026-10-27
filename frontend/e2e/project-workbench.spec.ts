@@ -27,7 +27,9 @@ test('full project workbench keeps exact requests, preview identity and internal
     taskPrompt = '',
     submissions = 0,
     previewLoads = 0,
-    historyCount = 1
+    historyCount = 1,
+    failureAvailable = false,
+    buildsRequested = 0
   const requests: { body: string | null; key: string | undefined }[] = []
   const versions = () =>
     Array.from({ length: current }, (_, index) => {
@@ -47,8 +49,8 @@ test('full project workbench keeps exact requests, preview identity and internal
   const task = () => ({
     id: id(10),
     status: 'SOURCE_SAVED',
-    resultVersionId: id(2),
-    baseSourceVersionId: id(1),
+    resultVersionId: id(current >= 3 ? 3 : 2),
+    baseSourceVersionId: id(current >= 3 ? 2 : 1),
     cancelRequested: false,
     errorCode: null,
     createdAt: now,
@@ -148,7 +150,7 @@ test('full project workbench keeps exact requests, preview identity and internal
       requests.push({ body: request.postData(), key: request.headers()['idempotency-key'] })
       submissions++
       taskPrompt = request.postDataJSON().prompt
-      current = 2
+      current = submissions >= 3 ? 3 : 2
       if (submissions === 1) return route.abort('failed')
       return send(task(), 202)
     }
@@ -176,8 +178,48 @@ test('full project workbench keeps exact requests, preview identity and internal
         lastSequence: 1,
       })
     if (path === '/runtime') return send({ coordinatorReady: true, databaseBound: true })
-    if (path === '/builds' && request.method() === 'POST') return send(execution('BUILD'), 202)
-    if (path === '/builds') return send(pageOf(current >= 2 ? [execution('BUILD')] : []))
+    if (path === '/builds' && request.method() === 'POST') {
+      buildsRequested++
+      return send(execution('BUILD'), 202)
+    }
+    if (path === '/builds')
+      return send(
+        pageOf(
+          current >= 2
+            ? [
+                ...(failureAvailable
+                  ? [
+                      {
+                        ...execution('BUILD'),
+                        id: id(21),
+                        status: 'FAILED',
+                        errorCode: 'EXECUTION_CHECK_FAILED',
+                      },
+                    ]
+                  : []),
+                execution('BUILD'),
+              ]
+            : [],
+        ),
+      )
+    if (path === `/execution/BUILD/${id(21)}/events`)
+      return send({
+        items: [
+          {
+            sequence: 1,
+            diagnostic: {
+              status: null,
+              operation: 'TYPECHECK',
+              probe: null,
+              phase: 'failed',
+              code: 'EXECUTION_CHECK_FAILED',
+              rawMessage: 'private-error-secret',
+            },
+          },
+        ],
+        hasMore: false,
+        nextCursor: null,
+      })
     if (path === '/preparations') return send(pageOf([]))
     if (path === '/runs' && request.method() === 'POST') {
       expect(approval).toBe(true)
@@ -286,6 +328,35 @@ test('full project workbench keeps exact requests, preview identity and internal
   const downloaded = page.waitForEvent('download')
   await page.getByRole('button', { name: '下载当前预览源码', exact: true }).click()
   expect((await downloaded).suggestedFilename()).toContain(id(70))
+  // Preparing/cancelling a repair is read-only. Confirmation keeps the independent idea draft and serving preview.
+  const idea = page.getByLabel('描述下一步修改', { exact: true })
+  await idea.fill('稍后还要增加导出功能')
+  failureAvailable = true
+  await page.getByRole('button', { name: '刷新', exact: true }).click()
+  await expect(page.getByRole('button', { name: '刷新', exact: true })).toBeEnabled()
+  await page.getByRole('button', { name: '构建与运行 ▾', exact: true }).click()
+  await page.getByLabel('构建记录', { exact: true }).selectOption(id(21))
+  await page.getByRole('button', { name: '准备修复需求', exact: true }).click()
+  await expect(page.getByLabel('将发送的构建修复需求')).toContainText('前端类型检查')
+  await expect(page.getByLabel('将发送的构建修复需求')).not.toContainText('private-error-secret')
+  expect(submissions).toBe(2)
+  await page.getByRole('button', { name: '取消建议', exact: true }).click()
+  expect(submissions).toBe(2)
+  await expect(idea).toHaveValue('稍后还要增加导出功能')
+  await page.getByRole('button', { name: '准备修复需求', exact: true }).click()
+  await page.getByLabel('补充修复要求（可选）').fill('保留全部已有业务功能')
+  await page.getByRole('button', { name: '确认提交修复', exact: true }).click()
+  await expect(page.getByText('源码 V3', { exact: true })).toBeVisible()
+  expect(submissions).toBe(3)
+  expect(buildsRequested).toBe(1)
+  expect(JSON.parse(requests[2]!.body!)).toMatchObject({
+    baseSourceVersionId: id(2),
+    expectedSourceRevision: 2,
+  })
+  expect(JSON.parse(requests[2]!.body!).prompt).toContain('保留全部已有业务功能')
+  await expect(idea).toHaveValue('稍后还要增加导出功能')
+  await expect(frame.locator('#counter')).toHaveText('1')
+  expect(previewLoads).toBe(1)
   historyCount = 30
   await page.getByRole('button', { name: '刷新', exact: true }).click()
   await expect(page.locator('.engineering-message')).toHaveCount(30)
@@ -296,6 +367,11 @@ test('full project workbench keeps exact requests, preview identity and internal
   ).toBe(true)
   for (const width of [320, 768, 1024, 1440]) {
     await page.setViewportSize({ width, height: 900 })
+    if (width < 760)
+      await page
+        .getByRole('group', { name: '工作台区域' })
+        .getByRole('button', { name: '工程与预览', exact: true })
+        .click()
     await expect(page.locator('iframe[title="完整工程运行预览"]')).toBeVisible()
     const size = await page.evaluate(() => ({
       viewport: innerHeight,

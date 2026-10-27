@@ -8,6 +8,11 @@ import { useSessionStore } from '../stores/session'
 import { statusLabel, terminal } from '../api/projectWorkbenchTasks'
 import EngineeringSourcePanel from '../components/EngineeringSourcePanel.vue'
 import EngineeringRunPanel from '../components/EngineeringRunPanel.vue'
+import {
+  buildRepairPrompt,
+  matchesBuildRepair,
+  type BuildRepairProposal,
+} from '../runtime/buildRepair'
 
 const route = useRoute(),
   session = useSessionStore(),
@@ -74,6 +79,17 @@ function submit() {
   const value = prompt.value
   void wb.submit(value, () => {
     if (prompt.value === value) prompt.value = ''
+  })
+}
+function submitBuildRepair(proposal: BuildRepairProposal, description: string) {
+  const context =
+    wb.project && wb.head && session.ready && session.identity?.userId === wb.project.ownerId
+      ? { projectId: wb.project.id, ownerId: wb.project.ownerId, head: wb.head }
+      : null
+  if (!matchesBuildRepair(proposal, context, wb.selectedBuild) || description.length > 1000) return
+  void wb.submit(buildRepairPrompt(proposal, description), () => {
+    toolsOpen.value = false
+    area.value = 'conversation'
   })
 }
 function versionLabel(id: string | null | undefined) {
@@ -359,6 +375,7 @@ async function showFile(version: string, path: string) {
                 :workbench="wb"
                 @source-file="showFile"
                 @build="wb.selectedBuildId = $event"
+                @repair="submitBuildRepair"
               />
             </div>
           </div>

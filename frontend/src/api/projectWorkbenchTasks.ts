@@ -29,7 +29,11 @@ export type Migration = {
   decision: string
   files: { path: string; sha256: string; applied: boolean }[]
 }
-export type TaskEvent = { sequence: number; description: string }
+export type TaskEvent = {
+  sequence: number
+  description: string
+  execution?: { operation: string | null; phase: string | null }
+}
 export function decodeCommand(v: unknown): CommandResult {
   const r = object(v)
   return {
@@ -139,7 +143,11 @@ export function decodeExecutionEvents(v: unknown) {
         const parts = ['status', 'operation', 'probe', 'phase', 'code']
           .map((key) => nullable(d[key], string))
           .filter(Boolean)
-        return { sequence: integer(e.sequence), description: parts.join(' · ') || '暂无可用诊断' }
+        return {
+          sequence: integer(e.sequence),
+          description: parts.join(' · ') || '暂无可用诊断',
+          execution: { operation: nullable(d.operation, string), phase: nullable(d.phase, string) },
+        }
       },
       100,
     ),
