@@ -2,7 +2,7 @@
 
 本模块在完整源码副本中调用 Claude Code 修改 Vue、Java、SQL、测试和配置，校验后保存不可变源码版本。维护者启用完整工程模式后，可从[工程工作台](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-workbench.md)提交需求、查看变更、构建及运行。新模式默认关闭，默认网页继续使用旧生成链路。Agent 自身结果见[验证记录](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-agent-verification.md)，进度见[任务清单](https://github.com/NigelWu95/atoms-demo/blob/main/tasks/project-agent/todo.md)。
 
-截至 2026-10-27，PA01–PA33 内部离线验收完成，包括本地受控进程和真实 CLI + 假模型服务的连续两轮编辑、取消恢复及旧链路回归。执行、交付及工作台模块已完成本地 A/B 原生应用构建、启动、预览和固定源码下载验收，构建失败的显式修复入口也已接通。真实 DeepSeek 的新模式开发与修复效果仍待[专项联调](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-agent-live-plan.md)。`SOURCE_SAVED` 只表示源码保存，不表示构建或业务功能通过。
+截至 2026-10-29，PA01–PA33 内部离线验收完成，包括本地受控进程和真实 CLI + 假模型服务的连续两轮编辑、取消恢复及旧链路回归。执行、交付及工作台模块已完成本地 A/B 原生应用构建、启动、预览和固定源码下载验收，构建失败的显式修复入口也已接通。真实 DeepSeek 专项联调已启动一次，因 `AGENT_PROTOCOL_INVALID` 失败，未保存新源码，剩余一次未执行；详见[专项计划与结果](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-agent-live-plan.md)。真实新模式开发与修复效果仍未通过验收。`SOURCE_SAVED` 只表示源码保存，不表示构建或业务功能通过。
 
 ## 源码与增量开发
 
@@ -78,11 +78,16 @@ QUEUED → PREPARING → RUNNING → VALIDATING → ACCEPTING → SOURCE_SAVED
 | `SOURCE_EDIT_BUSY` / 基线冲突 | 查询同项目任务及当前源码版本；不强制覆盖或删锁 |
 | `AGENT_CLI_UNSUPPORTED` / `AGENT_CLI_CHANGED` | 核对可执行文件及其版本，npm 包版本不证明原生程序已安装；占位脚本会被拒绝。重新做离线契约验证，不自动升级或换宽权限模式 |
 | `AGENT_MODEL_INCOMPLETE` / 协议、工具、路径拒绝 | 保留原版与失败任务；先查看稳定错误码，不把模型完成声明当作新版本 |
+| `AGENT_PROVIDER_AUTH_FAILED` | CLI 报告鉴权失败；核对提供方密钥配置，不输出密钥或自动重试 |
+| `AGENT_PROVIDER_RATE_LIMITED` / `AGENT_PROVIDER_UNAVAILABLE` | CLI 报告限流或服务错误；保留任务，核对提供方状态及剩余额度后决定是否重试 |
+| `AGENT_PROVIDER_ERROR` | CLI 报告其他提供方错误；不能据此猜测具体 HTTP 状态、上下文限制或权限问题 |
 | `AGENT_STATE_CAPACITY` / `AGENT_STATE_UNAVAILABLE` | 核对私有目录标记/权限和空间；逻辑上限 1 GiB、余量 512 MiB，不自动删历史 |
 | `AGENT_PROCESS_UNSETTLED` / `AGENT_EXECUTION_UNCERTAIN` | 停止新调度，保留执行意图、租约及目录；按下文核对，不凭 PID 强制解除 |
 | `AGENT_COORDINATOR_UNAVAILABLE` | 核对源码协调者就绪、数据库独占会话与未决任务，避免同时启动第二个拥有者 |
 
 先关联 `agent_task_finished` 的 requestId（任务 UUID）、projectId、状态、错误码和耗时。`owned_process_unsettled` 另含 executionId 与固定 reason：后代数量/身份/枚举异常、进程退出超时、I/O 收尾超时或收尾异常。上述结构化日志不记录提示、绝对路径、命令、密钥或原始异常。
+
+`AGENT_PROTOCOL_INVALID` 另有 `agent_protocol_rejected` 日志，只有任务 UUID、执行 UUID、固定枚举 reason 和事件序号 eventNumber，可区分 JSON、初始化、事件形状、工具顺序或终态等拒绝位置。日志出现不证明进程已停止，仍需核对最终任务与租约停止摘要。提供方错误分类同样不会保存原始响应、放宽协议检查或触发自动重试。
 
 维护者以只读方式核对 `agent_tasks`、`source_edit_leases`、关联 `source_operations/source_versions`：任务/执行/租约关联、`execution_pending`、停止摘要、基线、源码提交是否存在。PID 不证明进程身份或已停止；候选文件存在也不证明提交成功。当前没有管理员强制解锁入口，不得删除审计、伪造停止摘要或替换一个无关进程的凭据。
 
@@ -94,7 +99,7 @@ QUEUED → PREPARING → RUNNING → VALIDATING → ACCEPTING → SOURCE_SAVED
 
 在确认停写的同一窗口备份 PG、正式 Git、工作副本和 Agent 私有证据，保留目录标记、权限及版本映射；密钥配置另行保管，不能放入源码 ZIP。关闭 `PROJECT_AGENT_ENABLED` 只停止后续能力，不删除表/历史，也不会自动解除未决任务。代码回退不能绕过新租约保护。
 
-本地执行、交付和工作台已接通。下一步是按固定项目与启动次数完成真实模型两轮增量开发，核对实际变更、构建、数据保留和预览下载一致性；方案见[真实联调计划](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-agent-live-plan.md)。代码恢复不回滚业务数据库；正式开放前仍需核对模型组合许可和不可信代码执行隔离。详见[能力地图](https://github.com/NigelWu95/atoms-demo/blob/main/FULL-PROJECT-CAPABILITY-MAP.md)与[ADR-016](https://github.com/NigelWu95/atoms-demo/blob/main/docs/decisions/016-full-project-source-and-coding-agent.md)。
+本地执行、交付和工作台已接通。真实联调第一轮失败后已按计划停止，下一步是确认剩余一次是否改用于第一轮诊断重试，成功后再核对实际变更、构建、数据保留和预览下载一致性；方案见[真实联调计划](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-agent-live-plan.md)。代码恢复不回滚业务数据库；正式开放前仍需核对模型组合许可和不可信代码执行隔离。详见[能力地图](https://github.com/NigelWu95/atoms-demo/blob/main/FULL-PROJECT-CAPABILITY-MAP.md)与[ADR-016](https://github.com/NigelWu95/atoms-demo/blob/main/docs/decisions/016-full-project-source-and-coding-agent.md)。
 
 跨模块持续遵守的约束：
 

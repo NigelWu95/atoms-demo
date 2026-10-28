@@ -1,6 +1,45 @@
 # project-agent · 离线实施与兼容性记录
 
-最近更新：2026-10-27。PA01–PA33 内部离线验收完成，本次新增 Claude Code 2.1.308 兼容复验；真实模型 PA-LIVE 未验收。后续执行、交付及工作台已完成本地验收，见[能力地图](https://github.com/NigelWu95/atoms-demo/blob/main/FULL-PROJECT-CAPABILITY-MAP.md)。本文件记录的 CLI 检查只使用本机假 Anthropic 服务和测试字符串，不调用真实 DeepSeek、不改个人 Claude 配置、不部署、不推送。任务状态以[清单](https://github.com/NigelWu95/atoms-demo/blob/main/tasks/project-agent/todo.md)为准。下文保留原阶段失败及修复证据。
+最近更新：2026-10-29。PA01–PA33 内部离线验收完成；PA-LIVE 已按批准方案实际启动一次，协议失败、未保存新源码，仍未通过真实增量开发验收。后续执行、交付及工作台已完成本地验收，见[能力地图](https://github.com/NigelWu95/atoms-demo/blob/main/FULL-PROJECT-CAPABILITY-MAP.md)。除下述 PA-LIVE 首次真实调用外，本文件的 CLI 契约检查均使用本机假 Anthropic 服务和测试字符串；本轮未改个人 Claude 配置、推送或部署。任务状态以[清单](https://github.com/NigelWu95/atoms-demo/blob/main/tasks/project-agent/todo.md)为准。下文保留原阶段失败及修复证据。
+
+## PA-LIVE 首次真实调用与失败诊断
+
+2026-10-28～29，按[已批准方案](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-agent-live-plan.md)使用原 EX22 待办 A。最多两次启动中已实际启动一次；第一轮失败后停止，分类字段第二轮未执行。不能把以下离线诊断修复当作真实调用已修复。
+
+### 实际执行结果
+
+- 基线：源码第 7 版 `d8106bb9-aace-405b-ba8b-a0a8c30cb4ee`，42 文件、247999 bytes；树摘要 `29013c47de04b8a3f645291511a8178cce1646598d45ea3d1fb7d28e84625193`。
+- 使用已验证的 Claude Code 2.1.308 原生文件、项目私有 JDK 17.0.14；调用参数为 `deepseek-flash[1m]`、high、128000 tokens、24 轮、1800 秒。真实提供方是否接受全部参数没有成功响应证据。
+- 首次提交 `688a9d4c-5b39-4878-bc28-81ee2655c216` 因验收程序把状态根放在平台 Git 内，被 `AGENT_STATE_UNAVAILABLE` 拒绝；未启动 CLI、未预留次数。改用平台仓库外的独立状态目录，保留原失败记录，不变更个人配置。
+- 实际启动任务 `9703b051-8a45-4e46-bb48-411f804b5fbd`，执行 `e72ba51e-17c8-4ff9-9f5f-32432b6da803`，于 10 月 28 日 23:45（Asia/Shanghai）从 RUNNING 转 FAILED，错误 `AGENT_PROTOCOL_INVALID`。
+- 启动预留由 5 增为 6，上限 7；失败次数未退回。没有成功解析的用量/工具摘要，不能把未知 token 用量或费用写成零。
+- `resultVersionId`、`sourceOperationId` 均为空；源码仍为原第 7 版。此轮搜索功能未交付，构建、运行、页面操作及 ZIP 一致性验收均未进入。
+
+执行前还发现原 `/private/tmp` 验收产物目录已不存在。只重建空父目录并复制原种子依赖策略，未重建或伪造旧构建产物/停止凭据。数据库仍保留旧构建记录，因此旧记录不能证明磁盘产物现在可用；后续必须重新实际构建。Docker 未运行时启动了既有 Docker Desktop 和既有 Postgres 容器，没有变更登录或数据库绑定。
+
+本次没有保留原始 CLI 流，故无法从统一错误码还原具体拒绝字段，也不能断言是密钥、HTTP 400、网络或模型上下文问题。私有证据保留在 `.local/agent-live-20261028/` 的 `round1-result.json`、`round1-events.json`、基线快照和带时间戳运行日志中，不提交密钥或任务原文。
+
+### 已完成的离线修复与验证
+
+假提供方的 HTTP 400/401/429/500 通过真实 CLI 得到 assistant.error，原解析器把这些失败统一归入 `AGENT_MODEL_INCOMPLETE`。新增四种稳定错误分类，并在进程层保留分类；分类不能接受失败源码，也不能触发新会话。HTTP 400 的固定夹具在一次 CLI 会话内实际发出两次请求，其他三个夹具各一次，不能以启动计数承诺 API 次数。
+
+协议拒绝新增 `agent_protocol_rejected` 日志，仅记录任务/执行 UUID、固定 reason 枚举和事件序号。原始响应、提示、源码、路径和异常正文不记录；其出现不代表进程停止，最终仍需查停止摘要。五种文件工具、权限检查、输出上限及版本准入保持原约束。
+
+验证过程保留失败证据：
+
+1. 原提供方分类的 4 项真实 CLI 离线测试先失败；新增进程层测试也先出现 4 项 `AGENT_IO_FAILED`，定位到错误码白名单漏传后修复。
+2. `ex22-agent-failure-diagnostics-green-20261029.log`：48 单元通过；原 CLI 契约、边界、协调租约共 8 集成通过。新增提供方测试有 1 项因为错误假设“一会话一请求”失败，未隐去这次失败。
+3. 按实际观察修正请求次数断言，补跑原两轮工程编辑：`ex22-agent-provider-journey-green-20261029.log` 的 32 单元 + 5 集成全部通过，BUILD SUCCESS。覆盖 Vue/Java/SQL 连续编辑、四类提供方失败、后续 success 不能掩盖错误、诊断脱敏和停止凭据。
+
+两轮回归合计覆盖 **48 个不同单元场景、13 个不同集成场景**，均有通过记录；不是后端全量重跑。全部 CLI 回归只连接本机假服务、使用测试凭据；平台 JAR 构建通过不代表此轮生成应用已构建。
+
+### 收尾核对
+
+只读检查确认：实际启动任务已有匹配执行的停止摘要，编辑租约 RELEASED、execution_pending=false；未启动的原失败任务租约也已释放。A 源码仍为 READY、第 7 版，活动 Agent/编辑租约为 0，159 条旧应用运行全部结束，执行任务槽和协调锁为 0。旧五份未决审计及旧 execution/binding 记录的摘要不变。
+
+A 仍为 7 行、B 为 4 行，各 3 条迁移；行摘要分别为 `9d81cdf8901f00f1dd49f8870279d739`、`5e001e9413c369327fd47200faf576c4`，迁移历史摘要分别为 `1813b3e27ba1491c11104c8b4c2a44fa`、`d52f8eb376b0ef124958c0996c4a87fe`。与原验收记录一致，未运行新 SQL。
+
+剩余一次建议改用于同一基线、同一搜索需求的诊断重试，成功后再审查并构建；这一用途调整尚待确认。未加次数、未清账、未自动重试、未推送或部署。
 
 ## PA32–PA33：最终全量与交接（2026-10-19 15:31）
 

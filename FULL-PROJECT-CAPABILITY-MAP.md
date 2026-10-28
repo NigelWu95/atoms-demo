@@ -17,7 +17,7 @@
 | 稳定模块 ID | 职责 | 依赖 | 规格状态 |
 |---|---|---|---|
 | `project-source` | 每项目完整源码 Git 仓库、不可变版本、工作副本、元数据、旧产物显式导入 | 现有项目身份与所有权 | 内部模块已验收、默认关闭；[使用说明](docs/project-source.md)、[测试证据](docs/project-source-verification.md)、[任务清单](tasks/project-source/todo.md) |
-| `project-agent` | Claude Code + DeepSeek 在任务副本中读取及修改 Vue、Java、SQL 等文件，提交可检查的变更 | `project-source` | PA01–PA33 内部离线验收完成，默认 4 并发；最终后端 290 单元 + 272 集成通过，CLI 2.1.302 / 2.1.303 / 2.1.308 精确适配。见[维护说明](docs/project-agent.md)、[证据](docs/project-agent-verification.md)、[任务清单](tasks/project-agent/todo.md)。真实模型 PA-LIVE 未完成，旧两份测试未决审计保留；此处只记录 Agent 自身结果，构建运行及页面结果见下方模块 |
+| `project-agent` | Claude Code + DeepSeek 在任务副本中读取及修改 Vue、Java、SQL 等文件，提交可检查的变更 | `project-source` | PA01–PA33 内部离线验收完成，默认 4 并发；最终后端 290 单元 + 272 集成通过，CLI 2.1.302 / 2.1.303 / 2.1.308 精确适配。见[维护说明](docs/project-agent.md)、[证据](docs/project-agent-verification.md)、[任务清单](tasks/project-agent/todo.md)。真实模型 PA-LIVE 首次会话协议失败、未保存源码，剩余一次未执行；[结果与后续计划](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-agent-live-plan.md)。旧两份测试未决审计保留；此处只记录 Agent 自身结果，构建运行及页面结果见下方模块 |
 | `project-execution` | 对固定源码版本测试、构建、启动本机进程；构建失败保留上一可用结果，数据库迁移另行核对 | `project-source` | EX01–30 与 C-EX10 已完成，实际业务应用及两轮前后端版本、迁移/失败核对、重启持久化、交付身份、有界查询和原链路回归均已内部验收。[维护说明](docs/project-execution.md)、[任务](tasks/project-execution/todo.md)、[证据](docs/project-execution-verification.md)。预览/下载已由交付模块验证，正式工作台已调用这些能力 |
 | `project-delivery` | 实际应用预览、同快照下载、代码版本恢复；明确业务数据边界 | `project-source`、`project-execution` | PD01–PD14 / C1–C5 完成内部验收。真实 Vue 页面、HTTP ZIP 标准解压与逐文件比对、自身脚本独立构建/启动、CRUD/409 和重启持久化通过；源码恢复追加版本，原预览 ZIP 不变。默认关闭，正式页面已由工作台模块接入。[使用说明](docs/project-delivery.md)、[证据](docs/project-delivery-verification.md)、[任务](tasks/project-delivery/todo.md) |
 | `project-workbench` | 文件树、差异、任务与构建状态、实际进程预览及增量开发入口 | 以上模块 | PW01–PW10 本地实现，受控完整交互与真实 A/B 页面预览/下载通过，构建失败可显式提交修复；默认关闭。[使用说明](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-workbench.md)、[证据](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-workbench-verification.md)、[任务](https://github.com/NigelWu95/atoms-demo/blob/main/tasks/project-workbench/todo.md) |
@@ -35,7 +35,7 @@
 - 新模式采用本机进程，不要求新增服务器；首期仅供受信任维护者受控验证，不向公开访客自动开放模型生成后端的执行。独立目录、配置和端口不能隔离同一系统用户的文件及网络权限。
 - 预览和下载匹配源码及构建身份，不承诺两处业务数据相同。代码恢复不自动回滚数据库迁移或运行数据。
 - 密钥、邮箱授权码、数据库密码、平台 Cookie、个人 Agent 会话不进入源码、模型上下文或 ZIP。模型提供方必要的调用凭据仅交给受控执行进程，不写入工作副本。
-- 当前不自动调用付费模型、修改个人配置、推送 GitHub、部署或变更服务器数据库。真实模型联调和新后端执行另行确认具体范围。
+- 当前不自动调用付费模型、修改个人配置、推送 GitHub、部署或变更服务器数据库。真实联调已获固定 A 项目两次启动授权，首次失败后停止；剩余一次的用途调整按已确认方案单独确认。
 - Claude Code 对第三方模型及对外托管场景的适用条款尚未完全确认，列为正式对外开放前核查项；不以修改认证、隐藏使用或规避限制作为实现方案。
 
 ## 最终验收场景
