@@ -20,6 +20,13 @@ public final class ProjectExecutionService {
     private final ProjectService projects;
     private final ProjectSourceReadGateway source;
     private final TransactionTemplate transaction;
+    private ExecutionDatabasePool databasePool;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    ProjectExecutionService(ExecutionSettings settings, ExecutionBuildRepository builds, ProjectService projects,
+                            ProjectSourceReadGateway source, PlatformTransactionManager transactions, ExecutionDatabasePool databasePool) {
+        this(settings, builds, projects, source, transactions); this.databasePool = databasePool;
+    }
 
     ProjectExecutionService(ExecutionSettings settings, ExecutionBuildRepository builds, ProjectService projects,
                             ProjectSourceReadGateway source, PlatformTransactionManager transactions) {
@@ -43,6 +50,7 @@ public final class ProjectExecutionService {
         if (previous != null) return view(previous);
         // Git and storage verification are outside locks. Never substitute the current/latest version.
         var snapshot = source.read(owner, project, request.version());
+        if (databasePool != null) databasePool.ensure(owner, project);
         return transaction.execute(tx -> {
             var config = authorize(owner);
             var replay = existing(owner, project, request);
@@ -92,7 +100,7 @@ public final class ProjectExecutionService {
 
     private ExecutionSettings.Configuration authorize(UUID owner) {
         var config = settings.load();
-        if (owner == null || !config.maintainerIds().contains(owner))
+        if (owner == null || !config.allows(owner))
             throw new ApiException(403, "EXECUTION_FORBIDDEN", "当前身份没有完整工程执行权限。");
         return config;
     }

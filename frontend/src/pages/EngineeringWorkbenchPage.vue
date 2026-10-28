@@ -124,7 +124,13 @@ async function showFile(version: string, path: string) {
   <section class="engineering-page" aria-label="完整工程工作台">
     <header class="engineering-header">
       <div class="engineering-title">
-        <RouterLink :to="`/projects/${projectId}`" class="subtle-link">← 原工作台</RouterLink>
+        <RouterLink
+          v-if="wb.project?.currentVersionId"
+          :to="`/projects/${projectId}/legacy`"
+          class="subtle-link"
+          >查看旧版与存档</RouterLink
+        >
+        <RouterLink v-else to="/projects" class="subtle-link">← 我的项目</RouterLink>
         <h1 tabindex="-1">{{ wb.project?.name ?? '完整工程工作台' }}</h1>
       </div>
       <div class="engineering-actions">
@@ -140,6 +146,10 @@ async function showFile(version: string, path: string) {
         </button>
       </div>
     </header>
+    <p class="engineering-banner">Claude Code + DeepSeek · 访客与登录账号均可开发自己的完整工程</p>
+    <p v-if="wb.project?.currentVersionId" class="engineering-banner">
+      首次开发将参考旧版源码迁移页面和业务。旧版本、对话与原存档继续保留；新工程使用独立运行库，账号业务需通过后端接口实际验收。
+    </p>
     <p v-if="wb.loading" role="status" class="engineering-banner">正在打开完整工程…</p>
     <div v-if="wb.error || wb.intent.error" role="alert" class="engineering-banner inline-error">
       {{ wb.error || wb.intent.error }}
@@ -152,9 +162,9 @@ async function showFile(version: string, path: string) {
     </div>
     <section v-if="wb.capabilities && !wb.capabilities.enabled" class="engineering-empty">
       <h2>完整工程工作台暂不可用</h2>
-      <p>此模式需要维护者权限和服务配置。</p>
+      <p>完整工程服务尚不可用，请检查服务配置或稍后重试。</p>
       <code>{{ wb.capabilities.reason }}</code
-      ><RouterLink :to="`/projects/${projectId}`" class="button secondary">返回原工作台</RouterLink>
+      ><RouterLink to="/projects" class="button secondary">返回我的项目</RouterLink>
     </section>
     <template v-else-if="wb.capabilities?.enabled">
       <p v-if="wb.capabilities.archived" class="engineering-banner">
@@ -185,7 +195,9 @@ async function showFile(version: string, path: string) {
           >
             <div v-if="!wb.head?.sourceVersionId" class="engineering-empty">
               <h3>从完整工程开始</h3>
-              <p>初始化 Vue + Spring Boot 工程后，Agent 会基于这些源码实现需求。</p>
+              <p>
+                直接提交下方需求即可准备 Vue + Spring Boot 工程并开始开发，也可以先初始化查看源码。
+              </p>
               <button
                 type="button"
                 class="button primary"
@@ -272,7 +284,7 @@ async function showFile(version: string, path: string) {
                 class="button primary"
                 type="submit"
                 :disabled="
-                  !wb.canEdit || !wb.capabilities.agentEnabled || !prompt.trim() || wb.intent.busy
+                  !wb.canSubmit || !wb.capabilities.agentEnabled || !prompt.trim() || wb.intent.busy
                 "
               >
                 {{ wb.intent.busy ? '正在提交…' : '提交开发需求' }}

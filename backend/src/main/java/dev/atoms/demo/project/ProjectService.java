@@ -18,7 +18,7 @@ public class ProjectService {
             rs.getString("name"), rs.getObject("owner_id", UUID.class), rs.getLong("project_revision"),
             rs.getObject("current_version_id", UUID.class), rs.getTimestamp("created_at").toInstant(), rs.getTimestamp("updated_at").toInstant(), rs.getObject("active_run_id", UUID.class), rs.getBoolean("archived"));
     public ProjectService(JdbcTemplate jdbc) { this.jdbc = jdbc; }
-    public record Page(List<Project> items, String nextCursor) {}
+    public record Page(List<Project> items, String nextCursor, java.util.Map<UUID, UUID> sourceVersions) {}
     private record Cursor(Instant createdAt, UUID id) {}
 
     public Project create(UUID owner, String name) {
@@ -66,7 +66,14 @@ public class ProjectService {
         }
         boolean hasMore = items.size() > limit;
         var page = List.copyOf(items.subList(0, Math.min(limit, items.size())));
-        return new Page(page, hasMore ? encode(page.get(page.size() - 1), sort, scope) : null);
+        var sources = new java.util.LinkedHashMap<UUID, UUID>();
+        if (!page.isEmpty()) {
+            String placeholders = String.join(",", java.util.Collections.nCopies(page.size(), "?"));
+            jdbc.query("SELECT project_id,current_source_version_id FROM project_sources WHERE current_source_version_id IS NOT NULL AND project_id IN (" + placeholders + ")",
+                    (org.springframework.jdbc.core.RowCallbackHandler) rs -> sources.put(rs.getObject(1, UUID.class), rs.getObject(2, UUID.class)),
+                    page.stream().map(Project::id).toArray());
+        }
+        return new Page(page, hasMore ? encode(page.get(page.size() - 1), sort, scope) : null, java.util.Map.copyOf(sources));
     }
     private Project require(List<Project> projects) {
         if (projects.isEmpty()) throw notFound();

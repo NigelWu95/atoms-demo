@@ -43,7 +43,7 @@ final class ExecutionBuildSettlement {
             if (projects.lock(build.ownerId(), build.projectId().toString()).archived()) reject();
             var state = locked(build);
             // A blocked lock acquisition must not preserve a permission snapshot from before the wait.
-            if (!settings.load().maintainerIds().contains(build.ownerId())) reject();
+            if (!settings.load().allows(build.ownerId())) reject();
             if (!"PACKAGING".equals(state.get("status")) || Boolean.TRUE.equals(state.get("execution_pending"))
                     || Boolean.TRUE.equals(state.get("cancel_requested"))) reject();
             completedStages(build, evidence);

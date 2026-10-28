@@ -129,7 +129,7 @@ final class DependencyPreparationLifecycle {
     }
     private void authorize() {
         if (projects.lock(task.ownerId(), task.projectId().toString()).archived()
-                || !settings.load().maintainerIds().contains(task.ownerId())) reject();
+                || !settings.load().allows(task.ownerId())) reject();
     }
     private void evidenceLock() {
         jdbc.queryForObject("SELECT id FROM projects WHERE id=? FOR UPDATE", UUID.class, task.projectId());

@@ -53,7 +53,9 @@ final class ExecutionRuntimeDispatcher {
                     if (current.owner.equals(owner) && current.request.equals(request)) return current.result.minimalCompletionStage();
                     throw ExecutionRun.error(409, current.request.keyHash().equals(request.keyHash()) ? "RUN_IDEMPOTENCY_CONFLICT" : "RUN_PROJECT_BUSY");
                 }
-                if (jobs.size() >= Math.min(capacity, settings.load().maxRunningProjects())) throw ExecutionRun.error(429, "RUN_CAPACITY_FULL");
+                int held = settings.load().ownerAccess() ? (int) runs.unfinished().stream()
+                        .filter(run -> run.status().equals("NEEDS_RECONCILIATION") && !jobs.containsKey(run.projectId())).count() : 0;
+                if (jobs.size() + held >= Math.min(capacity, settings.load().maxRunningProjects())) throw ExecutionRun.error(429, "RUN_CAPACITY_FULL");
                 var job = new Job(owner, project, request);
                 jobs.put(project, job); // Present before any admission can commit, including the receipt/handoff window.
                 try { executor.execute(job); }
@@ -77,6 +79,7 @@ final class ExecutionRuntimeDispatcher {
             if (rows.size() > 4) throw unavailable();
             for (var row : rows) {
                 var job = jobs.get(row.projectId());
+                if (job == null && settings.load().ownerAccess() && row.status().equals("NEEDS_RECONCILIATION")) continue;
                 if (job == null || !job.matches(row) || row.status().equals("NEEDS_RECONCILIATION")) throw unavailable();
             }
         }

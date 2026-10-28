@@ -54,6 +54,19 @@ class ProjectAgentInitializationIT extends AgentIntegrationSupport {
         assertThat(jdbc.queryForObject("SELECT count(*) FROM agent_tasks WHERE project_id=?", Integer.class, project)).isZero();
     }
 
+    @Test void guestOwnerCanInitializeAndSubmitButCannotReadOrEditAnotherGuestsProject() throws Exception {
+        configuration.setProperty("atoms.project-workbench.owner-access-enabled", "true");
+        source.start(database);
+        UUID project = source.createEmpty(stranger);
+        var initial = initialization.initialize(stranger, project, "guest-initialize").completion().get(30, TimeUnit.SECONDS);
+        assertThat(initial.status()).isEqualTo("COMMITTED");
+        var task = tasks.submit(stranger, project, new ProjectAgentService.Input("实现后端计数器", initial.resultVersionId().toString(), 1), "guest-submit");
+        assertThat(task.status()).isEqualTo("QUEUED");
+        assertThatThrownBy(() -> tasks.submit(owner, project, new ProjectAgentService.Input("修改他人项目", initial.resultVersionId().toString(), 1), "foreign"))
+                .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.status()).isEqualTo(404));
+        tasks.cancel(stranger, project, task.id());
+    }
+
     @Test void disabledForeignArchivedAndBrokenTemplateCreateNoIntentOrTask() {
         UUID project = source.createEmpty(owner);
         var reads = new AtomicInteger();

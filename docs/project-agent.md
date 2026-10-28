@@ -1,20 +1,20 @@
 # 完整工程 Agent · 使用与维护
 
-本模块在完整源码副本中调用 Claude Code 修改 Vue、Java、SQL、测试和配置，校验后保存不可变源码版本。维护者启用完整工程模式后，可从[工程工作台](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-workbench.md)提交需求、查看变更、构建及运行。新模式默认关闭，默认网页继续使用旧生成链路。Agent 自身结果见[验证记录](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-agent-verification.md)，进度见[任务清单](https://github.com/NigelWu95/atoms-demo/blob/main/tasks/project-agent/todo.md)。
+本模块在完整源码副本中调用 Claude Code 修改 Vue、Java、SQL、测试和配置，校验后保存不可变源码版本。2026-10-29 本地日常环境已启用默认完整工程模式，访客与注册账号均可开发自己的工程；新部署仍需显式配置开关、工具及数据库。可从[工程工作台](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-workbench.md)提交需求、查看变更、构建及运行。[默认模式验收](https://github.com/NigelWu95/atoms-demo/blob/main/docs/default-engineering-verification.md)、[Agent 验证记录](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-agent-verification.md)、[任务清单](https://github.com/NigelWu95/atoms-demo/blob/main/tasks/project-agent/todo.md)。
 
 截至 2026-10-29，PA01–PA33 内部离线能力及执行、交付、工作台模块已完成本地验收。用户追加真实调用授权后，Claude Code + DeepSeek 已保存搜索/状态筛选 V8、真实修复 V9、分类增量 V10 及状态修复 V11。V9 已通过完整构建、真实页面/API、预览 ZIP 逐文件一致性验收；V11 的构建、兼容迁移、实际预览、同源码 ZIP 独立构建/运行及重启持久化也已通过。详见[2026-10-29 真实验收](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-agent-live-20261029.md)。`SOURCE_SAVED` 只表示源码保存，不表示构建或业务功能通过。
 
 ## 源码与增量开发
 
 1. 对新项目用 `ProjectAgentInitialization.initialize(owner, project, key)` 初始化 `full-project-v1` 完整模板，等待源码操作 `COMMITTED`。初始化不调用模型，也不生成用户业务。
-2. 用 `ProjectAgentService.submit(owner, project, input, key)` 提交需求，绑定当前源码版本 UUID 和修订号。平台检查维护者资格、项目所有权、归档状态、幂等键和编辑租约。
+2. 用 `ProjectAgentService.submit(owner, project, input, key)` 提交需求，绑定当前源码版本 UUID 和修订号。平台检查模式准入、项目所有权、归档状态、幂等键和编辑租约；`PROJECT_WORKBENCH_OWNER_ACCESS=true` 时所有项目所有者可用，否则仍仅维护者。
 3. Worker 从该版本创建普通文件副本。每个任务启动新的 CLI 会话，不依赖个人会话或 `--resume`。模型可以读取旧文件并修改业务前端、Java 接口及追加 SQL。
 4. 平台确认自有进程和 I/O 结束，扫描并封存候选，再检查项目归属与基线，保存新的 Git/数据库版本关联。失败保留原版；没有修改则返回 `NO_CHANGES`。
 5. 下一轮绑定刚保存的版本和修订号。正式 Git 仓库不直接交给 Agent，历史版本不会被模型覆盖。
 
 源码和非敏感配置在磁盘 Git；PostgreSQL 保存版本引用、任务、事件、额度与租约，任务提示也单独持久化，不将整工程放入一个字段。目录结构、文件限制与备份方式见[源码维护说明](project-source.md)。现有 UTF-8、512 文件、单文件 2 MiB、整树 16 MiB 限制继续生效。
 
-旧三文件项目不自动迁移；旧预览、下载、发布和数据不变。显式导入只保留旧兼容实现，不等于自动改写为原生业务后端。
+旧三文件项目首次在新模式提交时，会初始化完整工程，并把原 HTML/CSS/JS 放入 `legacy/` 作为 Agent 的迁移参考；原版本、对话、发布及业务数据保留。初始化不等于业务已迁移，后端账号体系仍需生成真实接口并验收；旧业务记录不自动复制到新运行库。
 
 ## 配置与启用前提
 
@@ -92,7 +92,7 @@ QUEUED → PREPARING → RUNNING → VALIDATING → ACCEPTING → SOURCE_SAVED
 
 维护者以只读方式核对 `agent_tasks`、`source_edit_leases`、关联 `source_operations/source_versions`：任务/执行/租约关联、`execution_pending`、停止摘要、基线、源码提交是否存在。PID 不证明进程身份或已停止；候选文件存在也不证明提交成功。当前没有管理员强制解锁入口，不得删除审计、伪造停止摘要或替换一个无关进程的凭据。
 
-启动时先恢复源码，再恢复 Agent；未执行者结算中断，已提交者补齐版本结果，退出不明者继续待核对，不重新调用模型。若存在未决任务，协调者保守拒绝启动。隔离测试 schema 的成功不能证明旧未决执行已被结算；两份历史测试失败审计仍保留在验证记录中。
+启动时先恢复源码，再恢复 Agent；未执行者结算中断，已提交者补齐版本结果，退出不明者继续待核对，不重新调用模型。维护者模式保留全局阻断。开启 `PROJECT_WORKBENCH_OWNER_ACCESS` 的多用户模式下，待核对任务保留原项目租约、工作目录与一个全局并发名额，其他项目可以使用剩余名额；重启不会释放这些名额，也不会补造停止凭据。历史运行实例的待核对记录同样保留原数据库、端口与运行容量，不能由新进程接管。隔离测试成功不代表旧未决记录已解决。
 
 ## 安全停止、备份与下一步
 

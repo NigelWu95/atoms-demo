@@ -27,14 +27,25 @@ final class AgentSettings {
                     (int) number("max-turns", 24, 1, 24),
                     Duration.ofSeconds(number("task-timeout-seconds", 1800, 1, 1800)),
                     Duration.ofSeconds(number("queue-timeout-seconds", 300, 1, 300)),
-                    (int) number("max-concurrent-tasks", 4, 1, 8));
+                    (int) number("max-concurrent-tasks", 4, 1, 8), ownerAccess());
         } catch (IllegalArgumentException error) { throw unavailable(); }
     }
 
     record Configuration(Path cli, Path stateRoot, Set<UUID> maintainerIds, boolean liveEnabled,
                          long maxLiveRuns, int maxOutputTokens, int maxTurns,
-                         Duration taskTimeout, Duration queueTimeout, int maxConcurrentTasks) {
+                         Duration taskTimeout, Duration queueTimeout, int maxConcurrentTasks, boolean ownerAccess) {
         Configuration { maintainerIds = Set.copyOf(maintainerIds); }
+        Configuration(Path cli, Path stateRoot, Set<UUID> maintainers, boolean liveEnabled, long maxLiveRuns,
+                      int maxOutputTokens, int maxTurns, Duration taskTimeout, Duration queueTimeout, int concurrent) {
+            this(cli, stateRoot, maintainers, liveEnabled, maxLiveRuns, maxOutputTokens, maxTurns, taskTimeout, queueTimeout, concurrent, false);
+        }
+        boolean allows(UUID owner) { return owner != null && (ownerAccess || maintainerIds.contains(owner)); }
+    }
+
+    private boolean ownerAccess() {
+        String value = configuration.getProperty("atoms.project-workbench.owner-access-enabled", "false");
+        if (!value.equals("true") && !value.equals("false")) throw unavailable();
+        return value.equals("true");
     }
 
     private boolean flag(String key) {

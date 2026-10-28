@@ -6,6 +6,7 @@ export type Project = {
   ownerId: string
   projectRevision: number
   currentVersionId?: string | null
+  currentSourceVersionId?: string | null
   createdAt: string
   updatedAt: string
   archived?: boolean
@@ -66,7 +67,15 @@ export function listProjects(
       !(value.nextCursor === null || typeof value.nextCursor === 'string')
     )
       return protocolFailure()
-    return { items: value.items.map(decodeProject), nextCursor: value.nextCursor }
+    const versions = value.sourceVersions === undefined ? {} : value.sourceVersions
+    if (!isRecord(versions)) return protocolFailure()
+    const items = value.items.map((item) => {
+      const project = decodeProject(item),
+        version = versions[project.id]
+      if (version !== undefined && typeof version !== 'string') return protocolFailure()
+      return { ...project, currentSourceVersionId: version ?? null }
+    })
+    return { items, nextCursor: value.nextCursor }
   })
 }
 /** Callers own the intent key and must reuse it after an unknown create result. */

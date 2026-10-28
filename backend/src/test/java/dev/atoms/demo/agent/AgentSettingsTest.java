@@ -89,6 +89,17 @@ class AgentSettingsTest {
                 .as(key).isInstanceOf(ApiException.class);
     }
 
+    @Test void ownerAccessIncludesGuestsOnlyWhenExplicitlyEnabled() {
+        UUID guest = UUID.randomUUID();
+        assertThat(new AgentSettings(config()).load().allows(guest)).isFalse();
+        var opened = new AgentSettings(config().withProperty("atoms.project-workbench.owner-access-enabled", "true")).load();
+        assertThat(opened.allows(guest)).isTrue();
+        assertThat(opened.allows(null)).isFalse();
+        assertThat(opened.maintainerIds()).doesNotContain(guest);
+        assertThatThrownBy(() -> new AgentSettings(config().withProperty("atoms.project-workbench.owner-access-enabled", "yes")).load())
+                .isInstanceOf(ApiException.class);
+    }
+
     private MockEnvironment config() {
         return new MockEnvironment().withProperty("atoms.agent.enabled", "true")
                 .withProperty("atoms.agent.cli", temporary.resolve("cli").toString())

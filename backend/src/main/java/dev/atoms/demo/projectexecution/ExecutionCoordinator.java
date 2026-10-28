@@ -127,7 +127,7 @@ final class ExecutionCoordinator implements SmartLifecycle, AutoCloseable, Execu
                 } else if (!preparations.unfinished().isEmpty()) throw unavailable();
                 resources.check(); requireLease();
                 if (!sourceReady.getAsBoolean() || !initial.equals(settings.load()) || !builds.inFlight().isEmpty()
-                        || unresolvedPreparations() || !runs.unfinished().isEmpty())
+                        || unresolvedPreparations() || hasBlockingRuns())
                     throw unavailable();
                 queue = new ExecutionBuildQueue(settings, builds, jdbc, transactions, lease);
                 var residentResources = resources.runtime(this::checkAuthority);
@@ -142,7 +142,7 @@ final class ExecutionCoordinator implements SmartLifecycle, AutoCloseable, Execu
                 activated = true; running.set(true);
                 monitor.scheduleWithFixedDelay(this::poll, 0, 250, TimeUnit.MILLISECONDS);
             } catch (IOException | java.sql.SQLException | RuntimeException error) {
-                log("execution_dispatcher_unavailable", null);
+                log("execution_dispatcher_unavailable", null, error);
                 requestStop(); finishWhenTerminated();
             }
         }
@@ -153,7 +153,7 @@ final class ExecutionCoordinator implements SmartLifecycle, AutoCloseable, Execu
         try {
             checkAuthority();
             if (runtime != null) runtime.checkOwnedRuns();
-            else if (!runs.unfinished().isEmpty()) throw unavailable();
+            else if (hasBlockingRuns()) throw unavailable();
             // Snapshot ownership BEFORE the query: a worker may finish and remove itself during the read.
             var owned = Set.copyOf(active.keySet());
             for (var build : builds.inFlight())
@@ -179,7 +179,7 @@ final class ExecutionCoordinator implements SmartLifecycle, AutoCloseable, Execu
                 canDispatch = dispatch(current, limit);
             }
         } catch (IOException | RuntimeException error) {
-            log("execution_dispatcher_stopping", null); requestStop();
+            log("execution_dispatcher_stopping", null, error); requestStop();
         }
     }
 
@@ -254,7 +254,7 @@ final class ExecutionCoordinator implements SmartLifecycle, AutoCloseable, Execu
     private void maintenanceAuthority(ExecutionRun failed, WorkerResources original, ExecutionRuntimeDispatcher resident) {
         if (!activated || released || !stopping.get() || running.get() || failed == null || original == null || original != resources
                 || resident == null || resident != runtime || !sourceReady.getAsBoolean()
-                || !settings.load().maintainerIds().contains(failed.ownerId()) || executor == null || !executor.isTerminated()) throw unavailable();
+                || !settings.load().allows(failed.ownerId()) || executor == null || !executor.isTerminated()) throw unavailable();
         requireLease();
     }
 
@@ -365,7 +365,7 @@ final class ExecutionCoordinator implements SmartLifecycle, AutoCloseable, Execu
                         if (preparationQueue != null)
                             for (var task : preparationQueue.waiting()) preparationQueue.cancelWaiting(task);
                     }
-                    if (!builds.inFlight().isEmpty() || unresolvedPreparations() || !runs.unfinished().isEmpty()) throw unavailable();
+                    if (!builds.inFlight().isEmpty() || unresolvedPreparations() || hasBlockingRuns()) throw unavailable();
                 }
                 if (resources != null) { resources.close(); resources = null; }
                 if (lease != null) { lease.close(); lease = null; }
@@ -403,6 +403,12 @@ final class ExecutionCoordinator implements SmartLifecycle, AutoCloseable, Execu
     private boolean unresolvedPreparations() {
         return preparations.unfinished().stream().anyMatch(task -> !task.status().equals("QUEUED"));
     }
+    private boolean hasBlockingRuns() {
+        // A previous unknown run keeps its database/port binding and durable running slot.
+        // Owner-access mode can run OTHER projects without adopting or clearing that process.
+        boolean isolate = settings.load().ownerAccess();
+        return runs.unfinished().stream().anyMatch(run -> !isolate || !run.status().equals("NEEDS_RECONCILIATION"));
+    }
     private static void outsideTransaction() {
         if (TransactionSynchronizationManager.isActualTransactionActive()) throw unavailable();
     }
@@ -412,6 +418,12 @@ final class ExecutionCoordinator implements SmartLifecycle, AutoCloseable, Execu
     private static void log(String event, UUID task) {
         LOG.warn("{\"event\":\"{}\",\"entryPoint\":\"execution_dispatcher\",\"requestId\":\"{}\",\"errorCode\":\"EXECUTION_COORDINATOR_UNAVAILABLE\"}",
                 event, task == null ? UUID.randomUUID() : task);
+    }
+    private static void log(String event, UUID task, Exception error) {
+        String code = error instanceof ApiException api ? api.code() : error instanceof IOException ? error.getMessage() : null;
+        if (code == null || !code.matches("(?:EXECUTION|RUN|SOURCE)_[A-Z_]{1,80}")) code = "EXECUTION_CHECK_FAILED";
+        LOG.warn("{\"event\":\"{}\",\"entryPoint\":\"execution_dispatcher\",\"requestId\":\"{}\",\"errorCode\":\"EXECUTION_COORDINATOR_UNAVAILABLE\",\"causeCode\":\"{}\"}",
+                event, task == null ? UUID.randomUUID() : task, code);
     }
 
     private abstract class Job implements Runnable {

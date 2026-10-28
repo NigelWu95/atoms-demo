@@ -1,14 +1,14 @@
 # 完整工程工作台
 
-新入口是 `/projects/:id/engineering`，连接已有的源码、Agent、构建、运行和交付模块。页面沿用平台侧栏与登录身份；原工作台和旧导出按钮继续保留。`PROJECT_WORKBENCH_ENABLED` 默认关闭，入口仅对满足项目所有权及执行模块维护者权限的账号展示。
+开启 `PROJECT_WORKBENCH_DEFAULT_MODE=true` 后，普通项目入口 `/projects/:id` 直接进入 Claude Code 完整工程工作台，显式 `/projects/:id/engineering` 也保留。开启 `PROJECT_WORKBENCH_OWNER_ACCESS=true` 后，注册账号和临时访客均可开发自己的项目；跨用户权限检查继续生效。旧版本、对话、预览及导出可从 `/projects/:id/legacy` 查看，旧生成接口拒绝新任务，不会静默回退。模块、真实模型和执行环境仍需按配置启用。
 
 ## 使用流程
 
-1. 在原项目页面打开“完整工程工作台”。首次点击“初始化工程”，创建固定 Vue + Spring Boot 工程；初始化本身不调用模型，也不自动转换旧模式的业务代码。
+1. 首次直接提交需求，会先创建 Vue + Spring Boot 工程，再提交 Claude Code 任务；也可单独初始化检查源码。旧项目会将原 HTML/CSS/JS 放入 `legacy/` 作为迁移参考，并记录原版本 ID。Agent 根据旧实现继续开发；初始化本身不调用模型、不宣称业务已转换。原运行数据仍保留在旧应用，不复制到源码或模型上下文。
 2. 在左侧输入需求。Agent 任务基于当前完整源码及 revision 提交，阶段、取消和最终源码结果独立展示。刷新后从服务端读取最近 50 次需求，未提交草稿沿用项目自动保存。
 3. 在“源码”中查看 Git 快照的文件树和正文；“差异”查看所选版本与其父版本的修改。前端、Java、SQL 和配置样例均属于同一个完整工程。源码保存在平台管理的磁盘 Git 仓库，PostgreSQL 保存任务、版本引用及权限。
 4. 展开顶部“构建与运行”。根据需要显式准备依赖，再对固定源码版本构建。准备依赖走既有审核策略，不接收自由 Shell 命令；保存源码成功不等于构建成功。
-5. 对成功构建核对数据库迁移，查看准确 SQL 文件。需要迁移时显式批准当前构建、目标与数据库历史；配置或历史变化会使批准失效。没有业务数据库绑定时页面说明原因，不代建数据库。
+5. 首次构建会从 `PROJECT_EXECUTION_DATABASE_POOL` 核验并分配一组预先准备的测试库和运行库，之后固定复用。固定映射与池合计最多 4 组，容量不足时明确提示；平台不持有建库管理员密码。对成功构建核对准确 SQL，需要迁移时显式批准当前构建、目标与数据库历史；配置或历史变化会使批准失效。
 6. 点击“启动应用”，等待真实进程状态为 READY，再打开预览。替换运行会先停止原进程；如果返回仍在停止，页面保留原请求供明确重试，不把它显示为新应用已启动。
 7. 两个下载按钮直接展示：“下载当前预览源码”固定到正在看的运行，“下载选中构建源码”固定到选中的成功构建。下载取原 Git 快照，不按最新模板重组；包含 Vue、Java、SQL、脚本、测试和配置样例，不含 JAR、依赖目录、业务数据或私有配置。
 
@@ -34,18 +34,20 @@
 
 ```properties
 PROJECT_WORKBENCH_ENABLED=true
+PROJECT_WORKBENCH_DEFAULT_MODE=true
+PROJECT_WORKBENCH_OWNER_ACCESS=true
 PROJECT_DELIVERY_ENABLED=true
 PROJECT_DELIVERY_ORIGIN=http://127.0.0.1:5173
 ```
 
-origin 必须是实际前端的协议、主机和端口，不加末尾斜线。此示例不代替执行器工具、依赖策略、维护者名单、独立测试库和业务库绑定。真实模型仍要求 Agent 的 live 开关及独立预算；旧生成接口的调用额度不会自动变成 Agent 额度。仅开启工作台不会创建存储、启动应用、调用模型或修改个人 Claude Code 配置。
+origin 必须是实际前端的协议、主机和端口，不加末尾斜线。此示例不代替执行器工具、依赖策略、独立测试库和业务库绑定。`OWNER_ACCESS` 开启后普通项目操作不再要求维护者名单，维护性核对仍要求维护者。真实模型仍要求 Agent 的 live 开关及独立预算；旧生成接口的调用额度不会自动变成 Agent 额度。仅开启工作台不会创建存储、启动应用、调用模型或修改个人 Claude Code 配置。
 
 具体准备见[源码模块](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-source.md)、[Agent 模块](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-agent.md)、[执行模块](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-execution.md)和[交付模块](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-delivery.md)。
 
 ## 交付边界
 
-新模式面向受信维护者，使用本机应用进程，不增加实例服务或服务器。页面复用原协调器的进程和任务所有权，不根据 PID 接管应用。文件树只读，开发修改通过 Agent；首版工程技术栈仍限定 Vue + Spring Boot + PostgreSQL。
+本地日常环境已按用户要求向项目所有者开放，包括访客，使用本机应用进程，不增加实例服务或服务器。页面复用原协调器的进程和任务所有权，不根据 PID 接管应用。文件树只读，开发修改通过 Agent；首版工程技术栈仍限定 Vue + Spring Boot + PostgreSQL。该开关不提供 OS 沙箱，不能据此认定已适合公网不可信代码托管。
 
 iframe 使用隔离来源，预览授权十分钟，仅存在页面内存；停止、退出或失效后清理，过期可重新打开。相对资源、模块脚本及有界 JSON 业务接口按已有交付协议工作，WebSocket、Cookie 登录等不在该预览协议范围内。
 
-本次不改变日常 `.env`、个人 JDK/Claude 配置或云端部署。真实付费模型生成的效果和远程部署结果需单列，不能从受控响应或已有样本的实机验收推导。验证范围见[验收记录](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-workbench-verification.md)。
+2026-10-29 的默认模式切换已更新本地私有环境配置。个人 Claude 配置、全局 Java 默认及云端部署保持原状；本地平台进程采用项目已有的 Java 17.0.14。旧阶段验收见[工作台验收记录](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-workbench-verification.md)，当前默认模式及访客真实调用见[本轮记录](https://github.com/NigelWu95/atoms-demo/blob/main/docs/default-engineering-verification.md)。

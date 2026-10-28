@@ -225,7 +225,7 @@ public final class ProjectExecutionAccess {
     }
     private ExecutionSettings.Configuration authorize(UUID owner) {
         var config = settings.load();
-        if (owner == null || !config.maintainerIds().contains(owner)) throw error(403, "EXECUTION_FORBIDDEN");
+        if (owner == null || !config.allows(owner)) throw error(403, "EXECUTION_FORBIDDEN");
         return config;
     }
     private ExecutionCoordinator.AccessScope scope() throws IOException {

@@ -62,7 +62,7 @@ final class DependencyPreparationQueue {
                             """, Boolean.class, current.id()))) { status = "TIMED_OUT"; code = "EXECUTION_QUEUE_TIMEOUT"; }
                     else if (!current.ownerId().equals(project.get("owner_id"))) { status = "FAILED"; code = "EXECUTION_PREPARATION_OWNER_CHANGED"; }
                     else if (Boolean.TRUE.equals(project.get("archived"))) { status = "FAILED"; code = "EXECUTION_PROJECT_ARCHIVED"; }
-                    else if (!config.maintainerIds().contains(current.ownerId())) { status = "FAILED"; code = "EXECUTION_FORBIDDEN"; }
+                    else if (!config.allows(current.ownerId())) { status = "FAILED"; code = "EXECUTION_FORBIDDEN"; }
                     if (status != null) current = finish(current, status, code);
                 }
                 authority(); return current;

@@ -131,6 +131,17 @@ class ExecutionSettingsTest {
                         assertThat(error.code()).isEqualTo("EXECUTION_CONFIGURATION_INVALID"));
     }
 
+    @Test void ownerAccessOpensExecutionWithoutGrantingMaintenancePermissions() {
+        UUID guest = UUID.randomUUID();
+        assertThat(new ExecutionSettings(config()).load().allows(guest)).isFalse();
+        var opened = new ExecutionSettings(config().withProperty("atoms.project-workbench.owner-access-enabled", "true")).load();
+        assertThat(opened.allows(guest)).isTrue();
+        assertThat(opened.allows(null)).isFalse();
+        assertThat(opened.maintainerIds()).doesNotContain(guest);
+        assertThatThrownBy(() -> new ExecutionSettings(config().withProperty("atoms.project-workbench.owner-access-enabled", "yes")).load())
+                .isInstanceOf(ApiException.class);
+    }
+
     private MockEnvironment config() {
         return new MockEnvironment().withProperty(PREFIX + "enabled", "true")
                 .withProperty(PREFIX + "root", temporary.resolve("execution").toString())

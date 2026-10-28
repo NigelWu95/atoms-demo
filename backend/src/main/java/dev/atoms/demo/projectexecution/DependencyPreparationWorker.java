@@ -46,7 +46,7 @@ final class DependencyPreparationWorker {
         final DependencyPreparationRepository.Task task;
         try {
             config = settings.load(); coordination.check();
-            if (!config.maintainerIds().contains(owner) || !config.root().equals(paths.checkedRoot()) || !source.readyForExecution()) throw unavailable();
+            if (!config.allows(owner) || !config.root().equals(paths.checkedRoot()) || !source.readyForExecution()) throw unavailable();
             edit = Objects.requireNonNull(service.handle(id));
             int original = jdbc.queryForObject("SELECT task_timeout_seconds FROM dependency_preparations WHERE id=? AND project_id=? AND owner_id=?",
                     Integer.class, id, project, owner);

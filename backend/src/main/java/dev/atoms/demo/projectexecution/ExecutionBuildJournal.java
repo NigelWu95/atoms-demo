@@ -52,7 +52,7 @@ final class ExecutionBuildJournal implements ExecutionFrontend.Journal, Executio
 
     private void beginStage(ExecutionToolchain.Operation operation, UUID execution) throws IOException {
         transact(() -> {
-            if (execution == null || !settings.load().maintainerIds().contains(build.ownerId())
+            if (execution == null || !settings.load().allows(build.ownerId())
                     || projects.lock(build.ownerId(), build.projectId().toString()).archived()) reject();
             var row = locked();
             int index = ORDER.indexOf(operation);

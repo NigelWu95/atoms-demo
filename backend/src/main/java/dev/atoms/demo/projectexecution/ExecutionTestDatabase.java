@@ -9,8 +9,15 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 /** Immutable maintainer registry, constructed once by the future opt-in coordinator, not per request. */
 final class ExecutionTestDatabase {
     private final Map<UUID, ExecutionPrivateConfig> bindings;
+    private java.util.function.Function<UUID, UUID> resolver = java.util.function.Function.identity();
 
     private ExecutionTestDatabase(Map<UUID, ExecutionPrivateConfig> bindings) { this.bindings = Map.copyOf(bindings); }
+    ExecutionTestDatabase resolving(java.util.function.Function<UUID, UUID> resolver) { this.resolver = resolver; return this; }
+    private ExecutionPrivateConfig configuration(UUID project) {
+        if (project == null) return null;
+        var direct = bindings.get(project);
+        return direct != null ? direct : bindings.get(resolver.apply(project));
+    }
 
     /** Registry identity comparison only; never shares credentials or opens a connection. */
     boolean overlapsRuntime(ExecutionPrivateConfig runtime) {
@@ -62,7 +69,7 @@ final class ExecutionTestDatabase {
             used = true;
             if (!this.build.equals(build) || !this.execution.equals(execution) || builder.directory() == null
                     || !backend.equals(builder.directory().toPath())) throw launchRejected();
-            issuer.bindings.get(verified.projectId()).applyTestEnvironment(builder);
+            issuer.configuration(verified.projectId()).applyTestEnvironment(builder);
         }
 
         void verify(OwnedProcess.Budget budget) throws IOException {
@@ -77,7 +84,7 @@ final class ExecutionTestDatabase {
 
     /** Opens a fresh bounded read-only connection; this registry accepts test configuration only. */
     Verified verify(UUID project, OwnedProcess.Budget budget) throws IOException {
-        var config = project == null ? null : bindings.get(project);
+        var config = configuration(project);
         if (config == null) throw new IOException("EXECUTION_DB_BINDING_NOT_FOUND");
         var identity = ExecutionDatabaseInspection.verify(config, budget);
         return new Verified(project, config.bindingId(), identity.databaseOid(), identity.roleOid(), identity.relationCount());

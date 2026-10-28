@@ -14,6 +14,7 @@ const props = defineProps<{
   project: Project
   modelValue: string
   repair?: RepairProposal | null
+  historyOnly?: boolean
 }>()
 const emit = defineEmits<{
   'update:modelValue': [value: string]
@@ -93,9 +94,13 @@ const connectionLabel = computed(
       <span role="status" aria-live="polite" class="muted">{{ runLabel(run) }}</span>
     </div>
     <div class="generation-conversation" tabindex="0" role="region" aria-label="对话记录">
-      <p class="muted generation-config">{{ configuration }}</p>
+      <p v-if="historyOnly" class="muted generation-config">
+        旧版对话与应用保留。继续开发请进入
+        <RouterLink :to="`/projects/${project.id}/engineering`">完整工程工作台</RouterLink>。
+      </p>
+      <p v-else class="muted generation-config">{{ configuration }}</p>
       <RepairConfirmation
-        v-if="repair && validRepair"
+        v-if="!historyOnly && repair && validRepair"
         :proposal="repair"
         :disabled="loading || !canSubmit"
         :submitting="busy"
@@ -122,6 +127,7 @@ const connectionLabel = computed(
       </div>
       <p v-if="error" role="alert" class="inline-error">{{ error }}</p>
       <GenerationRecovery
+        v-if="!historyOnly"
         :pending="pending"
         :saved-at="recoverySavedAt"
         :blocked="recoveryBlocked"
@@ -168,6 +174,7 @@ const connectionLabel = computed(
       </p>
     </div>
     <PromptComposer
+      v-if="!historyOnly"
       compact
       :model-value="modelValue"
       :disabled="!canSubmit"

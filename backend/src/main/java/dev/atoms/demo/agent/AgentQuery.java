@@ -64,7 +64,7 @@ public class AgentQuery {
         });
     }
     private void authorize(UUID owner, UUID project) {
-        if (owner == null || !settings.load().maintainerIds().contains(owner))
+        if (owner == null || !settings.load().allows(owner))
             throw new ApiException(403, "AGENT_NOT_ALLOWED", "当前账号未获准使用完整工程 Agent。");
         projects.lock(owner, project.toString());
     }

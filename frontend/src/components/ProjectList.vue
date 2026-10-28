@@ -147,8 +147,14 @@ async function archive(project: Project) {
           <span class="project-copy"
             ><strong>{{ project.name }}</strong
             ><span class="muted"
-              >{{ project.currentVersionId ? '已生成' : '尚未生成' }} · 更新于
-              {{ new Date(project.updatedAt).toLocaleDateString('zh-CN') }}</span
+              >{{
+                project.currentSourceVersionId
+                  ? '工程已保存'
+                  : project.currentVersionId
+                    ? '已生成'
+                    : '尚未生成'
+              }}
+              · 更新于 {{ new Date(project.updatedAt).toLocaleDateString('zh-CN') }}</span
             ></span
           >
           <span class="project-open">打开 <span aria-hidden="true">↗</span></span>

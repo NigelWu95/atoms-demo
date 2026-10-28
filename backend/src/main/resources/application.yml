@@ -26,6 +26,8 @@ spring:
 atoms:
   project-workbench:
     enabled: ${PROJECT_WORKBENCH_ENABLED:false}
+    default-mode: ${PROJECT_WORKBENCH_DEFAULT_MODE:false}
+    owner-access-enabled: ${PROJECT_WORKBENCH_OWNER_ACCESS:false}
   project-delivery:
     enabled: ${PROJECT_DELIVERY_ENABLED:false}
     origin: ${PROJECT_DELIVERY_ORIGIN:}
@@ -40,6 +42,7 @@ atoms:
     maintainer-ids: ${PROJECT_EXECUTION_MAINTAINER_IDS:}
     test-databases: ${PROJECT_EXECUTION_TEST_DATABASES:}
     runtime-databases: ${PROJECT_EXECUTION_RUNTIME_DATABASES:}
+    database-pool: ${PROJECT_EXECUTION_DATABASE_POOL:}
     max-concurrent-builds: ${PROJECT_EXECUTION_MAX_CONCURRENT_BUILDS:1}
     queue-capacity: ${PROJECT_EXECUTION_QUEUE_CAPACITY:8}
     max-running-projects: ${PROJECT_EXECUTION_MAX_RUNNING_PROJECTS:4}

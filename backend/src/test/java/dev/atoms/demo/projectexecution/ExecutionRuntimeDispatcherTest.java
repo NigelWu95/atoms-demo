@@ -115,6 +115,21 @@ class ExecutionRuntimeDispatcherTest {
         unfinished.set(List.of());
     }
 
+    @Test void preexistingQuarantinedRunKeepsCapacityWithoutBeingAdopted() throws Exception {
+        environment.withProperty("atoms.project-workbench.owner-access-enabled", "true");
+        var retained = row(UUID.randomUUID(), request, "NEEDS_RECONCILIATION", null);
+        unfinished.set(List.of(retained));
+        dispatcher.checkOwnedRuns();
+        assertCode(() -> dispatcher.submit(owner, project, request), "RUN_CAPACITY_FULL");
+        verify(resources, never()).submit(any(), any(), any(ExecutionRun.Request.class));
+        verify(resources, never()).execute(any());
+        assertThat(unfinished.get()).containsExactly(retained);
+        // Unowned active rows are still an error, rather than being silently treated as quarantined.
+        unfinished.set(List.of(row(UUID.randomUUID(), request, "READY", null)));
+        assertThatThrownBy(dispatcher::checkOwnedRuns).hasMessage("RUN_DISPATCH_UNAVAILABLE");
+        unfinished.set(List.of());
+    }
+
     @Test void unknownCompletionStopsDispatchAndRetainsItsSlotInsteadOfClaimingTermination() throws Exception {
         expectRetained = true;
         doAnswer(call -> { executing.countDown(); throw new IOException("RUN_STATE_UNAVAILABLE"); }).when(resources).execute(ticket);

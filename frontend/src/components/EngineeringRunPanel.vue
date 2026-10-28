@@ -126,7 +126,7 @@ function start() {
       加载更早构建
     </button>
     <p v-if="!workbench.runtime.databaseBound" class="muted">
-      该项目尚未绑定运行数据库。维护者配置后才可启动应用。
+      该项目尚未分配运行数据库。首次构建时会从已配置的数据库池分配；可用容量不足时会提示。
     </p>
     <section v-if="workbench.migration" class="engineering-migration" aria-label="数据库迁移核对">
       <h3>待运行构建 {{ workbench.migration.buildId.slice(0, 8) }}</h3>

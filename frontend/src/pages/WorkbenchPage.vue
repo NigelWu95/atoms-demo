@@ -16,6 +16,7 @@ import { useProjectDraft } from '../composables/useProjectDraft'
 import { matchesRepair, type RepairProposal } from '../runtime/previewRepair'
 
 const draft = useDraftStore()
+defineProps<{ historyOnly?: boolean }>()
 const session = useSessionStore()
 const route = useRoute()
 const projectId = computed(() => (typeof route.params.id === 'string' ? route.params.id : null))
@@ -195,6 +196,7 @@ watch(
         v-model="prompt"
         :project="project"
         :repair="repair"
+        :history-only="historyOnly"
         @dismiss-repair="repair = null"
         @changed="project = $event"
       />

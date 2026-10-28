@@ -81,9 +81,25 @@ export function useEngineeringWorkbench(projectId: () => string) {
         !capabilities.value.archived &&
         capabilities.value.sourceReady &&
         head.value?.status === 'READY' &&
+        head.value.sourceVersionId &&
         !intent.pending.value &&
         !agents.value.some((t) => !tasks.terminal(t.status)) &&
         !preparations.value.some((t) => !tasks.terminal(t.status))
+      ),
+  )
+  const canSubmit = computed(
+    () =>
+      canEdit.value ||
+      !!(
+        capabilities.value?.enabled &&
+        capabilities.value.agentEnabled &&
+        capabilities.value.sourceReady &&
+        !capabilities.value.archived &&
+        head.value &&
+        !head.value.sourceVersionId &&
+        !intent.pending.value &&
+        !agents.value.some((t) => !tasks.terminal(t.status)) &&
+        (!operation.value || ['COMMITTED', 'FAILED', 'CANCELLED'].includes(operation.value.status))
       ),
   )
   function capture() {
@@ -275,21 +291,72 @@ export function useEngineeringWorkbench(projectId: () => string) {
       }
     })
   }
-  function submit(prompt: string, accepted: () => void) {
-    const base = head.value
-    if (
-      !canEdit.value ||
-      !base?.sourceVersionId ||
-      !capabilities.value?.agentEnabled ||
-      !prompt.trim()
-    )
-      return
-    return command(
-      '开发需求',
-      '/agent/tasks',
-      { prompt, baseSourceVersionId: base.sourceVersionId, expectedSourceRevision: base.revision },
-      accepted,
-    )
+  async function submit(prompt: string, accepted: () => void) {
+    const current = capture()
+    if (!current || !canSubmit.value || !capabilities.value?.agentEnabled || !prompt.trim()) return
+    let base = head.value
+    // Retain both the key and base across an uncertain response; never silently submit twice.
+    await intent.run('开发需求', async (key) => {
+      if (!base?.sourceVersionId) {
+        const initialized = await source.write(
+          current.project,
+          '/source/initialize',
+          {},
+          `${key}-init`,
+          source.decodeOperation,
+          current.signal,
+        )
+        if (!same(current)) return
+        operation.value = initialized
+        notice.value = '正在准备工程，完成后自动提交本次需求…'
+        const deadline = Date.now() + 30000
+        while (Date.now() < deadline) {
+          if (!same(current) || current.signal.aborted) return
+          base = await source.read(
+            current.project,
+            '/source/head',
+            source.decodeHead,
+            current.signal,
+          )
+          if (base.sourceVersionId && base.status === 'READY') break
+          const list = await source.read(
+            current.project,
+            '/source/operations',
+            (value) => source.array(value, source.decodeOperation, 10),
+            current.signal,
+          )
+          const state = list.find((item) => item.id === initialized.id)
+          if (state && ['FAILED', 'CANCELLED', 'NEEDS_RECONCILIATION'].includes(state.status))
+            throw new ApiFailure(
+              'SOURCE_INITIALIZATION_INCOMPLETE',
+              '工程准备未完成，请刷新后检查源码操作；需求仍已保留。',
+            )
+          await new Promise((resolve) => setTimeout(resolve, 500))
+        }
+        if (!base?.sourceVersionId || base.status !== 'READY')
+          throw new ApiFailure(
+            'SOURCE_INITIALIZATION_PENDING',
+            '工程仍在准备，请稍后重试本次需求。',
+          )
+      }
+      if (!same(current)) return
+      const result = await source.write(
+        current.project,
+        '/agent/tasks',
+        {
+          prompt,
+          baseSourceVersionId: base.sourceVersionId,
+          expectedSourceRevision: base.revision,
+        },
+        key,
+        tasks.decodeCommand,
+        current.signal,
+      )
+      if (!same(current)) return
+      accepted()
+      notice.value = `开发需求已受理：${tasks.statusLabel(result.status)}`
+      void refresh()
+    })
   }
   function build() {
     if (selectedVersionId.value)
@@ -573,6 +640,7 @@ export function useEngineeringWorkbench(projectId: () => string) {
     serving,
     activeRun,
     canEdit,
+    canSubmit,
     intent,
     sourceBrowser,
     preview,

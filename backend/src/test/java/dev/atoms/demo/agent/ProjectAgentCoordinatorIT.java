@@ -200,4 +200,30 @@ class ProjectAgentCoordinatorIT extends AgentIntegrationSupport {
             assertThat(service.handle(task.id())).isNull();
         }
     }
+
+    @Test void multiUserModeReservesQuarantinedCapacityWithoutBlockingOtherProjects() throws Exception {
+        configuration.withProperty("atoms.project-workbench.owner-access-enabled", "true")
+                .withProperty("atoms.agent.max-concurrent-tasks", "2");
+        source.start(database);
+        repository = org.mockito.Mockito.spy(repository);
+        org.mockito.Mockito.doReturn(true).when(repository).hasUnresolved();
+        org.mockito.Mockito.doReturn(1).when(repository).quarantinedExecutions();
+        var adapter = new AgentFixtureAdapter(temporary, "hang");
+        try (var coordinator = coordinator(adapter)) {
+            coordinator.start();
+            assertThat(coordinator.isRunning()).isTrue();
+            var first = submit(); awaitProcess(adapter, first.id());
+            var queued = submit();
+            long until = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(750);
+            do {
+                assertThat(repository.get(queued.id()).status()).isEqualTo("QUEUED");
+                assertThat(adapter.calls.get()).isEqualTo(1);
+                Thread.sleep(25);
+            } while (System.nanoTime() < until);
+            service.cancel(owner, first.projectId(), first.id()); awaitTerminal(first.id());
+            awaitProcess(adapter, queued.id());
+            assertThat(coordinator.isRunning()).isTrue();
+            assertThat(repository.quarantinedExecutions()).isEqualTo(1);
+        }
+    }
 }

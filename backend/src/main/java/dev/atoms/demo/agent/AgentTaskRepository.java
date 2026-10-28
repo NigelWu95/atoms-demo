@@ -45,6 +45,9 @@ class AgentTaskRepository {
     boolean hasUnresolved() {
         return Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM agent_tasks WHERE status='NEEDS_RECONCILIATION')", Boolean.class));
     }
+    int quarantinedExecutions() {
+        return jdbc.queryForObject("SELECT count(*) FROM agent_tasks WHERE status='NEEDS_RECONCILIATION'", Integer.class);
+    }
     boolean hasUnsettledExecutions() {
         return Boolean.TRUE.equals(jdbc.queryForObject("""
                 SELECT EXISTS(SELECT 1 FROM agent_tasks a JOIN source_edit_leases e ON e.id=a.edit_lease_id

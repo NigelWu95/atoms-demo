@@ -37,7 +37,7 @@ final class DependencyPreparationClaim {
             return transaction.execute(tx -> {
                 jdbc.execute("SET LOCAL lock_timeout = '3s'");
                 var config = settings.load();
-                if (owner == null || !config.maintainerIds().contains(owner))
+                if (owner == null || !config.allows(owner))
                     throw new ApiException(403, "EXECUTION_FORBIDDEN", "当前身份没有完整工程执行权限。");
                 if (projects.lock(owner, project.toString()).archived()) throw ExecutionBuild.conflict("EXECUTION_PROJECT_ARCHIVED");
                 var rows = jdbc.queryForList("SELECT * FROM dependency_preparations WHERE project_id=? AND id=? FOR UPDATE", project, id);

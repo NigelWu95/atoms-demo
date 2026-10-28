@@ -32,14 +32,25 @@ final class ExecutionSettings {
                     number("queue-capacity", 8, 8), number("max-running-projects", 4, 4),
                     Duration.ofSeconds(number("task-timeout-seconds", 1800, 1800)),
                     Duration.ofSeconds(number("queue-timeout-seconds", 300, 300)),
-                    Duration.ofSeconds(number("start-timeout-seconds", 120, 120)));
+                    Duration.ofSeconds(number("start-timeout-seconds", 120, 120)), ownerAccess());
         } catch (IllegalArgumentException error) { throw unavailable(); }
     }
 
     record Configuration(Path root, Path node, Path npm, Path java, Path maven, Path policy,
                          Set<UUID> maintainerIds, int maxConcurrentBuilds, int queueCapacity,
-                         int maxRunningProjects, Duration taskTimeout, Duration queueTimeout, Duration startTimeout) {
+                         int maxRunningProjects, Duration taskTimeout, Duration queueTimeout, Duration startTimeout, boolean ownerAccess) {
         Configuration { maintainerIds = Set.copyOf(maintainerIds); }
+        Configuration(Path root, Path node, Path npm, Path java, Path maven, Path policy, Set<UUID> maintainers,
+                      int builds, int queue, int running, Duration taskTimeout, Duration queueTimeout, Duration startTimeout) {
+            this(root, node, npm, java, maven, policy, maintainers, builds, queue, running, taskTimeout, queueTimeout, startTimeout, false);
+        }
+        boolean allows(UUID owner) { return owner != null && (ownerAccess || maintainerIds.contains(owner)); }
+    }
+
+    private boolean ownerAccess() {
+        String value = configuration.getProperty("atoms.project-workbench.owner-access-enabled", "false");
+        if (!value.equals("true") && !value.equals("false")) throw unavailable();
+        return value.equals("true");
     }
 
     private Path path(String key) {

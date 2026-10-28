@@ -63,7 +63,7 @@ final class ExecutionRunJournal {
     }
     private void currentConfiguration() {
         var current = settings.load();
-        if (!current.equals(configuration) || !current.maintainerIds().contains(run.ownerId()))
+        if (!current.equals(configuration) || !current.allows(run.ownerId()))
             throw ExecutionRun.error(409, "RUN_CONFIGURATION_CHANGED");
     }
     private static void remaining(dev.atoms.demo.execution.OwnedProcess.Budget budget) {

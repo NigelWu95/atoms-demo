@@ -59,7 +59,7 @@ final class ExecutionBuildQueue {
                         result = finish(current, "FAILED", "EXECUTION_BUILD_OWNER_CHANGED");
                     else if (Boolean.TRUE.equals(project.get("archived")))
                         result = finish(current, "FAILED", "EXECUTION_PROJECT_ARCHIVED");
-                    else if (!config.maintainerIds().contains(current.ownerId()))
+                    else if (!config.allows(current.ownerId()))
                         result = finish(current, "FAILED", "EXECUTION_FORBIDDEN");
                 }
                 // A lost observation must roll back state, capacity and the trigger's event together.

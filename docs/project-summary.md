@@ -1,5 +1,7 @@
 # Atoms Demo 项目实现说明
 
+2026-10-29 本地开发模式更新：普通项目入口已切换为 **Claude Code + DeepSeek 完整工程开发**，临时访客同样可用。Agent 可修改 Vue 前端、Java 业务接口、SQL 迁移和配置，源码保存在磁盘 Git；旧项目的版本、对话及数据保留。旧版“仅生成 HTML/CSS/JS”的描述适用于下方历史阶段与尚未更新的云端版本。新默认模式、真实访客验收及仍存在的边界见[本轮验收](https://github.com/NigelWu95/atoms-demo/blob/main/docs/default-engineering-verification.md)和[工作台说明](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-workbench.md)，本次未推送或部署服务器。
+
 2026-10-18 导航修正已部署：源码 `dc2aa3d`、发布包 `atoms-demo-<release-id>` 于 00:56 上线，本次未推送 GitHub。介绍首页 `/` 对新访客、回访者和已登录账号始终保留，不再自动跳到工作区；工作区内的“开始创作”仍使用带侧栏的 `/create`。从首页登录后返回首页并保留当前标签页 idea。下文 10 月 17 日内容是此前版本，根路由跳转行为已由本次修正替换。
 
 本项目围绕 AI 应用搭建平台的核心体验，实现“描述需求 → 智能体规划与生成 → 可交互预览 → 数据保存 → 继续修改 → 显式发布”的主流程。目标是交付一个能够真实调用模型、生成代码并运行应用的产品原型，而不是静态页面复刻，也不尝试在首版覆盖完整商业平台。

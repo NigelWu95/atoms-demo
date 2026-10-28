@@ -18,6 +18,7 @@ function mockApi() {
   let savedDraft = { prompt: '', revision: 0 }
   return vi.fn().mockImplementation((path: string, options?: RequestInit) => {
     if (path === '/api/health') return Promise.resolve(Response.json({ status: 'UP' }))
+    if (path === '/api/development-mode') return Promise.resolve(Response.json({ mode: 'LEGACY' }))
     if (path === '/api/auth/methods')
       return Promise.resolve(Response.json({ emailCodeEnabled: true }))
     if (path === '/api/csrf')
@@ -146,7 +147,7 @@ describe('foundation website', () => {
       expect(wrapper.find('.project-row').exists()).toBe(false)
       expect(fetch.mock.calls.some(([url]) => String(url).startsWith('/api/projects?'))).toBe(false)
       expect(wrapper.get('textarea').attributes('aria-describedby')).toBe('prompt-hint')
-      expect(wrapper.text()).toContain('不会调用模型')
+      expect(wrapper.text()).toContain('在工作台提交需求开始开发')
     } finally {
       wrapper.unmount()
     }
@@ -161,8 +162,10 @@ describe('foundation website', () => {
               items: [
                 { ...project, name: '已生成项目', currentVersionId: 'version-1' },
                 { ...project, id: 'project-2', name: '空白项目', currentVersionId: null },
+                { ...project, id: 'project-3', name: '完整工程项目', currentVersionId: null },
               ],
               nextCursor: null,
+              sourceVersions: { 'project-3': 'source-version-1' },
             }),
           )
         : original(url, options),
@@ -174,6 +177,8 @@ describe('foundation website', () => {
       expect(rows[0]!.text()).toContain('已生成')
       expect(rows[0]!.text()).not.toContain('尚未生成')
       expect(rows[1]!.text()).toContain('尚未生成')
+      expect(rows[2]!.text()).toContain('工程已保存')
+      expect(rows[2]!.text()).not.toContain('尚未生成')
       expect(wrapper.text()).not.toContain('AI 生成稍后接入')
     } finally {
       wrapper.unmount()

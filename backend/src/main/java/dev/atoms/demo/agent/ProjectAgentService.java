@@ -95,7 +95,7 @@ public class ProjectAgentService {
     }
     AgentSettings.Configuration authorizeMaintainer(UUID owner) {
         var config = settings.load();
-        if (owner == null || !config.maintainerIds().contains(owner))
+        if (owner == null || !config.allows(owner))
             throw new ApiException(403, "AGENT_NOT_ALLOWED", "当前账号未获准使用完整工程 Agent。");
         return config;
     }

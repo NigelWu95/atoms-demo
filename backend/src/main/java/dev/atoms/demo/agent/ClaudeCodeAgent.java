@@ -21,7 +21,7 @@ final class ClaudeCodeAgent implements CodingAgent {
 
     @Override public Session prepare(AgentTask task, Path work, AgentDeadline deadline) throws IOException {
         var config = settings.load();
-        if (!config.maintainerIds().contains(task.ownerId())) throw new ApiException(403, "AGENT_NOT_ALLOWED", "当前账号未获准使用完整工程 Agent。");
+        if (!config.allows(task.ownerId())) throw new ApiException(403, "AGENT_NOT_ALLOWED", "当前账号未获准使用完整工程 Agent。");
         if (!config.liveEnabled()) throw new ApiException(503, "AGENT_LIVE_DISABLED", "真实工程 Agent 调用尚未启用。");
         deadline.remaining();
         if (task.maxTokens() != config.maxOutputTokens() || task.maxTurns() != config.maxTurns()
@@ -55,6 +55,9 @@ final class ClaudeCodeAgent implements CodingAgent {
                 Inspect the existing files first. Preserve working behavior and unrelated file bytes.
                 The project uses Vue and Spring Boot Java 17 with PostgreSQL; implement required frontend,
                 backend business logic, tests, and additive SQL migrations as needed, not just a static mockup.
+                If legacy/MIGRATION.md exists, read it and the legacy source first. Migrate that application's
+                behavior into the full project while implementing the request; do not replace it with a blank demo.
+                Account systems require real backend authentication and database storage, not browser-only simulations.
                 Only Read, Glob, Grep, Write and Edit are available. Do not use a shell, MCP, subagents,
                 external downloads, personal settings, credentials, or paths outside this directory.
                 Declare dependencies in the project manifests. The platform separately validates dependencies,

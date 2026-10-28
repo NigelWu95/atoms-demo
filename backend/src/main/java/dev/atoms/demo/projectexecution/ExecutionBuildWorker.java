@@ -76,7 +76,7 @@ final class ExecutionBuildWorker {
         final ExecutionBuild build;
         try {
             config = settings.load(); coordination.check();
-            if (!config.maintainerIds().contains(owner) || !config.root().equals(paths.checkedRoot())) throw unavailable();
+            if (!config.allows(owner) || !config.root().equals(paths.checkedRoot())) throw unavailable();
             // Parameterized, scoped read; admission's timeout is immutable. Never extend it on dequeue.
             // https://docs.spring.io/spring-framework/reference/6.2/data-access/jdbc/core.html#jdbc-JdbcTemplate
             int original = jdbc.queryForObject("SELECT task_timeout_seconds FROM execution_builds WHERE id=? AND project_id=? AND owner_id=?",

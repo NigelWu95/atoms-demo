@@ -204,7 +204,7 @@ final class ExecutionRunService {
     }
     private ExecutionSettings.Configuration authorize(UUID owner) {
         var configuration = settings.load();
-        if (owner == null || !configuration.maintainerIds().contains(owner))
+        if (owner == null || !configuration.allows(owner))
             throw new ApiException(403, "EXECUTION_FORBIDDEN", "当前身份没有完整工程执行权限。");
         return configuration;
     }

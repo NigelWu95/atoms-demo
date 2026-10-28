@@ -9,7 +9,14 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 /** Complete maintainer-owned business registry. No HTTP parameters, application writes or migrations. */
 final class ExecutionDatabaseBinding {
     private final Map<UUID, ExecutionPrivateConfig> configurations;
+    private java.util.function.Function<UUID, UUID> resolver = java.util.function.Function.identity();
     private ExecutionDatabaseBinding(Map<UUID, ExecutionPrivateConfig> configurations) { this.configurations = Map.copyOf(configurations); }
+    ExecutionDatabaseBinding resolving(java.util.function.Function<UUID, UUID> resolver) { this.resolver = resolver; return this; }
+    private ExecutionPrivateConfig configuration(UUID project) {
+        if (project == null) return null;
+        var direct = configurations.get(project);
+        return direct != null ? direct : configurations.get(resolver.apply(project));
+    }
 
     void requireSeparateFrom(ExecutionTestDatabase tests) throws IOException {
         if (tests == null) throw ExecutionPrivateConfig.invalid();
@@ -44,7 +51,7 @@ final class ExecutionDatabaseBinding {
 
     /** Fresh read-only physical identity. Persisting this snapshot alone never grants access to business credentials. */
     ExecutionBindingRepository.Target verify(UUID project, OwnedProcess.Budget budget) throws IOException {
-        var config = project == null ? null : configurations.get(project);
+        var config = configuration(project);
         if (config == null) throw new IOException("RUN_DB_BINDING_NOT_FOUND");
         var identity = ExecutionDatabaseInspection.verify(config, budget);
         return new ExecutionBindingRepository.Target(project, config.bindingId(), config.databasePort(), config.database(), config.role(),
@@ -52,7 +59,7 @@ final class ExecutionDatabaseBinding {
     }
 
     ExecutionMigrationHistory.Snapshot history(UUID project, OwnedProcess.Budget budget) throws IOException {
-        var config = project == null ? null : configurations.get(project);
+        var config = configuration(project);
         if (config == null) throw new IOException("RUN_DB_BINDING_NOT_FOUND");
         return ExecutionMigrationHistory.inspect(project, config, budget);
     }
@@ -83,7 +90,7 @@ final class ExecutionDatabaseBinding {
             used = true;
             verify(budget);
             var builder = command.builder();
-            issuer.configurations.get(target.project()).applyRuntimeEnvironment(builder);
+            issuer.configuration(target.project()).applyRuntimeEnvironment(builder);
             return builder;
         }
 

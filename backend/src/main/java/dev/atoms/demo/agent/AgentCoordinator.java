@@ -30,6 +30,7 @@ final class AgentCoordinator implements SmartLifecycle, AutoCloseable {
     private final AtomicBoolean running = new AtomicBoolean(), closed = new AtomicBoolean();
     private final java.util.Set<UUID> active = ConcurrentHashMap.newKeySet();
     private int concurrency;
+    private boolean isolateUnresolvedProjects;
     private AgentCoordinatorLease lease;
     private ThreadPoolExecutor executor;
     private ScheduledExecutorService monitor;
@@ -43,7 +44,9 @@ final class AgentCoordinator implements SmartLifecycle, AutoCloseable {
     @Override public synchronized void start() {
         if (running.get() || closed.get() || !settings.enabled()) return;
         try {
-            concurrency = settings.load().maxConcurrentTasks();
+            var config = settings.load();
+            concurrency = config.maxConcurrentTasks();
+            isolateUnresolvedProjects = config.ownerAccess();
             if (!source.readyForAgent()) throw unavailable();
             lease = new AgentCoordinatorLease(database);
             long deadline = System.nanoTime()+TimeUnit.SECONDS.toNanos(60);
@@ -56,7 +59,7 @@ final class AgentCoordinator implements SmartLifecycle, AutoCloseable {
                     reconcile(id); cursor = id;
                 }
             }
-            if (tasks.hasUnresolved()) throw unavailable();
+            if (tasks.hasUnresolved() && !isolateUnresolvedProjects) throw unavailable();
             executor = new ThreadPoolExecutor(concurrency, concurrency, 0, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<>(concurrency),
                     task -> new Thread(task, "atoms-agent-worker"), new ThreadPoolExecutor.AbortPolicy());
             monitor = Executors.newSingleThreadScheduledExecutor(task -> new Thread(task, "atoms-agent-dispatcher"));
@@ -72,7 +75,8 @@ final class AgentCoordinator implements SmartLifecycle, AutoCloseable {
         if (closed.get()) return;
         if (!running.get()) { closeSafely(); return; }
         try {
-            if (!settings.enabled() || !source.readyForAgent() || !lease.healthy() || tasks.hasUnresolved()) throw unavailable();
+            if (!settings.enabled() || !source.readyForAgent() || !lease.healthy()
+                    || tasks.hasUnresolved() && !isolateUnresolvedProjects) throw unavailable();
             for (var task : tasks.queued()) {
                 if (!running.get()) return;
                 if (active.contains(task.id())) continue;
@@ -90,7 +94,10 @@ final class AgentCoordinator implements SmartLifecycle, AutoCloseable {
 
     /** One poller admits work; shutdown shares this short lock, never the task's execution lock. */
     private synchronized void dispatch(UUID id) {
-        if (!running.get() || active.size() >= concurrency || !active.add(id)) return;
+        // Unknown executions retain their lease/work directory AND a global capacity slot across restarts.
+        // Never release or retry them merely because their owning worker/thread has returned.
+        int held = isolateUnresolvedProjects ? tasks.quarantinedExecutions() : 0;
+        if (!running.get() || active.size() + held >= concurrency || !active.add(id)) return;
         try { executor.execute(() -> execute(id)); }
         catch (RuntimeException error) { active.remove(id); throw error; }
     }
@@ -101,7 +108,10 @@ final class AgentCoordinator implements SmartLifecycle, AutoCloseable {
 
     private void execute(UUID id) {
         try {
-            if (worker.execute(id, () -> !running.get()).status().equals("NEEDS_RECONCILIATION")) running.set(false);
+            if (worker.execute(id, () -> !running.get()).status().equals("NEEDS_RECONCILIATION")) {
+                if (isolateUnresolvedProjects) log("agent_project_quarantined", "AGENT_EXECUTION_UNCERTAIN");
+                else running.set(false);
+            }
         }
         catch (Throwable error) {
             boolean interrupted = Thread.interrupted();
@@ -128,7 +138,7 @@ final class AgentCoordinator implements SmartLifecycle, AutoCloseable {
             // No owned worker remains; settle only never-started queued work, not unknown executions.
             // A lost lease does not authorize modifying another dispatcher's newly admitted queue.
             if (lease != null && lease.healthy()) for (var task : tasks.queued()) reconcile(task.id());
-            if (tasks.hasUnresolved() || tasks.hasUnsettledExecutions()) throw unavailable();
+            if ((tasks.hasUnresolved() || tasks.hasUnsettledExecutions()) && !isolateUnresolvedProjects) throw unavailable();
             closeLease();
         } catch (InterruptedException error) {
             interrupted = true; throw unavailable();

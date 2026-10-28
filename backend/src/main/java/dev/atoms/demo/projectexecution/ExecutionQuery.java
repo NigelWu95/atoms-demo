@@ -119,7 +119,7 @@ public final class ExecutionQuery {
     }
     private void authorize(UUID owner) {
         var config = settings.load();
-        if (owner == null || !config.maintainerIds().contains(owner)) throw error(403, "EXECUTION_FORBIDDEN");
+        if (owner == null || !config.allows(owner)) throw error(403, "EXECUTION_FORBIDDEN");
     }
     private static String scope(String type, UUID owner, UUID project, Kind kind) { return "1|" + type + "|" + owner + "|" + project + "|" + kind + "|"; }
     private static String encode(String raw) { return Base64.getUrlEncoder().withoutPadding().encodeToString(raw.getBytes(StandardCharsets.UTF_8)); }

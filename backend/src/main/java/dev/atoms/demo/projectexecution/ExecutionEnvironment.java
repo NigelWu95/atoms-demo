@@ -46,8 +46,9 @@ final class ExecutionEnvironment implements ExecutionCoordinator.Factory {
         try {
             requireReady();
             var config = settings.load();
-            var bindings = bindings("test-databases", false);
-            var runtimeBindings = bindings("runtime-databases", true);
+            var pool = ExecutionDatabasePool.read(configuration);
+            var bindings = ExecutionDatabasePool.merge(bindings("test-databases", !pool.isEmpty()), pool, false);
+            var runtimeBindings = ExecutionDatabasePool.merge(bindings("runtime-databases", true), pool, true);
             if (!bindings.keySet().containsAll(runtimeBindings.keySet())) throw unavailable();
             var protectedRoots = protectedRoots();
             var database = jdbc.queryForMap("SELECT current_database() AS database_name, current_user AS role_name");
@@ -56,6 +57,8 @@ final class ExecutionEnvironment implements ExecutionCoordinator.Factory {
                     Set.of((String) database.get("database_name")), Set.of((String) database.get("role_name")));
             var runtimeDatabases = runtimeBindings.isEmpty() ? null : ExecutionDatabaseBinding.load(runtimeBindings, privateRoots,
                     Set.of((String) database.get("database_name")), Set.of((String) database.get("role_name")));
+            databases.resolving(project -> ExecutionDatabasePool.resolve(jdbc, project));
+            if (runtimeDatabases != null) runtimeDatabases.resolving(project -> ExecutionDatabasePool.resolve(jdbc, project));
             if (runtimeDatabases != null) runtimeDatabases.requireSeparateFrom(databases);
             paths = new ExecutionPaths(config.root(), protectedRoots);
             var resources = new NativeResources(paths, bindings, runtimeBindings, protectedRoots, databases, runtimeDatabases);
@@ -88,8 +91,9 @@ final class ExecutionEnvironment implements ExecutionCoordinator.Factory {
         @Override public void check() throws IOException {
             try {
                 requireReady();
-                if (!paths.checkedRoot().equals(settings.load().root()) || !bindings.equals(bindings("test-databases", false))
-                        || !runtimeBindings.equals(bindings("runtime-databases", true))
+                var pool = ExecutionDatabasePool.read(configuration);
+                if (!paths.checkedRoot().equals(settings.load().root()) || !bindings.equals(ExecutionDatabasePool.merge(bindings("test-databases", !pool.isEmpty()), pool, false))
+                        || !runtimeBindings.equals(ExecutionDatabasePool.merge(bindings("runtime-databases", true), pool, true))
                         || !protectedRoots.equals(protectedRoots())) throw unavailable();
                 if (runtimeDatabases != null) runtimeDatabases.verifyConfiguration();
             } catch (IOException | RuntimeException error) { throw unavailable(); }

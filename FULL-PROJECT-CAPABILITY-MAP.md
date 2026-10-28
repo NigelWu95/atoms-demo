@@ -1,5 +1,7 @@
 # 完整源码工程与 Coding Agent · 能力地图
 
+2026-10-29 默认模式更新：本地已开启 `PROJECT_WORKBENCH_DEFAULT_MODE` 和 `PROJECT_WORKBENCH_OWNER_ACCESS`，普通入口及访客使用 Claude Code + DeepSeek，旧接口拒绝新生成；首次构建从预配置库池自动绑定独立测试/运行库。下方“默认关闭”“维护者启用”描述仓库的初始配置及前期验收，当前本地配置已覆盖这些默认值。详见[默认模式验收](https://github.com/NigelWu95/atoms-demo/blob/main/docs/default-engineering-verification.md)，本次未推送或更新云端部署。
+
 状态：2026-10-29，源码模块、Agent PA01–PA33 离线能力、执行模块 EX01–30 / C-EX10 及交付模块 PD01–PD14 / C1–C5 已完成内部验收。真实 Vue/Java/SQL 应用已验证构建、独立 PG、版本更新、迁移核对、路径预览、固定源码 ZIP 独立运行和重启持久化；见[执行记录](docs/project-execution-verification.md)及[交付记录](docs/project-delivery-verification.md)。正式工作台 PW01–PW10 已实现，本地 A/B 页面启动、预览和下载闭环通过，新增显式构建修复入口；见[工作台说明](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-workbench.md)与[本轮验证](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-workbench-verification.md)。新模式默认关闭，真实模型两轮增量与修复、实际运行、下载工程独立启动及重启持久化已完成本地验收；部署尚未更新；旧未决审计保留。
 
 ## 目标与现状

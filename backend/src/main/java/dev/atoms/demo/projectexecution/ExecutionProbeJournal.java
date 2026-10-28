@@ -51,7 +51,7 @@ final class ExecutionProbeJournal {
         transact(() -> {
             if (projects.lock(build.ownerId(), build.projectId().toString()).archived()) reject();
             var row = locked();
-            if (!settings.load().maintainerIds().contains(build.ownerId()) || execution == null
+            if (!settings.load().allows(build.ownerId()) || execution == null
                     || Boolean.TRUE.equals(row.get("execution_pending")) || Boolean.TRUE.equals(row.get("cancel_requested"))) reject();
             int index = ORDER.indexOf(kind);
             var history = history();

@@ -25,16 +25,18 @@ public class RunAdmissionService {
     private final ModelGateway model;
     private final long ceiling;
     private final boolean workerEnabled;
+    private final boolean engineeringDefault;
     public RunAdmissionService(RunRepository repo, ProjectService projects, IdempotencyService idempotency,
                                ObjectMapper json, ModelGateway model, Environment env, org.springframework.jdbc.core.JdbcTemplate jdbc) {
         this.repo = repo; this.projects = projects; this.idempotency = idempotency; this.json = json; this.model = model;
         this.jdbc = jdbc;
         ceiling = Math.max(0, env.getProperty("GENERATION_MAX_MODEL_CALLS", Long.class, 0L));
         workerEnabled = env.getProperty("atoms.generation.worker-enabled", Boolean.class, true);
+        engineeringDefault = env.getProperty("atoms.project-workbench.default-mode", Boolean.class, false);
     }
     public Availability availability() {
         long used = jdbc.queryForObject("SELECT requests_reserved FROM generation_budget WHERE id = 1", Long.class);
-        return new Availability(model.configured(), workerEnabled, Math.max(0, ceiling - used), "deepseek-flash");
+        return new Availability(model.configured(), workerEnabled && !engineeringDefault, Math.max(0, ceiling - used), "deepseek-flash");
     }
     @Transactional(timeout = 5)
     public IdempotencyService.Result submit(UUID owner, String projectId, JsonNode body, String key) {
@@ -42,6 +44,7 @@ public class RunAdmissionService {
         long used = repo.lockBudget();
         var project = projects.lock(owner, projectId);
         return idempotency.execute(owner, "POST", "/api/projects/" + project.id() + "/runs", key, input, () -> {
+            if (engineeringDefault) throw new ApiException(409, "ENGINEERING_MODE_REQUIRED", "开发已切换到 Claude Code，请刷新并进入完整工程工作台；已有版本仍可查看。");
             if (!model.configured()) throw new ApiException(503, "MODEL_NOT_CONFIGURED", "尚未配置 DeepSeek API Key，请联系本地开发者。");
             if (ceiling - used < 2) throw new ApiException(429, "GENERATION_LIMIT_REACHED", "剩余调用次数不足；首次生成至少需要两次模型请求，请调整服务端额度。");
             if (project.activeRunId() != null) throw new ApiException(409, "RUN_ALREADY_ACTIVE", "该项目已有生成任务，请等待或取消。");
