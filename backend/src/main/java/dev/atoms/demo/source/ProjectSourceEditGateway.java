@@ -35,12 +35,21 @@ public class ProjectSourceEditGateway {
 
     /** Trusted template adapter only. Publishes an initial source version, never an Agent task or business-ready state. */
     public Submitted initializeTemplate(UUID owner, UUID project, SourceTree tree, String templateId, String digest, String key) {
+        return initializeTemplate(owner, project, tree, null, templateId, digest, key);
+    }
+
+    /** Trusted legacy adapter only; records the authorized, immutable legacy version being imported. */
+    public Submitted importTemplate(UUID owner, UUID project, SourceTree tree, UUID legacyVersion, String templateId, String digest, String key) {
+        return initializeTemplate(owner, project, tree, java.util.Objects.requireNonNull(legacyVersion), templateId, digest, key);
+    }
+
+    private Submitted initializeTemplate(UUID owner, UUID project, SourceTree tree, UUID legacyVersion, String templateId, String digest, String key) {
         requireOutsideTransaction();
         service.authorize(owner, project);
         if (templateId == null || digest == null) throw new IllegalArgumentException("Controlled template origin required");
         var scheduler = coordinator.get();
         if (scheduler == null || !scheduler.isRunning()) throw ProjectSourceService.conflict("SOURCE_COORDINATOR_UNAVAILABLE");
-        var submission = scheduler.initialize(owner, project, tree, templateId, digest, key);
+        var submission = scheduler.initialize(owner, project, tree, legacyVersion, templateId, digest, key);
         return new Submitted(submission.operation(), submission.completion());
     }
 

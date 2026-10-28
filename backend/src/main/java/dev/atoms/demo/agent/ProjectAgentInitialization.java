@@ -36,8 +36,10 @@ public class ProjectAgentInitialization {
         var existing = projects.get(owner, project.toString());
         if (existing.archived()) throw AgentTask.conflict("AGENT_PROJECT_ARCHIVED");
         var tree = template.get();
-        if (artifacts != null && existing.currentVersionId() != null)
+        if (artifacts != null && existing.currentVersionId() != null) {
             tree = LegacyEngineeringSource.attach(tree, artifacts.get(owner, project.toString(), existing.currentVersionId().toString()));
+            return source.importTemplate(owner, project, tree, existing.currentVersionId(), FullProjectTemplateCatalog.ID, tree.sha256(), key);
+        }
         return source.initializeTemplate(owner, project, tree, FullProjectTemplateCatalog.ID, tree.sha256(), key);
     }
 }

@@ -12,6 +12,8 @@ import static org.assertj.core.api.Assertions.*;
 
 class ProjectAgentInitializationIT extends AgentIntegrationSupport {
     @Autowired DataSource database;
+    @Autowired dev.atoms.demo.artifact.ArtifactService artifacts;
+    @Autowired com.fasterxml.jackson.databind.ObjectMapper json;
     private ProjectAgentService tasks;
     private ProjectAgentInitialization initialization;
 
@@ -50,6 +52,37 @@ class ProjectAgentInitializationIT extends AgentIntegrationSupport {
                 .isInstanceOf(ApiException.class);
         assertThat(jdbc.queryForObject("SELECT current_source_version_id FROM project_sources WHERE project_id=?", UUID.class, project))
                 .isEqualTo(initial.resultVersionId());
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM source_versions WHERE project_id=?", Integer.class, project)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM agent_tasks WHERE project_id=?", Integer.class, project)).isZero();
+    }
+
+    @Test void importsAnExistingGuestsLegacyVersionWithoutReplacingItsHistoryOrAdmittingAnAgentTask() throws Exception {
+        configuration.setProperty("atoms.project-workbench.owner-access-enabled", "true");
+        source.start(database);
+        UUID project = source.createEmpty(stranger);
+        var artifact = json.createObjectNode().put("formatVersion", 1);
+        artifact.putObject("manifest").put("title", "2048").put("summary", "Legacy game")
+                .put("runtime", "web-static-v1").put("stateSchemaVersion", 1).putObject("initialState").put("privateData", "not-imported");
+        artifact.putObject("files").put("view.html", "<main>2048</main>")
+                .put("styles.css", "main {color:green}").put("main.js", "let score = 2048;");
+        var legacy = artifacts.save(stranger, project.toString(), 0, null, artifact);
+        var importer = new ProjectAgentInitialization(tasks, projects, source.gateway(), artifacts);
+        assertThatThrownBy(() -> importer.initialize(owner, project, "foreign-import"))
+                .isInstanceOfSatisfying(ApiException.class, error -> assertThat(error.status()).isEqualTo(404));
+        var result = importer.initialize(stranger, project, "guest-import").completion().get(30, TimeUnit.SECONDS);
+        assertThat(result.status()).isEqualTo("COMMITTED");
+        assertThat(result.kind()).isEqualTo("IMPORT");
+        assertThat(result.legacyVersionId()).isEqualTo(legacy.id());
+        assertThat(result.templateId()).isEqualTo("full-project-v1");
+        assertThat(new String(source.file(stranger, project, result.resultVersionId(), "legacy/main.js"), java.nio.charset.StandardCharsets.UTF_8))
+                .isEqualTo("let score = 2048;");
+        assertThat(new String(source.file(stranger, project, result.resultVersionId(), "legacy/MIGRATION.md"), java.nio.charset.StandardCharsets.UTF_8))
+                .contains(legacy.id().toString()).doesNotContain("not-imported");
+        assertThat(new String(source.file(stranger, project, result.resultVersionId(), "frontend/src/App.vue"), java.nio.charset.StandardCharsets.UTF_8))
+                .contains("尚未生成业务功能");
+        assertThat(importer.initialize(stranger, project, "guest-import").completion().get(5, TimeUnit.SECONDS).id()).isEqualTo(result.id());
+        assertThat(projects.get(stranger, project.toString()).currentVersionId()).isEqualTo(legacy.id());
+        assertThat(artifacts.get(stranger, project.toString(), legacy.id().toString()).artifact()).isEqualTo(legacy.artifact());
         assertThat(jdbc.queryForObject("SELECT count(*) FROM source_versions WHERE project_id=?", Integer.class, project)).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM agent_tasks WHERE project_id=?", Integer.class, project)).isZero();
     }

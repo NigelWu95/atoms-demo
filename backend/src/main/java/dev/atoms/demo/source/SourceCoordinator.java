@@ -65,8 +65,12 @@ final class SourceCoordinator implements SmartLifecycle, AutoCloseable {
     }
 
     synchronized Submission initialize(UUID owner, UUID project, SourceTree input, String templateId, String templateDigest, String key) {
+        return initialize(owner, project, input, null, templateId, templateDigest, key);
+    }
+
+    synchronized Submission initialize(UUID owner, UUID project, SourceTree input, UUID legacyVersion, String templateId, String templateDigest, String key) {
         requireRunning();
-        var operation = new SourceInitializer(service).request(owner, project, input, templateId, templateDigest, key);
+        var operation = new SourceInitializer(service).request(owner, project, input, legacyVersion, templateId, templateDigest, key);
         return enqueue(operation, input);
     }
 
