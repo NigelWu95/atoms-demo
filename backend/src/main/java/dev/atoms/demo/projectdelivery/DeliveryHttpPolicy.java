@@ -62,7 +62,7 @@ final class DeliveryHttpPolicy {
         boolean write = method != null && !Set.of("GET", "HEAD").contains(method);
         if (preflight && write) probe.put("content-type", "application/json");
         new ExecutionHttpRequest(method, route.path(), request.getQueryString(), probe,
-                write && !("DELETE".equals(method) && !probe.containsKey("content-type"))
+                write && !(("DELETE".equals(method) || "POST".equals(method)) && !probe.containsKey("content-type"))
                         ? "{}".getBytes(StandardCharsets.UTF_8) : new byte[0]);
         return new Input(method, route.path(), request.getQueryString(), Map.copyOf(headers), preflight);
     }

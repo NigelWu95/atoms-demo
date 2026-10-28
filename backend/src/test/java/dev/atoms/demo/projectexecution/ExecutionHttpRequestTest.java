@@ -67,6 +67,19 @@ class ExecutionHttpRequestTest {
         assertThatThrownBy(() -> request.headers().put("Cookie", "x")).isInstanceOf(UnsupportedOperationException.class);
     }
 
+    @Test void bodylessPostRemainsAWriteAndDoesNotAcceptUndeclaredOrInvalidContent() {
+        var input = request("POST", "/api/counter/increment", null, Map.of(), new byte[0]);
+        assertThat(input.write()).isTrue();
+        assertThat(input.headers()).isEmpty();
+        assertThat(input.body()).isEmpty();
+        assertRejected(() -> request("POST", "/api/counter/increment", null, Map.of(), new byte[]{1}), 422);
+        assertRejected(() -> request("POST", "/api/counter/increment", null,
+                Map.of("Content-Type", "application/json"), new byte[0]), 422);
+        assertRejected(() -> request("POST", "/api/counter/increment", null,
+                Map.of("Content-Type", "text/plain"), new byte[0]), 422);
+        assertRejected(() -> request("POST", "/assets/app.js", null, Map.of(), new byte[0]), 422);
+    }
+
     private ExecutionHttpRequest request(String method, String path, String query, Map<String, String> headers, byte[] body) {
         return new ExecutionHttpRequest(method, path, query, headers, body);
     }

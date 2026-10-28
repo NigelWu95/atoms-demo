@@ -77,5 +77,14 @@ class DeliveryHttpPolicyTest {
         assertThat(input.request(new byte[0]).headers()).isEmpty();
         assertThat(input.write()).isTrue();
     }
+    @Test void supportsBodylessPostAndValidatesTheActualBodyBeforeForwarding() {
+        var request = request("POST", "api/counter/increment");
+        request.addHeader("Origin", "null");
+        var input = DeliveryHttpPolicy.input(request, DeliveryHttpPolicy.route(request));
+        assertThat(input.write()).isTrue();
+        assertThat(input.request(new byte[0]).headers()).isEmpty();
+        assertThat(input.request(new byte[0]).body()).isEmpty();
+        assertThatThrownBy(() -> input.request("{}".getBytes(StandardCharsets.UTF_8))).isInstanceOf(ApiException.class);
+    }
     private MockHttpServletRequest request(String method, String path) { return new MockHttpServletRequest(method, prefix + path); }
 }

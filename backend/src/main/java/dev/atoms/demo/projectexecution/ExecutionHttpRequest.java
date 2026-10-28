@@ -30,7 +30,10 @@ public final class ExecutionHttpRequest {
         this.headers = headers(headers); this.body = body.clone();
         String type = this.headers.get("content-type");
         if (type != null && !type.matches("(?i)application/json(?:\\s*;\\s*charset=utf-8)?")) throw unsupported();
-        if (write && !(method.equals("DELETE") && this.body.length == 0)) {
+        // Action endpoints may use POST without a representation (for example /counter/increment).
+        // It remains a write, and a declared JSON representation still requires valid JSON bytes.
+        boolean bodylessAction = this.body.length == 0 && (method.equals("DELETE") || method.equals("POST") && type == null);
+        if (write && !bodylessAction) {
             if (type == null || this.body.length == 0) throw unsupported();
             try { if (JSON.readTree(utf8(this.body)) == null) throw unsupported(); }
             catch (Exception error) { throw unsupported(); }
