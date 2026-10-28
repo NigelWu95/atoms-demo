@@ -32,6 +32,7 @@ final class AgentProtocolFixture implements AutoCloseable {
     private volatile boolean configurationCanarySeen, outsideContentSeen;
     private AgentStreamDecoder.Summary summary;
     private String decoderFailure;
+    private int providerFailureStatus;
     private static final String CONFIG_CANARY = "atoms-fixture-customization-must-not-load";
     private static final String OUTSIDE_CANARY = "atoms-fixture-outside-content-must-not-leak";
     private volatile boolean readReturnedOriginalContent, editReturnedSuccess;
@@ -62,6 +63,12 @@ final class AgentProtocolFixture implements AutoCloseable {
     AgentStreamDecoder.Summary summary() { return summary; }
     String failure() { return failure; }
     String decoderFailure() { return decoderFailure; }
+    Result rejectProvider(int status) throws Exception {
+        if (!Set.of(400, 401, 429, 500).contains(status)) throw new IllegalArgumentException();
+        providerFailureStatus = status;
+        steps = List.of();
+        return run(false, true);
+    }
     record ToolResult(boolean error, String content) {}
     private record Step(String id, String name, Map<String, Object> input) {}
     record Request(String apiKey, String model, int maxTokens, List<String> tools, boolean stream,
@@ -271,6 +278,19 @@ final class AgentProtocolFixture implements AutoCloseable {
             requests.add(new Request(exchange.getRequestHeaders().getFirst("x-api-key"), body.path("model").asText(),
                     body.path("max_tokens").asInt(), List.copyOf(toolNames), body.path("stream").asBoolean(), Map.copyOf(toolFields)));
             int round = requests.size();
+            if (providerFailureStatus != 0) {
+                String type = switch (providerFailureStatus) {
+                    case 401 -> "authentication_error";
+                    case 429 -> "rate_limit_error";
+                    case 500 -> "api_error";
+                    default -> "invalid_request_error";
+                };
+                byte[] response = json.writeValueAsBytes(Map.of("type", "error", "error", Map.of(
+                        "type", type, "message", "synthetic-provider-private-message")));
+                exchange.getResponseHeaders().set("Content-Type", "application/json");
+                exchange.sendResponseHeaders(providerFailureStatus, response.length);
+                exchange.getResponseBody().write(response); return;
+            }
             if (round > steps.size() + 1) {
                 failure = "Unexpected local API retry or auxiliary request";
                 exchange.sendResponseHeaders(400, -1); return;

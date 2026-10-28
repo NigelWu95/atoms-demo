@@ -5,6 +5,8 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import static org.assertj.core.api.Assertions.*;
 
 class AgentStreamDecoderTest {
@@ -108,6 +110,38 @@ class AgentStreamDecoderTest {
         for (String invalid : new String[]{missingResult, stream.replace("\"tool_use_id\":\"edit_one\"", "\"tool_use_id\":\"unknown\""),
                 INIT + "{\"type\":\"system\",\"subtype\":\"hook_started\"}\n" + SUCCESS})
             assertThatThrownBy(() -> read(invalid)).isInstanceOf(IOException.class);
+    }
+
+    @ParameterizedTest
+    @CsvSource({"authentication_failed,AGENT_PROVIDER_AUTH_FAILED", "rate_limit,AGENT_PROVIDER_RATE_LIMITED",
+            "server_error,AGENT_PROVIDER_UNAVAILABLE", "unknown,AGENT_PROVIDER_ERROR",
+            "PRIVATE_UNKNOWN_PROVIDER_ERROR,AGENT_PROVIDER_ERROR"})
+    void providerErrorsCannotBeOverriddenByALaterSuccessOrLeakTheirPayload(String error, String code) {
+        String event = "{\"type\":\"assistant\",\"error\":\"" + error
+                + "\",\"message\":{\"content\":[{\"type\":\"text\",\"text\":\"PRIVATE_RESPONSE_BODY\"}]}}\n";
+        assertThatThrownBy(() -> read(INIT + event + SUCCESS))
+                .isInstanceOf(IOException.class).hasMessage(code).hasNoCause();
+    }
+
+    @Test void diagnosticsIdentifyTheRejectedStageWithoutCopyingUntrustedFields() {
+        assertRejection(INIT + "PRIVATE_MALFORMED_JSON", AgentStreamDecoder.Rejection.INVALID_JSON, 2);
+        assertRejection(INIT + "{\"type\":\"PRIVATE_EVENT\"}\n", AgentStreamDecoder.Rejection.UNKNOWN_EVENT, 2);
+        assertRejection(INIT + "{\"type\":\"system\",\"subtype\":\"PRIVATE_HOOK\"}\n",
+                AgentStreamDecoder.Rejection.UNKNOWN_SYSTEM_EVENT, 2);
+        assertRejection(INIT + "{\"type\":\"assistant\",\"error\":{\"message\":\"PRIVATE_ERROR\"},\"message\":{\"content\":[]}}\n",
+                AgentStreamDecoder.Rejection.INVALID_MESSAGE_SHAPE, 2);
+        assertRejection(INIT + "{\"type\":\"user\",\"message\":{\"content\":[{\"type\":\"tool_result\",\"tool_use_id\":\"PRIVATE_UNKNOWN_ID\"}]}}\n",
+                AgentStreamDecoder.Rejection.TOOL_RESULT_SEQUENCE, 2);
+        assertRejection(INIT, AgentStreamDecoder.Rejection.MISSING_FINAL_RESULT, 1);
+    }
+
+    private void assertRejection(String stream, AgentStreamDecoder.Rejection reason, int eventNumber) {
+        assertThatThrownBy(() -> read(stream)).isInstanceOfSatisfying(AgentStreamDecoder.ProtocolFailure.class, error -> {
+            assertThat(error.getMessage()).isEqualTo("AGENT_PROTOCOL_INVALID");
+            assertThat(error.rejection()).isEqualTo(reason);
+            assertThat(error.eventNumber()).isEqualTo(eventNumber);
+            assertThat(error.getCause()).isNull();
+        });
     }
 
     private AgentStreamDecoder.Summary read(String value) throws IOException {

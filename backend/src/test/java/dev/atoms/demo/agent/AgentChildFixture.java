@@ -40,6 +40,19 @@ public final class AgentChildFixture {
                 if (args[0].equals("exit-error")) System.exit(3);
             }
             case "truncated" -> System.out.println(INIT);
+            case "private-protocol-error" -> {
+                System.in.readAllBytes();
+                System.out.println(INIT);
+                System.out.println("{\"type\":\"PRIVATE_UNKNOWN_EVENT\",\"payload\":\"PRIVATE_SOURCE_AND_SECRET\"}");
+                System.out.println(RESULT);
+            }
+            case "authentication_failed", "rate_limit", "server_error", "unknown" -> {
+                System.in.readAllBytes();
+                System.out.println(INIT);
+                System.out.println("{\"type\":\"assistant\",\"error\":\"" + args[0]
+                        + "\",\"message\":{\"content\":[{\"type\":\"text\",\"text\":\"PRIVATE_PROVIDER_BODY\"}]}}");
+                System.out.println(RESULT);
+            }
             case "stdout-flood" -> { while (true) System.out.write(new byte[8192]); }
             case "stderr-flood" -> { while (true) System.err.write(new byte[8192]); }
             case "ignore-term" -> {

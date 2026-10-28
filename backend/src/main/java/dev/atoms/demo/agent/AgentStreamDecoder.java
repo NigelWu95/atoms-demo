@@ -21,6 +21,21 @@ import java.util.TreeSet;
 
 /** Decodes one NDJSON run. Raw model text, source, reasoning and stderr are never returned. */
 final class AgentStreamDecoder {
+    enum Rejection {
+        REUSED_DECODER, MISSING_FINAL_RESULT, TRAILING_OR_EMPTY_EVENT, INVALID_JSON, INVALID_EVENT_SHAPE,
+        MISSING_INITIALIZATION, UNKNOWN_SYSTEM_EVENT, UNKNOWN_EVENT, INVALID_CAPABILITY_SHAPE,
+        INVALID_MESSAGE_SHAPE, TOOL_RESULT_SEQUENCE, INVALID_TOOL_CALL, INVALID_TOOL_ARGUMENTS,
+        UNRESOLVED_TOOLS, INVALID_RESULT_SHAPE, INVALID_USAGE
+    }
+    static final class ProtocolFailure extends IOException {
+        private final Rejection rejection;
+        private final int eventNumber;
+        ProtocolFailure(Rejection rejection, int eventNumber) {
+            super("AGENT_PROTOCOL_INVALID"); this.rejection = rejection; this.eventNumber = eventNumber;
+        }
+        Rejection rejection() { return rejection; }
+        int eventNumber() { return eventNumber; }
+    }
     private static final Set<String> TOOLS = Set.of("Read", "Glob", "Grep", "Write", "Edit");
     // Pinned CLI releases report these modules even in safe mode; no filesystem plugin is accepted.
     private static final Set<String> BUILTIN_MODULES = Set.of("cc-plugin-agents-md", "cc-plugin-plugin-authoring");
@@ -51,7 +66,7 @@ final class AgentStreamDecoder {
     }
 
     Summary read(InputStream input) throws IOException {
-        if (consumed) throw invalid();
+        if (consumed) throw invalid(Rejection.REUSED_DECODER);
         consumed = true;
         var line = new ByteArrayOutputStream();
         byte[] buffer = new byte[8192];
@@ -68,44 +83,44 @@ final class AgentStreamDecoder {
             }
         }
         if (line.size() > 0) event(line.toByteArray());
-        if (!initialized || !completed) throw invalid();
+        if (!initialized || !completed) throw invalid(Rejection.MISSING_FINAL_RESULT);
         return new Summary(events, toolCounts, List.copyOf(paths), inputTokens, outputTokens);
     }
 
     private void event(byte[] bytes) throws IOException {
         if (++events > limits.events()) throw limit();
-        if (completed || bytes.length == 0) throw invalid();
+        if (completed || bytes.length == 0) throw invalid(Rejection.TRAILING_OR_EMPTY_EVENT);
         final JsonNode event;
         try {
             String text = StandardCharsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT)
                     .onUnmappableCharacter(CodingErrorAction.REPORT).decode(ByteBuffer.wrap(bytes)).toString();
             event = json.readTree(text);
-        } catch (IOException | RuntimeException error) { throw invalid(); }
+        } catch (IOException | RuntimeException error) { throw invalid(Rejection.INVALID_JSON); }
         if (event == null || !event.isObject() || !event.path("type").isTextual()
-                || !event.path("parent_tool_use_id").isNull() && !event.path("parent_tool_use_id").isMissingNode()) throw invalid();
+                || !event.path("parent_tool_use_id").isNull() && !event.path("parent_tool_use_id").isMissingNode()) throw invalid(Rejection.INVALID_EVENT_SHAPE);
         String type = event.path("type").asText();
         // Observed before init in CLI 2.1.302; this notification grants no capability or success.
         if (type.equals("system") && event.path("subtype").asText().equals("ui_invalidate")) return;
         if (type.equals("system") && event.path("subtype").asText().equals("init")) {
             initialize(event); return;
         }
-        if (!initialized) throw invalid();
+        if (!initialized) throw invalid(Rejection.MISSING_INITIALIZATION);
         switch (type) {
             case "system" -> {
                 if (event.path("subtype").asText().equals("permission_denied")) throw new IOException("AGENT_TOOL_FAILED");
-                if (!Set.of("status", "compact_boundary").contains(event.path("subtype").asText())) throw invalid();
+                if (!Set.of("status", "compact_boundary").contains(event.path("subtype").asText())) throw invalid(Rejection.UNKNOWN_SYSTEM_EVENT);
             }
             case "assistant", "user" -> message(event);
             case "result" -> result(event);
             case "rate_limit_event" -> { /* No provider payload enters the summary. */ }
-            default -> throw invalid();
+            default -> throw invalid(Rejection.UNKNOWN_EVENT);
         }
     }
 
     private void initialize(JsonNode event) throws IOException {
-        if (initialized || !event.path("tools").isArray()) throw invalid();
+        if (initialized || !event.path("tools").isArray()) throw invalid(Rejection.INVALID_CAPABILITY_SHAPE);
         var tools = new HashSet<String>();
-        for (var tool : event.path("tools")) if (!tool.isTextual() || !tools.add(tool.asText())) throw invalid();
+        for (var tool : event.path("tools")) if (!tool.isTextual() || !tools.add(tool.asText())) throw invalid(Rejection.INVALID_CAPABILITY_SHAPE);
         if (!tools.equals(TOOLS)) throw new IOException("AGENT_CLI_UNSUPPORTED");
         for (String field : List.of("mcp_servers", "skills")) {
             var value = event.path(field);
@@ -129,25 +144,37 @@ final class AgentStreamDecoder {
 
     private void message(JsonNode event) throws IOException {
         var content = event.path("message").path("content");
-        if (!content.isArray()) throw invalid();
+        if (!content.isArray()) throw invalid(Rejection.INVALID_MESSAGE_SHAPE);
+        // Pinned CLI emits assistant.error before its terminal event on provider failures.
+        // Never copy the provider message, error text or response body into diagnostics.
+        var provider = event.path("error");
+        if (event.path("type").asText().equals("assistant") && !provider.isMissingNode() && !provider.isNull()) {
+            if (!provider.isTextual()) throw invalid(Rejection.INVALID_MESSAGE_SHAPE);
+            throw new IOException(switch (provider.textValue()) {
+                case "authentication_failed" -> "AGENT_PROVIDER_AUTH_FAILED";
+                case "rate_limit" -> "AGENT_PROVIDER_RATE_LIMITED";
+                case "server_error" -> "AGENT_PROVIDER_UNAVAILABLE";
+                default -> "AGENT_PROVIDER_ERROR";
+            });
+        }
         for (var block : content) {
             if (block.path("type").asText().equals("tool_result")) {
                 if (block.path("is_error").asBoolean()) throw new IOException("AGENT_TOOL_FAILED");
                 if (!event.path("type").asText().equals("user")
                         || !pendingTools.remove(block.path("tool_use_id").asText())
-                        || !block.path("is_error").isMissingNode() && !block.path("is_error").isBoolean()) throw invalid();
+                        || !block.path("is_error").isMissingNode() && !block.path("is_error").isBoolean()) throw invalid(Rejection.TOOL_RESULT_SEQUENCE);
             }
             if (!block.path("type").asText().equals("tool_use")) continue;
             String name = block.path("name").asText(), id = block.path("id").asText();
             if (!event.path("type").asText().equals("assistant") || !TOOLS.contains(name)
-                    || id.isEmpty() || id.length() > 256 || !toolIds.add(id)) throw invalid();
+                    || id.isEmpty() || id.length() > 256 || !toolIds.add(id)) throw invalid(Rejection.INVALID_TOOL_CALL);
             pendingTools.add(id);
             toolCounts.merge(name, 1, Integer::sum);
             var input = block.path("input");
-            if (!input.isObject()) throw invalid();
+            if (!input.isObject()) throw invalid(Rejection.INVALID_TOOL_ARGUMENTS);
             var path = input.path(name.equals("Glob") || name.equals("Grep") ? "path" : "file_path");
             if (path.isMissingNode() && (name.equals("Glob") || name.equals("Grep"))) continue;
-            if (!path.isTextual()) throw invalid();
+            if (!path.isTextual()) throw invalid(Rejection.INVALID_TOOL_ARGUMENTS);
             recordPath(path.asText());
         }
     }
@@ -166,8 +193,8 @@ final class AgentStreamDecoder {
     }
 
     private void result(JsonNode event) throws IOException {
-        if (!pendingTools.isEmpty()) throw invalid();
-        if (!event.path("is_error").isBoolean() || !event.path("permission_denials").isArray()) throw invalid();
+        if (!pendingTools.isEmpty()) throw invalid(Rejection.UNRESOLVED_TOOLS);
+        if (!event.path("is_error").isBoolean() || !event.path("permission_denials").isArray()) throw invalid(Rejection.INVALID_RESULT_SHAPE);
         if (!event.path("permission_denials").isEmpty()) throw new IOException("AGENT_TOOL_FAILED");
         if (!event.path("subtype").asText().equals("success") || event.path("is_error").booleanValue())
             throw new IOException("AGENT_MODEL_INCOMPLETE");
@@ -178,9 +205,9 @@ final class AgentStreamDecoder {
 
     private long count(JsonNode value) throws IOException {
         if (value.isMissingNode()) return 0;
-        if (!value.isIntegralNumber() || !value.canConvertToLong() || value.longValue() < 0) throw invalid();
+        if (!value.isIntegralNumber() || !value.canConvertToLong() || value.longValue() < 0) throw invalid(Rejection.INVALID_USAGE);
         return value.longValue();
     }
-    private static IOException invalid() { return new IOException("AGENT_PROTOCOL_INVALID"); }
+    private ProtocolFailure invalid(Rejection rejection) { return new ProtocolFailure(rejection, events); }
     private static IOException limit() { return new IOException("AGENT_OUTPUT_LIMIT"); }
 }

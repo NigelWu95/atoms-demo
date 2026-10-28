@@ -8,6 +8,7 @@ import java.util.function.BooleanSupplier;
 
 /** Agent protocol adapter; the shared process owner issues execution-bound stopped evidence. */
 final class AgentProcess {
+    private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(AgentProcess.class);
     private final OwnedProcess owner;
     AgentProcess() { owner = new OwnedProcess(); }
     AgentProcess(java.util.function.Function<Process, List<ProcessHandle>> descendants) {
@@ -31,7 +32,14 @@ final class AgentProcess {
         if (prompt == null || prompt.isEmpty()) throw new Failure("AGENT_INVOCATION_REJECTED", null);
         try {
             var result = owner.run(builder, prompt, deadline::remaining, cancelled, task, execution,
-                    stream -> new AgentStreamDecoder(builder.directory().toPath()).read(stream), preflight);
+                    stream -> {
+                        try { return new AgentStreamDecoder(builder.directory().toPath()).read(stream); }
+                        catch (AgentStreamDecoder.ProtocolFailure error) {
+                            LOG.warn("{\"event\":\"agent_protocol_rejected\",\"requestId\":\"{}\",\"executionId\":\"{}\",\"reason\":\"{}\",\"eventNumber\":{}}",
+                                    task, execution, error.rejection(), error.eventNumber());
+                            throw error;
+                        }
+                    }, preflight);
             return new Result(result.summary(), result.stopped());
         } catch (OwnedProcess.Failure error) { throw new Failure(error.getMessage(), error.stopped()); }
     }

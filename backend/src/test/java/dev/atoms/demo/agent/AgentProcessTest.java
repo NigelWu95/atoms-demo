@@ -8,6 +8,8 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import static org.assertj.core.api.Assertions.*;
 
 class AgentProcessTest {
@@ -56,6 +58,49 @@ class AgentProcessTest {
                     .isInstanceOf(AgentProcess.Failure.class).hasMessage("AGENT_OUTPUT_LIMIT")
                     .satisfies(error -> assertThat(((AgentProcess.Failure) error).stopped()).isNotNull());
         }
+    }
+
+    @ParameterizedTest
+    @CsvSource({"authentication_failed,AGENT_PROVIDER_AUTH_FAILED", "rate_limit,AGENT_PROVIDER_RATE_LIMITED",
+            "server_error,AGENT_PROVIDER_UNAVAILABLE", "unknown,AGENT_PROVIDER_ERROR"})
+    void providerFailuresSurviveTheProcessBoundaryWithAStoppedReceipt(String mode, String code) throws Exception {
+        var task = java.util.UUID.randomUUID(); var execution = java.util.UUID.randomUUID();
+        assertThatThrownBy(() -> new AgentProcess().run(command(mode), "PRIVATE_PROMPT", new AgentDeadline(Duration.ofSeconds(8)),
+                () -> false, task, execution)).isInstanceOfSatisfying(AgentProcess.Failure.class, error -> {
+                    assertThat(error.getMessage()).isEqualTo(code);
+                    assertThat(error.stopped()).isNotNull();
+                    assertThat(error.stopped().matches(task, execution, temporary)).isTrue();
+                    assertThat(error.getCause()).isNull();
+                });
+        assertStopped(temporary.resolve("parent.pid"));
+    }
+
+    @Test void protocolRejectionLogsOnlyFixedMetadataAndStillStopsProcess() throws Exception {
+        var task = java.util.UUID.randomUUID(); var execution = java.util.UUID.randomUUID();
+        var logger = (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger(AgentProcess.class);
+        var logs = new ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent>();
+        logs.start(); logger.addAppender(logs);
+        try {
+            assertThatThrownBy(() -> new AgentProcess().run(command("private-protocol-error"), "PRIVATE_PROMPT",
+                    new AgentDeadline(Duration.ofSeconds(8)), () -> false, task, execution))
+                    .isInstanceOfSatisfying(AgentProcess.Failure.class, error -> {
+                        assertThat(error.getMessage()).isEqualTo("AGENT_PROTOCOL_INVALID");
+                        assertThat(error.stopped()).isNotNull();
+                        assertThat(error.stopped().matches(task, execution, temporary)).isTrue();
+                    });
+            assertThat(logs.list).hasSize(1);
+            var log = logs.list.get(0);
+            var event = new com.fasterxml.jackson.databind.ObjectMapper().readTree(log.getFormattedMessage());
+            assertThat(event.size()).isEqualTo(5);
+            assertThat(event.path("event").asText()).isEqualTo("agent_protocol_rejected");
+            assertThat(event.path("requestId").asText()).isEqualTo(task.toString());
+            assertThat(event.path("executionId").asText()).isEqualTo(execution.toString());
+            assertThat(event.path("reason").asText()).isEqualTo("UNKNOWN_EVENT");
+            assertThat(event.path("eventNumber").asInt()).isEqualTo(2);
+            assertThat(event.toString()).doesNotContain("PRIVATE_", temporary.toString());
+            assertThat(log.getThrowableProxy()).isNull();
+            assertStopped(temporary.resolve("parent.pid"));
+        } finally { logger.detachAppender(logs); logs.stop(); }
     }
 
     @Test void expiredOrCancelledTasksNeverStartAProcess() {
