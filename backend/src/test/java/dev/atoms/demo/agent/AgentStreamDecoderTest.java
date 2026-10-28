@@ -144,6 +144,63 @@ class AgentStreamDecoderTest {
         });
     }
 
+    @ParameterizedTest
+    @CsvSource({"api_error,SYSTEM_API_ERROR", "api_retry,SYSTEM_API_RETRY",
+            "informational,SYSTEM_INFORMATIONAL", "model_fallback,SYSTEM_MODEL_FALLBACK"})
+    void rejectedSystemNotificationsHaveFixedDiagnosticsWithoutAcceptingTheirContents(String subtype, AgentStreamDecoder.Rejection reason) {
+        assertRejection(INIT + "{\"type\":\"system\",\"subtype\":\"" + subtype
+                + "\",\"content\":\"PRIVATE_NOTIFICATION\"}\n" + SUCCESS, reason, 2);
+    }
+
+    @Test void unknownSystemSubtypeUsesOnlyAFingerprintForOfflineMatching() {
+        String event = "{\"type\":\"system\",\"subtype\":\"PRIVATE_UNKNOWN_NOTICE\",\"content\":\"PRIVATE_BODY\"}\n";
+        assertThatThrownBy(() -> read(INIT + event + SUCCESS)).isInstanceOfSatisfying(AgentStreamDecoder.ProtocolFailure.class, error -> {
+            assertThat(error.rejection()).isEqualTo(AgentStreamDecoder.Rejection.UNKNOWN_SYSTEM_EVENT);
+            assertThat(error.systemSubtypeSha256()).matches("[a-f0-9]{64}");
+            assertThat(error.toString() + error.systemSubtypeSha256()).doesNotContain("PRIVATE_");
+        });
+    }
+
+    @Test void thinkingProgressDoesNotReplaceCapabilityInitializationFinalResultOrMeasuredUsage() throws Exception {
+        String progress = "{\"type\":\"system\",\"subtype\":\"thinking_tokens\",\"estimated_tokens\":100,\"estimated_tokens_delta\":10}\n";
+        var summary = read(INIT + progress + SUCCESS.replace("\"permission_denials\":[]",
+                "\"permission_denials\":[],\"usage\":{\"input_tokens\":20,\"output_tokens\":30}"));
+        assertThat(summary.events()).isEqualTo(3);
+        assertThat(summary.inputTokens()).isEqualTo(20);
+        assertThat(summary.outputTokens()).isEqualTo(30);
+        assertThat(summary.toolCounts()).isEmpty();
+        assertThat(summary.paths()).isEmpty();
+        assertRejection(progress + SUCCESS, AgentStreamDecoder.Rejection.MISSING_INITIALIZATION, 1);
+        assertRejection(INIT + progress, AgentStreamDecoder.Rejection.MISSING_FINAL_RESULT, 2);
+        assertThatThrownBy(() -> read(INIT.replace("\"Read\"", "\"Bash\"") + progress + SUCCESS)).hasMessage("AGENT_CLI_UNSUPPORTED");
+        for (String invalid : new String[]{progress.replace(":100", ":-1"), progress.replace(":10}", ":-1}"),
+                progress.replace(":100", ":\"100\""), progress.replace(":10}", ":101}"),
+                progress.replace(":100", ":1e50"), progress.replace(",\"estimated_tokens_delta\":10", "")}) {
+            assertRejection(INIT + invalid + SUCCESS, AgentStreamDecoder.Rejection.INVALID_USAGE, 2);
+        }
+    }
+
+    @Test void frequentThinkingProgressDoesNotConsumeTheToolProtocolEventAllowance() throws Exception {
+        String progress = "{\"type\":\"system\",\"subtype\":\"thinking_tokens\",\"estimated_tokens\":10,\"estimated_tokens_delta\":1}\n";
+        assertThat(read(INIT + progress.repeat(5000) + SUCCESS).events()).isEqualTo(5002);
+        assertThatThrownBy(() -> new AgentStreamDecoder(Path.of("/private/project"),
+                new AgentStreamDecoder.Limits(1024, 4096, 2)).read(input(INIT + progress.repeat(100) + SUCCESS)))
+                .hasMessage("AGENT_OUTPUT_LIMIT");
+        String status = "{\"type\":\"system\",\"subtype\":\"status\"}\n";
+        assertThatThrownBy(() -> read(INIT + status.repeat(4096) + SUCCESS)).hasMessage("AGENT_OUTPUT_LIMIT");
+    }
+
+    @Test void terminalTurnLimitIsDistinctFromAnIncompleteModelResponse() {
+        String result = SUCCESS.replace("\"success\"", "\"error_max_turns\"").replace("false", "true")
+                .replace("\"permission_denials\":[]", "\"permission_denials\":[],\"num_turns\":24,\"result\":\"PRIVATE_PARTIAL_SOURCE\"");
+        assertThatThrownBy(() -> read(INIT + result)).isInstanceOfSatisfying(AgentStreamDecoder.Incomplete.class, failure -> {
+            assertThat(failure.getMessage()).isEqualTo("AGENT_TURN_LIMIT");
+            assertThat(failure.reason()).isEqualTo(AgentStreamDecoder.TerminalReason.TURN_LIMIT);
+            assertThat(failure.turns()).isEqualTo(24);
+            assertThat(failure.getCause()).isNull();
+        });
+    }
+
     private AgentStreamDecoder.Summary read(String value) throws IOException {
         return new AgentStreamDecoder(Path.of("/private/project")).read(input(value));
     }

@@ -33,6 +33,7 @@ final class AgentProtocolFixture implements AutoCloseable {
     private AgentStreamDecoder.Summary summary;
     private String decoderFailure;
     private int providerFailureStatus;
+    private boolean includeThinking;
     private static final String CONFIG_CANARY = "atoms-fixture-customization-must-not-load";
     private static final String OUTSIDE_CANARY = "atoms-fixture-outside-content-must-not-leak";
     private volatile boolean readReturnedOriginalContent, editReturnedSuccess;
@@ -68,6 +69,10 @@ final class AgentProtocolFixture implements AutoCloseable {
         providerFailureStatus = status;
         steps = List.of();
         return run(false, true);
+    }
+    Result editWithThinking() throws Exception {
+        includeThinking = true;
+        return edit(false);
     }
     record ToolResult(boolean error, String content) {}
     private record Step(String id, String name, Map<String, Object> input) {}
@@ -318,17 +323,25 @@ final class AgentProtocolFixture implements AutoCloseable {
         message.putArray("content");
         message.set("usage", json.valueToTree(Map.of("input_tokens", 30, "output_tokens", 1)));
         event(output, "message_start", Map.of("message", message));
+        int index = includeThinking ? 1 : 0;
+        if (includeThinking) {
+            event(output, "content_block_start", Map.of("index", 0, "content_block", Map.of("type", "thinking", "thinking", "")));
+            event(output, "content_block_delta", Map.of("index", 0, "delta", Map.of("type", "thinking_delta",
+                    "thinking", "PRIVATE_SYNTHETIC_THINKING ".repeat(64))));
+            event(output, "content_block_delta", Map.of("index", 0, "delta", Map.of("type", "signature_delta", "signature", "offline-fixture-signature")));
+            event(output, "content_block_stop", Map.of("index", 0));
+        }
         if (round <= steps.size()) {
             Step step = steps.get(round - 1);
-            event(output, "content_block_start", Map.of("index", 0, "content_block",
+            event(output, "content_block_start", Map.of("index", index, "content_block",
                     Map.of("type", "tool_use", "id", step.id(), "name", step.name(), "input", Map.of())));
-            event(output, "content_block_delta", Map.of("index", 0, "delta",
+            event(output, "content_block_delta", Map.of("index", index, "delta",
                     Map.of("type", "input_json_delta", "partial_json", json.writeValueAsString(step.input()))));
         } else {
-            event(output, "content_block_start", Map.of("index", 0, "content_block", Map.of("type", "text", "text", "")));
-            event(output, "content_block_delta", Map.of("index", 0, "delta", Map.of("type", "text_delta", "text", "Edited.")));
+            event(output, "content_block_start", Map.of("index", index, "content_block", Map.of("type", "text", "text", "")));
+            event(output, "content_block_delta", Map.of("index", index, "delta", Map.of("type", "text_delta", "text", "Edited.")));
         }
-        event(output, "content_block_stop", Map.of("index", 0));
+        event(output, "content_block_stop", Map.of("index", index));
         var delta = json.createObjectNode().put("stop_reason", round <= steps.size() ? "tool_use" : "end_turn").putNull("stop_sequence");
         event(output, "message_delta", Map.of("delta", delta, "usage", Map.of("output_tokens", 20)));
         event(output, "message_stop", Map.of());

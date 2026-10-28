@@ -35,8 +35,16 @@ final class AgentProcess {
                     stream -> {
                         try { return new AgentStreamDecoder(builder.directory().toPath()).read(stream); }
                         catch (AgentStreamDecoder.ProtocolFailure error) {
-                            LOG.warn("{\"event\":\"agent_protocol_rejected\",\"requestId\":\"{}\",\"executionId\":\"{}\",\"reason\":\"{}\",\"eventNumber\":{}}",
-                                    task, execution, error.rejection(), error.eventNumber());
+                            LOG.warn("{\"event\":\"agent_protocol_rejected\",\"requestId\":\"{}\",\"executionId\":\"{}\",\"reason\":\"{}\",\"eventNumber\":{},\"systemSubtypeSha256\":\"{}\"}",
+                                    task, execution, error.rejection(), error.eventNumber(), error.systemSubtypeSha256());
+                            throw error;
+                        } catch (AgentStreamDecoder.OutputLimit error) {
+                            LOG.warn("{\"event\":\"agent_stream_limited\",\"requestId\":\"{}\",\"executionId\":\"{}\",\"reason\":\"{}\",\"eventNumber\":{}}",
+                                    task, execution, error.reason(), error.eventNumber());
+                            throw error;
+                        } catch (AgentStreamDecoder.Incomplete error) {
+                            LOG.warn("{\"event\":\"agent_result_incomplete\",\"requestId\":\"{}\",\"executionId\":\"{}\",\"reason\":\"{}\",\"turns\":{}}",
+                                    task, execution, error.reason(), error.turns());
                             throw error;
                         }
                     }, preflight);

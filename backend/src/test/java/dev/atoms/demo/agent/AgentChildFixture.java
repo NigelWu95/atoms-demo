@@ -40,6 +40,10 @@ public final class AgentChildFixture {
                 if (args[0].equals("exit-error")) System.exit(3);
             }
             case "truncated" -> System.out.println(INIT);
+            case "turn-limit" -> {
+                System.in.readAllBytes(); System.out.println(INIT);
+                System.out.println(RESULT.replace("\"success\"", "\"error_max_turns\"").replace("false", "true"));
+            }
             case "private-protocol-error" -> {
                 System.in.readAllBytes();
                 System.out.println(INIT);

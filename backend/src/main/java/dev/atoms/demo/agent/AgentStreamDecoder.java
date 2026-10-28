@@ -24,17 +24,39 @@ final class AgentStreamDecoder {
     enum Rejection {
         REUSED_DECODER, MISSING_FINAL_RESULT, TRAILING_OR_EMPTY_EVENT, INVALID_JSON, INVALID_EVENT_SHAPE,
         MISSING_INITIALIZATION, UNKNOWN_SYSTEM_EVENT, UNKNOWN_EVENT, INVALID_CAPABILITY_SHAPE,
+        SYSTEM_API_ERROR, SYSTEM_API_RETRY, SYSTEM_INFORMATIONAL, SYSTEM_MODEL_FALLBACK,
         INVALID_MESSAGE_SHAPE, TOOL_RESULT_SEQUENCE, INVALID_TOOL_CALL, INVALID_TOOL_ARGUMENTS,
         UNRESOLVED_TOOLS, INVALID_RESULT_SHAPE, INVALID_USAGE
     }
     static final class ProtocolFailure extends IOException {
         private final Rejection rejection;
         private final int eventNumber;
+        private String systemSubtypeSha256 = "";
         ProtocolFailure(Rejection rejection, int eventNumber) {
             super("AGENT_PROTOCOL_INVALID"); this.rejection = rejection; this.eventNumber = eventNumber;
         }
         Rejection rejection() { return rejection; }
         int eventNumber() { return eventNumber; }
+        String systemSubtypeSha256() { return systemSubtypeSha256; }
+    }
+    enum LimitReason { LINE_BYTES, TOTAL_BYTES, PROTOCOL_EVENTS, PROGRESS_EVENTS, PATHS }
+    static final class OutputLimit extends IOException {
+        private final LimitReason reason;
+        private final int eventNumber;
+        OutputLimit(LimitReason reason, int eventNumber) { super("AGENT_OUTPUT_LIMIT"); this.reason = reason; this.eventNumber = eventNumber; }
+        LimitReason reason() { return reason; }
+        int eventNumber() { return eventNumber; }
+    }
+    enum TerminalReason { TURN_LIMIT, BUDGET_LIMIT, EXECUTION_ERROR, OTHER }
+    static final class Incomplete extends IOException {
+        private final TerminalReason reason;
+        private final long turns;
+        Incomplete(TerminalReason reason, long turns) {
+            super(reason == TerminalReason.TURN_LIMIT ? "AGENT_TURN_LIMIT" : "AGENT_MODEL_INCOMPLETE");
+            this.reason = reason; this.turns = turns;
+        }
+        TerminalReason reason() { return reason; }
+        long turns() { return turns; }
     }
     private static final Set<String> TOOLS = Set.of("Read", "Glob", "Grep", "Write", "Edit");
     // Pinned CLI releases report these modules even in safe mode; no filesystem plugin is accepted.
@@ -46,7 +68,7 @@ final class AgentStreamDecoder {
     private final Map<String, Integer> toolCounts = new HashMap<>();
     private final Set<String> paths = new TreeSet<>(), toolIds = new HashSet<>(), pendingTools = new HashSet<>();
     private boolean initialized, completed, consumed;
-    private int events;
+    private int events, protocolEvents, progressEvents;
     private long inputTokens, outputTokens;
 
     record Limits(int lineBytes, long totalBytes, int events) {
@@ -73,11 +95,11 @@ final class AgentStreamDecoder {
         long total = 0; int count;
         while ((count = input.read(buffer)) != -1) {
             total += count;
-            if (total > limits.totalBytes()) throw limit();
+            if (total > limits.totalBytes()) throw limit(LimitReason.TOTAL_BYTES);
             for (int i = 0; i < count; i++) {
                 if (buffer[i] == '\n') { event(line.toByteArray()); line.reset(); }
                 else {
-                    if (line.size() >= limits.lineBytes()) throw limit();
+                    if (line.size() >= limits.lineBytes()) throw limit(LimitReason.LINE_BYTES);
                     line.write(buffer[i]);
                 }
             }
@@ -88,7 +110,7 @@ final class AgentStreamDecoder {
     }
 
     private void event(byte[] bytes) throws IOException {
-        if (++events > limits.events()) throw limit();
+        events++;
         if (completed || bytes.length == 0) throw invalid(Rejection.TRAILING_OR_EMPTY_EVENT);
         final JsonNode event;
         try {
@@ -99,6 +121,11 @@ final class AgentStreamDecoder {
         if (event == null || !event.isObject() || !event.path("type").isTextual()
                 || !event.path("parent_tool_use_id").isNull() && !event.path("parent_tool_use_id").isMissingNode()) throw invalid(Rejection.INVALID_EVENT_SHAPE);
         String type = event.path("type").asText();
+        // Thinking estimates can arrive for every streamed token. They do not consume the tool protocol allowance,
+        // but still obey a separate count, the same per-line/total byte bounds and the owning process deadline.
+        if (type.equals("system") && event.path("subtype").asText().equals("thinking_tokens")) {
+            if (++progressEvents > 262144) throw limit(LimitReason.PROGRESS_EVENTS);
+        } else if (++protocolEvents > limits.events()) throw limit(LimitReason.PROTOCOL_EVENTS);
         // Observed before init in CLI 2.1.302; this notification grants no capability or success.
         if (type.equals("system") && event.path("subtype").asText().equals("ui_invalidate")) return;
         if (type.equals("system") && event.path("subtype").asText().equals("init")) {
@@ -108,7 +135,27 @@ final class AgentStreamDecoder {
         switch (type) {
             case "system" -> {
                 if (event.path("subtype").asText().equals("permission_denied")) throw new IOException("AGENT_TOOL_FAILED");
-                if (!Set.of("status", "compact_boundary").contains(event.path("subtype").asText())) throw invalid(Rejection.UNKNOWN_SYSTEM_EVENT);
+                String subtype = event.path("subtype").asText();
+                // CLI 2.1.308 emits these while consuming thinking deltas, even without partial-message output.
+                // They are progress estimates, not final usage or evidence of a successful generation.
+                if (subtype.equals("thinking_tokens")) {
+                    var total = event.path("estimated_tokens"); var delta = event.path("estimated_tokens_delta");
+                    if (!total.isIntegralNumber() || !delta.isIntegralNumber() || count(delta) > count(total))
+                        throw invalid(Rejection.INVALID_USAGE);
+                    return;
+                }
+                if (!Set.of("status", "compact_boundary").contains(subtype)) {
+                    var rejection = invalid(switch (subtype) {
+                    case "api_error" -> Rejection.SYSTEM_API_ERROR;
+                    case "api_retry" -> Rejection.SYSTEM_API_RETRY;
+                    case "informational" -> Rejection.SYSTEM_INFORMATIONAL;
+                    case "model_fallback" -> Rejection.SYSTEM_MODEL_FALLBACK;
+                    default -> Rejection.UNKNOWN_SYSTEM_EVENT;
+                    });
+                    // Match this fingerprint to CLI protocol names offline; never log the untrusted name itself.
+                    rejection.systemSubtypeSha256 = sha256(subtype);
+                    throw rejection;
+                }
             }
             case "assistant", "user" -> message(event);
             case "result" -> result(event);
@@ -188,7 +235,7 @@ final class AgentStreamDecoder {
             String relative = workspace.relativize(path).toString();
             new ProjectSourcePolicy().validatePath(relative);
             paths.add(relative);
-            if (paths.size() > 512) throw limit();
+            if (paths.size() > 512) throw limit(LimitReason.PATHS);
         } catch (IllegalArgumentException error) { throw new IOException("AGENT_TOOL_PATH_REJECTED"); }
     }
 
@@ -197,7 +244,12 @@ final class AgentStreamDecoder {
         if (!event.path("is_error").isBoolean() || !event.path("permission_denials").isArray()) throw invalid(Rejection.INVALID_RESULT_SHAPE);
         if (!event.path("permission_denials").isEmpty()) throw new IOException("AGENT_TOOL_FAILED");
         if (!event.path("subtype").asText().equals("success") || event.path("is_error").booleanValue())
-            throw new IOException("AGENT_MODEL_INCOMPLETE");
+            throw new Incomplete(switch (event.path("subtype").asText()) {
+                case "error_max_turns" -> TerminalReason.TURN_LIMIT;
+                case "error_max_budget_usd" -> TerminalReason.BUDGET_LIMIT;
+                case "error_during_execution" -> TerminalReason.EXECUTION_ERROR;
+                default -> TerminalReason.OTHER;
+            }, count(event.path("num_turns")));
         inputTokens = count(event.path("usage").path("input_tokens"));
         outputTokens = count(event.path("usage").path("output_tokens"));
         completed = true;
@@ -209,5 +261,10 @@ final class AgentStreamDecoder {
         return value.longValue();
     }
     private ProtocolFailure invalid(Rejection rejection) { return new ProtocolFailure(rejection, events); }
-    private static IOException limit() { return new IOException("AGENT_OUTPUT_LIMIT"); }
+    private static String sha256(String value) {
+        try { return java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256")
+                .digest(value.getBytes(StandardCharsets.UTF_8))); }
+        catch (java.security.NoSuchAlgorithmException impossible) { throw new IllegalStateException(impossible); }
+    }
+    private OutputLimit limit(LimitReason reason) { return new OutputLimit(reason, events); }
 }

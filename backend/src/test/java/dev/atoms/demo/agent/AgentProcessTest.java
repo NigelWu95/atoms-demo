@@ -62,7 +62,7 @@ class AgentProcessTest {
 
     @ParameterizedTest
     @CsvSource({"authentication_failed,AGENT_PROVIDER_AUTH_FAILED", "rate_limit,AGENT_PROVIDER_RATE_LIMITED",
-            "server_error,AGENT_PROVIDER_UNAVAILABLE", "unknown,AGENT_PROVIDER_ERROR"})
+            "server_error,AGENT_PROVIDER_UNAVAILABLE", "unknown,AGENT_PROVIDER_ERROR", "turn-limit,AGENT_TURN_LIMIT"})
     void providerFailuresSurviveTheProcessBoundaryWithAStoppedReceipt(String mode, String code) throws Exception {
         var task = java.util.UUID.randomUUID(); var execution = java.util.UUID.randomUUID();
         assertThatThrownBy(() -> new AgentProcess().run(command(mode), "PRIVATE_PROMPT", new AgentDeadline(Duration.ofSeconds(8)),
@@ -91,12 +91,13 @@ class AgentProcessTest {
             assertThat(logs.list).hasSize(1);
             var log = logs.list.get(0);
             var event = new com.fasterxml.jackson.databind.ObjectMapper().readTree(log.getFormattedMessage());
-            assertThat(event.size()).isEqualTo(5);
+            assertThat(event.size()).isEqualTo(6);
             assertThat(event.path("event").asText()).isEqualTo("agent_protocol_rejected");
             assertThat(event.path("requestId").asText()).isEqualTo(task.toString());
             assertThat(event.path("executionId").asText()).isEqualTo(execution.toString());
             assertThat(event.path("reason").asText()).isEqualTo("UNKNOWN_EVENT");
             assertThat(event.path("eventNumber").asInt()).isEqualTo(2);
+            assertThat(event.path("systemSubtypeSha256").asText()).isEmpty();
             assertThat(event.toString()).doesNotContain("PRIVATE_", temporary.toString());
             assertThat(log.getThrowableProxy()).isNull();
             assertStopped(temporary.resolve("parent.pid"));
