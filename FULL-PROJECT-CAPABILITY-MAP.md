@@ -1,6 +1,6 @@
 # 完整源码工程与 Coding Agent · 能力地图
 
-状态：2026-10-27，源码模块、Agent PA01–PA33 离线能力、执行模块 EX01–30 / C-EX10 及交付模块 PD01–PD14 / C1–C5 已完成内部验收。真实 Vue/Java/SQL 应用已验证构建、独立 PG、版本更新、迁移核对、路径预览、固定源码 ZIP 独立运行和重启持久化；见[执行记录](docs/project-execution-verification.md)及[交付记录](docs/project-delivery-verification.md)。正式工作台 PW01–PW10 已实现，本地 A/B 页面启动、预览和下载闭环通过，新增显式构建修复入口；见[工作台说明](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-workbench.md)与[本轮验证](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-workbench-verification.md)。新模式默认关闭，真实付费模型闭环和部署尚未完成；旧未决审计保留。
+状态：2026-10-29，源码模块、Agent PA01–PA33 离线能力、执行模块 EX01–30 / C-EX10 及交付模块 PD01–PD14 / C1–C5 已完成内部验收。真实 Vue/Java/SQL 应用已验证构建、独立 PG、版本更新、迁移核对、路径预览、固定源码 ZIP 独立运行和重启持久化；见[执行记录](docs/project-execution-verification.md)及[交付记录](docs/project-delivery-verification.md)。正式工作台 PW01–PW10 已实现，本地 A/B 页面启动、预览和下载闭环通过，新增显式构建修复入口；见[工作台说明](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-workbench.md)与[本轮验证](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-workbench-verification.md)。新模式默认关闭，真实模型两轮增量与修复、实际运行、下载工程独立启动及重启持久化已完成本地验收；部署尚未更新；旧未决审计保留。
 
 ## 目标与现状
 
@@ -10,14 +10,14 @@
 
 让用户描述需求后得到可持续修改的完整 Vue + Spring Boot 17 + PostgreSQL 工程，包含实际前端、后端业务接口和数据库迁移。预览运行该工程的构建结果，下载提供对应的同一份源码快照。
 
-默认旧工作台生成链路仍是模型生成 `view.html`、`styles.css`、`main.js`，数据库保存不可变产物，再与固定工程模板组装。新源码模块已能在磁盘 Git 管理完整 Vue/Java/SQL 树及增量版本，内部 Claude Code 适配器已通过真实 CLI + 假模型服务的两轮编辑与恢复验收，执行 worker 已能实际构建完整种子工程。正式页面已经接入需求提交、源码检查与运行交付；真实 DeepSeek 的新模式生成效果仍未验收，不宣称任意后端需求均可成功。新工程常驻运行已完成内部实际业务验收。
+默认旧工作台生成链路仍是模型生成 `view.html`、`styles.css`、`main.js`，数据库保存不可变产物，再与固定工程模板组装。新源码模块已能在磁盘 Git 管理完整 Vue/Java/SQL 树及增量版本，内部 Claude Code 适配器已通过真实 CLI + 假模型服务的两轮编辑与恢复验收，执行 worker 已能实际构建完整种子工程。正式页面已经接入需求提交、源码检查与运行交付；真实 DeepSeek 已保存 V8–V11，V9 搜索/筛选的实际运行与下载一致性已验收，V11 分类版本的兼容迁移、实际运行、下载工程独立构建/启动及重启持久化也已验收，不宣称任意后端需求均可成功。新工程常驻运行已完成内部实际业务验收。
 
 原有固定模板能力与验收记录保留在 [原能力地图](CAPABILITY-MAP.md)。本地图描述新模式，不追溯修改旧模式的功能及安全结论。
 
 | 稳定模块 ID | 职责 | 依赖 | 规格状态 |
 |---|---|---|---|
 | `project-source` | 每项目完整源码 Git 仓库、不可变版本、工作副本、元数据、旧产物显式导入 | 现有项目身份与所有权 | 内部模块已验收、默认关闭；[使用说明](docs/project-source.md)、[测试证据](docs/project-source-verification.md)、[任务清单](tasks/project-source/todo.md) |
-| `project-agent` | Claude Code + DeepSeek 在任务副本中读取及修改 Vue、Java、SQL 等文件，提交可检查的变更 | `project-source` | PA01–PA33 内部离线验收完成，默认 4 并发；最终后端 290 单元 + 272 集成通过，CLI 2.1.302 / 2.1.303 / 2.1.308 精确适配。见[维护说明](docs/project-agent.md)、[证据](docs/project-agent-verification.md)、[任务清单](tasks/project-agent/todo.md)。真实模型 PA-LIVE 首次会话协议失败、未保存源码，剩余一次未执行；[结果与后续计划](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-agent-live-plan.md)。旧两份测试未决审计保留；此处只记录 Agent 自身结果，构建运行及页面结果见下方模块 |
+| `project-agent` | Claude Code + DeepSeek 在任务副本中读取及修改 Vue、Java、SQL 等文件，提交可检查的变更 | `project-source` | PA01–PA33 内部离线验收完成，默认 4 并发；最终后端 290 单元 + 272 集成通过，CLI 2.1.302 / 2.1.303 / 2.1.308 精确适配。见[维护说明](docs/project-agent.md)、[证据](docs/project-agent-verification.md)、[任务清单](tasks/project-agent/todo.md)。真实模型 PA-LIVE 追加授权后保存 V8–V11，V9 完整构建/运行/下载一致性通过，V11 分类、兼容迁移及下载工程独立构建/运行/重启持久化通过；[2026-10-29 真实验收](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-agent-live-20261029.md)。旧两份测试未决审计保留；此处只记录 Agent 自身结果，构建运行及页面结果见下方模块 |
 | `project-execution` | 对固定源码版本测试、构建、启动本机进程；构建失败保留上一可用结果，数据库迁移另行核对 | `project-source` | EX01–30 与 C-EX10 已完成，实际业务应用及两轮前后端版本、迁移/失败核对、重启持久化、交付身份、有界查询和原链路回归均已内部验收。[维护说明](docs/project-execution.md)、[任务](tasks/project-execution/todo.md)、[证据](docs/project-execution-verification.md)。预览/下载已由交付模块验证，正式工作台已调用这些能力 |
 | `project-delivery` | 实际应用预览、同快照下载、代码版本恢复；明确业务数据边界 | `project-source`、`project-execution` | PD01–PD14 / C1–C5 完成内部验收。真实 Vue 页面、HTTP ZIP 标准解压与逐文件比对、自身脚本独立构建/启动、CRUD/409 和重启持久化通过；源码恢复追加版本，原预览 ZIP 不变。默认关闭，正式页面已由工作台模块接入。[使用说明](docs/project-delivery.md)、[证据](docs/project-delivery-verification.md)、[任务](tasks/project-delivery/todo.md) |
 | `project-workbench` | 文件树、差异、任务与构建状态、实际进程预览及增量开发入口 | 以上模块 | PW01–PW10 本地实现，受控完整交互与真实 A/B 页面预览/下载通过，构建失败可显式提交修复；默认关闭。[使用说明](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-workbench.md)、[证据](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-workbench-verification.md)、[任务](https://github.com/NigelWu95/atoms-demo/blob/main/tasks/project-workbench/todo.md) |
@@ -35,7 +35,7 @@
 - 新模式采用本机进程，不要求新增服务器；首期仅供受信任维护者受控验证，不向公开访客自动开放模型生成后端的执行。独立目录、配置和端口不能隔离同一系统用户的文件及网络权限。
 - 预览和下载匹配源码及构建身份，不承诺两处业务数据相同。代码恢复不自动回滚数据库迁移或运行数据。
 - 密钥、邮箱授权码、数据库密码、平台 Cookie、个人 Agent 会话不进入源码、模型上下文或 ZIP。模型提供方必要的调用凭据仅交给受控执行进程，不写入工作副本。
-- 当前不自动调用付费模型、修改个人配置、推送 GitHub、部署或变更服务器数据库。真实联调已获固定 A 项目两次启动授权，首次失败后停止；剩余一次的用途调整按已确认方案单独确认。
+- 当前不自动调用付费模型、修改个人配置、推送 GitHub、部署或变更服务器数据库。真实联调追加次数已获授权，固定 A 项目，按有界批次逐次检查结果；当前累计启动预留 15、本批上限 18。
 - Claude Code 对第三方模型及对外托管场景的适用条款尚未完全确认，列为正式对外开放前核查项；不以修改认证、隐藏使用或规避限制作为实现方案。
 
 ## 最终验收场景

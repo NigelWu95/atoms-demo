@@ -1,6 +1,6 @@
 # project-agent · 开发任务
 
-状态：2026-10-29，范围见规格 §10。PA01–PA33 内部离线验收已完成，Agent 原阶段最终后端 290 单元 + 272 集成通过，旧未决审计继续保留。执行、交付与完整工程工作台现已完成本地 A/B 原生应用验收，构建失败的显式修复入口已接通；各阶段具体证据分别记录，不以模拟响应代表真实模型效果。PA-LIVE 已按[两次启动方案](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-agent-live-plan.md)实际启动一次，因协议错误失败，未保存新源码；剩余一次未执行，真实增量开发仍未验收。依据为[已确认规格](https://github.com/NigelWu95/atoms-demo/blob/main/SPEC-project-agent.md)和[本模块计划](https://github.com/NigelWu95/atoms-demo/blob/main/tasks/project-agent/plan.md)。下方保留历史失败与修复记录。
+状态：2026-10-29，PA01–PA33 内部离线验收完成，旧未决审计保留。PA-LIVE 用户已追加调用授权，真实模型保存 V8–V11；V9 完整构建、页面/API 和预览 ZIP 一致性通过，分类 V11 的完整构建、兼容迁移、实际预览、ZIP 独立运行及重启持久化也通过，见[2026-10-29 真实验收](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-agent-live-20261029.md)。
 
 每项 S=1–2、M=3–5 个主要文件（含测试）；实际超出先拆子任务，不藏进巨型文件。路径缩写：A=backend/src/main/java/dev/atoms/demo/agent，AT=backend/src/test/java/dev/atoms/demo/agent，S/ST=对应 source 包，M=backend/src/main/resources/db/migration，T=templates/full-project-v1。Agent 包和原生后端模板目录已创建。U/I/CLI/ALL/PY/FRONT/BROWSER/DOC 命令定义在计划 §6。
 
@@ -367,11 +367,11 @@
 
 - [x] PA31–PA33 离线验收完成；命令、数量、失败修复、进程与版本证据见验证文档。自审未扩大权限；没有真实模型、个人配置修改、推送或部署。按批准的连续实施范围交接下一模块，不把内部离线通过称为完整产品完成。
 
-## PA-LIVE · 真实 DeepSeek 联调（已批准两次，第一次失败后停止）
+## PA-LIVE · 真实 DeepSeek 联调（已追加授权）
 
-- [ ] 完成真实联调。固定 A 项目、最多两次会话已获批准；第一次失败，累计启动预留 6/7，剩余一次用途调整待确认。失败任务、停止摘要与原源码均保留。
+- [x] 完成真实联调。用户追加授权后采用有界批次，累计启动预留 15、本批上限 18。两轮真实功能及修复保存 V8–V11，V9/V11 实际构建和页面通过；最终 ZIP 独立构建/运行及重启持久化通过。失败任务与原源码均保留。
 - 描述：真实 Claude Code + DeepSeek 完成首轮及第二轮 Vue/Java/SQL 变更，并保存可追溯源码版本。
-- 验收：实际工具调用及有效参数有证据；两轮基线和差异正确，未改文件保留；失败/取消费用风险如实说明，未执行新工程后端或部署。
+- 验收：实际工具调用及有效参数有证据；两轮基线和差异正确，未改文件保留；失败/取消计数保留；在既有 A 资源上验证构建、后端与预览下载，部署另行处理。
 - 验证：在批准后才记录具体 live 命令、私有配置引用、模型 usage、任务和源码 hash；不能用 CLI loopback 测试代替。
 - 主要文件：`docs/project-agent-verification.md`、`docs/project-agent.md`。规模 S；若需要新增 live 验证程序，先拆测试任务，仍不写入真实 Key。
 
@@ -385,6 +385,6 @@
 - [x] 核对 npm 占位入口与实际原生文件，未修改个人安装或配置。
 - [x] 平台子进程关闭工具延迟加载，继续固定五种文件工具与原权限边界；18 单元 + 9 CLI/协调集成通过。
 - [x] 更新已完成的执行、交付和工作台现状，准备固定测试 A、最多两次启动的真实联调方案。
-- [ ] PA-LIVE：10 月 28 日已实际启动一次，`AGENT_PROTOCOL_INVALID`，未保存新源码；未完成两轮开发与后续构建验收。离线错误处理修复不等于真实调用成功。
+- [x] PA-LIVE：10 月 28 日首次失败保留；10 月 29 日追加授权后完成 V8–V11 真实生成与修复，最终实际运行和下载工程独立启动/重启持久化通过，见[2026-10-29 真实验收](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-agent-live-20261029.md)。
 
 失败原因、官方依据和通过证据见[兼容复验](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-agent-verification.md#2026-10-27--claude-code-21308-兼容复验)。

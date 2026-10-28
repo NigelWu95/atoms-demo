@@ -1,6 +1,6 @@
 # project-agent · 离线实施与兼容性记录
 
-最近更新：2026-10-29。PA01–PA33 内部离线验收完成；PA-LIVE 已按批准方案实际启动一次，协议失败、未保存新源码，仍未通过真实增量开发验收。后续执行、交付及工作台已完成本地验收，见[能力地图](https://github.com/NigelWu95/atoms-demo/blob/main/FULL-PROJECT-CAPABILITY-MAP.md)。除下述 PA-LIVE 首次真实调用外，本文件的 CLI 契约检查均使用本机假 Anthropic 服务和测试字符串；本轮未改个人 Claude 配置、推送或部署。任务状态以[清单](https://github.com/NigelWu95/atoms-demo/blob/main/tasks/project-agent/todo.md)为准。下文保留原阶段失败及修复证据。
+最近更新：2026-10-29。PA01–PA33 内部离线验收完成；PA-LIVE 已按追加授权完成真实模型生成 V8、修复 V9、分类 V10 和修复 V11。V9/V11 完整构建、实际预览及 ZIP 一致性通过，V11 下载工程独立构建/运行和重启持久化也通过；详见[2026-10-29 真实验收](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-agent-live-20261029.md)。以下保留各阶段历史结果。
 
 ## PA-LIVE 首次真实调用与失败诊断
 

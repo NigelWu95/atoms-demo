@@ -2,7 +2,7 @@
 
 本模块在完整源码副本中调用 Claude Code 修改 Vue、Java、SQL、测试和配置，校验后保存不可变源码版本。维护者启用完整工程模式后，可从[工程工作台](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-workbench.md)提交需求、查看变更、构建及运行。新模式默认关闭，默认网页继续使用旧生成链路。Agent 自身结果见[验证记录](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-agent-verification.md)，进度见[任务清单](https://github.com/NigelWu95/atoms-demo/blob/main/tasks/project-agent/todo.md)。
 
-截至 2026-10-29，PA01–PA33 内部离线验收完成，包括本地受控进程和真实 CLI + 假模型服务的连续两轮编辑、取消恢复及旧链路回归。执行、交付及工作台模块已完成本地 A/B 原生应用构建、启动、预览和固定源码下载验收，构建失败的显式修复入口也已接通。真实 DeepSeek 专项联调已启动一次，因 `AGENT_PROTOCOL_INVALID` 失败，未保存新源码，剩余一次未执行；详见[专项计划与结果](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-agent-live-plan.md)。真实新模式开发与修复效果仍未通过验收。`SOURCE_SAVED` 只表示源码保存，不表示构建或业务功能通过。
+截至 2026-10-29，PA01–PA33 内部离线能力及执行、交付、工作台模块已完成本地验收。用户追加真实调用授权后，Claude Code + DeepSeek 已保存搜索/状态筛选 V8、真实修复 V9、分类增量 V10 及状态修复 V11。V9 已通过完整构建、真实页面/API、预览 ZIP 逐文件一致性验收；V11 的构建、兼容迁移、实际预览、同源码 ZIP 独立构建/运行及重启持久化也已通过。详见[2026-10-29 真实验收](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-agent-live-20261029.md)。`SOURCE_SAVED` 只表示源码保存，不表示构建或业务功能通过。
 
 ## 源码与增量开发
 
@@ -77,6 +77,7 @@ QUEUED → PREPARING → RUNNING → VALIDATING → ACCEPTING → SOURCE_SAVED
 | `AGENT_CONFIGURATION_INVALID` / `AGENT_CONFIGURATION_CHANGED` | 核对绝对路径、UUID、数值范围及任务绑定配置；不悄悄使用新参数重放旧任务 |
 | `SOURCE_EDIT_BUSY` / 基线冲突 | 查询同项目任务及当前源码版本；不强制覆盖或删锁 |
 | `AGENT_CLI_UNSUPPORTED` / `AGENT_CLI_CHANGED` | 核对可执行文件及其版本，npm 包版本不证明原生程序已安装；占位脚本会被拒绝。重新做离线契约验证，不自动升级或换宽权限模式 |
+| `AGENT_TURN_LIMIT` | CLI 明确耗尽工具轮数；缩小文件读取和改动范围后基于原版本另行提交，失败工作副本不作为新版本 |
 | `AGENT_MODEL_INCOMPLETE` / 协议、工具、路径拒绝 | 保留原版与失败任务；先查看稳定错误码，不把模型完成声明当作新版本 |
 | `AGENT_PROVIDER_AUTH_FAILED` | CLI 报告鉴权失败；核对提供方密钥配置，不输出密钥或自动重试 |
 | `AGENT_PROVIDER_RATE_LIMITED` / `AGENT_PROVIDER_UNAVAILABLE` | CLI 报告限流或服务错误；保留任务，核对提供方状态及剩余额度后决定是否重试 |
