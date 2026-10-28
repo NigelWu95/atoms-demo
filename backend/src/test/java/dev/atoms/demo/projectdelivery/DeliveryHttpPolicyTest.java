@@ -28,11 +28,11 @@ class DeliveryHttpPolicyTest {
         var request = request("PATCH", "api/todos/123");
         request.addHeader("Origin", "null"); request.addHeader("Content-Type", "application/json");
         request.addHeader("If-Match", "\"v1\""); request.addHeader("Cookie", "PLATFORM=canary");
-        request.addHeader("Authorization", "Bearer canary"); request.addHeader("Referer", "https://platform.example/account");
+        request.addHeader("Authorization", "Bearer " + "a".repeat(43)); request.addHeader("Referer", "https://platform.example/account");
         request.addHeader("X-CSRF-TOKEN", "canary"); request.addHeader("Forwarded", "for=canary");
         var input = DeliveryHttpPolicy.input(request, DeliveryHttpPolicy.route(request));
         assertThat(input.request("{}".getBytes(StandardCharsets.UTF_8)).headers())
-                .isEqualTo(Map.of("content-type", "application/json", "if-match", "\"v1\""));
+                .isEqualTo(Map.of("content-type", "application/json", "if-match", "\"v1\"", "authorization", "Bearer " + "a".repeat(43)));
         assertThatThrownBy(() -> input.request("{invalid".getBytes(StandardCharsets.UTF_8))).isInstanceOf(ApiException.class);
         assertThat(input.toString()).doesNotContain("canary", "123");
     }
@@ -44,7 +44,7 @@ class DeliveryHttpPolicyTest {
         assertThat(input.preflight()).isTrue();
         var response = new MockHttpServletResponse(); DeliveryHttpPolicy.preflight(response, input);
         assertThat(response.getStatus()).isEqualTo(204); assertThat(response.getHeader("Access-Control-Max-Age")).isEqualTo("30");
-        request.removeHeader("Access-Control-Request-Headers"); request.addHeader("Access-Control-Request-Headers", "authorization");
+        request.removeHeader("Access-Control-Request-Headers"); request.addHeader("Access-Control-Request-Headers", "cookie");
         assertThatThrownBy(() -> DeliveryHttpPolicy.input(request, DeliveryHttpPolicy.route(request))).isInstanceOf(ApiException.class);
         request.removeHeader("Access-Control-Request-Headers"); request.setRequestURI(prefix + "assets/app.js");
         assertThatThrownBy(() -> DeliveryHttpPolicy.input(request, DeliveryHttpPolicy.route(request))).isInstanceOf(ApiException.class);

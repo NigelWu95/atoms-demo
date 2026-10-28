@@ -9,11 +9,11 @@ import java.nio.ByteBuffer;
 import java.nio.charset.*;
 import java.util.*;
 
-/** Value-only request: no URL authority, credentials, process identifiers or caller-selected response limits. */
+/** Value-only request: no URL authority, platform cookies, process identifiers or caller-selected response limits. */
 public final class ExecutionHttpRequest {
     static final int API_BYTES = 1 << 20, STATIC_BYTES = 4 << 20;
     private static final Set<String> METHODS = Set.of("GET", "HEAD", "POST", "PUT", "PATCH", "DELETE");
-    private static final Set<String> HEADERS = Set.of("accept", "content-type", "if-match", "if-none-match", "idempotency-key");
+    private static final Set<String> HEADERS = Set.of("accept", "content-type", "if-match", "if-none-match", "idempotency-key", "authorization");
     private static final ObjectMapper JSON = new ObjectMapper().enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
     private final String method, path, query;
     private final Map<String, String> headers;
@@ -28,6 +28,8 @@ public final class ExecutionHttpRequest {
         this.api = this.path.startsWith("/api/"); this.write = !method.equals("GET") && !method.equals("HEAD");
         if (write && !api || !write && body.length != 0) throw unsupported();
         this.headers = headers(headers); this.body = body.clone();
+        String authorization = this.headers.get("authorization");
+        if (authorization != null && (!api || !authorization.matches("(?i)Bearer [A-Za-z0-9._~+/\\-]{16,480}={0,2}"))) throw unsupported();
         String type = this.headers.get("content-type");
         if (type != null && !type.matches("(?i)application/json(?:\\s*;\\s*charset=utf-8)?")) throw unsupported();
         // Action endpoints may use POST without a representation (for example /counter/increment).

@@ -12,6 +12,18 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 
 class ExecutionHttpTransportTest {
+    @Test void forwardsExplicitApplicationBearerWithoutCookiesOrAmbientAuthentication() throws Exception {
+        String bearer = "Bearer " + "b".repeat(43);
+        try (var upstream = new Upstream(exchange -> {
+            assertThat(exchange.getRequestHeaders().getFirst("Authorization")).isEqualTo(bearer);
+            assertThat(exchange.getRequestHeaders().getFirst("Cookie")).isNull();
+            exchange.getResponseHeaders().set("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, 2); exchange.getResponseBody().write("{}".getBytes(StandardCharsets.UTF_8)); exchange.close();
+        })) {
+            var request = new ExecutionHttpRequest("GET", "/api/profiles", null, Map.of("Authorization", bearer), new byte[0]);
+            assertThat(send(upstream.port(), request, Duration.ofSeconds(5)).status()).isEqualTo(200);
+        }
+    }
     @Test void actualJsonConflictAndStaticModuleBytesKeepSemanticsWithoutUpstreamPolicyHeaders() throws Exception {
         try (var upstream = new Upstream(exchange -> {
             assertThat(exchange.getRequestHeaders().getFirst("Cookie")).isNull();

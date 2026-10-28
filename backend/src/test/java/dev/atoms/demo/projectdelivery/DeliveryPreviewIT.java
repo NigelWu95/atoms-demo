@@ -71,7 +71,7 @@ class DeliveryPreviewIT {
         assertThat(document.headers().firstValue("Content-Security-Policy").orElse("")).contains("sandbox allow-scripts", "frame-ancestors http://127.0.0.1:5174");
         assertThat(document.headers().firstValue("X-Frame-Options")).contains("SAMEORIGIN");
         var write = send("POST", "api/todos", "{\"title\":\"draft\"}", Map.of("Origin", "null", "Content-Type", "application/json",
-                "Cookie", "PLATFORM=canary", "Authorization", "Bearer canary", "X-CSRF-TOKEN", "canary"));
+                "Cookie", "PLATFORM=canary", "X-CSRF-TOKEN", "canary"));
         assertThat(write.statusCode()).isEqualTo(409); assertThat(write.body()).contains("VERSION_CONFLICT");
         assertThat(write.headers().firstValue("Access-Control-Allow-Origin")).contains("null");
         assertThat(write.headers().firstValue("Access-Control-Allow-Credentials")).isEmpty();
@@ -86,7 +86,7 @@ class DeliveryPreviewIT {
         verify(execution).identity(eq(owner), eq(project), same(handle), any());
         verify(execution, never()).exchange(any(), any(), any(), any(), any());
         assertThat(send("OPTIONS", "api/todos", null, Map.of("Origin", "null", "Access-Control-Request-Method", "POST",
-                "Access-Control-Request-Headers", "authorization")).statusCode()).isEqualTo(422);
+                "Access-Control-Request-Headers", "cookie")).statusCode()).isEqualTo(422);
         var manager = browser.request("DELETE", "/api/session", null, null, null);
         assertThat(manager.status()).isEqualTo(403);
         assertThat(manager.raw().headers().firstValue("Access-Control-Allow-Origin")).isEmpty();
@@ -101,6 +101,29 @@ class DeliveryPreviewIT {
         assertThat(send("POST", "api/todos", "{broken", Map.of("Origin", "null", "Content-Type", "application/json")).statusCode()).isEqualTo(422);
         var foreign = send("GET", "", null, Map.of("Origin", "https://foreign.example"));
         assertThat(foreign.statusCode()).isEqualTo(422); assertThat(foreign.headers().firstValue("Access-Control-Allow-Origin")).isEmpty();
+        verifyNoInteractions(execution);
+    }
+
+    @Test void applicationBearerReachesOnlyTheBoundApiWhilePlatformCookiesRemainStripped() throws Exception {
+        String bearer = "Bearer " + "b".repeat(43);
+        when(execution.exchange(eq(owner), eq(project), same(handle), any(), any())).thenAnswer(call -> {
+            ExecutionHttpRequest request = call.getArgument(3);
+            assertThat(request.path()).isEqualTo("/api/profiles");
+            assertThat(request.headers()).containsEntry("authorization", bearer).doesNotContainKeys("cookie", "x-csrf-token");
+            return reply(200, "application/json", "{\"profiles\":[]}");
+        });
+        var options = send("OPTIONS", "api/profiles", null, Map.of("Origin", "null", "Access-Control-Request-Method", "GET",
+                "Access-Control-Request-Headers", "authorization"));
+        assertThat(options.statusCode()).isEqualTo(204);
+        assertThat(options.headers().firstValue("Access-Control-Allow-Headers").orElse("")).contains("Authorization");
+        assertThat(options.headers().firstValue("Access-Control-Allow-Credentials")).isEmpty();
+        assertThat(send("GET", "api/profiles", null, Map.of("Origin", "null", "Authorization", bearer,
+                "Cookie", "PLATFORM=private", "X-CSRF-TOKEN", "private")).statusCode()).isEqualTo(200);
+        clearInvocations(execution);
+        assertThat(send("GET", "api/profiles", null, Map.of("Origin", "https://foreign.example", "Authorization", bearer)).statusCode()).isEqualTo(422);
+        assertThat(send("GET", "assets/app.js", null, Map.of("Origin", "null", "Authorization", bearer)).statusCode()).isEqualTo(422);
+        assertThat(send("OPTIONS", "assets/app.js", null, Map.of("Origin", "null", "Access-Control-Request-Method", "GET",
+                "Access-Control-Request-Headers", "authorization")).statusCode()).isEqualTo(422);
         verifyNoInteractions(execution);
     }
 

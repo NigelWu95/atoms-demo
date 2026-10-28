@@ -10,7 +10,7 @@ import java.util.*;
 /** Browser policy for this capability prefix only; never derives authority from Host or forwarded headers. */
 final class DeliveryHttpPolicy {
     static final int REQUEST_BYTES = 1 << 20;
-    static final Set<String> HEADERS = Set.of("accept", "content-type", "if-match", "if-none-match", "idempotency-key");
+    static final Set<String> HEADERS = Set.of("accept", "content-type", "if-match", "if-none-match", "idempotency-key", "authorization");
     private DeliveryHttpPolicy() {}
 
     record Route(String token, String path) {
@@ -54,6 +54,7 @@ final class DeliveryHttpPolicy {
                     name = name.strip().toLowerCase(Locale.ROOT);
                     if (!HEADERS.contains(name) || !seen.add(name)) throw unsupported();
                 }
+                if (seen.contains("authorization") && !route.path().startsWith("/api/")) throw unsupported();
             }
             headers.clear();
         }
@@ -95,7 +96,7 @@ final class DeliveryHttpPolicy {
     static void preflight(HttpServletResponse response, Input input) {
         response.setStatus(204);
         response.setHeader("Access-Control-Allow-Methods", input.method());
-        response.setHeader("Access-Control-Allow-Headers", "Accept, Content-Type, If-Match, If-None-Match, Idempotency-Key");
+        response.setHeader("Access-Control-Allow-Headers", "Accept, Content-Type, If-Match, If-None-Match, Idempotency-Key, Authorization");
         response.setHeader("Access-Control-Max-Age", "30");
     }
     private static String single(HttpServletRequest request, String name) {

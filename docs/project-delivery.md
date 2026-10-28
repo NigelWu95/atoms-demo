@@ -60,5 +60,6 @@ node scripts/start.mjs --config /absolute/private/runtime.properties
 - 每次读取持续核对原会话和准确运行，不靠缓存的 READY 状态。停止、换版、撤销、登出或过期使旧预览失效；浏览预览不会续期平台登录。
 - 预览授权十分钟，最多 32 个/每会话 8 个；HTTP 交换最多 16 个/每授权 4 个；下载最多 2 个/每会话 1 个。交换和下载各使用单一 30 秒预算；取消后实际未结束的工作继续占名额，避免重复派发。
 - 首版支持相对资源 URL、ES modules 和有界 JSON CRUD；也支持不声明 Content-Type 且无请求体的 POST 动作接口，以及无请求体 DELETE。非空请求仍要求合法 JSON；空 POST 仍按写操作校验权限和转发。Cookie 登录、localStorage/IndexedDB、Service Worker、WebSocket/SSE、大文件传输、外站资源和 history 路由回退不在预览契约内；不通过开放同源执行来掩盖不兼容。
+- 应用账号可以使用自身后端签发的 Bearer 会话：预览仅在 `/api/` 接受显式 `Authorization: Bearer …`，令牌字符和长度受限；静态资源、Basic 认证及异常头拒绝。隔离 iframe 的 CORS 预检允许该头，仍不开放凭据 Cookie。平台会话 Cookie、CSRF 头和 Referer 不转发给应用。生成的前端应使用 `credentials: 'omit'` 并把应用令牌留在内存；刷新后重新登录，从应用数据库恢复数据。平台预览授权和应用登录是两个独立层次。
 
 正式工作台的文件树、Agent 需求、构建/启动编排见[工作台模块](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-workbench.md)。完整工程新模式的真实付费模型闭环、公开发布和远程部署未在本次验收中完成；本次没有增加服务器、外网隧道或独立实例服务。

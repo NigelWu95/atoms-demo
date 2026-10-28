@@ -47,7 +47,7 @@ class ExecutionHttpRequestTest {
     }
 
     @Test void credentialsUnknownHeadersAndHeaderInjectionNeverReachAnUpstreamRequest() {
-        for (String name : List.of("Cookie", "Authorization", "Host", "Origin", "Referer", "Forwarded", "X-Forwarded-Host", "Connection", "Transfer-Encoding"))
+        for (String name : List.of("Cookie", "Host", "Origin", "Referer", "Forwarded", "X-Forwarded-Host", "Connection", "Transfer-Encoding"))
             assertRejected(() -> request("GET", "/api/todos", null, Map.of(name, "PRIVATE_CANARY"), new byte[0]), 422);
         for (Map<String, String> headers : List.of(Map.of("Accept", "application/json\r\nX: value"), Map.of("If-Match", "x".repeat(513)),
                 Map.of("Accept", "a", "accept", "b")))
@@ -78,6 +78,17 @@ class ExecutionHttpRequestTest {
         assertRejected(() -> request("POST", "/api/counter/increment", null,
                 Map.of("Content-Type", "text/plain"), new byte[0]), 422);
         assertRejected(() -> request("POST", "/assets/app.js", null, Map.of(), new byte[0]), 422);
+    }
+
+    @Test void applicationBearerIsBoundedAndOnlyAcceptedForApiRequests() {
+        String bearer = "Bearer " + "a".repeat(43);
+        var input = request("GET", "/api/profiles", null, Map.of("Authorization", bearer), new byte[0]);
+        assertThat(input.headers()).containsEntry("authorization", bearer);
+        assertThat(input.toString()).doesNotContain(bearer);
+        for (String value : List.of("Basic " + "a".repeat(43), "Bearer short", bearer + "\r\nX: x", "Bearer " + "a".repeat(481)))
+            assertRejected(() -> request("GET", "/api/profiles", null, Map.of("Authorization", value), new byte[0]), 422);
+        for (String path : List.of("/", "/assets/app.js"))
+            assertRejected(() -> request("GET", path, null, Map.of("Authorization", bearer), new byte[0]), 422);
     }
 
     private ExecutionHttpRequest request(String method, String path, String query, Map<String, String> headers, byte[] body) {
