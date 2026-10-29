@@ -2,9 +2,15 @@
 
 提交说明：[实现思路、完成程度与后续优先级](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-summary.md)。
 
-2026-10-29 **本地独立端口发布已实现**：在完整工程工作台点击“应用发布”，构建并启动后可直接打开应用地址；每个项目使用自己的进程、端口和数据库，支持停止 / 下线。原 2048 已通过直接访问、后端登录、停止后端口关闭及同端口重启恢复存档验收。本轮仅本机使用，未部署远程；见[使用说明与验收记录](https://github.com/NigelWu95/atoms-demo/blob/main/docs/local-publication.md)。
+2026-10-29 **已推送 GitHub 并部署远程，默认使用 Claude Code + DeepSeek 新模式**：访问 **<http://192.0.2.10:8443/>**，注册账号与临时访客均进入完整工程工作台。服务器已安装 Claude Code 2.1.308 及完整构建工具链；源码保存在磁盘 Git，支持生成 / 修改 Vue、Java、SQL、构建、独立 Java 进程、工作台转发预览与同版本源码 ZIP 下载。旧项目、账号、邮箱及模型配置保留，旧生成接口不再接收新任务。云端真实计数器已完成模型生成、构建、操作、刷新与进程重启后 PostgreSQL 数据恢复，下载的 41 个文件与运行源码逐一一致。**独立端口仍仅允许服务器本机访问，未开放新工程的公网独立应用链接。** 新模式系统任务预算 18 次，验收使用 1 次；4 组永久项目数据库绑定中验收占 1 组。部署版本、验收和当前边界见[部署记录](https://github.com/NigelWu95/atoms-demo/blob/main/docs/cloud-deployment.md)。
 
-2026-10-29 **本地默认开发已切换为 Claude Code + DeepSeek，临时访客同样可用（未推送、未部署）**：普通项目入口进入完整工程工作台，首次提交自动准备完整工程；后续任务基于磁盘 Git 源码增量开发 Vue、Java、SQL 与配置。旧项目首次开发会携带原源码作迁移参考，旧版本、对话和存档继续保留，旧生成接口不再接收新任务。访客真实全栈计数器已完成源码生成、增量修复、完整构建、实际运行、重启/刷新持久化及下载 ZIP 的 43 文件一致性核验；项目列表显示“工程已保存”。新运行库首次构建自动分配，本机固定映射与池共最多 4 个项目。配置与完整验收范围见[默认模式验收](https://github.com/NigelWu95/atoms-demo/blob/main/docs/default-engineering-verification.md)和[工作台说明](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-workbench.md)。下面“默认关闭”等有日期条目为历史阶段记录，不代表当前本地配置。
+2026-10-29 **本地独立端口发布已实现**：在完整工程工作台点击“应用发布”，构建并启动后可直接打开应用地址；每个项目使用自己的进程、端口和数据库，支持停止 / 下线。原 2048 已通过直接访问、后端登录、停止后端口关闭及同端口重启恢复存档验收。此条为本机发布验收；云端部署后的端口访问边界见上文。详见[使用说明与验收记录](https://github.com/NigelWu95/atoms-demo/blob/main/docs/local-publication.md)。
+
+2026-10-29 **本地默认开发已切换为 Claude Code + DeepSeek，临时访客同样可用（现已随上述版本推送、部署）**：普通项目入口进入完整工程工作台，首次提交自动准备完整工程；后续任务基于磁盘 Git 源码增量开发 Vue、Java、SQL 与配置。旧项目首次开发会携带原源码作迁移参考，旧版本、对话和存档继续保留，旧生成接口不再接收新任务。访客真实全栈计数器已完成源码生成、增量修复、完整构建、实际运行、重启/刷新持久化及下载 ZIP 的 43 文件一致性核验；项目列表显示“工程已保存”。新运行库首次构建自动分配，本机固定映射与池共最多 4 个项目。配置与完整验收范围见[默认模式验收](https://github.com/NigelWu95/atoms-demo/blob/main/docs/default-engineering-verification.md)和[工作台说明](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-workbench.md)。下面“默认关闭”等有日期条目为历史阶段记录，不代表当前本地配置。
+
+## 阶段记录
+
+以下开关、测试及部署状态以各条记录日期为准；当前线上状态以上述 10 月 29 日部署记录为准。
 
 2026-10-27 **完整工程工作台已实现并完成本地验收（未推送、未部署）**：新增 `/projects/:id/engineering`，接通初始化、Agent 需求与任务、文件树/差异、依赖准备、构建、迁移核对、启动/停止、真实预览、固定源码下载及恢复。正式页面已实际启动 A/B 两个 Vue + Spring Boot 应用，下载身份与预览一致，刷新/切标签保留输入，停止后业务数据与迁移历史不变。旧工作台与导出入口保留。**新模式仍默认关闭，真实付费模型的端到端效果尚未验收**；以下带部署时间的条目继续描述旧线上链路。见[工作台说明](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-workbench.md)、[本轮验收](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-workbench-verification.md)、[交付验收](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-delivery-verification.md)和[能力地图](https://github.com/NigelWu95/atoms-demo/blob/main/FULL-PROJECT-CAPABILITY-MAP.md)。
 
