@@ -14,7 +14,9 @@ spring:
     username: ${DB_USER:atoms_app}
     password: ${APP_DB_PASSWORD}
     hikari:
-      maximum-pool-size: 5
+      # Source, Agent, engineering execution and legacy build/runtime each retain a coordinator connection.
+      # Leave capacity for worker transactions and HTTP requests while all five coordinators are enabled.
+      maximum-pool-size: ${DB_POOL_MAX_SIZE:16}
       connection-timeout: 3000
       validation-timeout: 2000
   flyway:
