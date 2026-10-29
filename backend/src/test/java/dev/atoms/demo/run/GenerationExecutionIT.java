@@ -21,7 +21,8 @@ import org.springframework.test.context.ActiveProfiles;
 import static org.assertj.core.api.Assertions.*;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = {"GENERATION_MAX_MODEL_CALLS=100000", "atoms.generation.worker-enabled=false"}, classes = {dev.atoms.demo.AtomsDemoApplication.class, GenerationExecutionIT.Fakes.class})
+        properties = {"GENERATION_MAX_MODEL_CALLS=100000", "atoms.generation.worker-enabled=false",
+                "atoms.project-workbench.default-mode=false"}, classes = {dev.atoms.demo.AtomsDemoApplication.class, GenerationExecutionIT.Fakes.class})
 @ActiveProfiles("test")
 class GenerationExecutionIT {
     @LocalServerPort int port;

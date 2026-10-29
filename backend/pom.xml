@@ -256,6 +256,10 @@
         <artifactId>maven-failsafe-plugin</artifactId>
         <configuration>
           <failIfNoTests>true</failIfNoTests>
+          <!-- Cached Spring contexts each retain a JDBC pool; bound their combined DB footprint. -->
+          <systemPropertyVariables>
+            <spring.test.context.cache.maxSize>2</spring.test.context.cache.maxSize>
+          </systemPropertyVariables>
           <!-- Independent opt-ins: CLI checks never enable private execution database/build checks. -->
           <excludedGroups>${agent.excluded-test-groups},${execution.excluded-test-groups}</excludedGroups>
         </configuration>

@@ -11,7 +11,8 @@ import org.springframework.test.context.ActiveProfiles;
 import static org.assertj.core.api.Assertions.*;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = {"DEEPSEEK_API_KEY=test-only-key", "GENERATION_MAX_MODEL_CALLS=100000", "atoms.generation.worker-enabled=false"})
+        properties = {"DEEPSEEK_API_KEY=test-only-key", "GENERATION_MAX_MODEL_CALLS=100000", "atoms.generation.worker-enabled=false",
+                "atoms.project-workbench.default-mode=false"})
 @ActiveProfiles("test")
 class RunAdmissionIT {
     @LocalServerPort int port;
