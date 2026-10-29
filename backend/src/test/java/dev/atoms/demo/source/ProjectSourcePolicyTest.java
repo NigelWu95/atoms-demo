@@ -100,6 +100,27 @@ class ProjectSourcePolicyTest {
                 fixture.replace("'MODEL_CANARY'", "'canary-do-not-save'"))))).isInstanceOf(IllegalArgumentException.class);
     }
 
+    @Test void acceptsPasswordParameterTypesWithoutTreatingLiteralOrConfiguredValuesAsTypes() {
+        String source = "export function login(\n  username: string,\n  password: string,\n  confirmPassword: string | null,\n) {}\n";
+        assertThat(policy.validate(List.of(file("frontend/src/api.ts", source))).files()).hasSize(1);
+        assertThat(policy.validate(List.of(file("frontend/src/App.vue", "<script setup lang=\"ts\">\ninterface Login {\n password: string;\n}\n</script>"))).files()).hasSize(1);
+        for (String value : List.of("password: 'string'", "password = string", "password: canary-do-not-save"))
+            assertThatThrownBy(() -> policy.validate(List.of(file("frontend/src/api.ts", value))))
+                    .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> policy.validate(List.of(file("config/application.yml", "password: string"))))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> policy.validate(List.of(file("frontend/src/api.ts", source + "\napiKey: 'canary-do-not-save'"))))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test void acceptsAnExplicitBearerDocumentationPlaceholderButNotTokensOrPlaceholderPrefixes() {
+        assertThat(policy.validate(List.of(file("README.md", "Use `Authorization: Bearer <token>` after login."))).files()).hasSize(1);
+        assertThat(policy.validate(List.of(file("README.md", "使用 `Authorization: Bearer <token>`；不在文档中记录真实令牌。"))).files()).hasSize(1);
+        for (String value : List.of("canary-do-not-save", "<token>-canary", "${APP_SESSION_TOKEN}", "<token>canary"))
+            assertThatThrownBy(() -> policy.validate(List.of(file("README.md", "Authorization: Bearer " + value))))
+                    .isInstanceOf(IllegalArgumentException.class);
+    }
+
     static SourceTree.File file(String path, String value) {
         return new SourceTree.File(path, value.getBytes(StandardCharsets.UTF_8), 0100644);
     }

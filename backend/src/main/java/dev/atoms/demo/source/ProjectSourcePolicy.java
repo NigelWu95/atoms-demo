@@ -34,6 +34,7 @@ public final class ProjectSourcePolicy {
     private static final Pattern CONFIG_SECRET = Pattern.compile("(?im)(?:^\\s*|,\\s*|(?<!\\$)\\{\\s*)(?:" + KEY
             + ")\\s*[:=]\\s*(\"[^\"\\r\\n]*\"|'[^'\\r\\n]*'|[^\\r\\n,]+)");
     private static final Pattern JSON_SECRET = Pattern.compile("(?i)[\"'](?:" + KEY + ")[\"']\\s*:\\s*[\"']([^\"']*)[\"']");
+    private static final Pattern BEARER_SECRET = Pattern.compile("(?i)Authorization\\s*:\\s*Bearer\\s+(?!<token>(?:[\\s`\"']|$))[^\\s]+");
     // Literal placeholders already present in the controlled template, not a blanket exemption for tests.
     private static final Set<String> TEMPLATE_PLACEHOLDERS = Set.of("REPLACE_WITH_DATABASE_PASSWORD", "RUNTIME_CANARY", "MODEL_CANARY", "PRIVATE_CANARY");
     private final Limits limits;
@@ -59,7 +60,7 @@ public final class ProjectSourcePolicy {
             if (file.mode() != 0100644 && !(file.mode() == 0100755 && file.path().equals("backend/mvnw"))) throw rejected();
             total += file.size();
             if (total > limits.treeBytes()) throw rejected();
-            validateText(file.content());
+            validateText(file.path(), file.content());
         }
         for (String name : names) {
             for (int slash = name.indexOf('/'); slash >= 0; slash = name.indexOf('/', slash + 1)) {
@@ -86,17 +87,22 @@ public final class ProjectSourcePolicy {
         }
     }
 
-    private void validateText(byte[] bytes) {
+    private void validateText(String path, byte[] bytes) {
         final String value;
         try {
             value = StandardCharsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT)
                     .onUnmappableCharacter(CodingErrorAction.REPORT).decode(ByteBuffer.wrap(bytes)).toString();
         } catch (CharacterCodingException error) { throw rejected(); }
-        if (value.indexOf('\0') >= 0 || value.matches("(?s).*-----BEGIN (?:[A-Z ]*PRIVATE KEY)-----.*")
-                || Pattern.compile("(?i)Authorization\\s*:\\s*Bearer\\s+[^\\s]+").matcher(value).find()) throw rejected();
+        if (value.indexOf('\0') >= 0 || value.matches("(?s).*-----BEGIN (?:[A-Z ]*PRIVATE KEY)-----.*")) throw rejected();
+        if (BEARER_SECRET.matcher(value).find()) throw rejected();
         for (Pattern pattern : List.of(CONFIG_SECRET, JSON_SECRET)) {
             var match = pattern.matcher(value);
             while (match.find()) {
+                // A TypeScript parameter/interface type is not a configured credential value.
+                // Keep this narrow: quoted literals, assignments and configuration files still reject.
+                if (pattern == CONFIG_SECRET && (path.endsWith(".ts") || path.endsWith(".tsx") || path.endsWith(".vue"))
+                        && value.substring(match.start(), match.start(1)).stripTrailing().endsWith(":" )
+                        && match.group(1).strip().matches("string(?:\\s*\\|\\s*(?:null|undefined))*;?")) continue;
                 String candidate = match.group(1).strip().replaceAll("^[\"']|[\"']$", "");
                 if (!candidate.isEmpty() && !candidate.matches("\\$\\{[A-Z_][A-Z_0-9]*}")
                         && !TEMPLATE_PLACEHOLDERS.contains(candidate)
