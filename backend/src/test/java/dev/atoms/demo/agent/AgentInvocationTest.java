@@ -49,6 +49,15 @@ class AgentInvocationTest {
                 .isInstanceOf(IllegalArgumentException.class).hasMessageNotContaining("key-canary");
     }
 
+    @Test void explicitLargerBudgetReachesTheCliWithoutAddingTools() {
+        var expanded = new AgentSettings.Configuration(settings.cli(), settings.stateRoot(), settings.maintainerIds(),
+                false, 0, 128000, 64, settings.taskTimeout(), settings.queueTimeout(), settings.maxConcurrentTasks());
+        var builder = AgentInvocation.create(expanded.cli(), expanded, Path.of("/private/work/one/project"),
+                root.resolve("config"), root.resolve("tmp"), "offline-fixture-key");
+        assertThat(builder.command()).containsSubsequence("--max-turns", "64")
+                .containsSubsequence("--tools", "Read,Glob,Grep,Write,Edit");
+    }
+
     private ProcessBuilder invocation() {
         return AgentInvocation.create(settings.cli(), settings, Path.of("/private/work/one/project"),
                 root.resolve("config"), root.resolve("tmp"), "offline-fixture-key");

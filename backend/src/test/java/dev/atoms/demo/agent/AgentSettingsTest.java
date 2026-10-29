@@ -33,7 +33,7 @@ class AgentSettingsTest {
         assertThat(settings.maxLiveRuns()).isZero();
         assertThat(settings.maintainerIds()).containsExactly(OWNER);
         assertThat(settings.maxOutputTokens()).isEqualTo(128000);
-        assertThat(settings.maxTurns()).isEqualTo(24);
+        assertThat(settings.maxTurns()).isEqualTo(64);
         assertThat(settings.taskTimeout()).isEqualTo(Duration.ofSeconds(1800));
         assertThat(settings.queueTimeout()).isEqualTo(Duration.ofSeconds(300));
         assertThat(settings.maxConcurrentTasks()).isEqualTo(4);
@@ -60,7 +60,8 @@ class AgentSettingsTest {
         assertInvalid("max-live-runs", "-1");
         assertInvalid("max-output-tokens", "163840");
         assertInvalid("max-output-tokens", "0");
-        assertInvalid("max-turns", "25");
+        assertInvalid("max-turns", "129");
+        assertInvalid("max-turns", "0");
         assertInvalid("task-timeout-seconds", "1801");
         assertInvalid("queue-timeout-seconds", "301");
         assertInvalid("queue-timeout-seconds", "0");
@@ -82,6 +83,12 @@ class AgentSettingsTest {
         for (int value : new int[]{1, 2, 3, 4, 8})
             assertThat(new AgentSettings(config().withProperty("atoms.agent.max-concurrent-tasks", Integer.toString(value)))
                     .load().maxConcurrentTasks()).isEqualTo(value);
+    }
+
+    @Test void acceptsBoundedTurnBudgetsForMultiFileEngineeringTasks() {
+        for (int value : new int[]{1, 24, 64, 128})
+            assertThat(new AgentSettings(config().withProperty("atoms.agent.max-turns", Integer.toString(value)))
+                    .load().maxTurns()).isEqualTo(value);
     }
 
     private void assertInvalid(String key, String value) {

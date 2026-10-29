@@ -29,7 +29,7 @@
 | `PROJECT_AGENT_MAINTAINER_IDS` | 空；逗号分隔、不重复的账号 UUID，不是邮箱地址 |
 | `PROJECT_AGENT_MAX_LIVE_RUNS` | `0`；持久的付费启动意图总上限，不按重启清零 |
 | `PROJECT_AGENT_MAX_OUTPUT_TOKENS` | `128000`；有效范围 1–128000 |
-| `PROJECT_AGENT_MAX_TURNS` | `24`；有效范围 1–24 |
+| `PROJECT_AGENT_MAX_TURNS` | `64`；有效范围 1–128。完整前后端工程可能需要超过 24 轮文件读写；仍受整轮期限和真实任务总额度限制 |
 | `PROJECT_AGENT_TASK_TIMEOUT_SECONDS` | `1800`；有效范围 1–1800，出队后共享期限 |
 | `PROJECT_AGENT_QUEUE_TIMEOUT_SECONDS` | `300`；有效范围 1–300，排队等待期限 |
 | `PROJECT_AGENT_MAX_CONCURRENT_TASKS` | `4`；有效范围 1–8，独立项目可同时执行 |
@@ -77,7 +77,7 @@ QUEUED → PREPARING → RUNNING → VALIDATING → ACCEPTING → SOURCE_SAVED
 | `AGENT_CONFIGURATION_INVALID` / `AGENT_CONFIGURATION_CHANGED` | 核对绝对路径、UUID、数值范围及任务绑定配置；不悄悄使用新参数重放旧任务 |
 | `SOURCE_EDIT_BUSY` / 基线冲突 | 查询同项目任务及当前源码版本；不强制覆盖或删锁 |
 | `AGENT_CLI_UNSUPPORTED` / `AGENT_CLI_CHANGED` | 核对可执行文件及其版本，npm 包版本不证明原生程序已安装；占位脚本会被拒绝。重新做离线契约验证，不自动升级或换宽权限模式 |
-| `AGENT_TURN_LIMIT` | CLI 明确耗尽工具轮数；缩小文件读取和改动范围后基于原版本另行提交，失败工作副本不作为新版本 |
+| `AGENT_TURN_LIMIT` | CLI 明确耗尽工具轮数；核对任务预算，缩小读取范围或调整 `PROJECT_AGENT_MAX_TURNS` 后重启服务，再基于已保存版本提交新任务。失败工作副本不作为成功版本；原失败任务及预算不改写 |
 | `AGENT_MODEL_INCOMPLETE` / 协议、工具、路径拒绝 | 保留原版与失败任务；先查看稳定错误码，不把模型完成声明当作新版本 |
 | `AGENT_PROVIDER_AUTH_FAILED` | CLI 报告鉴权失败；核对提供方密钥配置，不输出密钥或自动重试 |
 | `AGENT_PROVIDER_RATE_LIMITED` / `AGENT_PROVIDER_UNAVAILABLE` | CLI 报告限流或服务错误；保留任务，核对提供方状态及剩余额度后决定是否重试 |

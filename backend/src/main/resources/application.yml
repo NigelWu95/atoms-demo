@@ -57,7 +57,7 @@ atoms:
     maintainer-ids: ${PROJECT_AGENT_MAINTAINER_IDS:}
     max-live-runs: ${PROJECT_AGENT_MAX_LIVE_RUNS:0}
     max-output-tokens: ${PROJECT_AGENT_MAX_OUTPUT_TOKENS:128000}
-    max-turns: ${PROJECT_AGENT_MAX_TURNS:24}
+    max-turns: ${PROJECT_AGENT_MAX_TURNS:64}
     task-timeout-seconds: ${PROJECT_AGENT_TASK_TIMEOUT_SECONDS:1800}
     queue-timeout-seconds: ${PROJECT_AGENT_QUEUE_TIMEOUT_SECONDS:300}
     max-concurrent-tasks: ${PROJECT_AGENT_MAX_CONCURRENT_TASKS:4}

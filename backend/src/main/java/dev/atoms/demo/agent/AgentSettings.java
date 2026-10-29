@@ -24,7 +24,7 @@ final class AgentSettings {
             return new Configuration(path("cli"), path("state-root"), maintainers(), flag("live-enabled"),
                     number("max-live-runs", 0, 0, Long.MAX_VALUE),
                     (int) number("max-output-tokens", 128000, 1, 128000),
-                    (int) number("max-turns", 24, 1, 24),
+                    (int) number("max-turns", 64, 1, 128),
                     Duration.ofSeconds(number("task-timeout-seconds", 1800, 1, 1800)),
                     Duration.ofSeconds(number("queue-timeout-seconds", 300, 1, 300)),
                     (int) number("max-concurrent-tasks", 4, 1, 8), ownerAccess());

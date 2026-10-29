@@ -84,4 +84,20 @@ class ProjectAgentAdmissionIT extends AgentIntegrationSupport {
                 .isInstanceOf(org.springframework.dao.DataAccessException.class);
         assertThat(service.get(owner, base.projectId(), task.id()).toString()).doesNotContain("private");
     }
+
+    @Test void expandedTurnBudgetPersistsWithoutChangingEarlierTaskBudgets() {
+        configuration.withProperty("atoms.agent.max-turns", "24");
+        var oldBase = source.create(owner);
+        var oldTask = service.submit(owner, oldBase.projectId(), input(oldBase, "small change"), "old-budget");
+        service.cancel(owner, oldBase.projectId(), oldTask.id());
+        configuration.withProperty("atoms.agent.max-turns", "128");
+        var newBase = source.create(owner);
+        var newTask = service.submit(owner, newBase.projectId(), input(newBase, "full stack change"), "expanded-budget");
+        assertThat(repository.get(newTask.id()).maxTurns()).isEqualTo(128);
+        assertThat(repository.get(oldTask.id()).maxTurns()).isEqualTo(24);
+        assertThat(repository.get(oldTask.id()).status()).isEqualTo("CANCELLED");
+        assertThatThrownBy(() -> jdbc.update("UPDATE agent_tasks SET max_turns=64 WHERE id=?", oldTask.id()))
+                .isInstanceOf(org.springframework.dao.DataAccessException.class);
+        service.cancel(owner, newBase.projectId(), newTask.id());
+    }
 }
