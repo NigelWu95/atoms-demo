@@ -146,7 +146,7 @@ function publishLocally() {
           :disabled="!wb.capabilities?.enabled || !!wb.capabilities.archived || !!wb.intent.pending"
           @click="publishLocally"
         >
-          本地发布
+          应用发布
         </button>
         <span class="outline-badge">源码 {{ versionLabel(wb.head?.sourceVersionId) }}</span
         ><span class="outline-badge">运行 {{ versionLabel(wb.serving?.sourceVersionId) }}</span

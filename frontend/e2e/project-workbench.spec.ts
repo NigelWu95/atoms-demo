@@ -305,12 +305,12 @@ test('full project workbench keeps exact requests, preview identity and internal
   await page.getByRole('button', { name: '构建与运行 ▾', exact: true }).click()
   await page.getByRole('button', { name: '构建选中源码', exact: true }).click()
   await page.getByRole('button', { name: '核对数据库迁移', exact: true }).click()
-  await expect(page.getByRole('button', { name: '启动并本地发布', exact: true })).toBeDisabled()
+  await expect(page.getByRole('button', { name: '启动并发布', exact: true })).toBeDisabled()
   page.on('dialog', (dialog) => dialog.accept())
   await page.getByRole('button', { name: '批准本次迁移', exact: true }).click()
-  await page.getByRole('button', { name: '启动并本地发布', exact: true }).click()
+  await page.getByRole('button', { name: '启动并发布', exact: true }).click()
   await expect(page.getByText('运行 V2', { exact: true })).toBeVisible()
-  await expect(page.getByRole('link', { name: '打开本地应用 ↗', exact: true })).toHaveAttribute(
+  await expect(page.getByRole('link', { name: '打开应用 ↗', exact: true })).toHaveAttribute(
     'href',
     'http://localhost:18203/',
   )

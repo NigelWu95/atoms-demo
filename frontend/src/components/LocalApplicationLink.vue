@@ -77,17 +77,17 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="engineering-actions local-application-link" aria-label="本地发布地址">
+  <div class="engineering-actions local-application-link" aria-label="应用发布地址">
     <template v-if="address">
       <a class="button primary" :href="address.url" target="_blank" rel="noopener noreferrer">
-        打开本地应用 ↗
+        打开应用 ↗
       </a>
-      <input aria-label="本地应用地址" :value="address.url" readonly />
+      <input aria-label="应用地址" :value="address.url" readonly />
       <button type="button" @click="copy">{{ copied ? '已复制' : '复制链接' }}</button>
       <small class="muted">独立进程 · 仅本机访问</small>
     </template>
-    <p v-else-if="loading" role="status">正在核对本地应用地址…</p>
-    <p v-else-if="!target" class="muted">启动并本地发布后，这里会显示独立端口访问链接。</p>
+    <p v-else-if="loading" role="status">正在核对应用地址…</p>
+    <p v-else-if="!target" class="muted">启动并发布后，这里会显示应用访问链接。</p>
     <template v-if="error">
       <p role="alert" class="inline-error">{{ error }}</p>
       <button v-if="target" type="button" :disabled="loading" @click="load">重新获取地址</button>

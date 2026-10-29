@@ -42,7 +42,7 @@ function start() {
 </script>
 <template>
   <div class="engineering-run-panel engineering-scroll">
-    <h3>构建与本地发布</h3>
+    <h3>构建与应用发布</h3>
     <p class="muted">
       构建选中源码后启动独立进程，通过本机端口直接访问。每个项目使用自己的端口和业务数据库。
       关闭工作台不会停止应用；更新沿用原端口，下线保留数据。
@@ -173,7 +173,7 @@ function start() {
           "
           @click="start"
         >
-          {{ workbench.activeRun ? '更新本地应用' : '启动并本地发布' }}
+          {{ workbench.activeRun ? '更新应用' : '启动并发布' }}
         </button>
       </div>
     </section>
