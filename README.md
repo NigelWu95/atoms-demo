@@ -2,7 +2,9 @@
 
 提交说明：[实现思路、完成程度与后续优先级](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-summary.md)。
 
-2026-10-29 **已推送 GitHub 并部署远程，默认使用 Claude Code + DeepSeek 新模式**：访问 **<http://192.0.2.10:8443/>**，注册账号与临时访客均进入完整工程工作台。服务器已安装 Claude Code 2.1.308 及完整构建工具链；源码保存在磁盘 Git，支持生成 / 修改 Vue、Java、SQL、构建、独立 Java 进程、工作台转发预览与同版本源码 ZIP 下载。旧项目、账号、邮箱及模型配置保留，旧生成接口不再接收新任务。云端真实计数器已完成模型生成、构建、操作、刷新与进程重启后 PostgreSQL 数据恢复，下载的 41 个文件与运行源码逐一一致。**独立端口仍仅允许服务器本机访问，未开放新工程的公网独立应用链接。** 新模式系统任务预算 18 次，验收使用 1 次；4 组永久项目数据库绑定中验收占 1 组。部署版本、验收和当前边界见[部署记录](https://github.com/NigelWu95/atoms-demo/blob/main/docs/cloud-deployment.md)。
+2026-10-29 **服务器独立端口发布已推送并部署**：采用平台内置端口入口，无需 Nginx 转发应用。工作台“应用发布”启动后显示 `服务器 IP＋端口` 链接，访问者无需平台登录；应用仍由独立 Java 进程承载，工作台预览保持不变。已从公网 Chrome 验证打开、操作、刷新恢复、停止后端口关闭及同地址重启恢复；体验[云端计数器](http://192.0.2.10:28201/)。平台 Cookie 不转给应用，应用响应 Cookie 按项目命名。本轮未增加模型调用或数据库绑定。见[发布说明](https://github.com/NigelWu95/atoms-demo/blob/main/docs/server-publication.md)和[部署记录](https://github.com/NigelWu95/atoms-demo/blob/main/docs/cloud-deployment.md)。
+
+2026-10-29 **已推送 GitHub 并部署远程，默认使用 Claude Code + DeepSeek 新模式**：访问 **<http://192.0.2.10:8443/>**，注册账号与临时访客均进入完整工程工作台。服务器已安装 Claude Code 2.1.308 及完整构建工具链；源码保存在磁盘 Git，支持生成 / 修改 Vue、Java、SQL、构建、独立 Java 进程、工作台转发预览与同版本源码 ZIP 下载。旧项目、账号、邮箱及模型配置保留，旧生成接口不再接收新任务。云端真实计数器已完成模型生成、构建、操作、刷新与进程重启后 PostgreSQL 数据恢复，下载的 41 个文件与运行源码逐一一致。本次首次新模式部署仅开放内部预览；同日后续的公网端口支持见上方发布记录。 新模式系统任务预算 18 次，验收使用 1 次；4 组永久项目数据库绑定中验收占 1 组。部署版本、验收和当前边界见[部署记录](https://github.com/NigelWu95/atoms-demo/blob/main/docs/cloud-deployment.md)。
 
 2026-10-29 **本地独立端口发布已实现**：在完整工程工作台点击“应用发布”，构建并启动后可直接打开应用地址；每个项目使用自己的进程、端口和数据库，支持停止 / 下线。原 2048 已通过直接访问、后端登录、停止后端口关闭及同端口重启恢复存档验收。此条为本机发布验收；云端部署后的端口访问边界见上文。详见[使用说明与验收记录](https://github.com/NigelWu95/atoms-demo/blob/main/docs/local-publication.md)。
 

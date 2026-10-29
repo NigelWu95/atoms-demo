@@ -37,4 +37,4 @@ Cookie 按主机而非端口共享，见 [RFC 6265 §8.5](https://httpwg.org/spe
 
 ## 验收
 
-新增真实 HTTP 测试覆盖匿名访问、Cookie 隔离、跨来源写拒绝、路径限制、端口占用、停止 / 重启、配置撤销及进程失效。后端相关单元测试 64 项、原预览 / 下载 / 会话 HTTP 集成测试 16 项通过；前端地址与组件测试 6 项、类型检查、lint、格式及构建通过。远程结果以[部署记录](https://github.com/NigelWu95/atoms-demo/blob/main/docs/cloud-deployment.md)中的本次实际记录为准。
+新增真实 HTTP 测试覆盖匿名访问、Cookie 隔离、跨来源写拒绝、路径限制、端口占用、停止 / 重启、配置撤销及进程失效。后端相关单元测试 64 项、原预览 / 下载 / 会话 HTTP 集成测试 16 项通过；前端地址与组件测试 6 项、类型检查、lint、格式及构建通过。同日已部署并从公网 Chrome 验证计数器的访问、操作、刷新、停止关闭端口和重启恢复，示例为 [云端计数器](http://192.0.2.10:28201/)。完整远程结果见[部署记录](https://github.com/NigelWu95/atoms-demo/blob/main/docs/cloud-deployment.md)中的本次实际记录。
