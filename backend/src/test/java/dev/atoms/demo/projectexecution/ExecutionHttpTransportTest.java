@@ -12,6 +12,19 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 
 class ExecutionHttpTransportTest {
+    @Test void explicitIsolatedApplicationCookieChannelPreservesResponseForPublicationOnly() throws Exception {
+        try (var upstream = new Upstream(exchange -> {
+            assertThat(exchange.getRequestHeaders().getFirst("Cookie")).isEqualTo("session=app-token");
+            exchange.getResponseHeaders().set("Content-Type", "application/json");
+            exchange.getResponseHeaders().set("Set-Cookie", "session=next-token; HttpOnly");
+            exchange.sendResponseHeaders(200, 2); exchange.getResponseBody().write("{}".getBytes(StandardCharsets.UTF_8)); exchange.close();
+        })) {
+            var input = new ExecutionHttpRequest("GET", "/api/counter", null, Map.of(), new byte[0], "session=app-token");
+            assertThat(send(upstream.port(), input, Duration.ofSeconds(5)).applicationCookies()).containsExactly("session=next-token; HttpOnly");
+            assertThatThrownBy(() -> new ExecutionHttpRequest("GET", "/api/counter", null, Map.of(), new byte[0], "x=y\r\nInjected: yes"))
+                    .isInstanceOf(ApiException.class).hasMessageNotContaining("Injected");
+        }
+    }
     @Test void forwardsExplicitApplicationBearerWithoutCookiesOrAmbientAuthentication() throws Exception {
         String bearer = "Bearer " + "b".repeat(43);
         try (var upstream = new Upstream(exchange -> {

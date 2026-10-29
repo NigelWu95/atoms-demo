@@ -32,6 +32,7 @@ final class ExecutionHttpTransport {
             var request = HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + input.path()
                     + (input.query() == null ? "" : "?" + input.query()))).timeout(remaining(budget));
             input.headers().forEach(request::header);
+            if (input.applicationCookies() != null) request.header("Cookie", input.applicationCookies());
             byte[] body = input.body();
             request.method(input.method(), body.length == 0 ? HttpRequest.BodyPublishers.noBody() : HttpRequest.BodyPublishers.ofByteArray(body));
             remaining(budget);
@@ -50,7 +51,7 @@ final class ExecutionHttpTransport {
                 if (JSON.readTree(json) == null) throw invalid();
             }
             remaining(budget);
-            return new ExecutionHttpResponse(response.statusCode(), metadata.type(), metadata.etag(), response.body());
+            return new ExecutionHttpResponse(response.statusCode(), metadata.type(), metadata.etag(), response.body(), metadata.cookies());
         } catch (Exception failure) {
             if (failure instanceof InterruptedException) Thread.currentThread().interrupt();
             if (input != null && input.write() && dispatched) throw uncertain();
@@ -90,9 +91,11 @@ final class ExecutionHttpTransport {
         }
         String etag = single(headers, "ETag");
         if (etag != null && (etag.length() > 512 || !etag.matches("(?:W/)?\"[\\x21\\x23-\\x7e]*\""))) throw invalid();
-        return new Metadata(type, etag);
+        var cookies = headers.allValues("Set-Cookie");
+        if (cookies.size() > 32 || cookies.stream().mapToInt(String::length).sum() > 8192) throw invalid();
+        return new Metadata(type, etag, cookies);
     }
-    private record Metadata(String type, String etag) {}
+    private record Metadata(String type, String etag, List<String> cookies) {}
     private static String single(HttpHeaders headers, String name) {
         var values = headers.allValues(name);
         if (values.size() > 1) throw invalid();

@@ -7,9 +7,12 @@ const address = {
   sourceVersionId: '00000000-0000-4000-8000-000000000003',
   url: 'http://localhost:18203/',
 }
-it('accepts only a canonical loopback application port with complete version identity', () => {
+it('accepts canonical local and server IPv4 ports with complete version identity', () => {
   expect(decodeLocalAddress(address)).toEqual(address)
   expect(decodeLocalAddress({ ...address, url: 'http://127.0.0.1:18204/' }).url).toContain('18204')
+  expect(decodeLocalAddress({ ...address, url: 'http://192.0.2.10:28201/' }).url).toContain(
+    '28201',
+  )
   for (const url of [
     'javascript:alert(1)',
     'http://example.com:18203/',
@@ -21,6 +24,10 @@ it('accepts only a canonical loopback application port with complete version ide
     'http://localhost:18203/#fragment',
     '//localhost:18203/',
     'http://127.0.0.1.evil.test:18203/',
+    'http://0.0.0.0:28201/',
+    'http://224.1.1.1:28201/',
+    'http://127.000.0.1:28201/',
+    'http://256.1.1.1:28201/',
   ])
     expect(() => decodeLocalAddress({ ...address, url })).toThrow()
   expect(() => decodeLocalAddress({ ...address, runId: 'wrong' })).toThrow()

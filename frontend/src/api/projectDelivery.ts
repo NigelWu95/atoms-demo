@@ -23,8 +23,15 @@ export type LocalApplicationAddress = {
 export function decodeLocalAddress(v: unknown): LocalApplicationAddress {
   const r = object(v),
     url = string(r.url, 128)
-  if (!/^http:\/\/(localhost|127\.0\.0\.1):[1-9][0-9]{3,4}\/$/.test(url)) return protocolFailure()
-  const port = Number(new URL(url).port)
+  if (!/^http:\/\/(localhost|(?:[0-9]{1,3}\.){3}[0-9]{1,3}):[1-9][0-9]{3,4}\/$/.test(url))
+    return protocolFailure()
+  const parsed = new URL(url)
+  if (parsed.href !== url) return protocolFailure()
+  if (parsed.hostname !== 'localhost') {
+    const parts = parsed.hostname.split('.').map(Number)
+    if (parts.some((n) => n > 255) || parts[0]! < 1 || parts[0]! >= 224) return protocolFailure()
+  }
+  const port = Number(parsed.port)
   if (port < 1024 || port > 65535) return protocolFailure()
   return {
     runId: uuid(r.runId),

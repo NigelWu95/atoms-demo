@@ -5,6 +5,7 @@ import { useSessionStore } from '../stores/session'
 import { getLocalAddress } from '../api/projectDelivery'
 import type { ExecutionTask } from '../api/projectWorkbenchTasks'
 import LocalApplicationLink from './LocalApplicationLink.vue'
+import { ApiFailure } from '../api/client'
 
 vi.mock('../api/projectDelivery', () => ({ getLocalAddress: vi.fn() }))
 const run = {
@@ -38,6 +39,22 @@ beforeEach(() => {
 afterEach(() => {
   wrappers.splice(0).forEach((w) => w.unmount())
   vi.resetAllMocks()
+  vi.useRealTimers()
+})
+it('retries only the preparing gateway and stops retrying after an owner change', async () => {
+  vi.useFakeTimers()
+  vi.mocked(getLocalAddress).mockRejectedValue(
+    new ApiFailure('PUBLICATION_NOT_READY', '准备中', 409),
+  )
+  const wrapper = setup()
+  await flushPromises()
+  await vi.advanceTimersByTimeAsync(1000)
+  expect(getLocalAddress).toHaveBeenCalledTimes(2)
+  useSessionStore().identity = { userId: 'other' } as never
+  await flushPromises()
+  await vi.advanceTimersByTimeAsync(2000)
+  expect(getLocalAddress).toHaveBeenCalledTimes(2)
+  expect(wrapper.find('a').exists()).toBe(false)
 })
 it('opens the running application directly with no platform opener and copies the real address', async () => {
   const copy = vi.fn().mockResolvedValue(undefined)

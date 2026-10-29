@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.time.Duration;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
 
 /** Joins a browser's original session to an exact execution capability; never reacquires a latest run. */
 @Service
@@ -16,9 +17,15 @@ final class DeliveryAccess {
     private final DeliveryGrants grants;
     private final SessionAccess sessions;
     private final ProjectExecutionAccess execution;
+    private final PublicationGateway publication;
 
     DeliveryAccess(DeliverySettings settings, DeliveryGrants grants, SessionAccess sessions, ProjectExecutionAccess execution) {
+        this(settings, grants, sessions, execution, null);
+    }
+    @Autowired DeliveryAccess(DeliverySettings settings, DeliveryGrants grants, SessionAccess sessions,
+            ProjectExecutionAccess execution, PublicationGateway publication) {
         this.settings = settings; this.grants = grants; this.sessions = sessions; this.execution = execution;
+        this.publication = publication;
     }
 
     DeliveryGrants.Preview issue(UUID owner, UUID project, UUID run, String session, SourceExecutionBudget budget) {
@@ -42,8 +49,9 @@ final class DeliveryAccess {
         var identity = endpoint.identity();
         if (!configuration.equals(configuration()) || !run.equals(identity.runId())
                 || !project.equals(identity.build().projectId())) throw changed();
+        String published = publication == null ? null : publication.address(owner, project, run, endpoint.port());
         return new LocalAddress(run, identity.build().buildId(), identity.build().sourceVersionId(),
-                DeliverySettings.localAddress(configuration, endpoint.port()));
+                published == null ? DeliverySettings.localAddress(configuration, endpoint.port()) : published);
     }
 
     void revoke(UUID owner, UUID project, UUID preview, String session, SourceExecutionBudget budget) {

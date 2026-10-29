@@ -7,6 +7,7 @@ import org.springframework.boot.autoconfigure.security.servlet.UserDetailsServic
 @SpringBootApplication(exclude = UserDetailsServiceAutoConfiguration.class)
 public class AtomsDemoApplication {
     public static void main(String[] args) {
+        dev.atoms.demo.projectdelivery.PublicationServerLimits.install();
         SpringApplication.run(AtomsDemoApplication.class, args);
     }
 }

@@ -33,6 +33,11 @@ atoms:
   project-delivery:
     enabled: ${PROJECT_DELIVERY_ENABLED:false}
     origin: ${PROJECT_DELIVERY_ORIGIN:}
+  project-publication:
+    enabled: ${PROJECT_PUBLICATION_ENABLED:false}
+    host: ${PROJECT_PUBLICATION_HOST:}
+    bind-address: ${PROJECT_PUBLICATION_BIND_ADDRESS:127.0.0.1}
+    port-offset: ${PROJECT_PUBLICATION_PORT_OFFSET:10000}
   project-execution:
     enabled: ${PROJECT_EXECUTION_ENABLED:false}
     root: ${PROJECT_EXECUTION_ROOT:}

@@ -19,8 +19,16 @@ public final class ExecutionHttpRequest {
     private final Map<String, String> headers;
     private final byte[] body;
     private final boolean api, write;
+    private final String applicationCookies;
 
     public ExecutionHttpRequest(String method, String path, String query, Map<String, String> headers, byte[] body) {
+        this(method, path, query, headers, body, null);
+    }
+    /** Only the trusted publication gateway supplies already isolated application cookies. */
+    public ExecutionHttpRequest(String method, String path, String query, Map<String, String> headers, byte[] body, String applicationCookies) {
+        if (applicationCookies != null && (applicationCookies.length() > 8192 || applicationCookies.isBlank()
+                || applicationCookies.codePoints().anyMatch(c -> c < 32 || c > 126))) throw unsupported();
+        this.applicationCookies = applicationCookies;
         if (body == null) throw unsupported();
         if (body.length > API_BYTES) throw new ApiException(413, "DELIVERY_REQUEST_TOO_LARGE", "应用请求超过大小限制。");
         if (method == null || !METHODS.contains(method)) throw unsupported();
@@ -48,6 +56,7 @@ public final class ExecutionHttpRequest {
     public Map<String, String> headers() { return headers; }
     public byte[] body() { return body.clone(); }
     public boolean write() { return write; }
+    public String applicationCookies() { return applicationCookies; }
     boolean api() { return api; }
     int responseLimit() { return api ? API_BYTES : STATIC_BYTES; }
     // Deliberately no toString of paths, query parameters, headers or bodies.

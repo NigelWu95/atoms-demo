@@ -41,6 +41,21 @@ class DeliveryAccessTest {
         verifyNoInteractions(execution);
     }
 
+    @Test void serverAddressUsesOnlyAnAuthorizedRunningPublicationAndNeverStartsItFromGet() {
+        var publication = mock(PublicationGateway.class);
+        var remote = new DeliveryAccess(new DeliverySettings(environment), grants, sessions, execution, publication);
+        environment.setProperty("atoms.project-delivery.origin", "http://192.0.2.10:8443");
+        when(execution.endpoint(eq(owner), eq(project), same(handle), any()))
+                .thenReturn(new ProjectExecutionAccess.RunningEndpoint(identity, 18203));
+        when(publication.address(owner, project, run, 18203)).thenReturn("http://192.0.2.10:28203/");
+        assertThat(remote.address(owner, project, run, session, budget()).url()).isEqualTo("http://192.0.2.10:28203/");
+        verify(publication).address(owner, project, run, 18203);
+        verifyNoMoreInteractions(publication);
+        when(sessions.streamValid(session, owner)).thenReturn(false);
+        code("SESSION_REQUIRED", () -> remote.address(owner, project, run, session, budget()));
+        verifyNoMoreInteractions(publication);
+    }
+
     @Test void issuedGrantPinsOriginalSessionAndHandleAndLogoutPermanentlyRevokesIt() {
         var preview = access.issue(owner, project, run, session, budget());
         var grant = access.resolve(token(preview)); access.validate(grant, budget());

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { errorMessage, protocolFailure } from '../api/client'
+import { ApiFailure, errorMessage, protocolFailure } from '../api/client'
 import { getLocalAddress, type LocalApplicationAddress } from '../api/projectDelivery'
 import type { ExecutionTask } from '../api/projectWorkbenchTasks'
 import { useSessionStore } from '../stores/session'
@@ -17,6 +17,7 @@ const address = ref<LocalApplicationAddress | null>(null),
   copied = ref(false)
 let epoch = 0,
   request = new AbortController()
+let retry: ReturnType<typeof setTimeout> | undefined
 const target = computed(() => {
   const run = props.run
   return session.ready &&
@@ -26,7 +27,9 @@ const target = computed(() => {
     ? `${props.ownerId}:${props.projectId}:${run.id}:${run.buildId}:${run.sourceVersionId}`
     : null
 })
-async function load() {
+async function load(attempt = 0) {
+  clearTimeout(retry)
+  retry = undefined
   const current = ++epoch
   request.abort()
   request = new AbortController()
@@ -48,9 +51,20 @@ async function load() {
       return protocolFailure()
     address.value = result
   } catch (failure) {
+    if (
+      current === epoch &&
+      failure instanceof ApiFailure &&
+      failure.code === 'PUBLICATION_NOT_READY' &&
+      attempt < 10
+    ) {
+      retry = setTimeout(() => {
+        if (current === epoch) void load(attempt + 1)
+      }, 1000)
+      return
+    }
     if (current === epoch) error.value = errorMessage(failure)
   } finally {
-    if (current === epoch) loading.value = false
+    if (current === epoch && retry === undefined) loading.value = false
   }
 }
 async function copy() {
@@ -70,6 +84,7 @@ const visible = () => {
 }
 document.addEventListener('visibilitychange', visible)
 onBeforeUnmount(() => {
+  clearTimeout(retry)
   epoch++
   request.abort()
   document.removeEventListener('visibilitychange', visible)
@@ -84,13 +99,13 @@ onBeforeUnmount(() => {
       </a>
       <input aria-label="应用地址" :value="address.url" readonly />
       <button type="button" @click="copy">{{ copied ? '已复制' : '复制链接' }}</button>
-      <small class="muted">独立进程 · 仅本机访问</small>
+      <small class="muted">独立进程 · 独立端口访问</small>
     </template>
     <p v-else-if="loading" role="status">正在核对应用地址…</p>
     <p v-else-if="!target" class="muted">启动并发布后，这里会显示应用访问链接。</p>
     <template v-if="error">
       <p role="alert" class="inline-error">{{ error }}</p>
-      <button v-if="target" type="button" :disabled="loading" @click="load">重新获取地址</button>
+      <button v-if="target" type="button" :disabled="loading" @click="load()">重新获取地址</button>
     </template>
   </div>
 </template>
