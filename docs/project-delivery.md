@@ -1,5 +1,7 @@
 # 完整工程交付
 
+2026-10-29 更新：本地已向访客和登录账号启用完整工程开发，并增加独立端口发布。就绪应用可在新窗口直接访问，工作台提供链接及停止 / 下线入口；不接入远程服务器。使用方法和实际 2048 启停验收见[本地发布说明](https://github.com/NigelWu95/atoms-demo/blob/main/docs/local-publication.md)。下文的默认关闭描述保留原模块验收背景，当前本地配置已覆盖。
+
 本模块提供真实应用预览、固定源码 ZIP 下载和源码版本恢复的后端能力。真实 Vue + Spring Boot + PostgreSQL 待办应用已通过平台预览、下载后独立构建运行及重启持久化验收；最终兼容性结果见[验证记录](project-delivery-verification.md)。**正式工作台已接入这些接口，新模式仍默认关闭。** 原有工作台和导出流程继续保留。
 
 规格见 [SPEC-project-delivery.md](../SPEC-project-delivery.md)，实施项见[任务清单](../tasks/project-delivery/todo.md)。
