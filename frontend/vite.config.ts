@@ -18,6 +18,9 @@ export default defineConfig(({ mode }) => ({
     host: '127.0.0.1',
     port: mode === 'fixtures' ? 5174 : 5173,
     strictPort: true,
+    // All platform requests are same-origin. Let the backend's capability-scoped
+    // preview policy handle OPTIONS from sandboxed (opaque-origin) app frames.
+    cors: false,
     proxy: { '/api': mode === 'fixtures' ? 'http://127.0.0.1:8081' : 'http://127.0.0.1:8080' },
     headers: {
       ...securityHeaders,
@@ -34,6 +37,7 @@ export default defineConfig(({ mode }) => ({
     host: '127.0.0.1',
     port: 4173,
     strictPort: true,
+    cors: false,
     proxy: { '/api': 'http://127.0.0.1:8080' },
     headers: { ...securityHeaders, 'Content-Security-Policy': contentPolicy },
   },
