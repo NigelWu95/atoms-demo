@@ -18,6 +18,14 @@ final class DeliveryController {
     private final DeliveryDownloads downloads;
     DeliveryController(DeliveryAccess access, DeliveryDownloads downloads) { this.access = access; this.downloads = downloads; }
 
+    @GetMapping("/runs/{runId}/address")
+    ResponseEntity<DeliveryAccess.LocalAddress> address(@PathVariable String projectId, @PathVariable String runId,
+            Principal principal, HttpServletRequest request) {
+        readOnly(request);
+        return ResponseEntity.ok().header("Cache-Control", "no-store").body(
+                access.address(owner(principal), id(projectId), id(runId), session(request), DeliveryAccess.deadline()));
+    }
+
     @GetMapping("/builds/{buildId}")
     DeliverySources.BuildView inspect(@PathVariable String projectId, @PathVariable String buildId,
             Principal principal, HttpServletRequest request) {

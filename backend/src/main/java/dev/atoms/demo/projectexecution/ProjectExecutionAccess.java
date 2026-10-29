@@ -135,6 +135,20 @@ public final class ProjectExecutionAccess {
     public record BuildIdentity(UUID projectId, UUID buildId, UUID sourceVersionId, String treeSha256,
             long jarBytes, String jarSha256, String manifestSha256) {}
     public record RunningIdentity(UUID runId, UUID executionId, BuildIdentity build) {}
+
+    /** Local publication reads the actual owned process, never a guessed port or a READY row alone. */
+    public RunningEndpoint endpoint(UUID owner, UUID project, RunningHandle handle, SourceExecutionBudget remaining) {
+        return guarded(() -> {
+            requireHandle(handle); var deadline = budget(remaining);
+            checked(owner, project, handle.build, handle, deadline);
+            var target = handle.process.confirmedTarget(handle.run.id(), handle.run.executionId());
+            if (!target.project().equals(project) || !target.id().equals(handle.run.bindingId())
+                    || !target.hash().equals(handle.run.bindingIdentitySha256())) throw revoked();
+            handle.build.scope.check(); serving(handle.build, handle); deadline.remaining();
+            return new RunningEndpoint(new RunningIdentity(handle.run.id(), handle.run.executionId(), view(handle.build.state)), target.port());
+        });
+    }
+    public record RunningEndpoint(RunningIdentity identity, int port) {}
     public static final class BuildHandle {
         private final ProjectExecutionAccess issuer;
         private final ExecutionSettings.Configuration configuration;

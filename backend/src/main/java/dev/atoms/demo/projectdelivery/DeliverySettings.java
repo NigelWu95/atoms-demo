@@ -42,6 +42,15 @@ final class DeliverySettings {
 
     record Configuration(String origin) {}
 
+    static String localAddress(Configuration configuration, int port) {
+        String host = URI.create(configuration.origin()).getHost();
+        if (!(host.equals("127.0.0.1") || host.equals("localhost")))
+            throw new ApiException(409, "DELIVERY_LOCAL_ONLY", "独立端口发布仅用于本机运行的平台，请在本机打开工作台。");
+        if (port < 1024 || port > 65535) throw invalid();
+        // Cookies are host-scoped, not port-scoped. Keep the application off the platform's cookie host.
+        return "http://" + (host.equals("localhost") ? "127.0.0.1" : "localhost") + ":" + port + "/";
+    }
+
     private String value(String key, String fallback) {
         try {
             String value = environment.getProperty("atoms.project-delivery." + key);

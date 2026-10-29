@@ -92,6 +92,36 @@ class DeliveryAccessTest {
         code("DELIVERY_PREVIEW_NOT_FOUND", () -> access.resolve(token(next)));
     }
 
+    @Test void localAddressIsBoundToLiveRunAndUsesADifferentCookieHost() {
+        when(execution.endpoint(eq(owner), eq(project), same(handle), any()))
+                .thenReturn(new ProjectExecutionAccess.RunningEndpoint(identity, 18203));
+        var address = access.address(owner, project, run, session, budget());
+        assertThat(address.url()).isEqualTo("http://localhost:18203/");
+        assertThat(address.runId()).isEqualTo(run);
+        assertThat(address.buildId()).isEqualTo(identity.build().buildId());
+        environment.setProperty("atoms.project-delivery.origin", "http://localhost:5173");
+        assertThat(access.address(owner, project, run, session, budget()).url()).isEqualTo("http://127.0.0.1:18203/");
+        environment.setProperty("atoms.project-delivery.origin", "https://example.com");
+        code("DELIVERY_LOCAL_ONLY", () -> access.address(owner, project, run, session, budget()));
+        when(execution.endpoint(eq(owner), eq(project), same(handle), any()))
+                .thenThrow(new ApiException(409, "EXECUTION_ACCESS_REVOKED", "stopped"));
+        code("EXECUTION_ACCESS_REVOKED", () -> access.address(owner, project, run, session, budget()));
+    }
+
+    @Test void addressDoesNotOutliveSessionOrConfigurationChangesDuringRead() {
+        when(execution.endpoint(eq(owner), eq(project), same(handle), any())).thenAnswer(call -> {
+            when(sessions.streamValid(session, owner)).thenReturn(false);
+            return new ProjectExecutionAccess.RunningEndpoint(identity, 18203);
+        });
+        code("SESSION_REQUIRED", () -> access.address(owner, project, run, session, budget()));
+        when(sessions.streamValid(session, owner)).thenReturn(true);
+        when(execution.endpoint(eq(owner), eq(project), same(handle), any())).thenAnswer(call -> {
+            environment.setProperty("atoms.project-delivery.origin", "http://localhost:5173");
+            return new ProjectExecutionAccess.RunningEndpoint(identity, 18203);
+        });
+        code("DELIVERY_PREVIEW_CHANGED", () -> access.address(owner, project, run, session, budget()));
+    }
+
     private SourceExecutionBudget budget() { return () -> Duration.ofSeconds(30); }
     private String token(DeliveryGrants.Preview preview) { return preview.iframeUrl().substring(DeliveryGrants.PREFIX.length()).replace("/", ""); }
     private void code(String expected, org.assertj.core.api.ThrowableAssert.ThrowingCallable action) {

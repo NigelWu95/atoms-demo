@@ -166,6 +166,10 @@ class ExecutionAccessIT {
         assertThat(identity.runId()).isEqualTo(admitted.id());
         assertThat(identity.executionId()).isEqualTo(runs.get(A, admitted.id()).executionId());
         assertThat(identity.build().buildId()).isEqualTo(build.id());
+        var endpoint = gateway.endpoint(OWNER, A, handle, budget()::remaining);
+        assertThat(endpoint.identity()).isEqualTo(identity);
+        assertThat(endpoint.port()).isEqualTo(target.port());
+        code("EXECUTION_ACCESS_FORBIDDEN", () -> gateway.endpoint(UUID.randomUUID(), A, handle, budget()::remaining));
         assertThat(gateway.source(OWNER, A, handle).version().id()).isEqualTo(base.versionId());
         var request = new ExecutionHttpRequest("GET", "/api/health", null, Map.of("Accept", "application/json"), new byte[0]);
         var response = gateway.exchange(OWNER, A, handle, request, budget()::remaining);
@@ -197,6 +201,7 @@ class ExecutionAccessIT {
         assertThat(fixture.launches).hasValue(1); assertThat(fixture.process.get().isServing()).isTrue();
         code("EXECUTION_ACCESS_FORBIDDEN", () -> access(source.readGateway()).identity(OWNER, A, handle));
         coordinator.stopApplication(OWNER, A, admitted.id());
+        code("EXECUTION_ACCESS_REVOKED", () -> gateway.endpoint(OWNER, A, handle, budget()::remaining));
         code("EXECUTION_ACCESS_REVOKED", () -> gateway.identity(OWNER, A, handle));
         code("EXECUTION_ACCESS_REVOKED", () -> gateway.exchange(OWNER, A, handle, request, budget()::remaining));
         await(() -> runs.get(A, admitted.id()).finishedAt() != null);

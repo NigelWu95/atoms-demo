@@ -45,6 +45,8 @@ class DeliveryManagementIT {
             return handle;
         });
         when(execution.identity(eq(owner), eq(project), same(handle), any())).thenReturn(identity);
+        when(execution.endpoint(eq(owner), eq(project), same(handle), any()))
+                .thenReturn(new ProjectExecutionAccess.RunningEndpoint(identity, 18203));
     }
 
     @Test void issuesWithRealSessionAndRevokesIdempotentlyWithoutStoppingApplication() throws Exception {
@@ -96,5 +98,23 @@ class DeliveryManagementIT {
         browser.initialize();
         assertThatThrownBy(() -> access.resolve(token)).isInstanceOfSatisfying(ApiException.class,
                 error -> assertThat(error.code()).isEqualTo("DELIVERY_PREVIEW_NOT_FOUND"));
+    }
+
+    @Test void localAddressNeedsOwnershipAndReturnsNoStoreWithoutCreatingAPreviewGrant() throws Exception {
+        String addressPath = path.replace("/previews", "/address");
+        var result = browser.get(addressPath);
+        assertThat(result.status()).isEqualTo(200);
+        assertThat(result.body().path("url").asText()).isEqualTo("http://localhost:18203/");
+        assertThat(result.body().path("runId").asText()).isEqualTo(run.toString());
+        assertThat(result.body().size()).isEqualTo(4);
+        assertThat(result.raw().headers().firstValue("Cache-Control").orElse("")).contains("no-store");
+        assertThat(new ApiBrowser(port).get(addressPath).status()).isEqualTo(401);
+        var other = new ApiBrowser(port); other.initialize();
+        assertThat(other.get(addressPath).status()).isEqualTo(404);
+        assertThat(browser.get(addressPath + "?port=80").status()).isEqualTo(422);
+        assertThat(browser.request("GET", addressPath, "{}", null).status()).isEqualTo(422);
+        when(execution.running(eq(owner), eq(project), eq(run), any()))
+                .thenThrow(new ApiException(409, "EXECUTION_ACCESS_REVOKED", "stopped"));
+        assertThat(browser.get(addressPath).status()).isEqualTo(409);
     }
 }

@@ -32,6 +32,20 @@ final class DeliveryAccess {
         catch (RuntimeException failure) { grants.invalidate(issued.grant()); throw failure; }
     }
 
+    record LocalAddress(UUID runId, UUID buildId, UUID sourceVersionId, String url) {}
+
+    LocalAddress address(UUID owner, UUID project, UUID run, String session, SourceExecutionBudget budget) {
+        var configuration = management(owner, session, budget);
+        var handle = execution.running(owner, project, run, budget);
+        var endpoint = execution.endpoint(owner, project, handle, budget);
+        session(session, owner); check(budget);
+        var identity = endpoint.identity();
+        if (!configuration.equals(configuration()) || !run.equals(identity.runId())
+                || !project.equals(identity.build().projectId())) throw changed();
+        return new LocalAddress(run, identity.build().buildId(), identity.build().sourceVersionId(),
+                DeliverySettings.localAddress(configuration, endpoint.port()));
+    }
+
     void revoke(UUID owner, UUID project, UUID preview, String session, SourceExecutionBudget budget) {
         configuration(); session(session, owner); check(budget);
         execution.authorizeProject(owner, project, budget);
