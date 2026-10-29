@@ -67,7 +67,7 @@ final class ExecutionCoordinator implements SmartLifecycle, AutoCloseable, Execu
     private ExecutionBuildQueue queue;
     private DependencyPreparationQueue preparationQueue;
     private int concurrency, maintenance;
-    private boolean activated, released;
+    private boolean activated, released, ownerAccess;
 
     @Autowired
     ExecutionCoordinator(ExecutionSettings settings, ExecutionBuildRepository builds, JdbcTemplate jdbc,
@@ -100,6 +100,7 @@ final class ExecutionCoordinator implements SmartLifecycle, AutoCloseable, Execu
                 if (!settings.enabled()) return;
                 var initial = settings.load();
                 concurrency = initial.maxConcurrentBuilds();
+                ownerAccess = initial.ownerAccess();
                 if (!sourceReady.getAsBoolean()) throw unavailable();
                 lease = new ExecutionCoordinatorLease(database);
                 resources = Objects.requireNonNull(factory.open());
@@ -406,8 +407,9 @@ final class ExecutionCoordinator implements SmartLifecycle, AutoCloseable, Execu
     private boolean hasBlockingRuns() {
         // A previous unknown run keeps its database/port binding and durable running slot.
         // Owner-access mode can run OTHER projects without adopting or clearing that process.
-        boolean isolate = settings.load().ownerAccess();
-        return runs.unfinished().stream().anyMatch(run -> !isolate || !run.status().equals("NEEDS_RECONCILIATION"));
+        // Shutdown must still settle this coordinator after the feature is disabled.
+        // Its startup policy remains fixed; loading disabled settings would prevent releasing resources.
+        return runs.unfinished().stream().anyMatch(run -> !ownerAccess || !run.status().equals("NEEDS_RECONCILIATION"));
     }
     private static void outsideTransaction() {
         if (TransactionSynchronizationManager.isActualTransactionActive()) throw unavailable();
