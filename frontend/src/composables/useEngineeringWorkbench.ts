@@ -449,7 +449,7 @@ export function useEngineeringWorkbench(projectId: () => string) {
           '正在停止原运行。停止完成后点击“重试原请求”，继续启动选中的构建。',
           409,
         )
-      notice.value = '启动请求已受理，等待应用就绪后打开预览。'
+      notice.value = '启动请求已受理；就绪后可打开本地应用或运行预览。关闭工作台不会停止应用。'
     })
   }
   async function restore() {

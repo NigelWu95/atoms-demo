@@ -8,6 +8,7 @@ import { useSessionStore } from '../stores/session'
 import { statusLabel, terminal } from '../api/projectWorkbenchTasks'
 import EngineeringSourcePanel from '../components/EngineeringSourcePanel.vue'
 import EngineeringRunPanel from '../components/EngineeringRunPanel.vue'
+import LocalApplicationLink from '../components/LocalApplicationLink.vue'
 import {
   buildRepairPrompt,
   matchesBuildRepair,
@@ -119,6 +120,11 @@ async function showFile(version: string, path: string) {
   await nextTick()
   void wb.sourceBrowser.selectFile(path)
 }
+function publishLocally() {
+  toolsOpen.value = true
+  area.value = 'engineering'
+  if (wb.selectedBuild?.status === 'SUCCEEDED' && !wb.readingMigration) void wb.inspectMigration()
+}
 </script>
 <template>
   <section class="engineering-page" aria-label="完整工程工作台">
@@ -134,6 +140,14 @@ async function showFile(version: string, path: string) {
         <h1 tabindex="-1">{{ wb.project?.name ?? '完整工程工作台' }}</h1>
       </div>
       <div class="engineering-actions">
+        <button
+          type="button"
+          class="button primary"
+          :disabled="!wb.capabilities?.enabled || !!wb.capabilities.archived || !!wb.intent.pending"
+          @click="publishLocally"
+        >
+          本地发布
+        </button>
         <span class="outline-badge">源码 {{ versionLabel(wb.head?.sourceVersionId) }}</span
         ><span class="outline-badge">运行 {{ versionLabel(wb.serving?.sourceVersionId) }}</span
         ><button
@@ -377,6 +391,12 @@ async function showFile(version: string, path: string) {
                 下载选中构建源码</button
               ><small class="muted">构建 {{ wb.selectedBuildId.slice(0, 8) || '暂无' }}</small>
             </div>
+            <LocalApplicationLink
+              v-if="wb.project && wb.capabilities.deliveryEnabled"
+              :project-id="projectId"
+              :owner-id="wb.project.ownerId"
+              :run="wb.serving"
+            />
             <div
               v-if="toolsOpen"
               id="engineering-tools"

@@ -42,9 +42,10 @@ function start() {
 </script>
 <template>
   <div class="engineering-run-panel engineering-scroll">
-    <h3>构建与运行</h3>
+    <h3>构建与本地发布</h3>
     <p class="muted">
-      构建只使用选中的源码。运行使用项目已配置的业务数据库；预览与下载绑定具体构建。
+      构建选中源码后启动独立进程，通过本机端口直接访问。每个项目使用自己的端口和业务数据库。
+      关闭工作台不会停止应用；更新沿用原端口，下线保留数据。
     </p>
     <div class="engineering-actions">
       <button
@@ -172,7 +173,7 @@ function start() {
           "
           @click="start"
         >
-          {{ workbench.activeRun ? '替换当前运行' : '启动应用' }}
+          {{ workbench.activeRun ? '更新本地应用' : '启动并本地发布' }}
         </button>
       </div>
     </section>
@@ -200,7 +201,7 @@ function start() {
           :disabled="!!workbench.intent.pending || run.stopRequested"
           @click="workbench.command('停止应用', `/runs/${run.id}/stop`, {})"
         >
-          请求停止
+          停止 / 下线
         </button>
       </div>
     </div>

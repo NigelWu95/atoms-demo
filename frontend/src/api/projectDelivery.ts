@@ -14,6 +14,31 @@ export type DeliveryPreview = {
   runId: string
   identity: DeliveryIdentity
 }
+export type LocalApplicationAddress = {
+  runId: string
+  buildId: string
+  sourceVersionId: string
+  url: string
+}
+export function decodeLocalAddress(v: unknown): LocalApplicationAddress {
+  const r = object(v),
+    url = string(r.url, 128)
+  if (!/^http:\/\/(localhost|127\.0\.0\.1):[1-9][0-9]{3,4}\/$/.test(url)) return protocolFailure()
+  const port = Number(new URL(url).port)
+  if (port < 1024 || port > 65535) return protocolFailure()
+  return {
+    runId: uuid(r.runId),
+    buildId: uuid(r.buildId),
+    sourceVersionId: uuid(r.sourceVersionId),
+    url,
+  }
+}
+export function getLocalAddress(project: string, run: string, signal: AbortSignal) {
+  return api.request(`${prefix(project)}/runs/${uuid(run)}/address`, decodeLocalAddress, {
+    signal,
+    timeoutMs: 35000,
+  })
+}
 const prefix = (project: string) => `/api/projects/${uuid(project)}/delivery`
 function decodeIdentity(v: unknown): DeliveryIdentity {
   const r = object(v)

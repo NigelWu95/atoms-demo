@@ -34,7 +34,15 @@ test('landing stays available after workspace entry, refresh and browser back', 
   expect(errors).toEqual([])
 })
 
-test('real API, project navigation, keyboard entry and disabled generation', async ({ page }) => {
+test('real API, legacy project navigation, keyboard entry and disabled generation', async ({
+  page,
+}) => {
+  // This case covers the retained legacy UI. Do not let a developer's default
+  // engineering-mode setting silently change which workflow these assertions exercise.
+  // Sessions, project creation, health, draft storage and generation availability remain real.
+  await page.route('**/api/development-mode', (route) =>
+    route.fulfill({ json: { mode: 'LEGACY' } }),
+  )
   const errors: string[] = []
   page.on('pageerror', (error) => errors.push(error.message))
   page.on('console', (message) => {
