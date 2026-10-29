@@ -1,8 +1,24 @@
 # 单服务器部署
 
-适用：Linux + systemd，原生安装 Java 17、PostgreSQL 17、Nginx。应用只运行一个后端实例。服务器不需要 Node / Maven / Docker；发布包在开发机构建。下列是部署步骤，不表示已经部署；发行版、SSH、域名、TLS 证书和防火墙须在接入服务器后核实。
+适用：Linux + systemd，原生安装 Java 17、PostgreSQL 17、Nginx。平台只运行一个后端实例，发布包在开发机构建。仅启动平台无需 Node / Maven / Docker；若在服务器启用 Claude Code 完整工程模式，还须安装下述生成与构建工具。下列是部署步骤，不表示已经部署；发行版、SSH、域名、TLS 证书和防火墙须在接入服务器后核实。
 
 本项目已于 2026-10-08 完成一台 Linux 主机的基础部署；地址、主机特有配置、证书期限和验收边界见[云部署记录](../../docs/cloud-deployment.md)。模板步骤和目标机事实分别记录，不将已验证主机的结论套用于其他服务器。
+
+## Claude Code 完整工程模式的额外环境
+
+平台发布包不包含 Claude Code、构建工具、用户工程目录或用户应用数据库。服务器启用新模式前须准备：
+
+- Linux 版 Claude Code CLI：当前适配版本为 2.1.302、2.1.303、2.1.308；使用经过验证的固定版本，并以 `atoms` 服务用户检查 CLI 可执行。服务器端运行 CLI，不要求浏览器用户安装。参见 [Claude Code 安装说明](https://code.claude.com/docs/en/setup)。
+- Node 24.20.x、npm 11.19.x、Maven 3.9.11、Java 17、Git 和 Python 3。配置各工具的实际绝对路径，不能复制开发机的 macOS 二进制或 `/Users/...` 路径。服务用户须能访问依赖仓库和 DeepSeek API。
+- 分开的源码 Git 仓库、Agent 工作目录、CLI 状态目录和构建/运行目录。目录由服务用户管理，置于发布目录之外；为 systemd 的 `ProtectSystem=strict` 配置相应 `ReadWritePaths`，避免换包时覆盖工程数据。
+- 私有依赖策略文件，以及独立的应用测试库/运行库和数据库角色。凭据保存在源码目录之外；通过 `PROJECT_EXECUTION_DATABASE_POOL` 或固定映射指定，目前合计最多 4 组。平台数据库、应用测试库和应用运行库各自独立。
+- 服务器私有配置中的 DeepSeek Key。平台为每次任务提供独立 `CLAUDE_CONFIG_DIR` 和调用环境，通过 [DeepSeek Anthropic 兼容接口](https://api-docs.deepseek.com/guides/anthropic_api/) 接入，无需修改个人 Claude Code 配置。
+
+准备完成后，按[工作台说明](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-workbench.md)、[Agent 说明](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-agent.md)和[执行环境说明](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-execution.md)配置 `PROJECT_SOURCE_*`、`PROJECT_AGENT_*`、`PROJECT_EXECUTION_*`、`PROJECT_DELIVERY_*`、`PROJECT_WORKBENCH_*`。真实任务额度 `PROJECT_AGENT_MAX_LIVE_RUNS` 与旧链路的 `GENERATION_MAX_MODEL_CALLS` 分开计数；保留既有额度和记账。普通访客进入新模式还需要 `PROJECT_WORKBENCH_DEFAULT_MODE=true` 与 `PROJECT_WORKBENCH_OWNER_ACCESS=true`。
+
+`PROJECT_DELIVERY_ORIGIN` 填浏览器实际访问平台的 origin（含非默认端口，不带路径）。服务器上的应用预览通过平台转发到各自进程。当前独立端口发布链接只支持平台在 `localhost` / `127.0.0.1` 上运行；部署平台到远程服务器不等于已经实现用户应用的公网独立端口发布。原 `/a/<slug>` 发布链路仍属于旧模式，参见[发布能力边界](https://github.com/NigelWu95/atoms-demo/blob/main/docs/local-publication.md)。
+
+验收时分别核对平台健康、Agent 工具与模型接入、生成应用构建、独立进程启动、预览和源码下载。仅 `/api/health` 为 UP 不能证明这些模块均已启用或可用。
 
 ## 1. 本地构建与交付
 

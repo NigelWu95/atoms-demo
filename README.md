@@ -79,7 +79,7 @@ cd backend
 
 ## 打包到服务器
 
-本机准备好开发依赖与测试数据库后，在项目根执行 `node scripts/release.mjs`。脚本运行检查与构建，输出 `dist/releases/atoms-demo-*.tar.gz` 和 SHA-256 校验文件；服务器不需要 Node、Maven 或 Docker。真实密码、API Key、数据库数据与测试夹具不会进入包。服务器配置另存 `/etc/atoms-demo/application.properties`，首次初始化/启动/更新/回退步骤见[部署说明](deploy/server/README.md)。脚本不会上传、部署或调用模型；远程 TLS、systemd 与外网访问仍须单独验收。
+本机准备好开发依赖与测试数据库后，在项目根执行 `node scripts/release.mjs`。脚本运行检查与构建，输出 `dist/releases/atoms-demo-*.tar.gz` 和 SHA-256 校验文件。仅启动平台不需要 Node、Maven 或 Docker；服务器启用 Claude Code 完整工程模式时，还须安装 CLI、Node、npm、Maven、Git、Python 和 Java，并配置工程目录及应用数据库。真实密码、API Key、数据库数据与测试夹具不会进入包。服务器配置另存 `/etc/atoms-demo/application.properties`，环境准备及初始化/启动/更新/回退步骤见[部署说明](https://github.com/NigelWu95/atoms-demo/blob/main/deploy/server/README.md)。脚本不会上传、部署或调用模型；远程 TLS、systemd 与外网访问仍须单独验收。
 
 本机发布包验收：`node scripts/smoke-release.mjs /绝对路径/解包目录`。需要本地 Docker Desktop、Chrome、OpenSSL、测试数据库，以及脚本锁定 digest 的官方 Nginx 镜像（可通过 `docker pull public.ecr.aws/docker/library/nginx@sha256:0985e772fb9f729e6fa0980da05fca5d9c468e870eed43071545afa9d2e27d94` 准备）。它在回环 8082/18443 启动真实 JAR 和一次性 HTTPS 代理，执行 `frontend/e2e-release`，结束后停服务、清理临时凭据和测试私钥；截图在 `frontend/test-results-release`。这只是 Docker Desktop 上的本地验证工具，不是服务器对 Docker 的依赖；其他容器环境的 host gateway 需另行适配。测试证书只用于此流程，不放入发布包，不用于公网。
 
