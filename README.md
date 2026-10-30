@@ -2,51 +2,16 @@
 
 提交说明：[实现思路、完成程度与后续优先级](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-summary.md)。
 
-2026-10-29 **服务器独立端口发布已推送并部署**：采用平台内置端口入口，无需 Nginx 转发应用。工作台“应用发布”启动后显示 `服务器 IP＋端口` 链接，访问者无需平台登录；应用仍由独立 Java 进程承载，工作台预览保持不变。已从公网 Chrome 验证打开、操作、刷新恢复、停止后端口关闭及同地址重启恢复；体验[云端计数器](http://192.0.2.10:28201/)。平台 Cookie 不转给应用，应用响应 Cookie 按项目命名。本轮未增加模型调用或数据库绑定。见[发布说明](https://github.com/NigelWu95/atoms-demo/blob/main/docs/server-publication.md)和[部署记录](https://github.com/NigelWu95/atoms-demo/blob/main/docs/cloud-deployment.md)。
+Atoms Demo 使用 Java 17 + Spring Boot + Vue + PostgreSQL，实现“描述需求 → 生成完整工程 → 增量修改 → 构建运行 → 预览与下载 → 应用发布”。
 
-2026-10-29 **已推送 GitHub 并部署远程，默认使用 Claude Code + DeepSeek 新模式**：访问 **<http://192.0.2.10:8443/>**，注册账号与临时访客均进入完整工程工作台。服务器已安装 Claude Code 2.1.308 及完整构建工具链；源码保存在磁盘 Git，支持生成 / 修改 Vue、Java、SQL、构建、独立 Java 进程、工作台转发预览与同版本源码 ZIP 下载。旧项目、账号、邮箱及模型配置保留，旧生成接口不再接收新任务。云端真实计数器已完成模型生成、构建、操作、刷新与进程重启后 PostgreSQL 数据恢复，下载的 41 个文件与运行源码逐一一致。本次首次新模式部署仅开放内部预览；同日后续的公网端口支持见上方发布记录。 新模式系统任务预算 18 次，验收使用 1 次；4 组永久项目数据库绑定中验收占 1 组。部署版本、验收和当前边界见[部署记录](https://github.com/NigelWu95/atoms-demo/blob/main/docs/cloud-deployment.md)。
+- **完整工程开发**：Claude Code 通过 DeepSeek 接口修改 Vue、Java、SQL 与配置，基于磁盘 Git 保存源码版本；注册用户与临时访客使用同一工程流程。
+- **真实运行与交付**：每个应用使用独立 Java 进程及数据库；工作台转发预览，工程下载绑定实际运行的源码与构建。
+- **应用发布**：可使用服务器 IP 与独立端口访问，平台内置转发入口，无需为用户应用单独配置 Nginx；下线停止应用进程并关闭入口，保留数据。
+- **账号与工作台**：邮箱验证码注册登录、可选密码、项目检索归档、服务端草稿、历史版本与差异、可收起侧栏以及对话/预览区域内部滚动。
 
-2026-10-29 **本地独立端口发布已实现**：在完整工程工作台点击“应用发布”，构建并启动后可直接打开应用地址；每个项目使用自己的进程、端口和数据库，支持停止 / 下线。原 2048 已通过直接访问、后端登录、停止后端口关闭及同端口重启恢复存档验收。此条为本机发布验收；云端部署后的端口访问边界见上文。详见[使用说明与验收记录](https://github.com/NigelWu95/atoms-demo/blob/main/docs/local-publication.md)。
+当前功能与验收范围见[工作台说明](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-workbench.md)、[完整工程验收](https://github.com/NigelWu95/atoms-demo/blob/main/docs/default-engineering-verification.md)、[发布说明](https://github.com/NigelWu95/atoms-demo/blob/main/docs/server-publication.md)和[工作台界面验收](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-workbench-verification.md)。下文保留旧版固定工程模式的使用说明。
 
-2026-10-29 **本地默认开发已切换为 Claude Code + DeepSeek，临时访客同样可用（现已随上述版本推送、部署）**：普通项目入口进入完整工程工作台，首次提交自动准备完整工程；后续任务基于磁盘 Git 源码增量开发 Vue、Java、SQL 与配置。旧项目首次开发会携带原源码作迁移参考，旧版本、对话和存档继续保留，旧生成接口不再接收新任务。访客真实全栈计数器已完成源码生成、增量修复、完整构建、实际运行、重启/刷新持久化及下载 ZIP 的 43 文件一致性核验；项目列表显示“工程已保存”。新运行库首次构建自动分配，本机固定映射与池共最多 4 个项目。配置与完整验收范围见[默认模式验收](https://github.com/NigelWu95/atoms-demo/blob/main/docs/default-engineering-verification.md)和[工作台说明](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-workbench.md)。下面“默认关闭”等有日期条目为历史阶段记录，不代表当前本地配置。
-
-## 阶段记录
-
-以下开关、测试及部署状态以各条记录日期为准；当前线上状态以上述 10 月 29 日部署记录为准。
-
-2026-10-27 **完整工程工作台已实现并完成本地验收（未推送、未部署）**：新增 `/projects/:id/engineering`，接通初始化、Agent 需求与任务、文件树/差异、依赖准备、构建、迁移核对、启动/停止、真实预览、固定源码下载及恢复。正式页面已实际启动 A/B 两个 Vue + Spring Boot 应用，下载身份与预览一致，刷新/切标签保留输入，停止后业务数据与迁移历史不变。旧工作台与导出入口保留。**新模式仍默认关闭，真实付费模型的端到端效果尚未验收**；以下带部署时间的条目继续描述旧线上链路。见[工作台说明](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-workbench.md)、[本轮验收](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-workbench-verification.md)、[交付验收](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-delivery-verification.md)和[能力地图](https://github.com/NigelWu95/atoms-demo/blob/main/FULL-PROJECT-CAPABILITY-MAP.md)。
-
-2026-10-18 **侧栏、账号邮箱与顶部工具已在本地实现（未部署、未推送）**：桌面侧栏可收为图标栏，手机保留“导航与账号”；首页右上角和工作区左下角显示已登录邮箱，点击可查看完整地址。工作台说明及草稿状态并入标题区；两种下载仍直接展示，检查、应用说明/修改记录、构建与进程改为顶部可展开面板，面板内部滚动，Escape 可关闭并回到入口。收起侧栏或工具不重载应用、不清空输入；错误与保存警告仍直接展示。下方带部署时间的条目为线上版本记录，具体本地验证范围见 [WR07 验收](https://github.com/NigelWu95/atoms-demo/blob/main/docs/design/iteration-experience/verification.md#2026-10-18wr07-可收起侧栏账号邮箱与顶部工具)。
-
-2026-10-18 **生成页内部滚动已部署**：17:27 上线源码 `fbd54c7`、发布包 `atoms-demo-<release-id>`，本次未推送 GitHub。工作台固定在视口内，左侧对话与右侧预览各自滚动，输入区留在底部；压缩顶部工具栏，长说明默认收起并让应用画面优先展示。手机导航/账号可展开，对话与预览切换保留输入。原下载、导出、版本恢复和发布入口保留；首页、账号及独立预览仍正常滚动。数据与邮箱/模型配置保留，无新增迁移。验证范围见 [WR06 验收记录](https://github.com/NigelWu95/atoms-demo/blob/main/docs/design/iteration-experience/verification.md#2026-10-18wr06-固定高度工作台与内部滚动)和[部署记录](https://github.com/NigelWu95/atoms-demo/blob/main/docs/cloud-deployment.md)。
-
-2026-10-18 **品牌回首页与快捷退出已部署**：01:40 上线源码 `6972940`、发布包 `atoms-demo-<release-id>`，本次未推送 GitHub。工作区左上角品牌返回介绍首页，侧栏“开始创作”仍到 `/create`。已登录时，首页右上角及工作区账号区域提供“退出登录”，无需先打开账号管理；复用服务端注销和私有状态清理，保留已保存项目。首页退出留在首页，工作区退出回带侧栏的创作页。数据及邮箱/模型配置保留，无新增迁移。[验收记录](https://github.com/NigelWu95/atoms-demo/blob/main/docs/account-workspace-verification.md)、[部署记录](https://github.com/NigelWu95/atoms-demo/blob/main/docs/cloud-deployment.md)。
-
-2026-10-18 **首页导航修正已部署**：根地址 `/` 保留带 idea 输入框的介绍页，未登录显示注册/登录入口，已登录显示“我的账号”；不再因为进入过工作区或已登录就跳到 `/create`。工作区“开始创作”仍到 `/create` 并保留侧栏；首页来源登录回首页，工作区来源登录回工作区，均保留当前标签页内存 idea。00:56 部署源码 `dc2aa3d`、发布包 `atoms-demo-<release-id>` 至 **<http://192.0.2.10:8443/>**，数据及私有配置保留，无新增迁移；本次未推送 GitHub。下方 10 月 17 日版本为历史记录。
-
-2026-10-17 **账号管理、可选密码登录与常驻工作区已实现并推送部署**：管理页展示本人真实邮箱、账号 ID 和注册时间；首次设置密码需专用邮箱验证码，修改需原密码。登录页默认验证码（新邮箱注册、已有邮箱登录），也可选择已有账号密码登录。进入工作区后“开始创作”使用右侧 `/create`，保留导航；首页来源登录后同样带着 idea 进入工作区。密码变更撤销旧版本会话。**当前公网仍使用 HTTP，密码登录及设置/修改保持关闭；邮箱验证码入口继续开放。** 私有邮箱/模型配置未修改。[使用说明](https://github.com/NigelWu95/atoms-demo/blob/main/docs/email-accounts.md)、[本轮验收](https://github.com/NigelWu95/atoms-demo/blob/main/docs/account-workspace-verification.md)。
-
-2026-10-17 22:59 历史部署源码 `80d0d06` 已推送 GitHub main，发布包 `atoms-demo-<release-id>`。备份后增量迁移至 V017，原有账号、业务数据和邮箱/模型配置保留，云端构建与应用进程开关仍关闭。已通过公网健康检查、常驻侧栏与登录方式界面、验证码表单重校验保留等浏览器检查；未发送真实邮件或调用模型。详细验证范围和迁移后的回退限制见[部署记录](https://github.com/NigelWu95/atoms-demo/blob/main/docs/cloud-deployment.md)。以下本地验收不自动等同于云端真实邮件、模型或工程运行验收，早期带日期的部署参数只作历史记录。
-
-2026-10-17 **生成/修复请求的整页刷新恢复已实现并部署**：同标签页暂存原请求，恢复有效期 24 小时。刷新只读取状态；点击“重试原提交”才发送原 key/body，已接受时返回同一任务，未送达时仍可能首次创建并消耗额度。身份和项目归属确认后才展示正文，账号变更清理；过期、损坏或存储不可用有明确提示，放弃本地记录不取消后台任务。最多保留 10 个项目；缓存不是加密存储，请勿输入敏感资料。真实验收及边界见 [PR04 记录](https://github.com/NigelWu95/atoms-demo/blob/main/docs/design/iteration-experience/verification.md#2026-10-17pr04-整页刷新请求恢复)。
-
-2026-10-17 **独立导出应用首屏优化已完成，模板随包部署**：连接就绪后优先展示应用画面，完整说明移到画面之后，默认收起；不折叠平台原有下载按钮。长说明在 320/768/1024/1440 px 下不会把应用推到首屏以下，展开说明不重建应用、不丢输入。独立工程前端 69 项单测、工程导出相关 57 项测试及 Chrome 外壳 18 项回归通过。已有 ZIP、JAR 和冻结构建不自动变化，新样式需重新导出或构建。这些为本地验收，不代表服务器启用独立运行；详见[SU01 验收记录](https://github.com/NigelWu95/atoms-demo/blob/main/docs/design/iteration-experience/verification.md)。
-
-2026-10-17 **真实 DeepSeek 首次生成 + 连续三轮修改及下载工程独立运行验收通过（本地）**：同一待办项目依次增加筛选、搜索、全部完成，旧任务和完成状态保留；共 8 次真实请求，未超过本轮 12 次上限。最终 ZIP 的应用源码与平台 V4 逐字节一致；下载工程完整构建、独立 Java 进程启动、实际操作、刷新和进程重启恢复、访客隔离通过，运行时未请求平台或模型 API。导出不包含平台业务数据。这里只验证一个应用样本，不代表任意需求成功率，也不等于云端模型闭环或真实错误修复已验收。详见[本轮验收记录](https://github.com/NigelWu95/atoms-demo/blob/main/docs/design/iteration-experience/verification.md#2026-10-17pr03-真实模型连续修改与下载工程验收)。
-
-2026-10-17 **逐行差异、预览优先布局和确认式修复已实现并部署**：修改记录显示增删行、行号与上下文，大文件回退全文；应用画面和两种直接展示的下载入口排在高级管理之前。当前共享预览报错后可准备修复建议、补充说明并确认，再复用原 MODIFY 流程；原始报错不自动发送，未提交草稿保持不变，不自动发布。该阶段前端 251 项单测、类型/规范/构建检查通过，修复流程四尺寸 Chrome/无障碍检查通过。真实错误修复效果仍待验收，不把受控响应测试当作模型效果。详见[验收记录](https://github.com/NigelWu95/atoms-demo/blob/main/docs/design/iteration-experience/verification.md)。
-
-2026-10-16 **连续开发与工作台优化已实现，10 月 17 日部署**：修改时带入当前版本谱系的有效历史需求，支持基线哈希校验的局部补丁；工作台增加真实阶段、关联需求及文件前后对比；项目草稿自动保存到服务端并检测多标签冲突；项目列表支持搜索、最近编辑排序与归档恢复。旧导出按钮继续直接展示。初版验证未调用真实模型或发送真实邮件；后续真实三轮修改样本见上文。设计与验证见[迭代体验计划](https://github.com/NigelWu95/atoms-demo/blob/main/docs/design/iteration-experience/plan.md)和[验收记录](https://github.com/NigelWu95/atoms-demo/blob/main/docs/design/iteration-experience/verification.md)。
-
-2026-10-16 **QQ SMTP 邮箱验证码注册/登录已推送并部署**：[账号入口](http://192.0.2.10:8443/account)。新邮箱保留当前访客项目，已有邮箱跨浏览器登录原账号，支持退出和跨标签页切换。真实发信/收信及一次验证码登录已在本地通过；云端已通过 SMTP TLS/认证、公网页面与健康检查，云端实际收信登录仍待用户复核。邮箱及模型配置通过 SSH 写入服务器私有文件，未进入仓库；模型累计上限同步为 10000，验收时已用 39、剩余 9961。当前保留用户指定的 HTTP 演示模式，流量未加密；仓库默认仍要求公网 HTTPS。见[邮箱说明](https://github.com/NigelWu95/atoms-demo/blob/main/docs/email-accounts.md)和[部署记录](https://github.com/NigelWu95/atoms-demo/blob/main/docs/cloud-deployment.md)。
-
-Java 17 + Spring Boot + Vue 工程。已实现访客与项目持久化、代码版本与受限预览、应用数据保存，并接通 DeepSeek 网关、后台规划/构建/有限修复及普通工作台的生成与修改交互。已提交的需求、规划和任务结果会保存到数据库。**本地真实 DeepSeek 的“生成待办 → 操作保存 → 刷新恢复 → 修改生成 V2 → 筛选且保留原数据”闭环已通过**，详见下文。固定版本发布、独立应用页面和 LIVE 数据隔离已实现；云端真实 2048 生成、预览操作和保存/刷新恢复已通过，云端发布与 LIVE 闭环仍待验收。设计见 [设计目录](docs/design/README.md)，原平台进度见 [原任务清单](docs/design/tasks/todo.md)，新增独立工程与下载模块见 [模块任务清单](tasks/todo.md)。
-
-2026-10-08 已按用户要求部署到 **<http://192.0.2.10:8443>**：单台云服务器原生运行整套平台和 PostgreSQL，按 `/a/<slug>` 发布应用。不接 ngrok、不等待域名；初始 HTTPS 已按用户明确要求切换为临时 HTTP Demo，流量未加密。HTTP 使用独立访客 Cookie，旧 HTTPS 项目不删除但不会自动归属新访客。云端已按用户授权同步 DeepSeek 密钥，累计调用上限 100 次由公网访客共用；当时配置为单次上限 **168400 tokens**（包含思考与最终输出）、单次超时 300 秒、整轮超时 600 秒，本地数据与私有配置不变。此前云端 2048 在 32768 tokens / 180 秒配置下已验证生成中刷新后 SSE 恢复、自动预览、游戏合并计分和状态刷新恢复。随后 16840 配置下的一次构建因 length 失败，其中 16266 tokens 用于推理；用户因此要求提高至 168400。本次调整不调用模型，部署后累计 6 / 100；更高额度不保证所有需求均能在超时和响应大小限制内完成。云端发布/LIVE 闭环仍待验收。见 [实际部署记录与回退](docs/cloud-deployment.md)、[ADR-011](docs/decisions/011-single-server-release.md) 和 [服务器部署说明](deploy/server/README.md)。数据库和后端内部端口不直接开放公网。
-
-2026-10-11 已更新到源码 `ca4dac8` 对应发布包，首页/列表状态修复与历史代码恢复已上线；原有项目、版本、业务数据和模型配置保留。此次升级不调用模型，切换前后累计记账均为 18 / 100。公网基础交互与接口验收已通过，云端有效恢复闭环仍待实测；详见[更新与回退记录](docs/cloud-deployment.md)。
-
-2026-10-13 云端已更新为源码 `b9aae45`、发布包 `atoms-demo-<release-id>`，工程 ZIP 下载随版本上线。按用户确认同步为 **163840 tokens / 单次 300 秒 / 整轮 900 秒**，线上累计上限仍为 **100 次**，验收时已用 18、剩余 82；没有同步本地 10000 次上限。原有数据与密钥保留，V011 增量迁移完成，公网健康与独立 Chrome 基础交互检查通过。本次未调用模型；云端原生构建仍关闭、独立实例预览尚未实现。备份、验证范围和回退步骤见[部署记录](docs/cloud-deployment.md)。
+实际演示地址由维护者单独提供。公开仓库仅保留通用部署说明和示例地址，不记录实际主机地址、证书信息、备份位置或运行实例标识。部署步骤见[服务器部署说明](https://github.com/NigelWu95/atoms-demo/blob/main/deploy/server/README.md)与[部署配置说明](https://github.com/NigelWu95/atoms-demo/blob/main/docs/cloud-deployment.md)。
 
 ## 下载自己的应用工程
 

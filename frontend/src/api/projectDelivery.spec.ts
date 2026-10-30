@@ -10,9 +10,7 @@ const address = {
 it('accepts canonical local and server IPv4 ports with complete version identity', () => {
   expect(decodeLocalAddress(address)).toEqual(address)
   expect(decodeLocalAddress({ ...address, url: 'http://127.0.0.1:18204/' }).url).toContain('18204')
-  expect(decodeLocalAddress({ ...address, url: 'http://192.0.2.10:28201/' }).url).toContain(
-    '28201',
-  )
+  expect(decodeLocalAddress({ ...address, url: 'http://192.0.2.10:28201/' }).url).toContain('28201')
   for (const url of [
     'javascript:alert(1)',
     'http://example.com:18203/',

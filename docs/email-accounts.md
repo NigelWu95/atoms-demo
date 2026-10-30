@@ -92,7 +92,7 @@ server.servlet.session.cookie.name=ATOMS_HTTP_SESSION
 
 本地新版的密码登录/设置/修改另有 `PASSWORD_AUTH_ALLOW_INSECURE_HTTP=false`，示例位于项目根 `.env.local.example`。原邮箱 HTTP 例外**不会自动开放密码提交**；保持默认值时，公网 HTTP 显示密码不可用，验证码按原配置继续工作。本轮没有开启该例外。未来推荐先提供 HTTPS；若明确接受临时明文风险，需要维护者另外确认两个 HTTP 例外及 Cookie 配置，不能从浏览器打开。此开关不替代 `EMAIL_AUTH_ENABLED`。
 
-服务器 [账号页](http://192.0.2.10:8443/account) 已按用户授权开放：本地邮箱/模型键通过 SSH 合并到 `/etc/atoms-demo/application.properties`，权限 root:atoms / 0640。没有覆盖服务器数据库密码、origin 或 Cookie 名称。显式 HTTP 例外已启用，QQ SMTP TLS/认证与公网页面检查通过；没有自动发送云端测试邮件，仍需用户在账号页收信并验证。不要暴露 8081/5174 测试服务或放开可信代理来源。`GET /api/auth/methods` 的 `emailCodeEnabled=true` 只代表配置/传输条件允许，不单独证明邮件送达。
+部署后通过实际站点的 `/account` 进入账号页。邮箱与模型配置由维护者写入私有配置文件，保留独立数据库凭据与站点 origin。已进行 QQ SMTP TLS/认证与页面检查；实际收信及登录需在目标环境验收。`GET /api/auth/methods` 的 `emailCodeEnabled=true` 只代表配置与传输条件允许，不单独证明邮件送达。真实站点地址、文件位置及部署流水不在公开文档中记录。
 
 以后改用 HTTPS 时，把 `EMAIL_AUTH_ALLOW_INSECURE_HTTP=false`、Cookie `secure=true`，并换回 HTTPS 专用 Cookie 名称，重启后重新登录；旧账号和项目不删除。仅关闭 HTTP 例外而仍通过 HTTP 访问时，已登录账号请求会被拒绝。详见 [ADR-015](https://github.com/NigelWu95/atoms-demo/blob/main/docs/decisions/015-explicit-http-email-demo.md)。
 

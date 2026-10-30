@@ -13,7 +13,7 @@
 说明更新至 2026 年 10 月 17 日。有效历史上下文、局部补丁、逐行对比、预览优先布局、确认式修复、服务端草稿、项目检索归档和同标签页请求恢复此前已推送 GitHub main。当前服务器于 22:59 更新为源码 `80d0d06`、发布包 `atoms-demo-<release-id>`，源码已推送 main；备份后增量迁移至 V017，保留验证码表单修复、欢迎页、独立账号页和登录返回，以及导出模板首屏优化。最新本地真实 DeepSeek 验收用 8 次请求完成一个待办项目首次生成和三轮修改，数据保留及最终下载工程独立运行通过；真实错误修复效果仍待验收。此次部署保留服务器账号、业务数据及私有配置，不调用模型或发送邮件。邮箱验证码账号及私有发信配置已启用，本地真实 QQ 收信/验证码登录已通过；云端 SMTP TLS/认证、公网页面与健康检查通过，实际收信登录待用户复核。云端构建与应用进程开关仍关闭，模型累计上限仍为 10000。详见[部署记录](https://github.com/NigelWu95/atoms-demo/blob/main/docs/cloud-deployment.md)。
 
 - 源码：[GitHub 仓库](https://github.com/NigelWu95/atoms-demo)。
-- 演示：[在线工作台](http://192.0.2.10:8443/)。当前使用明文 HTTP，仅用于临时演示，请勿输入敏感信息。
+- 演示：实际访问地址由维护者单独提供，公开仓库不记录服务器入口。
 - 启动与部署：[项目 README](https://github.com/NigelWu95/atoms-demo/blob/main/README.md)、[服务器部署说明](https://github.com/NigelWu95/atoms-demo/blob/main/deploy/server/README.md)。
 
 ## 一 实现思路与关键取舍

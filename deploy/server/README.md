@@ -2,7 +2,7 @@
 
 适用：Linux + systemd，原生安装 Java 17、PostgreSQL 17、Nginx。平台只运行一个后端实例，发布包在开发机构建。仅启动平台无需 Node / Maven / Docker；若在服务器启用 Claude Code 完整工程模式，还须安装下述生成与构建工具。下列是部署步骤，不表示已经部署；发行版、SSH、域名、TLS 证书和防火墙须在接入服务器后核实。
 
-本项目已于 2026-10-08 完成一台 Linux 主机的基础部署；地址、主机特有配置、证书期限和验收边界见[云部署记录](../../docs/cloud-deployment.md)。模板步骤和目标机事实分别记录，不将已验证主机的结论套用于其他服务器。
+本文中的路径、账号与端口均为部署模板约定，不代表实际运行主机信息。主机地址、实际配置、证书与备份记录由维护者私下保存；见[部署配置说明](../../docs/cloud-deployment.md)。
 
 ## Claude Code 完整工程模式的额外环境
 
@@ -16,7 +16,7 @@
 
 准备完成后，按[工作台说明](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-workbench.md)、[Agent 说明](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-agent.md)和[执行环境说明](https://github.com/NigelWu95/atoms-demo/blob/main/docs/project-execution.md)配置 `PROJECT_SOURCE_*`、`PROJECT_AGENT_*`、`PROJECT_EXECUTION_*`、`PROJECT_DELIVERY_*`、`PROJECT_WORKBENCH_*`。真实任务额度 `PROJECT_AGENT_MAX_LIVE_RUNS` 与旧链路的 `GENERATION_MAX_MODEL_CALLS` 分开计数；保留既有额度和记账。普通访客进入新模式还需要 `PROJECT_WORKBENCH_DEFAULT_MODE=true` 与 `PROJECT_WORKBENCH_OWNER_ACCESS=true`。
 
-`PROJECT_DELIVERY_ORIGIN` 填浏览器实际访问平台的 origin（含非默认端口，不带路径）。服务器上的应用预览通过平台转发到各自进程。当前独立端口发布链接只支持平台在 `localhost` / `127.0.0.1` 上运行；部署平台到远程服务器不等于已经实现用户应用的公网独立端口发布。原 `/a/<slug>` 发布链路仍属于旧模式，参见[发布能力边界](https://github.com/NigelWu95/atoms-demo/blob/main/docs/local-publication.md)。
+`PROJECT_DELIVERY_ORIGIN` 填浏览器实际访问平台的 origin（含非默认端口，不带路径）。服务器上的应用预览通过平台转发到各自进程。启用服务器独立端口入口后，可通过配置的服务器 IP 与发布端口访问；具体配置及入口边界见[独立端口发布说明](https://github.com/NigelWu95/atoms-demo/blob/main/docs/server-publication.md)。原 `/a/<slug>` 发布链路仍属于旧模式，参见[发布能力边界](https://github.com/NigelWu95/atoms-demo/blob/main/docs/local-publication.md)。
 
 验收时分别核对平台健康、Agent 工具与模型接入、生成应用构建、独立进程启动、预览和源码下载。仅 `/api/health` 为 UP 不能证明这些模块均已启用或可用。
 
